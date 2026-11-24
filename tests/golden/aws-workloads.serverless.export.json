@@ -92,7 +92,20 @@
         "path": "other/send.ts",
         "start": 84,
         "end": 101
-      }
+      },
+      "holder": "example.com/acme/serverless::other/send.ts::client"
+    },
+    {
+      "id": "example.com/acme/serverless::other/send.ts::dispatch::(member)client#0",
+      "caller": "example.com/acme/serverless::other/send.ts::dispatch",
+      "target": "example.com/acme/serverless::other/send.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "other/send.ts",
+        "start": 141,
+        "end": 152
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/acme/serverless::other/send.ts::dispatch::SendMessageCommand#0",
@@ -125,7 +138,20 @@
         "path": "outside.ts",
         "start": 84,
         "end": 101
-      }
+      },
+      "holder": "example.com/acme/serverless::outside.ts::client"
+    },
+    {
+      "id": "example.com/acme/serverless::outside.ts::dispatch::(member)client#0",
+      "caller": "example.com/acme/serverless::outside.ts::dispatch",
+      "target": "example.com/acme/serverless::outside.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "outside.ts",
+        "start": 141,
+        "end": 152
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/acme/serverless::outside.ts::dispatch::SendMessageCommand#0",
@@ -158,7 +184,20 @@
         "path": "worker/send.ts",
         "start": 84,
         "end": 101
-      }
+      },
+      "holder": "example.com/acme/serverless::worker/send.ts::client"
+    },
+    {
+      "id": "example.com/acme/serverless::worker/send.ts::dispatch::(member)client#0",
+      "caller": "example.com/acme/serverless::worker/send.ts::dispatch",
+      "target": "example.com/acme/serverless::worker/send.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "worker/send.ts",
+        "start": 141,
+        "end": 152
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/acme/serverless::worker/send.ts::dispatch::SendMessageCommand#0",
@@ -181,6 +220,18 @@
         "start": 141,
         "end": 234
       }
+    },
+    {
+      "id": "example.com/acme/serverless::worker/send.ts::typedDispatch::(member)client#0",
+      "caller": "example.com/acme/serverless::worker/send.ts::typedDispatch",
+      "target": "example.com/acme/serverless::worker/send.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "worker/send.ts",
+        "start": 282,
+        "end": 293
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/acme/serverless::worker/send.ts::typedDispatch::SendMessageCommand#0",
@@ -227,6 +278,30 @@
     }
   ],
   "consumers": [],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "example.com/acme/serverless::outside.ts::client",
+        "example.com/acme/serverless::outside.ts::dispatch"
+      ]
+    },
+    {
+      "name": "other",
+      "members": [
+        "example.com/acme/serverless::other/send.ts::client",
+        "example.com/acme/serverless::other/send.ts::dispatch"
+      ]
+    },
+    {
+      "name": "worker",
+      "members": [
+        "example.com/acme/serverless::worker/send.ts::client",
+        "example.com/acme/serverless::worker/send.ts::dispatch",
+        "example.com/acme/serverless::worker/send.ts::typedDispatch"
+      ]
+    }
+  ],
   "iac_nodes": [
     {
       "identity": "example.com/acme/serverless::serverless.yml::Orders",

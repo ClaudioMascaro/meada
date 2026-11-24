@@ -109,7 +109,20 @@
         "path": "worker.ts",
         "start": 84,
         "end": 101
-      }
+      },
+      "holder": "example.com/gcp/app::worker.ts::client"
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::batch::(member)client#0",
+      "caller": "example.com/gcp/app::worker.ts::batch",
+      "target": "example.com/gcp/app::worker.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 352,
+        "end": 363
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/gcp/app::worker.ts::batch::SendMessageCommand#0",
@@ -134,6 +147,18 @@
       }
     },
     {
+      "id": "example.com/gcp/app::worker.ts::current::(member)client#0",
+      "caller": "example.com/gcp/app::worker.ts::current",
+      "target": "example.com/gcp/app::worker.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 246,
+        "end": 257
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/gcp/app::worker.ts::current::SendMessageCommand#0",
       "caller": "example.com/gcp/app::worker.ts::current",
       "target": null,
@@ -154,6 +179,18 @@
         "start": 246,
         "end": 315
       }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::duplicate::(member)client#0",
+      "caller": "example.com/gcp/app::worker.ts::duplicate",
+      "target": "example.com/gcp/app::worker.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1024,
+        "end": 1035
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/gcp/app::worker.ts::duplicate::SendMessageCommand#0",
@@ -178,6 +215,18 @@
       }
     },
     {
+      "id": "example.com/gcp/app::worker.ts::legacy::(member)client#0",
+      "caller": "example.com/gcp/app::worker.ts::legacy",
+      "target": "example.com/gcp/app::worker.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 137,
+        "end": 148
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/gcp/app::worker.ts::legacy::SendMessageCommand#0",
       "caller": "example.com/gcp/app::worker.ts::legacy",
       "target": null,
@@ -198,6 +247,18 @@
         "start": 137,
         "end": 207
       }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::secret::(member)client#0",
+      "caller": "example.com/gcp/app::worker.ts::secret",
+      "target": "example.com/gcp/app::worker.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 460,
+        "end": 471
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/gcp/app::worker.ts::secret::SendMessageCommand#0",
@@ -222,6 +283,18 @@
       }
     },
     {
+      "id": "example.com/gcp/app::worker.ts::sidecar::(member)client#0",
+      "caller": "example.com/gcp/app::worker.ts::sidecar",
+      "target": "example.com/gcp/app::worker.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 795,
+        "end": 806
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/gcp/app::worker.ts::sidecar::SendMessageCommand#0",
       "caller": "example.com/gcp/app::worker.ts::sidecar",
       "target": null,
@@ -242,6 +315,18 @@
         "start": 795,
         "end": 866
       }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::unknown::(member)client#0",
+      "caller": "example.com/gcp/app::worker.ts::unknown",
+      "target": "example.com/gcp/app::worker.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 682,
+        "end": 693
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/gcp/app::worker.ts::unknown::SendMessageCommand#0",
@@ -266,6 +351,18 @@
       }
     },
     {
+      "id": "example.com/gcp/app::worker.ts::v2secret::(member)client#0",
+      "caller": "example.com/gcp/app::worker.ts::v2secret",
+      "target": "example.com/gcp/app::worker.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 573,
+        "end": 584
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/gcp/app::worker.ts::v2secret::SendMessageCommand#0",
       "caller": "example.com/gcp/app::worker.ts::v2secret",
       "target": null,
@@ -286,6 +383,18 @@
         "start": 573,
         "end": 643
       }
+    },
+    {
+      "id": "example.com/gcp/app::worker.ts::wrongKind::(member)client#0",
+      "caller": "example.com/gcp/app::worker.ts::wrongKind",
+      "target": "example.com/gcp/app::worker.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 907,
+        "end": 918
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/gcp/app::worker.ts::wrongKind::SendMessageCommand#0",
@@ -366,6 +475,23 @@
       "contract": "resource::cloudsql::orders-db/orders",
       "site": "example.com/gcp/app",
       "via": null
+    }
+  ],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "example.com/gcp/app::worker.ts::batch",
+        "example.com/gcp/app::worker.ts::client",
+        "example.com/gcp/app::worker.ts::current",
+        "example.com/gcp/app::worker.ts::duplicate",
+        "example.com/gcp/app::worker.ts::legacy",
+        "example.com/gcp/app::worker.ts::secret",
+        "example.com/gcp/app::worker.ts::sidecar",
+        "example.com/gcp/app::worker.ts::unknown",
+        "example.com/gcp/app::worker.ts::v2secret",
+        "example.com/gcp/app::worker.ts::wrongKind"
+      ]
     }
   ],
   "iac_nodes": [

@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use crate::lang::{
     Annotated, Binds, Bound, Call, Class, Closure, Const, Def, Export, Facts, FirstResult, Import,
     Imported, Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step,
-    Taker, Through, Ty, Value,
+    Taker, Through, Ty, Use, Value,
 };
 
 mod mutations;
@@ -1375,6 +1375,100 @@ impl<'a> Resolver<'a> {
             Some(known) if self.built_final => known.clone(),
             Some(exact @ Resolution::Exact(_)) => exact.clone(),
             _ => self.call(path, &self.files[path].calls[index]),
+        }
+    }
+
+    /// What the reference at `index` of `path` (`Facts::references`) names, exactly: `None` no
+    /// row; `Some(None)` a row with no target, for a name a package specifier binds (the package
+    /// kind attaches it); `Some(Some((file, name)))` an `exact` edge to that definition or
+    /// declaration symbol. Never a name match: a use is never `inferred` or `ambiguous`.
+    pub fn reference(&self, path: &'a str, index: usize) -> Option<Option<(&'a str, &'a str)>> {
+        let r = self.files[path].references.get(index)?;
+        let (scope, name) = (r.scope.as_str(), r.name.as_str());
+        let bare = |s: &str| !s.starts_with('.') && !s.starts_with('/');
+        let rows = || Seen {
+            rows: true,
+            ..self.seen(path, scope)
+        };
+        let work = &mut Work::default();
+        match (r.kind, r.from.as_deref()) {
+            (Use::Dynamic | Use::Reexport, Some(from)) if bare(from) => {
+                return self.module(path, from).is_none().then_some(None);
+            }
+            (Use::Reexport, _) if name == "*" => return None,
+            (Use::Reexport, Some(from)) => {
+                let imported = (self.files[path].exports.iter()).find_map(|e| match e {
+                    Export::From {
+                        source,
+                        name: imported @ Imported::Name(n),
+                        ..
+                    } if source == from && n == name => Some((source.as_str(), imported)),
+                    _ => None,
+                })?;
+                let found = self.import(path, "", imported.0, imported.1, &mut rows());
+                return self.edge(found, true);
+            }
+            (Use::Dynamic, Some(from)) => {
+                let module = self.module(path, from)?;
+                return self.edge(self.export_as(module, name, &mut rows(), true), true);
+            }
+            _ => {}
+        }
+        // A dotted head alone is a callee's (`client.get()`): its definitions are the call's own
+        // to resolve, so only a declaration symbol is an edge.
+        let head_of_call = r.kind == Use::Member && !name.contains('.');
+        let reading = match r.kind {
+            Use::Type => Reading::Type,
+            _ => Reading::Read,
+        };
+        // A member chain is walked as far as it resolves: `config.url`, then `config`.
+        let mut prefix = name;
+        loop {
+            let mut found =
+                self.resolve_labelled(path, scope, prefix, &mut rows(), work, reading, None);
+            // A type or interface the file declares binds no type reading; read as a value, the
+            // locals, parameters and constants of the scopes around hide it as they should.
+            if !matches!(found, Binding::Def(_) | Binding::External(..)) && reading != Reading::Read
+            {
+                found = self.resolve_labelled(
+                    path,
+                    scope,
+                    prefix,
+                    &mut rows(),
+                    work,
+                    Reading::Read,
+                    None,
+                );
+            }
+            // A declaration no reading binds (an enum, `export default <expression>`) is the
+            // file's own: nothing around the use hid it, or the value reading would have said.
+            if matches!(found, Binding::Unknown)
+                && !prefix.contains('.')
+                && self.declared.get(path).is_some_and(|d| d.contains(prefix))
+            {
+                found = Binding::Const(path, prefix);
+            }
+            if let Some(edge) = self.edge(found, !head_of_call) {
+                return Some(edge);
+            }
+            prefix = prefix.rsplit_once('.')?.0;
+        }
+    }
+
+    /// The edge a reference's binding gives (`reference`): a definition when `defs`, a
+    /// declaration symbol, or a row with no target for a package's name.
+    fn edge(&self, found: Binding<'a>, defs: bool) -> Option<Option<(&'a str, &'a str)>> {
+        match found {
+            Binding::Def(t) if defs => Some(Some((t.path, t.name))),
+            Binding::Const(p, n) if self.declared.get(p).is_some_and(|d| d.contains(n)) => {
+                Some(Some((p, n)))
+            }
+            Binding::External(source, _)
+                if defs && !source.starts_with('.') && !source.starts_with('/') =>
+            {
+                Some(None)
+            }
+            _ => None,
         }
     }
 

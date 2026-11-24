@@ -189,6 +189,30 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/checkout.ts::createOrder::(type)Request#0",
+      "caller": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "target": "example.com/chain/gateway::src/checkout.ts::Request",
+      "level": "exact",
+      "span": {
+        "path": "src/checkout.ts",
+        "start": 311,
+        "end": 318
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/gateway::src/checkout.ts::createOrder::(value)ORDERS_CREATED#0",
+      "caller": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "target": "example.com/chain/gateway::src/topics.ts::ORDERS_CREATED",
+      "level": "exact",
+      "span": {
+        "path": "src/checkout.ts",
+        "start": 440,
+        "end": 454
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/gateway::src/checkout.ts::createOrder::JSON.stringify#0",
       "caller": "example.com/chain/gateway::src/checkout.ts::createOrder",
       "target": null,
@@ -233,6 +257,18 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/events.ts::publish::(member)producer#0",
+      "caller": "example.com/chain/gateway::src/events.ts::publish",
+      "target": "example.com/chain/gateway::src/kafka.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/events.ts",
+        "start": 187,
+        "end": 200
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/chain/gateway::src/events.ts::publish::producer.send#0",
       "caller": "example.com/chain/gateway::src/events.ts::publish",
       "target": null,
@@ -244,6 +280,19 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/kafka.ts::(member)kafka#0",
+      "caller": "example.com/chain/gateway::src/kafka.ts",
+      "target": "example.com/chain/gateway::src/kafka.ts::kafka",
+      "level": "exact",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 134,
+        "end": 148
+      },
+      "kind": "member",
+      "holder": "example.com/chain/gateway::src/kafka.ts::producer"
+    },
+    {
       "id": "example.com/chain/gateway::src/kafka.ts::Kafka#0",
       "caller": "example.com/chain/gateway::src/kafka.ts",
       "target": null,
@@ -252,7 +301,8 @@
         "path": "src/kafka.ts",
         "start": 48,
         "end": 107
-      }
+      },
+      "holder": "example.com/chain/gateway::src/kafka.ts::kafka"
     },
     {
       "id": "example.com/chain/gateway::src/kafka.ts::kafka.producer#0",
@@ -263,7 +313,8 @@
         "path": "src/kafka.ts",
         "start": 134,
         "end": 150
-      }
+      },
+      "holder": "example.com/chain/gateway::src/kafka.ts::producer"
     },
     {
       "id": "example.com/chain/gateway::src/orders.ts::cancelOrder::(call_expression).end#0",
@@ -288,6 +339,18 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/orders.ts::listOrders::(type)Request#0",
+      "caller": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "target": "example.com/chain/gateway::src/orders.ts::Request",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 126,
+        "end": 133
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/chain/gateway::src/orders.ts::listOrders::productOf#0",
       "caller": "example.com/chain/gateway::src/orders.ts::listOrders",
       "target": "example.com/chain/gateway::src/catalog.ts::productOf",
@@ -308,6 +371,54 @@
         "start": 229,
         "end": 262
       }
+    },
+    {
+      "id": "example.com/chain/gateway::src/routes.ts::(member)api#0",
+      "caller": "example.com/chain/gateway::src/routes.ts",
+      "target": "example.com/chain/gateway::src/routes.ts::api",
+      "level": "exact",
+      "span": {
+        "path": "src/routes.ts",
+        "start": 158,
+        "end": 165
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/chain/gateway::src/routes.ts::(value)cancelOrder#0",
+      "caller": "example.com/chain/gateway::src/routes.ts",
+      "target": "example.com/chain/gateway::src/orders.ts::cancelOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/routes.ts",
+        "start": 253,
+        "end": 264
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/chain/gateway::src/routes.ts::(value)createOrder#0",
+      "caller": "example.com/chain/gateway::src/routes.ts",
+      "target": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/routes.ts",
+        "start": 213,
+        "end": 224
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/chain/gateway::src/routes.ts::(value)listOrders#0",
+      "caller": "example.com/chain/gateway::src/routes.ts",
+      "target": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "level": "exact",
+      "span": {
+        "path": "src/routes.ts",
+        "start": 177,
+        "end": 187
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/gateway::src/routes.ts::POST /api/events::(call_expression).end#0",
@@ -340,7 +451,8 @@
         "path": "src/routes.ts",
         "start": 148,
         "end": 156
-      }
+      },
+      "holder": "example.com/chain/gateway::src/routes.ts::api"
     },
     {
       "id": "example.com/chain/gateway::src/routes.ts::api.delete#0",
@@ -385,6 +497,30 @@
         "start": 190,
         "end": 225
       }
+    },
+    {
+      "id": "example.com/chain/gateway::src/server.ts::(member)app#0",
+      "caller": "example.com/chain/gateway::src/server.ts",
+      "target": "example.com/chain/gateway::src/server.ts::app",
+      "level": "exact",
+      "span": {
+        "path": "src/server.ts",
+        "start": 151,
+        "end": 158
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/chain/gateway::src/server.ts::(value)api#0",
+      "caller": "example.com/chain/gateway::src/server.ts",
+      "target": "example.com/chain/gateway::src/routes.ts::api",
+      "level": "exact",
+      "span": {
+        "path": "src/server.ts",
+        "start": 167,
+        "end": 170
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/gateway::src/server.ts::GET /api/health::res.send#0",
@@ -439,7 +575,8 @@
         "path": "src/server.ts",
         "start": 76,
         "end": 85
-      }
+      },
+      "holder": "example.com/chain/gateway::src/server.ts::app"
     }
   ],
   "providers": [
@@ -514,14 +651,47 @@
       "name": "src",
       "members": [
         "example.com/chain/gateway::src/catalog.ts::productOf",
+        "example.com/chain/gateway::src/orders.ts::Request",
         "example.com/chain/gateway::src/orders.ts::listOrders"
       ]
     },
     {
       "name": "src#2",
       "members": [
+        "example.com/chain/gateway::src/checkout.ts::Request",
         "example.com/chain/gateway::src/checkout.ts::createOrder",
-        "example.com/chain/gateway::src/events.ts::publish"
+        "example.com/chain/gateway::src/topics.ts::ORDERS_CREATED"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/chain/gateway::src/events.ts::publish",
+        "example.com/chain/gateway::src/kafka.ts::producer"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
+        "example.com/chain/gateway::src/kafka.ts::kafka"
+      ]
+    },
+    {
+      "name": "src#5",
+      "members": [
+        "example.com/chain/gateway::src/orders.ts::cancelOrder"
+      ]
+    },
+    {
+      "name": "src#6",
+      "members": [
+        "example.com/chain/gateway::src/routes.ts::api"
+      ]
+    },
+    {
+      "name": "src#7",
+      "members": [
+        "example.com/chain/gateway::src/server.ts::app"
       ]
     }
   ],

@@ -129,6 +129,10 @@ impl<'a> Graph<'a> {
             }
             for c in &export.calls {
                 graph.calls.insert(&c.id, (n, c));
+                // A use is no call: the walks follow calls alone.
+                if c.kind.is_some() {
+                    continue;
+                }
                 graph.callees.entry(&c.caller).or_default().push((n, c));
                 for t in c.target.iter().chain(&c.candidates) {
                     graph.callers.entry(t).or_default().push((n, c));
@@ -760,7 +764,9 @@ pub(crate) fn read(
                     }
                 }
                 let mut calls = sites;
-                calls.extend(partial.callees(None, &new)?);
+                // The down-walk follows calls alone, as `Graph` does; a row started from is read.
+                let callees = partial.callees(None, &new)?;
+                calls.extend(callees.into_iter().filter(|(_, c)| c.kind.is_none()));
                 for (_, c) in &calls {
                     next.extend(c.target.iter().chain(&c.candidates).cloned());
                     across(&c.id, &mut next);
@@ -779,7 +785,8 @@ pub(crate) fn read(
                     );
                 }
                 let mut calls = sites;
-                calls.extend(partial.callers(None, &new, candidates)?);
+                let callers = partial.callers(None, &new, candidates)?;
+                calls.extend(callers.into_iter().filter(|(_, c)| c.kind.is_none()));
                 next.extend(calls.into_iter().map(|(_, c)| c.caller));
             }
         }

@@ -1295,10 +1295,6 @@ pub enum Use {
 
 impl Use {
     /// The `calls.kind` value and the id prefix of a row of this kind.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the index writes it from the next commit")
-    )]
     pub fn as_str(self) -> &'static str {
         match self {
             Use::Jsx => "jsx",

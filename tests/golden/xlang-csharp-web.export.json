@@ -204,6 +204,19 @@
       }
     },
     {
+      "id": "example.com/xlang-csharp/web::src/events.ts::(member)kafka#0",
+      "caller": "example.com/xlang-csharp/web::src/events.ts",
+      "target": "example.com/xlang-csharp/web::src/events.ts::kafka",
+      "level": "exact",
+      "span": {
+        "path": "src/events.ts",
+        "start": 122,
+        "end": 136
+      },
+      "kind": "member",
+      "holder": "example.com/xlang-csharp/web::src/events.ts::producer"
+    },
+    {
       "id": "example.com/xlang-csharp/web::src/events.ts::Kafka#0",
       "caller": "example.com/xlang-csharp/web::src/events.ts",
       "target": null,
@@ -212,7 +225,20 @@
         "path": "src/events.ts",
         "start": 48,
         "end": 103
-      }
+      },
+      "holder": "example.com/xlang-csharp/web::src/events.ts::kafka"
+    },
+    {
+      "id": "example.com/xlang-csharp/web::src/events.ts::announceShipment::(member)producer#0",
+      "caller": "example.com/xlang-csharp/web::src/events.ts::announceShipment",
+      "target": "example.com/xlang-csharp/web::src/events.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/events.ts",
+        "start": 263,
+        "end": 276
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/xlang-csharp/web::src/events.ts::announceShipment::producer.send#0",
@@ -234,7 +260,20 @@
         "path": "src/events.ts",
         "start": 122,
         "end": 138
-      }
+      },
+      "holder": "example.com/xlang-csharp/web::src/events.ts::producer"
+    },
+    {
+      "id": "example.com/xlang-csharp/web::src/orders.ts::orderStatus::(value)API#0",
+      "caller": "example.com/xlang-csharp/web::src/orders.ts::orderStatus",
+      "target": "example.com/xlang-csharp/web::src/orders.ts::API",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 128,
+        "end": 131
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/xlang-csharp/web::src/orders.ts::orderStatus::fetch#0",
@@ -371,7 +410,26 @@
     {
       "name": "src",
       "members": [
-        "example.com/xlang-csharp/web::src/orders.ts::orderStatus",
+        "example.com/xlang-csharp/web::src/events.ts::announceShipment",
+        "example.com/xlang-csharp/web::src/events.ts::producer"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/xlang-csharp/web::src/events.ts::kafka"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/xlang-csharp/web::src/orders.ts::API",
+        "example.com/xlang-csharp/web::src/orders.ts::orderStatus"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
         "example.com/xlang-csharp/web::src/orders.ts::reserveOrder",
         "example.com/xlang-csharp/web::src/sync.ts::syncOrders"
       ]

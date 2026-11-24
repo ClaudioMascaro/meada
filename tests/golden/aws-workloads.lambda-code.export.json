@@ -39,7 +39,20 @@
         "path": "worker/send.ts",
         "start": 84,
         "end": 101
-      }
+      },
+      "holder": "example.com/acme/lambda::worker/send.ts::client"
+    },
+    {
+      "id": "example.com/acme/lambda::worker/send.ts::dispatch::(member)client#0",
+      "caller": "example.com/acme/lambda::worker/send.ts::dispatch",
+      "target": "example.com/acme/lambda::worker/send.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "worker/send.ts",
+        "start": 141,
+        "end": 152
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/acme/lambda::worker/send.ts::dispatch::SendMessageCommand#0",
@@ -72,6 +85,15 @@
     }
   ],
   "consumers": [],
+  "communities": [
+    {
+      "name": "worker",
+      "members": [
+        "example.com/acme/lambda::worker/send.ts::client",
+        "example.com/acme/lambda::worker/send.ts::dispatch"
+      ]
+    }
+  ],
   "iac_nodes": [
     {
       "identity": "example.com/acme/lambda::main.tf::aws_lambda_function.local",

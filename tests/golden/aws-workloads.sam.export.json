@@ -61,7 +61,20 @@
         "path": "outside.ts",
         "start": 84,
         "end": 101
-      }
+      },
+      "holder": "example.com/acme/sam::outside.ts::client"
+    },
+    {
+      "id": "example.com/acme/sam::outside.ts::outside::(member)client#0",
+      "caller": "example.com/acme/sam::outside.ts::outside",
+      "target": "example.com/acme/sam::outside.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "outside.ts",
+        "start": 140,
+        "end": 151
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/acme/sam::outside.ts::outside::SendMessageCommand#0",
@@ -94,7 +107,20 @@
         "path": "worker/send.ts",
         "start": 84,
         "end": 101
-      }
+      },
+      "holder": "example.com/acme/sam::worker/send.ts::client"
+    },
+    {
+      "id": "example.com/acme/sam::worker/send.ts::dispatch::(member)client#0",
+      "caller": "example.com/acme/sam::worker/send.ts::dispatch",
+      "target": "example.com/acme/sam::worker/send.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "worker/send.ts",
+        "start": 141,
+        "end": 152
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/acme/sam::worker/send.ts::dispatch::SendMessageCommand#0",
@@ -131,6 +157,22 @@
     }
   ],
   "consumers": [],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "example.com/acme/sam::outside.ts::client",
+        "example.com/acme/sam::outside.ts::outside"
+      ]
+    },
+    {
+      "name": "worker",
+      "members": [
+        "example.com/acme/sam::worker/send.ts::client",
+        "example.com/acme/sam::worker/send.ts::dispatch"
+      ]
+    }
+  ],
   "iac_nodes": [
     {
       "identity": "example.com/acme/sam::template.yaml::Orders",

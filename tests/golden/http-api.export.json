@@ -146,7 +146,8 @@
         "path": "app/api/health/route.js",
         "start": 149,
         "end": 167
-      }
+      },
+      "holder": "example.com/acme/api::app/api/health/route.js::GET"
     },
     {
       "id": "example.com/acme/api::app/api/health/route.js::withLogging#0",
@@ -157,7 +158,8 @@
         "path": "app/api/health/route.js",
         "start": 131,
         "end": 168
-      }
+      },
+      "holder": "example.com/acme/api::app/api/health/route.js::GET"
     },
     {
       "id": "example.com/acme/api::app/api/users/[id]/route.ts::DELETE::Response#0",

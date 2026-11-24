@@ -12,7 +12,7 @@ CREATE INDEX symbols_hash ON symbols (hash);
 CREATE TABLE calls (
     id TEXT NOT NULL, caller TEXT NOT NULL, target TEXT, level TEXT,
     path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, narrowed INTEGER NOT NULL,
-    decorates TEXT
+    decorates TEXT, kind TEXT, holder TEXT
 );
 CREATE INDEX calls_path ON calls (path);
 CREATE INDEX calls_id ON calls (id);

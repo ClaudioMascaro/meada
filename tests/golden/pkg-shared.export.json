@@ -381,6 +381,30 @@
       }
     },
     {
+      "id": "example.com/pkg/shared::kit/src/index.ts::(reexport)greet#0",
+      "caller": "example.com/pkg/shared::kit/src/index.ts",
+      "target": "example.com/pkg/shared::kit/src/greet.ts::greet",
+      "level": "exact",
+      "span": {
+        "path": "kit/src/index.ts",
+        "start": 95,
+        "end": 100
+      },
+      "kind": "reexport"
+    },
+    {
+      "id": "example.com/pkg/shared::kit/src/more.ts::Client.create::(type)Client#0",
+      "caller": "example.com/pkg/shared::kit/src/more.ts::Client.create",
+      "target": "example.com/pkg/shared::kit/src/more.ts::Client",
+      "level": "exact",
+      "span": {
+        "path": "kit/src/more.ts",
+        "start": 117,
+        "end": 123
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/pkg/shared::kit/src/more.ts::Client.create::Client#0",
       "caller": "example.com/pkg/shared::kit/src/more.ts::Client.create",
       "target": "example.com/pkg/shared::kit/src/more.ts::Client",
@@ -401,6 +425,18 @@
         "start": 57,
         "end": 75
       }
+    },
+    {
+      "id": "example.com/pkg/shared::src/index.ts::(reexport)normalize#0",
+      "caller": "example.com/pkg/shared::src/index.ts",
+      "target": "example.com/pkg/shared::src/text.ts::normalize",
+      "level": "exact",
+      "span": {
+        "path": "src/index.ts",
+        "start": 9,
+        "end": 18
+      },
+      "kind": "reexport"
     },
     {
       "id": "example.com/pkg/shared::src/text.ts::normalize::(call_expression).toLowerCase#0",

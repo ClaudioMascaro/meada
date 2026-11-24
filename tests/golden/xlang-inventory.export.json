@@ -238,7 +238,8 @@
         "start": 162,
         "end": 185
       },
-      "decorates": "example.com/xlang/inventory::inventory/main.py::stock_level"
+      "decorates": "example.com/xlang/inventory::inventory/main.py::stock_level",
+      "holder": "example.com/xlang/inventory::inventory/main.py::stock_level"
     },
     {
       "id": "example.com/xlang/inventory::inventory/main.py::app.post#0",
@@ -250,7 +251,8 @@
         "start": 335,
         "end": 361
       },
-      "decorates": "example.com/xlang/inventory::inventory/main.py::reserve"
+      "decorates": "example.com/xlang/inventory::inventory/main.py::reserve",
+      "holder": "example.com/xlang/inventory::inventory/main.py::reserve"
     },
     {
       "id": "example.com/xlang/inventory::inventory/main.py::audit::(call).strip#0",

@@ -1800,6 +1800,7 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
     let mut callers: Vec<_> = export
         .calls
         .iter()
+        .filter(|c| c.kind.is_none())
         .filter(|c| c.target.as_deref() == Some(id) || c.candidates.iter().any(|t| t == id))
         .collect();
     callers.sort_by_key(|c| (&c.span.path, c.span.start));
@@ -1817,7 +1818,9 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
             )
         })
         .collect();
-    let mut calls: Vec<_> = export.calls.iter().filter(|c| c.caller == id).collect();
+    let mut calls: Vec<_> = (export.calls.iter())
+        .filter(|c| c.caller == id && c.kind.is_none())
+        .collect();
     calls.sort_by_key(|c| (c.target.is_none(), &c.id));
     let lines_of = |calls: Vec<&CallSite>, files: &mut Files| -> Vec<String> {
         let mut lines: Vec<String> = calls

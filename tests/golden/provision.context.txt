@@ -31,7 +31,7 @@ resource::s3::archive
   example.com/provision/infra provisioner envs/prod/main.tf:4 aws_s3_bucket.archive (root envs/prod)
 
 example.com/provision/app src/producer.ts:7-11 enqueueOrder
-community: none
+community: src#3
 processes: 1 (1 export; 1 repository): enqueueOrder (example.com/provision/app)
 async function enqueueOrder(body: string) {
   await client.send(

@@ -76,6 +76,32 @@
   ],
   "calls": [
     {
+      "id": "example.com/asyncapi/events::src/emit.ts::(member)connection#0",
+      "caller": "example.com/asyncapi/events::src/emit.ts",
+      "target": "example.com/asyncapi/events::src/emit.ts::connection",
+      "level": "exact",
+      "span": {
+        "path": "src/emit.ts",
+        "start": 468,
+        "end": 492
+      },
+      "kind": "member",
+      "holder": "example.com/asyncapi/events::src/emit.ts::channel"
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::(member)kafka#0",
+      "caller": "example.com/asyncapi/events::src/emit.ts",
+      "target": "example.com/asyncapi/events::src/emit.ts::kafka",
+      "level": "exact",
+      "span": {
+        "path": "src/emit.ts",
+        "start": 153,
+        "end": 167
+      },
+      "kind": "member",
+      "holder": "example.com/asyncapi/events::src/emit.ts::producer"
+    },
+    {
       "id": "example.com/asyncapi/events::src/emit.ts::Kafka#0",
       "caller": "example.com/asyncapi/events::src/emit.ts",
       "target": null,
@@ -84,7 +110,8 @@
         "path": "src/emit.ts",
         "start": 76,
         "end": 134
-      }
+      },
+      "holder": "example.com/asyncapi/events::src/emit.ts::kafka"
     },
     {
       "id": "example.com/asyncapi/events::src/emit.ts::amqp.connect#0",
@@ -95,7 +122,20 @@
         "path": "src/emit.ts",
         "start": 412,
         "end": 444
-      }
+      },
+      "holder": "example.com/asyncapi/events::src/emit.ts::connection"
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::announceUpdate::(member)producer#0",
+      "caller": "example.com/asyncapi/events::src/emit.ts::announceUpdate",
+      "target": "example.com/asyncapi/events::src/emit.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/emit.ts",
+        "start": 313,
+        "end": 326
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/asyncapi/events::src/emit.ts::announceUpdate::producer.send#0",
@@ -117,7 +157,8 @@
         "path": "src/emit.ts",
         "start": 468,
         "end": 494
-      }
+      },
+      "holder": "example.com/asyncapi/events::src/emit.ts::channel"
     },
     {
       "id": "example.com/asyncapi/events::src/emit.ts::kafka.producer#0",
@@ -128,7 +169,32 @@
         "path": "src/emit.ts",
         "start": 153,
         "end": 169
-      }
+      },
+      "holder": "example.com/asyncapi/events::src/emit.ts::producer"
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::work::(member)channel#0",
+      "caller": "example.com/asyncapi/events::src/emit.ts::work",
+      "target": "example.com/asyncapi/events::src/emit.ts::channel",
+      "level": "exact",
+      "span": {
+        "path": "src/emit.ts",
+        "start": 594,
+        "end": 609
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::work::(value)onCancellation#0",
+      "caller": "example.com/asyncapi/events::src/emit.ts::work",
+      "target": "example.com/asyncapi/events::src/emit.ts::onCancellation",
+      "level": "exact",
+      "span": {
+        "path": "src/emit.ts",
+        "start": 633,
+        "end": 647
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/asyncapi/events::src/emit.ts::work::channel.consume#0",
@@ -292,6 +358,35 @@
       "format": "asyncapi",
       "version": "3.0.0",
       "contracts": []
+    }
+  ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/asyncapi/events::src/emit.ts::announceUpdate",
+        "example.com/asyncapi/events::src/emit.ts::producer"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/asyncapi/events::src/emit.ts::channel",
+        "example.com/asyncapi/events::src/emit.ts::onCancellation",
+        "example.com/asyncapi/events::src/emit.ts::work"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/asyncapi/events::src/emit.ts::connection"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
+        "example.com/asyncapi/events::src/emit.ts::kafka"
+      ]
     }
   ],
   "links": [

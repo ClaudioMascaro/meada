@@ -295,6 +295,8 @@ impl<'t> References<'t> {
             | "class_declaration"
             | "class"
             | "abstract_class_declaration"
+            | "enum_declaration"
+            | "function_signature"
             | "internal_module"
             | "module"
             | "method_definition"

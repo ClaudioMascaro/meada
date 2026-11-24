@@ -149,6 +149,18 @@
       }
     },
     {
+      "id": "example.com/xlang-swift/web::src/orders.ts::orderStatus::(value)API#0",
+      "caller": "example.com/xlang-swift/web::src/orders.ts::orderStatus",
+      "target": "example.com/xlang-swift/web::src/orders.ts::API",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 128,
+        "end": 131
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/xlang-swift/web::src/orders.ts::orderStatus::fetch#0",
       "caller": "example.com/xlang-swift/web::src/orders.ts::orderStatus",
       "target": null,
@@ -264,7 +276,13 @@
     {
       "name": "src",
       "members": [
-        "example.com/xlang-swift/web::src/orders.ts::orderStatus",
+        "example.com/xlang-swift/web::src/orders.ts::API",
+        "example.com/xlang-swift/web::src/orders.ts::orderStatus"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
         "example.com/xlang-swift/web::src/orders.ts::reserveOrder",
         "example.com/xlang-swift/web::src/sync.ts::syncOrders"
       ]

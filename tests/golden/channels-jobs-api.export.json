@@ -147,6 +147,19 @@
   ],
   "calls": [
     {
+      "id": "example.com/jobs/api::src/bullmq.ts::(value)QUEUE#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts",
+      "target": "example.com/jobs/api::src/bullmq.ts::QUEUE",
+      "level": "exact",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 82,
+        "end": 87
+      },
+      "kind": "value",
+      "holder": "example.com/jobs/api::src/bullmq.ts::emails"
+    },
+    {
       "id": "example.com/jobs/api::src/bullmq.ts::Queue#0",
       "caller": "example.com/jobs/api::src/bullmq.ts",
       "target": null,
@@ -155,7 +168,8 @@
         "path": "src/bullmq.ts",
         "start": 72,
         "end": 88
-      }
+      },
+      "holder": "example.com/jobs/api::src/bullmq.ts::emails"
     },
     {
       "id": "example.com/jobs/api::src/bullmq.ts::Queue#1",
@@ -166,7 +180,8 @@
         "path": "src/bullmq.ts",
         "start": 106,
         "end": 126
-      }
+      },
+      "holder": "example.com/jobs/api::src/bullmq.ts::reports"
     },
     {
       "id": "example.com/jobs/api::src/bullmq.ts::Set#0",
@@ -177,7 +192,8 @@
         "path": "src/bullmq.ts",
         "start": 141,
         "end": 158
-      }
+      },
+      "holder": "example.com/jobs/api::src/bullmq.ts::seen"
     },
     {
       "id": "example.com/jobs/api::src/bullmq.ts::enqueue::Queue#0",
@@ -202,6 +218,18 @@
       }
     },
     {
+      "id": "example.com/jobs/api::src/bullmq.ts::remember::(member)seen#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts::remember",
+      "target": "example.com/jobs/api::src/bullmq.ts::seen",
+      "level": "exact",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 483,
+        "end": 491
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/jobs/api::src/bullmq.ts::remember::seen.add#0",
       "caller": "example.com/jobs/api::src/bullmq.ts::remember",
       "target": null,
@@ -211,6 +239,18 @@
         "start": 483,
         "end": 495
       }
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::requestReport::(member)reports#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts::requestReport",
+      "target": "example.com/jobs/api::src/bullmq.ts::reports",
+      "level": "exact",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 374,
+        "end": 385
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/jobs/api::src/bullmq.ts::requestReport::reports.add#0",
@@ -235,6 +275,18 @@
       }
     },
     {
+      "id": "example.com/jobs/api::src/bullmq.ts::sendWelcome::(member)emails#0",
+      "caller": "example.com/jobs/api::src/bullmq.ts::sendWelcome",
+      "target": "example.com/jobs/api::src/bullmq.ts::emails",
+      "level": "exact",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 292,
+        "end": 302
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/jobs/api::src/bullmq.ts::sendWelcome::emails.add#0",
       "caller": "example.com/jobs/api::src/bullmq.ts::sendWelcome",
       "target": null,
@@ -254,7 +306,20 @@
         "path": "src/ioredis.ts",
         "start": 44,
         "end": 55
-      }
+      },
+      "holder": "example.com/jobs/api::src/ioredis.ts::redis"
+    },
+    {
+      "id": "example.com/jobs/api::src/ioredis.ts::appendOrder::(member)redis#0",
+      "caller": "example.com/jobs/api::src/ioredis.ts::appendOrder",
+      "target": "example.com/jobs/api::src/ioredis.ts::redis",
+      "level": "exact",
+      "span": {
+        "path": "src/ioredis.ts",
+        "start": 114,
+        "end": 124
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/jobs/api::src/ioredis.ts::appendOrder::redis.xadd#0",
@@ -268,6 +333,18 @@
       }
     },
     {
+      "id": "example.com/jobs/api::src/ioredis.ts::appendRefund::(member)redis#0",
+      "caller": "example.com/jobs/api::src/ioredis.ts::appendRefund",
+      "target": "example.com/jobs/api::src/ioredis.ts::redis",
+      "level": "exact",
+      "span": {
+        "path": "src/ioredis.ts",
+        "start": 211,
+        "end": 221
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/jobs/api::src/ioredis.ts::appendRefund::redis.xadd#0",
       "caller": "example.com/jobs/api::src/ioredis.ts::appendRefund",
       "target": null,
@@ -277,6 +354,18 @@
         "start": 211,
         "end": 247
       }
+    },
+    {
+      "id": "example.com/jobs/api::src/noderedis.ts::appendShipment::(member)client#0",
+      "caller": "example.com/jobs/api::src/noderedis.ts::appendShipment",
+      "target": "example.com/jobs/api::src/noderedis.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "src/noderedis.ts",
+        "start": 130,
+        "end": 141
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/jobs/api::src/noderedis.ts::appendShipment::client.xAdd#0",
@@ -298,7 +387,8 @@
         "path": "src/noderedis.ts",
         "start": 54,
         "end": 68
-      }
+      },
+      "holder": "example.com/jobs/api::src/noderedis.ts::client"
     }
   ],
   "providers": [
@@ -332,8 +422,50 @@
     {
       "name": "src",
       "members": [
+        "example.com/jobs/api::src/bullmq.ts::QUEUE"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/jobs/api::src/bullmq.ts::emails",
+        "example.com/jobs/api::src/bullmq.ts::sendWelcome"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
         "example.com/jobs/api::src/bullmq.ts::enqueue",
         "example.com/jobs/api::src/bullmq.ts::sendInvoice"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
+        "example.com/jobs/api::src/bullmq.ts::remember",
+        "example.com/jobs/api::src/bullmq.ts::seen"
+      ]
+    },
+    {
+      "name": "src#5",
+      "members": [
+        "example.com/jobs/api::src/bullmq.ts::reports",
+        "example.com/jobs/api::src/bullmq.ts::requestReport"
+      ]
+    },
+    {
+      "name": "src#6",
+      "members": [
+        "example.com/jobs/api::src/ioredis.ts::appendOrder",
+        "example.com/jobs/api::src/ioredis.ts::appendRefund",
+        "example.com/jobs/api::src/ioredis.ts::redis"
+      ]
+    },
+    {
+      "name": "src#7",
+      "members": [
+        "example.com/jobs/api::src/noderedis.ts::appendShipment",
+        "example.com/jobs/api::src/noderedis.ts::client"
       ]
     }
   ],

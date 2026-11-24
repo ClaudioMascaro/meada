@@ -125,6 +125,19 @@
   ],
   "calls": [
     {
+      "id": "example.com/asyncapi/services::src/kafka.ts::(member)kafka#0",
+      "caller": "example.com/asyncapi/services::src/kafka.ts",
+      "target": "example.com/asyncapi/services::src/kafka.ts::kafka",
+      "level": "exact",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 127,
+        "end": 141
+      },
+      "kind": "member",
+      "holder": "example.com/asyncapi/services::src/kafka.ts::consumer"
+    },
+    {
       "id": "example.com/asyncapi/services::src/kafka.ts::Kafka#0",
       "caller": "example.com/asyncapi/services::src/kafka.ts",
       "target": null,
@@ -133,7 +146,8 @@
         "path": "src/kafka.ts",
         "start": 48,
         "end": 108
-      }
+      },
+      "holder": "example.com/asyncapi/services::src/kafka.ts::kafka"
     },
     {
       "id": "example.com/asyncapi/services::src/kafka.ts::kafka.consumer#0",
@@ -144,7 +158,8 @@
         "path": "src/kafka.ts",
         "start": 127,
         "end": 166
-      }
+      },
+      "holder": "example.com/asyncapi/services::src/kafka.ts::consumer"
     },
     {
       "id": "example.com/asyncapi/services::src/kafka.ts::kafka.producer#0",
@@ -155,7 +170,32 @@
         "path": "src/kafka.ts",
         "start": 185,
         "end": 201
-      }
+      },
+      "holder": "example.com/asyncapi/services::src/kafka.ts::producer"
+    },
+    {
+      "id": "example.com/asyncapi/services::src/kafka.ts::listen::(member)consumer#0",
+      "caller": "example.com/asyncapi/services::src/kafka.ts::listen",
+      "target": "example.com/asyncapi/services::src/kafka.ts::consumer",
+      "level": "exact",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 245,
+        "end": 263
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/asyncapi/services::src/kafka.ts::listen::(value)onOrder#0",
+      "caller": "example.com/asyncapi/services::src/kafka.ts::listen",
+      "target": "example.com/asyncapi/services::src/kafka.ts::onOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 387,
+        "end": 394
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/asyncapi/services::src/kafka.ts::listen::consumer.run#0",
@@ -191,6 +231,18 @@
       }
     },
     {
+      "id": "example.com/asyncapi/services::src/kafka.ts::requestPayment::(member)producer#0",
+      "caller": "example.com/asyncapi/services::src/kafka.ts::requestPayment",
+      "target": "example.com/asyncapi/services::src/kafka.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 652,
+        "end": 665
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/asyncapi/services::src/kafka.ts::requestPayment::producer.send#0",
       "caller": "example.com/asyncapi/services::src/kafka.ts::requestPayment",
       "target": null,
@@ -202,6 +254,19 @@
       }
     },
     {
+      "id": "example.com/asyncapi/services::src/queues.ts::(member)connection#0",
+      "caller": "example.com/asyncapi/services::src/queues.ts",
+      "target": "example.com/asyncapi/services::src/queues.ts::connection",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 110,
+        "end": 134
+      },
+      "kind": "member",
+      "holder": "example.com/asyncapi/services::src/queues.ts::channel"
+    },
+    {
       "id": "example.com/asyncapi/services::src/queues.ts::amqp.connect#0",
       "caller": "example.com/asyncapi/services::src/queues.ts",
       "target": null,
@@ -210,7 +275,20 @@
         "path": "src/queues.ts",
         "start": 54,
         "end": 86
-      }
+      },
+      "holder": "example.com/asyncapi/services::src/queues.ts::connection"
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::cancel::(member)channel#0",
+      "caller": "example.com/asyncapi/services::src/queues.ts::cancel",
+      "target": "example.com/asyncapi/services::src/queues.ts::channel",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 531,
+        "end": 550
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/asyncapi/services::src/queues.ts::cancel::Buffer.from#0",
@@ -243,7 +321,20 @@
         "path": "src/queues.ts",
         "start": 110,
         "end": 136
-      }
+      },
+      "holder": "example.com/asyncapi/services::src/queues.ts::channel"
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::ship::(member)channel#0",
+      "caller": "example.com/asyncapi/services::src/queues.ts::ship",
+      "target": "example.com/asyncapi/services::src/queues.ts::channel",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 414,
+        "end": 433
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/asyncapi/services::src/queues.ts::ship::Buffer.from#0",
@@ -266,6 +357,30 @@
         "start": 414,
         "end": 477
       }
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::work::(member)channel#0",
+      "caller": "example.com/asyncapi/services::src/queues.ts::work",
+      "target": "example.com/asyncapi/services::src/queues.ts::channel",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 257,
+        "end": 272
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::work::(value)onInvoice#0",
+      "caller": "example.com/asyncapi/services::src/queues.ts::work",
+      "target": "example.com/asyncapi/services::src/queues.ts::onInvoice",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 292,
+        "end": 301
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/asyncapi/services::src/queues.ts::work::channel.consume#0",
@@ -308,6 +423,50 @@
       "contract": "channel::amqp::invoices.issued",
       "site": "example.com/asyncapi/services::src/queues.ts::onInvoice",
       "via": null
+    }
+  ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/asyncapi/services::src/kafka.ts::consumer",
+        "example.com/asyncapi/services::src/kafka.ts::listen",
+        "example.com/asyncapi/services::src/kafka.ts::onOrder"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/asyncapi/services::src/kafka.ts::kafka"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/asyncapi/services::src/kafka.ts::producer",
+        "example.com/asyncapi/services::src/kafka.ts::requestPayment"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
+        "example.com/asyncapi/services::src/queues.ts::cancel",
+        "example.com/asyncapi/services::src/queues.ts::channel",
+        "example.com/asyncapi/services::src/queues.ts::ship"
+      ]
+    },
+    {
+      "name": "src#5",
+      "members": [
+        "example.com/asyncapi/services::src/queues.ts::connection"
+      ]
+    },
+    {
+      "name": "src#6",
+      "members": [
+        "example.com/asyncapi/services::src/queues.ts::onInvoice",
+        "example.com/asyncapi/services::src/queues.ts::work"
+      ]
     }
   ],
   "links": [

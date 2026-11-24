@@ -105,7 +105,20 @@
         "path": "code/parameter.ts",
         "start": 85,
         "end": 102
-      }
+      },
+      "holder": "example.com/acme/app::code/parameter.ts::client"
+    },
+    {
+      "id": "example.com/acme/app::code/parameter.ts::parameter::(member)client#0",
+      "caller": "example.com/acme/app::code/parameter.ts::parameter",
+      "target": "example.com/acme/app::code/parameter.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "code/parameter.ts",
+        "start": 141,
+        "end": 152
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/acme/app::code/parameter.ts::parameter::GetParameterCommand#0",
@@ -193,7 +206,20 @@
         "path": "code/send.ts",
         "start": 81,
         "end": 98
-      }
+      },
+      "holder": "example.com/acme/app::code/send.ts::sqs"
+    },
+    {
+      "id": "example.com/acme/app::code/send.ts::send::(member)sqs#0",
+      "caller": "example.com/acme/app::code/send.ts::send",
+      "target": "example.com/acme/app::code/send.ts::sqs",
+      "level": "exact",
+      "span": {
+        "path": "code/send.ts",
+        "start": 139,
+        "end": 147
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/acme/app::code/send.ts::send::SendMessageCommand#0",
@@ -226,7 +252,20 @@
         "path": "send.ts",
         "start": 81,
         "end": 98
-      }
+      },
+      "holder": "example.com/acme/app::send.ts::sqs"
+    },
+    {
+      "id": "example.com/acme/app::send.ts::send::(member)sqs#0",
+      "caller": "example.com/acme/app::send.ts::send",
+      "target": "example.com/acme/app::send.ts::sqs",
+      "level": "exact",
+      "span": {
+        "path": "send.ts",
+        "start": 139,
+        "end": 147
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/acme/app::send.ts::send::SendMessageCommand#0",
@@ -277,6 +316,29 @@
       "contract": "channel::sqs::jobs",
       "site": "example.com/acme/app::code/queue.py::receive",
       "via": "workload:example.com/acme/app::compose.yaml::services.worker (root .), env:QUEUE_URL"
+    }
+  ],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "example.com/acme/app::send.ts::send",
+        "example.com/acme/app::send.ts::sqs"
+      ]
+    },
+    {
+      "name": "code",
+      "members": [
+        "example.com/acme/app::code/parameter.ts::client",
+        "example.com/acme/app::code/parameter.ts::parameter"
+      ]
+    },
+    {
+      "name": "code#2",
+      "members": [
+        "example.com/acme/app::code/send.ts::send",
+        "example.com/acme/app::code/send.ts::sqs"
+      ]
     }
   ],
   "iac_nodes": [

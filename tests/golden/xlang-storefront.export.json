@@ -180,6 +180,19 @@
       }
     },
     {
+      "id": "example.com/xlang/storefront::src/events.ts::(member)kafka#0",
+      "caller": "example.com/xlang/storefront::src/events.ts",
+      "target": "example.com/xlang/storefront::src/events.ts::kafka",
+      "level": "exact",
+      "span": {
+        "path": "src/events.ts",
+        "start": 129,
+        "end": 143
+      },
+      "kind": "member",
+      "holder": "example.com/xlang/storefront::src/events.ts::producer"
+    },
+    {
       "id": "example.com/xlang/storefront::src/events.ts::Kafka#0",
       "caller": "example.com/xlang/storefront::src/events.ts",
       "target": null,
@@ -188,7 +201,20 @@
         "path": "src/events.ts",
         "start": 48,
         "end": 110
-      }
+      },
+      "holder": "example.com/xlang/storefront::src/events.ts::kafka"
+    },
+    {
+      "id": "example.com/xlang/storefront::src/events.ts::announceRestock::(member)producer#0",
+      "caller": "example.com/xlang/storefront::src/events.ts::announceRestock",
+      "target": "example.com/xlang/storefront::src/events.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/events.ts",
+        "start": 272,
+        "end": 285
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/xlang/storefront::src/events.ts::announceRestock::producer.send#0",
@@ -210,7 +236,8 @@
         "path": "src/events.ts",
         "start": 129,
         "end": 145
-      }
+      },
+      "holder": "example.com/xlang/storefront::src/events.ts::producer"
     },
     {
       "id": "example.com/xlang/storefront::src/inventory.ts::reserveStock::fetch#0",
@@ -222,6 +249,18 @@
         "start": 254,
         "end": 326
       }
+    },
+    {
+      "id": "example.com/xlang/storefront::src/inventory.ts::stockLevel::(value)INVENTORY#0",
+      "caller": "example.com/xlang/storefront::src/inventory.ts::stockLevel",
+      "target": "example.com/xlang/storefront::src/inventory.ts::INVENTORY",
+      "level": "exact",
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 140,
+        "end": 149
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/xlang/storefront::src/inventory.ts::stockLevel::fetch#0",
@@ -343,8 +382,27 @@
     {
       "name": "src",
       "members": [
+        "example.com/xlang/storefront::src/events.ts::announceRestock",
+        "example.com/xlang/storefront::src/events.ts::producer"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/xlang/storefront::src/events.ts::kafka"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/xlang/storefront::src/inventory.ts::INVENTORY",
+        "example.com/xlang/storefront::src/inventory.ts::stockLevel"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
         "example.com/xlang/storefront::src/inventory.ts::reserveStock",
-        "example.com/xlang/storefront::src/inventory.ts::stockLevel",
         "example.com/xlang/storefront::src/sync.ts::syncInventory"
       ]
     }

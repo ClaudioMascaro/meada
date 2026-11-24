@@ -533,7 +533,8 @@
         "path": "worker.js",
         "start": 57,
         "end": 69
-      }
+      },
+      "holder": "local/gcp-sdk-env::worker.js::bus"
     },
     {
       "id": "local/gcp-sdk-env::worker.js::publishJs::(call_expression).publishMessage#0",
@@ -545,6 +546,18 @@
         "start": 101,
         "end": 155
       }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.js::publishJs::(member)bus#0",
+      "caller": "local/gcp-sdk-env::worker.js::publishJs",
+      "target": "local/gcp-sdk-env::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 101,
+        "end": 110
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-env::worker.js::publishJs::bus.topic#0",
@@ -567,6 +580,18 @@
         "start": 189,
         "end": 248
       }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.js::receiveJs::(member)bus#0",
+      "caller": "local/gcp-sdk-env::worker.js::receiveJs",
+      "target": "local/gcp-sdk-env::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 189,
+        "end": 205
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-env::worker.js::receiveJs::bus.subscription#0",
@@ -632,7 +657,8 @@
         "path": "worker.ts",
         "start": 183,
         "end": 195
-      }
+      },
+      "holder": "local/gcp-sdk-env::worker.ts::bus"
     },
     {
       "id": "local/gcp-sdk-env::worker.ts::SecretManagerServiceClient#0",
@@ -643,7 +669,8 @@
         "path": "worker.ts",
         "start": 244,
         "end": 276
-      }
+      },
+      "holder": "local/gcp-sdk-env::worker.ts::secrets"
     },
     {
       "id": "local/gcp-sdk-env::worker.ts::Storage#0",
@@ -654,7 +681,8 @@
         "path": "worker.ts",
         "start": 213,
         "end": 226
-      }
+      },
+      "holder": "local/gcp-sdk-env::worker.ts::storage"
     },
     {
       "id": "local/gcp-sdk-env::worker.ts::publishPlain::(call_expression).publishMessage#0",
@@ -666,6 +694,18 @@
         "start": 311,
         "end": 365
       }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::publishPlain::(member)bus#0",
+      "caller": "local/gcp-sdk-env::worker.ts::publishPlain",
+      "target": "local/gcp-sdk-env::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 311,
+        "end": 320
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-env::worker.ts::publishPlain::bus.topic#0",
@@ -690,6 +730,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-env::worker.ts::publishStructured::(member)bus#0",
+      "caller": "local/gcp-sdk-env::worker.ts::publishStructured",
+      "target": "local/gcp-sdk-env::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 503,
+        "end": 512
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-env::worker.ts::publishStructured::bus.topic#0",
       "caller": "local/gcp-sdk-env::worker.ts::publishStructured",
       "target": null,
@@ -710,6 +762,18 @@
         "start": 699,
         "end": 756
       }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::publishTyped::(member)bus#0",
+      "caller": "local/gcp-sdk-env::worker.ts::publishTyped",
+      "target": "local/gcp-sdk-env::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 699,
+        "end": 708
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-env::worker.ts::publishTyped::bus.topic#0",
@@ -745,6 +809,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-env::worker.ts::readBucket::(member)storage#0",
+      "caller": "local/gcp-sdk-env::worker.ts::readBucket",
+      "target": "local/gcp-sdk-env::worker.ts::storage",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1179,
+        "end": 1193
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-env::worker.ts::readBucket::storage.bucket#0",
       "caller": "local/gcp-sdk-env::worker.ts::readBucket",
       "target": null,
@@ -754,6 +830,18 @@
         "start": 1179,
         "end": 1213
       }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::readSecret::(member)secrets#0",
+      "caller": "local/gcp-sdk-env::worker.ts::readSecret",
+      "target": "local/gcp-sdk-env::worker.ts::secrets",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1271,
+        "end": 1298
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-env::worker.ts::readSecret::secrets.accessSecretVersion#0",
@@ -778,6 +866,30 @@
       }
     },
     {
+      "id": "local/gcp-sdk-env::worker.ts::receivePlain::(member)bus#0",
+      "caller": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "target": "local/gcp-sdk-env::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 402,
+        "end": 418
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::receivePlain::(value)handler#0",
+      "caller": "local/gcp-sdk-env::worker.ts::receivePlain",
+      "target": "local/gcp-sdk-env::worker.ts::handler",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 453,
+        "end": 460
+      },
+      "kind": "value"
+    },
+    {
       "id": "local/gcp-sdk-env::worker.ts::receivePlain::bus.subscription#0",
       "caller": "local/gcp-sdk-env::worker.ts::receivePlain",
       "target": null,
@@ -798,6 +910,30 @@
         "start": 601,
         "end": 662
       }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::receiveStructured::(member)bus#0",
+      "caller": "local/gcp-sdk-env::worker.ts::receiveStructured",
+      "target": "local/gcp-sdk-env::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 601,
+        "end": 617
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::receiveStructured::(value)handler#0",
+      "caller": "local/gcp-sdk-env::worker.ts::receiveStructured",
+      "target": "local/gcp-sdk-env::worker.ts::handler",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 654,
+        "end": 661
+      },
+      "kind": "value"
     },
     {
       "id": "local/gcp-sdk-env::worker.ts::receiveStructured::bus.subscription#0",
@@ -822,6 +958,30 @@
       }
     },
     {
+      "id": "local/gcp-sdk-env::worker.ts::receiveTyped::(member)bus#0",
+      "caller": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "target": "local/gcp-sdk-env::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 793,
+        "end": 809
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::receiveTyped::(value)handler#0",
+      "caller": "local/gcp-sdk-env::worker.ts::receiveTyped",
+      "target": "local/gcp-sdk-env::worker.ts::handler",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 847,
+        "end": 854
+      },
+      "kind": "value"
+    },
+    {
       "id": "local/gcp-sdk-env::worker.ts::receiveTyped::bus.subscription#0",
       "caller": "local/gcp-sdk-env::worker.ts::receiveTyped",
       "target": null,
@@ -842,6 +1002,30 @@
         "start": 1083,
         "end": 1144
       }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::unknown::(member)bus#0",
+      "caller": "local/gcp-sdk-env::worker.ts::unknown",
+      "target": "local/gcp-sdk-env::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1083,
+        "end": 1099
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::unknown::(value)handler#0",
+      "caller": "local/gcp-sdk-env::worker.ts::unknown",
+      "target": "local/gcp-sdk-env::worker.ts::handler",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1136,
+        "end": 1143
+      },
+      "kind": "value"
     },
     {
       "id": "local/gcp-sdk-env::worker.ts::unknown::bus.subscription#0",
@@ -866,6 +1050,30 @@
       }
     },
     {
+      "id": "local/gcp-sdk-env::worker.ts::wrongSubscription::(member)bus#0",
+      "caller": "local/gcp-sdk-env::worker.ts::wrongSubscription",
+      "target": "local/gcp-sdk-env::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 897,
+        "end": 913
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::wrongSubscription::(value)handler#0",
+      "caller": "local/gcp-sdk-env::worker.ts::wrongSubscription",
+      "target": "local/gcp-sdk-env::worker.ts::handler",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 953,
+        "end": 960
+      },
+      "kind": "value"
+    },
+    {
       "id": "local/gcp-sdk-env::worker.ts::wrongSubscription::bus.subscription#0",
       "caller": "local/gcp-sdk-env::worker.ts::wrongSubscription",
       "target": null,
@@ -886,6 +1094,18 @@
         "start": 996,
         "end": 1051
       }
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::wrongTopic::(member)bus#0",
+      "caller": "local/gcp-sdk-env::worker.ts::wrongTopic",
+      "target": "local/gcp-sdk-env::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 996,
+        "end": 1005
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-env::worker.ts::wrongTopic::bus.topic#0",
@@ -1017,6 +1237,51 @@
       "contract": "channel::pubsub",
       "site": "local/gcp-sdk-env::worker.ts::wrongSubscription",
       "via": "env:TYPED_TOPIC"
+    }
+  ],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "local/gcp-sdk-env::worker.js::bus",
+        "local/gcp-sdk-env::worker.js::publishJs",
+        "local/gcp-sdk-env::worker.js::receiveJs"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "local/gcp-sdk-env::worker.ts::bus",
+        "local/gcp-sdk-env::worker.ts::publishPlain",
+        "local/gcp-sdk-env::worker.ts::publishStructured",
+        "local/gcp-sdk-env::worker.ts::publishTyped",
+        "local/gcp-sdk-env::worker.ts::wrongSubscription",
+        "local/gcp-sdk-env::worker.ts::wrongTopic"
+      ]
+    },
+    {
+      "name": ".#3",
+      "members": [
+        "local/gcp-sdk-env::worker.ts::handler",
+        "local/gcp-sdk-env::worker.ts::receivePlain",
+        "local/gcp-sdk-env::worker.ts::receiveStructured",
+        "local/gcp-sdk-env::worker.ts::receiveTyped",
+        "local/gcp-sdk-env::worker.ts::unknown"
+      ]
+    },
+    {
+      "name": ".#4",
+      "members": [
+        "local/gcp-sdk-env::worker.ts::readBucket",
+        "local/gcp-sdk-env::worker.ts::storage"
+      ]
+    },
+    {
+      "name": ".#5",
+      "members": [
+        "local/gcp-sdk-env::worker.ts::readSecret",
+        "local/gcp-sdk-env::worker.ts::secrets"
+      ]
     }
   ],
   "iac_nodes": [

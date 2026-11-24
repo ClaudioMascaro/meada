@@ -218,6 +218,13 @@ pub struct CallSite {
     /// ordinary call. The caller stays the enclosing scope.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decorates: Option<String>,
+    /// How a row that is no call uses its target (TS/JS): `jsx`, `type`, `value`, `member`,
+    /// `extends`, `reexport` or `dynamic`; absent for a call.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// For a row whose caller is its file, the innermost symbol of the file holding it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub holder: Option<String>,
 }
 
 /// The provider side of a contract: a symbol that serves it, a file, a repository, the call

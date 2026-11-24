@@ -375,6 +375,45 @@
   ],
   "calls": [
     {
+      "id": "local/azure-sdk-ts::worker.js::(member)bus#0",
+      "caller": "local/azure-sdk-ts::worker.js",
+      "target": "local/azure-sdk-ts::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 353,
+        "end": 369
+      },
+      "kind": "member",
+      "holder": "local/azure-sdk-ts::worker.js::sender"
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.js::(member)container#0",
+      "caller": "local/azure-sdk-ts::worker.js",
+      "target": "local/azure-sdk-ts::worker.js::container",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 790,
+        "end": 818
+      },
+      "kind": "member",
+      "holder": "local/azure-sdk-ts::worker.js::blob"
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.js::(member)storage#0",
+      "caller": "local/azure-sdk-ts::worker.js",
+      "target": "local/azure-sdk-ts::worker.js::storage",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 727,
+        "end": 753
+      },
+      "kind": "member",
+      "holder": "local/azure-sdk-ts::worker.js::container"
+    },
+    {
       "id": "local/azure-sdk-ts::worker.js::Bus#0",
       "caller": "local/azure-sdk-ts::worker.js",
       "target": null,
@@ -383,7 +422,8 @@
         "path": "worker.js",
         "start": 317,
         "end": 336
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.js::bus"
     },
     {
       "id": "local/azure-sdk-ts::worker.js::Consumer#0",
@@ -394,7 +434,8 @@
         "path": "worker.js",
         "start": 602,
         "end": 656
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.js::consumer"
     },
     {
       "id": "local/azure-sdk-ts::worker.js::Producer#0",
@@ -405,7 +446,8 @@
         "path": "worker.js",
         "start": 538,
         "end": 583
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.js::producer"
     },
     {
       "id": "local/azure-sdk-ts::worker.js::Secrets#0",
@@ -416,7 +458,8 @@
         "path": "worker.js",
         "start": 851,
         "end": 881
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.js::secrets"
     },
     {
       "id": "local/azure-sdk-ts::worker.js::Storage#0",
@@ -427,7 +470,8 @@
         "path": "worker.js",
         "start": 674,
         "end": 707
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.js::storage"
     },
     {
       "id": "local/azure-sdk-ts::worker.js::bus.createReceiver#0",
@@ -438,7 +482,8 @@
         "path": "worker.js",
         "start": 409,
         "end": 448
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.js::receiver"
     },
     {
       "id": "local/azure-sdk-ts::worker.js::bus.createReceiver#1",
@@ -449,7 +494,8 @@
         "path": "worker.js",
         "start": 471,
         "end": 519
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.js::subscription"
     },
     {
       "id": "local/azure-sdk-ts::worker.js::bus.createSender#0",
@@ -460,7 +506,8 @@
         "path": "worker.js",
         "start": 353,
         "end": 390
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.js::sender"
     },
     {
       "id": "local/azure-sdk-ts::worker.js::container.getBlockBlobClient#0",
@@ -471,7 +518,8 @@
         "path": "worker.js",
         "start": 790,
         "end": 833
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.js::blob"
     },
     {
       "id": "local/azure-sdk-ts::worker.js::hidden::(call_expression).getBlockBlobClient#0",
@@ -606,6 +654,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-ts::worker.js::read::(member)container#0",
+      "caller": "local/azure-sdk-ts::worker.js::read",
+      "target": "local/azure-sdk-ts::worker.js::container",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1303,
+        "end": 1326
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-ts::worker.js::read::container.getBlobClient#0",
       "caller": "local/azure-sdk-ts::worker.js::read",
       "target": null,
@@ -615,6 +675,18 @@
         "start": 1303,
         "end": 1341
       }
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.js::receive::(member)receiver#0",
+      "caller": "local/azure-sdk-ts::worker.js::receive",
+      "target": "local/azure-sdk-ts::worker.js::receiver",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 968,
+        "end": 992
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-ts::worker.js::receive::receiver.receiveMessages#0",
@@ -628,6 +700,30 @@
       }
     },
     {
+      "id": "local/azure-sdk-ts::worker.js::receiveEvents::(member)consumer#0",
+      "caller": "local/azure-sdk-ts::worker.js::receiveEvents",
+      "target": "local/azure-sdk-ts::worker.js::consumer",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1176,
+        "end": 1194
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.js::receiveEvents::(value)handler#0",
+      "caller": "local/azure-sdk-ts::worker.js::receiveEvents",
+      "target": "local/azure-sdk-ts::worker.js::handler",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1211,
+        "end": 1218
+      },
+      "kind": "value"
+    },
+    {
       "id": "local/azure-sdk-ts::worker.js::receiveEvents::consumer.subscribe#0",
       "caller": "local/azure-sdk-ts::worker.js::receiveEvents",
       "target": null,
@@ -637,6 +733,18 @@
         "start": 1176,
         "end": 1220
       }
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.js::secret::(member)secrets#0",
+      "caller": "local/azure-sdk-ts::worker.js::secret",
+      "target": "local/azure-sdk-ts::worker.js::secrets",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1383,
+        "end": 1400
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-ts::worker.js::secret::secrets.getSecret#0",
@@ -650,6 +758,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-ts::worker.js::send::(member)sender#0",
+      "caller": "local/azure-sdk-ts::worker.js::send",
+      "target": "local/azure-sdk-ts::worker.js::sender",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 908,
+        "end": 927
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-ts::worker.js::send::sender.sendMessages#0",
       "caller": "local/azure-sdk-ts::worker.js::send",
       "target": null,
@@ -659,6 +779,18 @@
         "start": 908,
         "end": 936
       }
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.js::sendEvents::(member)producer#0",
+      "caller": "local/azure-sdk-ts::worker.js::sendEvents",
+      "target": "local/azure-sdk-ts::worker.js::producer",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1113,
+        "end": 1131
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-ts::worker.js::sendEvents::producer.sendBatch#0",
@@ -680,7 +812,32 @@
         "path": "worker.js",
         "start": 727,
         "end": 775
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.js::container"
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.js::subscribe::(member)subscription#0",
+      "caller": "local/azure-sdk-ts::worker.js::subscribe",
+      "target": "local/azure-sdk-ts::worker.js::subscription",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1029,
+        "end": 1051
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.js::subscribe::(value)handler#0",
+      "caller": "local/azure-sdk-ts::worker.js::subscribe",
+      "target": "local/azure-sdk-ts::worker.js::handler",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1069,
+        "end": 1076
+      },
+      "kind": "value"
     },
     {
       "id": "local/azure-sdk-ts::worker.js::subscribe::subscription.subscribe#0",
@@ -694,6 +851,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-ts::worker.js::write::(member)blob#0",
+      "caller": "local/azure-sdk-ts::worker.js::write",
+      "target": "local/azure-sdk-ts::worker.js::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1250,
+        "end": 1261
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-ts::worker.js::write::blob.upload#0",
       "caller": "local/azure-sdk-ts::worker.js::write",
       "target": null,
@@ -705,6 +874,45 @@
       }
     },
     {
+      "id": "local/azure-sdk-ts::worker.ts::(member)bus#0",
+      "caller": "local/azure-sdk-ts::worker.ts",
+      "target": "local/azure-sdk-ts::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 353,
+        "end": 369
+      },
+      "kind": "member",
+      "holder": "local/azure-sdk-ts::worker.ts::sender"
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.ts::(member)container#0",
+      "caller": "local/azure-sdk-ts::worker.ts",
+      "target": "local/azure-sdk-ts::worker.ts::container",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 790,
+        "end": 818
+      },
+      "kind": "member",
+      "holder": "local/azure-sdk-ts::worker.ts::blob"
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.ts::(member)storage#0",
+      "caller": "local/azure-sdk-ts::worker.ts",
+      "target": "local/azure-sdk-ts::worker.ts::storage",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 727,
+        "end": 753
+      },
+      "kind": "member",
+      "holder": "local/azure-sdk-ts::worker.ts::container"
+    },
+    {
       "id": "local/azure-sdk-ts::worker.ts::Bus#0",
       "caller": "local/azure-sdk-ts::worker.ts",
       "target": null,
@@ -713,7 +921,8 @@
         "path": "worker.ts",
         "start": 317,
         "end": 336
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.ts::bus"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::Consumer#0",
@@ -724,7 +933,8 @@
         "path": "worker.ts",
         "start": 602,
         "end": 656
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.ts::consumer"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::Producer#0",
@@ -735,7 +945,8 @@
         "path": "worker.ts",
         "start": 538,
         "end": 583
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.ts::producer"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::Secrets#0",
@@ -746,7 +957,8 @@
         "path": "worker.ts",
         "start": 851,
         "end": 881
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.ts::secrets"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::Storage#0",
@@ -757,7 +969,8 @@
         "path": "worker.ts",
         "start": 674,
         "end": 707
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.ts::storage"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::bus.createReceiver#0",
@@ -768,7 +981,8 @@
         "path": "worker.ts",
         "start": 409,
         "end": 448
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.ts::receiver"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::bus.createReceiver#1",
@@ -779,7 +993,8 @@
         "path": "worker.ts",
         "start": 471,
         "end": 519
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.ts::subscription"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::bus.createSender#0",
@@ -790,7 +1005,8 @@
         "path": "worker.ts",
         "start": 353,
         "end": 390
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.ts::sender"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::container.getBlockBlobClient#0",
@@ -801,7 +1017,8 @@
         "path": "worker.ts",
         "start": 790,
         "end": 833
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.ts::blob"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::hidden::(call_expression).getBlockBlobClient#0",
@@ -936,6 +1153,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-ts::worker.ts::read::(member)container#0",
+      "caller": "local/azure-sdk-ts::worker.ts::read",
+      "target": "local/azure-sdk-ts::worker.ts::container",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1303,
+        "end": 1326
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-ts::worker.ts::read::container.getBlobClient#0",
       "caller": "local/azure-sdk-ts::worker.ts::read",
       "target": null,
@@ -945,6 +1174,18 @@
         "start": 1303,
         "end": 1341
       }
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.ts::receive::(member)receiver#0",
+      "caller": "local/azure-sdk-ts::worker.ts::receive",
+      "target": "local/azure-sdk-ts::worker.ts::receiver",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 968,
+        "end": 992
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::receive::receiver.receiveMessages#0",
@@ -958,6 +1199,30 @@
       }
     },
     {
+      "id": "local/azure-sdk-ts::worker.ts::receiveEvents::(member)consumer#0",
+      "caller": "local/azure-sdk-ts::worker.ts::receiveEvents",
+      "target": "local/azure-sdk-ts::worker.ts::consumer",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1176,
+        "end": 1194
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.ts::receiveEvents::(value)handler#0",
+      "caller": "local/azure-sdk-ts::worker.ts::receiveEvents",
+      "target": "local/azure-sdk-ts::worker.ts::handler",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1211,
+        "end": 1218
+      },
+      "kind": "value"
+    },
+    {
       "id": "local/azure-sdk-ts::worker.ts::receiveEvents::consumer.subscribe#0",
       "caller": "local/azure-sdk-ts::worker.ts::receiveEvents",
       "target": null,
@@ -967,6 +1232,18 @@
         "start": 1176,
         "end": 1220
       }
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.ts::secret::(member)secrets#0",
+      "caller": "local/azure-sdk-ts::worker.ts::secret",
+      "target": "local/azure-sdk-ts::worker.ts::secrets",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1383,
+        "end": 1400
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::secret::secrets.getSecret#0",
@@ -980,6 +1257,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-ts::worker.ts::send::(member)sender#0",
+      "caller": "local/azure-sdk-ts::worker.ts::send",
+      "target": "local/azure-sdk-ts::worker.ts::sender",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 908,
+        "end": 927
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-ts::worker.ts::send::sender.sendMessages#0",
       "caller": "local/azure-sdk-ts::worker.ts::send",
       "target": null,
@@ -989,6 +1278,18 @@
         "start": 908,
         "end": 936
       }
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.ts::sendEvents::(member)producer#0",
+      "caller": "local/azure-sdk-ts::worker.ts::sendEvents",
+      "target": "local/azure-sdk-ts::worker.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1113,
+        "end": 1131
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::sendEvents::producer.sendBatch#0",
@@ -1010,7 +1311,32 @@
         "path": "worker.ts",
         "start": 727,
         "end": 775
-      }
+      },
+      "holder": "local/azure-sdk-ts::worker.ts::container"
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.ts::subscribe::(member)subscription#0",
+      "caller": "local/azure-sdk-ts::worker.ts::subscribe",
+      "target": "local/azure-sdk-ts::worker.ts::subscription",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1029,
+        "end": 1051
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.ts::subscribe::(value)handler#0",
+      "caller": "local/azure-sdk-ts::worker.ts::subscribe",
+      "target": "local/azure-sdk-ts::worker.ts::handler",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1069,
+        "end": 1076
+      },
+      "kind": "value"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::subscribe::subscription.subscribe#0",
@@ -1022,6 +1348,18 @@
         "start": 1029,
         "end": 1078
       }
+    },
+    {
+      "id": "local/azure-sdk-ts::worker.ts::write::(member)blob#0",
+      "caller": "local/azure-sdk-ts::worker.ts::write",
+      "target": "local/azure-sdk-ts::worker.ts::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1250,
+        "end": 1261
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-ts::worker.ts::write::blob.upload#0",
@@ -1111,6 +1449,136 @@
       "contract": "channel::servicebus::subscription:orders-typescript/audit",
       "site": "local/azure-sdk-ts::worker.ts::subscribe",
       "via": null
+    }
+  ],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "local/azure-sdk-ts::worker.js::blob",
+        "local/azure-sdk-ts::worker.js::write"
+      ]
+    },
+    {
+      "name": ".#10",
+      "members": [
+        "local/azure-sdk-ts::worker.ts::blob",
+        "local/azure-sdk-ts::worker.ts::write"
+      ]
+    },
+    {
+      "name": ".#11",
+      "members": [
+        "local/azure-sdk-ts::worker.ts::bus"
+      ]
+    },
+    {
+      "name": ".#12",
+      "members": [
+        "local/azure-sdk-ts::worker.ts::consumer",
+        "local/azure-sdk-ts::worker.ts::handler",
+        "local/azure-sdk-ts::worker.ts::receiveEvents",
+        "local/azure-sdk-ts::worker.ts::subscribe",
+        "local/azure-sdk-ts::worker.ts::subscription"
+      ]
+    },
+    {
+      "name": ".#13",
+      "members": [
+        "local/azure-sdk-ts::worker.ts::container",
+        "local/azure-sdk-ts::worker.ts::read"
+      ]
+    },
+    {
+      "name": ".#14",
+      "members": [
+        "local/azure-sdk-ts::worker.ts::producer",
+        "local/azure-sdk-ts::worker.ts::sendEvents"
+      ]
+    },
+    {
+      "name": ".#15",
+      "members": [
+        "local/azure-sdk-ts::worker.ts::receive",
+        "local/azure-sdk-ts::worker.ts::receiver"
+      ]
+    },
+    {
+      "name": ".#16",
+      "members": [
+        "local/azure-sdk-ts::worker.ts::secret",
+        "local/azure-sdk-ts::worker.ts::secrets"
+      ]
+    },
+    {
+      "name": ".#17",
+      "members": [
+        "local/azure-sdk-ts::worker.ts::send",
+        "local/azure-sdk-ts::worker.ts::sender"
+      ]
+    },
+    {
+      "name": ".#18",
+      "members": [
+        "local/azure-sdk-ts::worker.ts::storage"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "local/azure-sdk-ts::worker.js::bus"
+      ]
+    },
+    {
+      "name": ".#3",
+      "members": [
+        "local/azure-sdk-ts::worker.js::consumer",
+        "local/azure-sdk-ts::worker.js::handler",
+        "local/azure-sdk-ts::worker.js::receiveEvents",
+        "local/azure-sdk-ts::worker.js::subscribe",
+        "local/azure-sdk-ts::worker.js::subscription"
+      ]
+    },
+    {
+      "name": ".#4",
+      "members": [
+        "local/azure-sdk-ts::worker.js::container",
+        "local/azure-sdk-ts::worker.js::read"
+      ]
+    },
+    {
+      "name": ".#5",
+      "members": [
+        "local/azure-sdk-ts::worker.js::producer",
+        "local/azure-sdk-ts::worker.js::sendEvents"
+      ]
+    },
+    {
+      "name": ".#6",
+      "members": [
+        "local/azure-sdk-ts::worker.js::receive",
+        "local/azure-sdk-ts::worker.js::receiver"
+      ]
+    },
+    {
+      "name": ".#7",
+      "members": [
+        "local/azure-sdk-ts::worker.js::secret",
+        "local/azure-sdk-ts::worker.js::secrets"
+      ]
+    },
+    {
+      "name": ".#8",
+      "members": [
+        "local/azure-sdk-ts::worker.js::send",
+        "local/azure-sdk-ts::worker.js::sender"
+      ]
+    },
+    {
+      "name": ".#9",
+      "members": [
+        "local/azure-sdk-ts::worker.js::storage"
+      ]
     }
   ],
   "links": [

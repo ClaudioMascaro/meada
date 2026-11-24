@@ -82,7 +82,8 @@
         "path": "worker.ts",
         "start": 67,
         "end": 99
-      }
+      },
+      "holder": "local/azure-sdk-mutations::worker.ts::bus"
     },
     {
       "id": "local/azure-sdk-mutations::worker.ts::alias::(call_expression).receiveMessages#0",
@@ -184,6 +185,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-mutations::worker.ts::receiver::(member)bus#0",
+      "caller": "local/azure-sdk-mutations::worker.ts::receiver",
+      "target": "local/azure-sdk-mutations::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 142,
+        "end": 160
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-mutations::worker.ts::receiver::bus.createReceiver#0",
       "caller": "local/azure-sdk-mutations::worker.ts::receiver",
       "target": null,
@@ -277,6 +290,7 @@
       "name": ".",
       "members": [
         "local/azure-sdk-mutations::worker.ts::alias",
+        "local/azure-sdk-mutations::worker.ts::bus",
         "local/azure-sdk-mutations::worker.ts::mapping",
         "local/azure-sdk-mutations::worker.ts::memo",
         "local/azure-sdk-mutations::worker.ts::receiver",

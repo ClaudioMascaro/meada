@@ -75,6 +75,19 @@
   ],
   "calls": [
     {
+      "id": "example.com/chain/worker::src/consumer.ts::(member)kafka#0",
+      "caller": "example.com/chain/worker::src/consumer.ts",
+      "target": "example.com/chain/worker::src/consumer.ts::kafka",
+      "level": "exact",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 160,
+        "end": 174
+      },
+      "kind": "member",
+      "holder": "example.com/chain/worker::src/consumer.ts::consumer"
+    },
+    {
       "id": "example.com/chain/worker::src/consumer.ts::Kafka#0",
       "caller": "example.com/chain/worker::src/consumer.ts",
       "target": null,
@@ -83,7 +96,8 @@
         "path": "src/consumer.ts",
         "start": 83,
         "end": 141
-      }
+      },
+      "holder": "example.com/chain/worker::src/consumer.ts::kafka"
     },
     {
       "id": "example.com/chain/worker::src/consumer.ts::kafka.consumer#0",
@@ -94,7 +108,8 @@
         "path": "src/consumer.ts",
         "start": 160,
         "end": 197
-      }
+      },
+      "holder": "example.com/chain/worker::src/consumer.ts::consumer"
     },
     {
       "id": "example.com/chain/worker::src/consumer.ts::onOrderCreated::notify#0",
@@ -106,6 +121,30 @@
         "start": 497,
         "end": 518
       }
+    },
+    {
+      "id": "example.com/chain/worker::src/consumer.ts::start::(member)consumer#0",
+      "caller": "example.com/chain/worker::src/consumer.ts::start",
+      "target": "example.com/chain/worker::src/consumer.ts::consumer",
+      "level": "exact",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 240,
+        "end": 258
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/chain/worker::src/consumer.ts::start::(value)onOrderCreated#0",
+      "caller": "example.com/chain/worker::src/consumer.ts::start",
+      "target": "example.com/chain/worker::src/consumer.ts::onOrderCreated",
+      "level": "exact",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 325,
+        "end": 339
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/worker::src/consumer.ts::start::consumer.run#0",
@@ -178,6 +217,19 @@
   "communities": [
     {
       "name": "src",
+      "members": [
+        "example.com/chain/worker::src/consumer.ts::consumer",
+        "example.com/chain/worker::src/consumer.ts::start"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/chain/worker::src/consumer.ts::kafka"
+      ]
+    },
+    {
+      "name": "src#3",
       "members": [
         "example.com/chain/worker::src/consumer.ts::onOrderCreated",
         "example.com/chain/worker::src/jobs.ts::settleOrders",

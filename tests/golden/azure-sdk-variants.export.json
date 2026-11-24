@@ -3015,6 +3015,45 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::(member)bus#0",
+      "caller": "local/azure-sdk-variants::worker.js",
+      "target": "local/azure-sdk-variants::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 353,
+        "end": 369
+      },
+      "kind": "member",
+      "holder": "local/azure-sdk-variants::worker.js::sender"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::(member)container#0",
+      "caller": "local/azure-sdk-variants::worker.js",
+      "target": "local/azure-sdk-variants::worker.js::container",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 790,
+        "end": 818
+      },
+      "kind": "member",
+      "holder": "local/azure-sdk-variants::worker.js::blob"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::(member)storage#0",
+      "caller": "local/azure-sdk-variants::worker.js",
+      "target": "local/azure-sdk-variants::worker.js::storage",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 727,
+        "end": 753
+      },
+      "kind": "member",
+      "holder": "local/azure-sdk-variants::worker.js::container"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::Bus#0",
       "caller": "local/azure-sdk-variants::worker.js",
       "target": null,
@@ -3023,7 +3062,8 @@
         "path": "worker.js",
         "start": 317,
         "end": 336
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.js::bus"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::Consumer#0",
@@ -3034,7 +3074,8 @@
         "path": "worker.js",
         "start": 602,
         "end": 656
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.js::consumer"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::Producer#0",
@@ -3045,7 +3086,8 @@
         "path": "worker.js",
         "start": 538,
         "end": 583
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.js::producer"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::Secrets#0",
@@ -3056,7 +3098,8 @@
         "path": "worker.js",
         "start": 851,
         "end": 881
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.js::secrets"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::Storage#0",
@@ -3067,7 +3110,8 @@
         "path": "worker.js",
         "start": 674,
         "end": 707
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.js::storage"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::bus.createReceiver#0",
@@ -3078,7 +3122,8 @@
         "path": "worker.js",
         "start": 409,
         "end": 448
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.js::receiver"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::bus.createReceiver#1",
@@ -3089,7 +3134,8 @@
         "path": "worker.js",
         "start": 471,
         "end": 519
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.js::subscription"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::bus.createSender#0",
@@ -3100,7 +3146,8 @@
         "path": "worker.js",
         "start": 353,
         "end": 390
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.js::sender"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::container.getBlockBlobClient#0",
@@ -3111,7 +3158,8 @@
         "path": "worker.js",
         "start": 790,
         "end": 833
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.js::blob"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::hidden::(call_expression).getBlockBlobClient#0",
@@ -3246,6 +3294,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::read::(member)container#0",
+      "caller": "local/azure-sdk-variants::worker.js::read",
+      "target": "local/azure-sdk-variants::worker.js::container",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1303,
+        "end": 1326
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::read::container.getBlobClient#0",
       "caller": "local/azure-sdk-variants::worker.js::read",
       "target": null,
@@ -3255,6 +3315,18 @@
         "start": 1303,
         "end": 1341
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::readBuffer::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.js::readBuffer",
+      "target": "local/azure-sdk-variants::worker.js::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 2029,
+        "end": 2050
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::readBuffer::blob.downloadToBuffer#0",
@@ -3268,6 +3340,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::readFile::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.js::readFile",
+      "target": "local/azure-sdk-variants::worker.js::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 2085,
+        "end": 2104
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::readFile::blob.downloadToFile#0",
       "caller": "local/azure-sdk-variants::worker.js::readFile",
       "target": null,
@@ -3277,6 +3361,18 @@
         "start": 2085,
         "end": 2110
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::receive::(member)receiver#0",
+      "caller": "local/azure-sdk-variants::worker.js::receive",
+      "target": "local/azure-sdk-variants::worker.js::receiver",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 968,
+        "end": 992
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::receive::receiver.receiveMessages#0",
@@ -3290,6 +3386,30 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::receiveEvents::(member)consumer#0",
+      "caller": "local/azure-sdk-variants::worker.js::receiveEvents",
+      "target": "local/azure-sdk-variants::worker.js::consumer",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1176,
+        "end": 1194
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::receiveEvents::(value)handler#0",
+      "caller": "local/azure-sdk-variants::worker.js::receiveEvents",
+      "target": "local/azure-sdk-variants::worker.js::handler",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1211,
+        "end": 1218
+      },
+      "kind": "value"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::receiveEvents::consumer.subscribe#0",
       "caller": "local/azure-sdk-variants::worker.js::receiveEvents",
       "target": null,
@@ -3299,6 +3419,30 @@
         "start": 1176,
         "end": 1220
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::repeatReads::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.js::repeatReads",
+      "target": "local/azure-sdk-variants::worker.js::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 3322,
+        "end": 3335
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::repeatReads::(member)secrets#0",
+      "caller": "local/azure-sdk-variants::worker.js::repeatReads",
+      "target": "local/azure-sdk-variants::worker.js::secrets",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 3356,
+        "end": 3373
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::repeatReads::blob.download#0",
@@ -3345,6 +3489,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::secret::(member)secrets#0",
+      "caller": "local/azure-sdk-variants::worker.js::secret",
+      "target": "local/azure-sdk-variants::worker.js::secrets",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1383,
+        "end": 1400
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::secret::secrets.getSecret#0",
       "caller": "local/azure-sdk-variants::worker.js::secret",
       "target": null,
@@ -3356,6 +3512,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::send::(member)sender#0",
+      "caller": "local/azure-sdk-variants::worker.js::send",
+      "target": "local/azure-sdk-variants::worker.js::sender",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 908,
+        "end": 927
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::send::sender.sendMessages#0",
       "caller": "local/azure-sdk-variants::worker.js::send",
       "target": null,
@@ -3365,6 +3533,18 @@
         "start": 908,
         "end": 936
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::sendEvents::(member)producer#0",
+      "caller": "local/azure-sdk-variants::worker.js::sendEvents",
+      "target": "local/azure-sdk-variants::worker.js::producer",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1113,
+        "end": 1131
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::sendEvents::producer.sendBatch#0",
@@ -3430,7 +3610,8 @@
         "path": "worker.js",
         "start": 727,
         "end": 775
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.js::container"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::structuredBlob::(call_expression).download#0",
@@ -3455,6 +3636,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::structuredBlob::(member)storage#0",
+      "caller": "local/azure-sdk-variants::worker.js::structuredBlob",
+      "target": "local/azure-sdk-variants::worker.js::storage",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 2786,
+        "end": 2812
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::structuredBlob::storage.getContainerClient#0",
       "caller": "local/azure-sdk-variants::worker.js::structuredBlob",
       "target": null,
@@ -3477,6 +3670,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::structuredQueue::(member)bus#0",
+      "caller": "local/azure-sdk-variants::worker.js::structuredQueue",
+      "target": "local/azure-sdk-variants::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 2317,
+        "end": 2333
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::structuredQueue::bus.createSender#0",
       "caller": "local/azure-sdk-variants::worker.js::structuredQueue",
       "target": null,
@@ -3486,6 +3691,18 @@
         "start": 2317,
         "end": 2432
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::structuredSecret::(member)secrets#0",
+      "caller": "local/azure-sdk-variants::worker.js::structuredSecret",
+      "target": "local/azure-sdk-variants::worker.js::secrets",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 2963,
+        "end": 2980
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::structuredSecret::secrets.getSecret#0",
@@ -3510,6 +3727,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::structuredSub::(member)bus#0",
+      "caller": "local/azure-sdk-variants::worker.js::structuredSub",
+      "target": "local/azure-sdk-variants::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 2492,
+        "end": 2510
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::structuredSub::bus.createReceiver#0",
       "caller": "local/azure-sdk-variants::worker.js::structuredSub",
       "target": null,
@@ -3519,6 +3748,30 @@
         "start": 2492,
         "end": 2728
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::subscribe::(member)subscription#0",
+      "caller": "local/azure-sdk-variants::worker.js::subscribe",
+      "target": "local/azure-sdk-variants::worker.js::subscription",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1029,
+        "end": 1051
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::subscribe::(value)handler#0",
+      "caller": "local/azure-sdk-variants::worker.js::subscribe",
+      "target": "local/azure-sdk-variants::worker.js::handler",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1069,
+        "end": 1076
+      },
+      "kind": "value"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::subscribe::subscription.subscribe#0",
@@ -3554,6 +3807,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::write::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.js::write",
+      "target": "local/azure-sdk-variants::worker.js::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1250,
+        "end": 1261
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::write::blob.upload#0",
       "caller": "local/azure-sdk-variants::worker.js::write",
       "target": null,
@@ -3563,6 +3828,18 @@
         "start": 1250,
         "end": 1274
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::writeData::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.js::writeData",
+      "target": "local/azure-sdk-variants::worker.js::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1857,
+        "end": 1872
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::writeData::blob.uploadData#0",
@@ -3576,6 +3853,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::writeFile::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.js::writeFile",
+      "target": "local/azure-sdk-variants::worker.js::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1912,
+        "end": 1927
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::writeFile::blob.uploadFile#0",
       "caller": "local/azure-sdk-variants::worker.js::writeFile",
       "target": null,
@@ -3585,6 +3874,18 @@
         "start": 1912,
         "end": 1933
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::writeStream::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.js::writeStream",
+      "target": "local/azure-sdk-variants::worker.js::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 1969,
+        "end": 1986
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::writeStream::blob.uploadStream#0",
@@ -3607,6 +3908,18 @@
         "start": 3152,
         "end": 3285
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::wrongService::(member)bus#0",
+      "caller": "local/azure-sdk-variants::worker.js::wrongService",
+      "target": "local/azure-sdk-variants::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 3152,
+        "end": 3168
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::wrongService::bus.createSender#0",
@@ -4302,6 +4615,45 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::(member)bus#0",
+      "caller": "local/azure-sdk-variants::worker.ts",
+      "target": "local/azure-sdk-variants::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 353,
+        "end": 369
+      },
+      "kind": "member",
+      "holder": "local/azure-sdk-variants::worker.ts::sender"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::(member)container#0",
+      "caller": "local/azure-sdk-variants::worker.ts",
+      "target": "local/azure-sdk-variants::worker.ts::container",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 790,
+        "end": 818
+      },
+      "kind": "member",
+      "holder": "local/azure-sdk-variants::worker.ts::blob"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::(member)storage#0",
+      "caller": "local/azure-sdk-variants::worker.ts",
+      "target": "local/azure-sdk-variants::worker.ts::storage",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 727,
+        "end": 753
+      },
+      "kind": "member",
+      "holder": "local/azure-sdk-variants::worker.ts::container"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::Bus#0",
       "caller": "local/azure-sdk-variants::worker.ts",
       "target": null,
@@ -4310,7 +4662,8 @@
         "path": "worker.ts",
         "start": 317,
         "end": 336
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.ts::bus"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::Consumer#0",
@@ -4321,7 +4674,8 @@
         "path": "worker.ts",
         "start": 602,
         "end": 656
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.ts::consumer"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::Producer#0",
@@ -4332,7 +4686,8 @@
         "path": "worker.ts",
         "start": 538,
         "end": 583
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.ts::producer"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::Secrets#0",
@@ -4343,7 +4698,8 @@
         "path": "worker.ts",
         "start": 851,
         "end": 881
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.ts::secrets"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::Storage#0",
@@ -4354,7 +4710,8 @@
         "path": "worker.ts",
         "start": 674,
         "end": 707
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.ts::storage"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::bus.createReceiver#0",
@@ -4365,7 +4722,8 @@
         "path": "worker.ts",
         "start": 409,
         "end": 448
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.ts::receiver"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::bus.createReceiver#1",
@@ -4376,7 +4734,8 @@
         "path": "worker.ts",
         "start": 471,
         "end": 519
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.ts::subscription"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::bus.createSender#0",
@@ -4387,7 +4746,8 @@
         "path": "worker.ts",
         "start": 353,
         "end": 390
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.ts::sender"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::container.getBlockBlobClient#0",
@@ -4398,7 +4758,8 @@
         "path": "worker.ts",
         "start": 790,
         "end": 833
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.ts::blob"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::hidden::(call_expression).getBlockBlobClient#0",
@@ -4533,6 +4894,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::read::(member)container#0",
+      "caller": "local/azure-sdk-variants::worker.ts::read",
+      "target": "local/azure-sdk-variants::worker.ts::container",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1303,
+        "end": 1326
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::read::container.getBlobClient#0",
       "caller": "local/azure-sdk-variants::worker.ts::read",
       "target": null,
@@ -4542,6 +4915,18 @@
         "start": 1303,
         "end": 1341
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::readBuffer::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.ts::readBuffer",
+      "target": "local/azure-sdk-variants::worker.ts::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 2029,
+        "end": 2050
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::readBuffer::blob.downloadToBuffer#0",
@@ -4555,6 +4940,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::readFile::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.ts::readFile",
+      "target": "local/azure-sdk-variants::worker.ts::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 2085,
+        "end": 2104
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::readFile::blob.downloadToFile#0",
       "caller": "local/azure-sdk-variants::worker.ts::readFile",
       "target": null,
@@ -4564,6 +4961,18 @@
         "start": 2085,
         "end": 2110
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::receive::(member)receiver#0",
+      "caller": "local/azure-sdk-variants::worker.ts::receive",
+      "target": "local/azure-sdk-variants::worker.ts::receiver",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 968,
+        "end": 992
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::receive::receiver.receiveMessages#0",
@@ -4577,6 +4986,30 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::receiveEvents::(member)consumer#0",
+      "caller": "local/azure-sdk-variants::worker.ts::receiveEvents",
+      "target": "local/azure-sdk-variants::worker.ts::consumer",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1176,
+        "end": 1194
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::receiveEvents::(value)handler#0",
+      "caller": "local/azure-sdk-variants::worker.ts::receiveEvents",
+      "target": "local/azure-sdk-variants::worker.ts::handler",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1211,
+        "end": 1218
+      },
+      "kind": "value"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::receiveEvents::consumer.subscribe#0",
       "caller": "local/azure-sdk-variants::worker.ts::receiveEvents",
       "target": null,
@@ -4586,6 +5019,30 @@
         "start": 1176,
         "end": 1220
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::repeatReads::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.ts::repeatReads",
+      "target": "local/azure-sdk-variants::worker.ts::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 3322,
+        "end": 3335
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::repeatReads::(member)secrets#0",
+      "caller": "local/azure-sdk-variants::worker.ts::repeatReads",
+      "target": "local/azure-sdk-variants::worker.ts::secrets",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 3356,
+        "end": 3373
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::repeatReads::blob.download#0",
@@ -4632,6 +5089,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::secret::(member)secrets#0",
+      "caller": "local/azure-sdk-variants::worker.ts::secret",
+      "target": "local/azure-sdk-variants::worker.ts::secrets",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1383,
+        "end": 1400
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::secret::secrets.getSecret#0",
       "caller": "local/azure-sdk-variants::worker.ts::secret",
       "target": null,
@@ -4643,6 +5112,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::send::(member)sender#0",
+      "caller": "local/azure-sdk-variants::worker.ts::send",
+      "target": "local/azure-sdk-variants::worker.ts::sender",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 908,
+        "end": 927
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::send::sender.sendMessages#0",
       "caller": "local/azure-sdk-variants::worker.ts::send",
       "target": null,
@@ -4652,6 +5133,18 @@
         "start": 908,
         "end": 936
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::sendEvents::(member)producer#0",
+      "caller": "local/azure-sdk-variants::worker.ts::sendEvents",
+      "target": "local/azure-sdk-variants::worker.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1113,
+        "end": 1131
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::sendEvents::producer.sendBatch#0",
@@ -4717,7 +5210,8 @@
         "path": "worker.ts",
         "start": 727,
         "end": 775
-      }
+      },
+      "holder": "local/azure-sdk-variants::worker.ts::container"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::structuredBlob::(call_expression).download#0",
@@ -4742,6 +5236,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::structuredBlob::(member)storage#0",
+      "caller": "local/azure-sdk-variants::worker.ts::structuredBlob",
+      "target": "local/azure-sdk-variants::worker.ts::storage",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 2786,
+        "end": 2812
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::structuredBlob::storage.getContainerClient#0",
       "caller": "local/azure-sdk-variants::worker.ts::structuredBlob",
       "target": null,
@@ -4764,6 +5270,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::structuredQueue::(member)bus#0",
+      "caller": "local/azure-sdk-variants::worker.ts::structuredQueue",
+      "target": "local/azure-sdk-variants::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 2317,
+        "end": 2333
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::structuredQueue::bus.createSender#0",
       "caller": "local/azure-sdk-variants::worker.ts::structuredQueue",
       "target": null,
@@ -4773,6 +5291,18 @@
         "start": 2317,
         "end": 2432
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::structuredSecret::(member)secrets#0",
+      "caller": "local/azure-sdk-variants::worker.ts::structuredSecret",
+      "target": "local/azure-sdk-variants::worker.ts::secrets",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 2963,
+        "end": 2980
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::structuredSecret::secrets.getSecret#0",
@@ -4797,6 +5327,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::structuredSub::(member)bus#0",
+      "caller": "local/azure-sdk-variants::worker.ts::structuredSub",
+      "target": "local/azure-sdk-variants::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 2492,
+        "end": 2510
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::structuredSub::bus.createReceiver#0",
       "caller": "local/azure-sdk-variants::worker.ts::structuredSub",
       "target": null,
@@ -4806,6 +5348,30 @@
         "start": 2492,
         "end": 2728
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::subscribe::(member)subscription#0",
+      "caller": "local/azure-sdk-variants::worker.ts::subscribe",
+      "target": "local/azure-sdk-variants::worker.ts::subscription",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1029,
+        "end": 1051
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::subscribe::(value)handler#0",
+      "caller": "local/azure-sdk-variants::worker.ts::subscribe",
+      "target": "local/azure-sdk-variants::worker.ts::handler",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1069,
+        "end": 1076
+      },
+      "kind": "value"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::subscribe::subscription.subscribe#0",
@@ -4841,6 +5407,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::write::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.ts::write",
+      "target": "local/azure-sdk-variants::worker.ts::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1250,
+        "end": 1261
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::write::blob.upload#0",
       "caller": "local/azure-sdk-variants::worker.ts::write",
       "target": null,
@@ -4850,6 +5428,18 @@
         "start": 1250,
         "end": 1274
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::writeData::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.ts::writeData",
+      "target": "local/azure-sdk-variants::worker.ts::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1857,
+        "end": 1872
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::writeData::blob.uploadData#0",
@@ -4863,6 +5453,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::writeFile::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.ts::writeFile",
+      "target": "local/azure-sdk-variants::worker.ts::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1912,
+        "end": 1927
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::writeFile::blob.uploadFile#0",
       "caller": "local/azure-sdk-variants::worker.ts::writeFile",
       "target": null,
@@ -4872,6 +5474,18 @@
         "start": 1912,
         "end": 1933
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::writeStream::(member)blob#0",
+      "caller": "local/azure-sdk-variants::worker.ts::writeStream",
+      "target": "local/azure-sdk-variants::worker.ts::blob",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1969,
+        "end": 1986
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::writeStream::blob.uploadStream#0",
@@ -4894,6 +5508,18 @@
         "start": 3152,
         "end": 3285
       }
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::wrongService::(member)bus#0",
+      "caller": "local/azure-sdk-variants::worker.ts::wrongService",
+      "target": "local/azure-sdk-variants::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 3152,
+        "end": 3168
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::wrongService::bus.createSender#0",
@@ -5448,6 +6074,158 @@
       "contract": "channel::servicebus::subscription:orders-typescript/audit",
       "site": "local/azure-sdk-variants::worker.ts::subscribe",
       "via": null
+    }
+  ],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "local/azure-sdk-variants::worker.js::blob",
+        "local/azure-sdk-variants::worker.js::readBuffer",
+        "local/azure-sdk-variants::worker.js::readFile",
+        "local/azure-sdk-variants::worker.js::write",
+        "local/azure-sdk-variants::worker.js::writeData",
+        "local/azure-sdk-variants::worker.js::writeFile",
+        "local/azure-sdk-variants::worker.js::writeStream"
+      ]
+    },
+    {
+      "name": ".#10",
+      "members": [
+        "local/azure-sdk-variants::worker.ts::blob",
+        "local/azure-sdk-variants::worker.ts::readBuffer",
+        "local/azure-sdk-variants::worker.ts::readFile",
+        "local/azure-sdk-variants::worker.ts::write",
+        "local/azure-sdk-variants::worker.ts::writeData",
+        "local/azure-sdk-variants::worker.ts::writeFile",
+        "local/azure-sdk-variants::worker.ts::writeStream"
+      ]
+    },
+    {
+      "name": ".#11",
+      "members": [
+        "local/azure-sdk-variants::worker.ts::bus",
+        "local/azure-sdk-variants::worker.ts::structuredQueue",
+        "local/azure-sdk-variants::worker.ts::structuredSub",
+        "local/azure-sdk-variants::worker.ts::wrongService"
+      ]
+    },
+    {
+      "name": ".#12",
+      "members": [
+        "local/azure-sdk-variants::worker.ts::consumer",
+        "local/azure-sdk-variants::worker.ts::handler",
+        "local/azure-sdk-variants::worker.ts::receiveEvents",
+        "local/azure-sdk-variants::worker.ts::subscribe",
+        "local/azure-sdk-variants::worker.ts::subscription"
+      ]
+    },
+    {
+      "name": ".#13",
+      "members": [
+        "local/azure-sdk-variants::worker.ts::container",
+        "local/azure-sdk-variants::worker.ts::read"
+      ]
+    },
+    {
+      "name": ".#14",
+      "members": [
+        "local/azure-sdk-variants::worker.ts::producer",
+        "local/azure-sdk-variants::worker.ts::sendEvents"
+      ]
+    },
+    {
+      "name": ".#15",
+      "members": [
+        "local/azure-sdk-variants::worker.ts::receive",
+        "local/azure-sdk-variants::worker.ts::receiver"
+      ]
+    },
+    {
+      "name": ".#16",
+      "members": [
+        "local/azure-sdk-variants::worker.ts::repeatReads",
+        "local/azure-sdk-variants::worker.ts::secret",
+        "local/azure-sdk-variants::worker.ts::secrets",
+        "local/azure-sdk-variants::worker.ts::structuredSecret"
+      ]
+    },
+    {
+      "name": ".#17",
+      "members": [
+        "local/azure-sdk-variants::worker.ts::send",
+        "local/azure-sdk-variants::worker.ts::sender"
+      ]
+    },
+    {
+      "name": ".#18",
+      "members": [
+        "local/azure-sdk-variants::worker.ts::storage",
+        "local/azure-sdk-variants::worker.ts::structuredBlob"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "local/azure-sdk-variants::worker.js::bus",
+        "local/azure-sdk-variants::worker.js::structuredQueue",
+        "local/azure-sdk-variants::worker.js::structuredSub",
+        "local/azure-sdk-variants::worker.js::wrongService"
+      ]
+    },
+    {
+      "name": ".#3",
+      "members": [
+        "local/azure-sdk-variants::worker.js::consumer",
+        "local/azure-sdk-variants::worker.js::handler",
+        "local/azure-sdk-variants::worker.js::receiveEvents",
+        "local/azure-sdk-variants::worker.js::subscribe",
+        "local/azure-sdk-variants::worker.js::subscription"
+      ]
+    },
+    {
+      "name": ".#4",
+      "members": [
+        "local/azure-sdk-variants::worker.js::container",
+        "local/azure-sdk-variants::worker.js::read"
+      ]
+    },
+    {
+      "name": ".#5",
+      "members": [
+        "local/azure-sdk-variants::worker.js::producer",
+        "local/azure-sdk-variants::worker.js::sendEvents"
+      ]
+    },
+    {
+      "name": ".#6",
+      "members": [
+        "local/azure-sdk-variants::worker.js::receive",
+        "local/azure-sdk-variants::worker.js::receiver"
+      ]
+    },
+    {
+      "name": ".#7",
+      "members": [
+        "local/azure-sdk-variants::worker.js::repeatReads",
+        "local/azure-sdk-variants::worker.js::secret",
+        "local/azure-sdk-variants::worker.js::secrets",
+        "local/azure-sdk-variants::worker.js::structuredSecret"
+      ]
+    },
+    {
+      "name": ".#8",
+      "members": [
+        "local/azure-sdk-variants::worker.js::send",
+        "local/azure-sdk-variants::worker.js::sender"
+      ]
+    },
+    {
+      "name": ".#9",
+      "members": [
+        "local/azure-sdk-variants::worker.js::storage",
+        "local/azure-sdk-variants::worker.js::structuredBlob"
+      ]
     }
   ],
   "links": [

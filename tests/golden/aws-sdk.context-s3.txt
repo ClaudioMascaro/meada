@@ -1,5 +1,5 @@
 example.com/aws/app app.ts:8-12 store
-community: none
+community: .#2
 processes: 1 (1 export; 1 repository): store (example.com/aws/app)
 async function store() {
   await s3.send(new PutObjectCommand({ Bucket: 'orders-bucket', Key: 'a' }));

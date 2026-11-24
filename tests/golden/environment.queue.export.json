@@ -39,7 +39,20 @@
         "path": "send.ts",
         "start": 81,
         "end": 98
-      }
+      },
+      "holder": "example.com/acme/app::send.ts::sqs"
+    },
+    {
+      "id": "example.com/acme/app::send.ts::send::(member)sqs#0",
+      "caller": "example.com/acme/app::send.ts::send",
+      "target": "example.com/acme/app::send.ts::sqs",
+      "level": "exact",
+      "span": {
+        "path": "send.ts",
+        "start": 139,
+        "end": 147
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/acme/app::send.ts::send::SendMessageCommand#0",
@@ -77,6 +90,15 @@
     }
   ],
   "consumers": [],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "example.com/acme/app::send.ts::send",
+        "example.com/acme/app::send.ts::sqs"
+      ]
+    }
+  ],
   "iac_nodes": [
     {
       "identity": "example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0]",

@@ -84,6 +84,67 @@
   ],
   "calls": [
     {
+      "id": "example.com/acme/paths::src/index.ts::(reexport)USER#0",
+      "caller": "example.com/acme/paths::src/index.ts",
+      "target": "example.com/acme/paths::src/routes.ts::USER",
+      "level": "exact",
+      "span": {
+        "path": "src/index.ts",
+        "start": 16,
+        "end": 20
+      },
+      "kind": "reexport"
+    },
+    {
+      "id": "example.com/acme/paths::src/index.ts::(reexport)USERS#0",
+      "caller": "example.com/acme/paths::src/index.ts",
+      "target": "example.com/acme/paths::src/routes.ts::USERS",
+      "level": "exact",
+      "span": {
+        "path": "src/index.ts",
+        "start": 9,
+        "end": 14
+      },
+      "kind": "reexport"
+    },
+    {
+      "id": "example.com/acme/paths::src/routes.ts::(value)USERS#0",
+      "caller": "example.com/acme/paths::src/routes.ts",
+      "target": "example.com/acme/paths::src/routes.ts::USERS",
+      "level": "exact",
+      "span": {
+        "path": "src/routes.ts",
+        "start": 161,
+        "end": 166
+      },
+      "kind": "value",
+      "holder": "example.com/acme/paths::src/routes.ts::USER"
+    },
+    {
+      "id": "example.com/acme/paths::src/users.ts::firstPage::(value)API_HOST#0",
+      "caller": "example.com/acme/paths::src/users.ts::firstPage",
+      "target": "example.com/acme/paths::src/routes.ts::API_HOST",
+      "level": "exact",
+      "span": {
+        "path": "src/users.ts",
+        "start": 548,
+        "end": 556
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/acme/paths::src/users.ts::firstPage::(value)USERS#0",
+      "caller": "example.com/acme/paths::src/users.ts::firstPage",
+      "target": "example.com/acme/paths::src/routes.ts::USERS",
+      "level": "exact",
+      "span": {
+        "path": "src/users.ts",
+        "start": 559,
+        "end": 564
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/paths::src/users.ts::firstPage::fetch#0",
       "caller": "example.com/acme/paths::src/users.ts::firstPage",
       "target": null,
@@ -95,6 +156,30 @@
       }
     },
     {
+      "id": "example.com/acme/paths::src/users.ts::getUser::(value)BASE#0",
+      "caller": "example.com/acme/paths::src/users.ts::getUser",
+      "target": "example.com/acme/paths::src/users.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/users.ts",
+        "start": 407,
+        "end": 411
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/acme/paths::src/users.ts::getUser::(value)USER#0",
+      "caller": "example.com/acme/paths::src/users.ts::getUser",
+      "target": "example.com/acme/paths::src/routes.ts::USER",
+      "level": "exact",
+      "span": {
+        "path": "src/users.ts",
+        "start": 414,
+        "end": 418
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/paths::src/users.ts::getUser::fetch#0",
       "caller": "example.com/acme/paths::src/users.ts::getUser",
       "target": null,
@@ -104,6 +189,30 @@
         "start": 398,
         "end": 421
       }
+    },
+    {
+      "id": "example.com/acme/paths::src/users.ts::listUsers::(value)API_HOST#0",
+      "caller": "example.com/acme/paths::src/users.ts::listUsers",
+      "target": "example.com/acme/paths::src/routes.ts::API_HOST",
+      "level": "exact",
+      "span": {
+        "path": "src/users.ts",
+        "start": 249,
+        "end": 257
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/acme/paths::src/users.ts::listUsers::(value)USERS#0",
+      "caller": "example.com/acme/paths::src/users.ts::listUsers",
+      "target": "example.com/acme/paths::src/routes.ts::USERS",
+      "level": "exact",
+      "span": {
+        "path": "src/users.ts",
+        "start": 260,
+        "end": 265
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/paths::src/users.ts::listUsers::fetch#0",
@@ -133,6 +242,25 @@
       "contract": "http::GET::/api/users",
       "site": "example.com/acme/paths::src/users.ts::listUsers::fetch#0",
       "via": "host:api.example.com"
+    }
+  ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/acme/paths::src/routes.ts::API_HOST",
+        "example.com/acme/paths::src/routes.ts::USERS",
+        "example.com/acme/paths::src/users.ts::firstPage",
+        "example.com/acme/paths::src/users.ts::listUsers"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/acme/paths::src/routes.ts::USER",
+        "example.com/acme/paths::src/users.ts::BASE",
+        "example.com/acme/paths::src/users.ts::getUser"
+      ]
     }
   ],
   "links": [

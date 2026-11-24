@@ -286,6 +286,30 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/checkout.ts::createOrder::(type)Request#0",
+      "caller": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "target": "example.com/chain/gateway::src/checkout.ts::Request",
+      "level": "exact",
+      "span": {
+        "path": "src/checkout.ts",
+        "start": 311,
+        "end": 318
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/gateway::src/checkout.ts::createOrder::(value)ORDERS_CREATED#0",
+      "caller": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "target": "example.com/chain/gateway::src/topics.ts::ORDERS_CREATED",
+      "level": "exact",
+      "span": {
+        "path": "src/checkout.ts",
+        "start": 440,
+        "end": 454
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/gateway::src/checkout.ts::createOrder::JSON.stringify#0",
       "caller": "example.com/chain/gateway::src/checkout.ts::createOrder",
       "target": null,
@@ -330,6 +354,18 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/events.ts::publish::(member)producer#0",
+      "caller": "example.com/chain/gateway::src/events.ts::publish",
+      "target": "example.com/chain/gateway::src/kafka.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/events.ts",
+        "start": 187,
+        "end": 200
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/chain/gateway::src/events.ts::publish::producer.send#0",
       "caller": "example.com/chain/gateway::src/events.ts::publish",
       "target": null,
@@ -339,6 +375,30 @@
         "start": 187,
         "end": 234
       }
+    },
+    {
+      "id": "example.com/chain/gateway::src/inventory.ts::(member)api#0",
+      "caller": "example.com/chain/gateway::src/inventory.ts",
+      "target": "example.com/chain/gateway::src/routes.ts::api",
+      "level": "exact",
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 451,
+        "end": 458
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/chain/gateway::src/inventory.ts::(value)getItem#0",
+      "caller": "example.com/chain/gateway::src/inventory.ts",
+      "target": "example.com/chain/gateway::src/inventory.ts::getItem",
+      "level": "exact",
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 478,
+        "end": 485
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/image::res.json#0",
@@ -372,6 +432,18 @@
         "start": 1254,
         "end": 1281
       }
+    },
+    {
+      "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price::(value)NOT_FOUND#0",
+      "caller": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
+      "target": "example.com/chain/gateway::src/inventory.ts::NOT_FOUND",
+      "level": "exact",
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 1265,
+        "end": 1274
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price::next#0",
@@ -484,6 +556,30 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/inventory.ts::getItem::(value)DEFAULTS#0",
+      "caller": "example.com/chain/gateway::src/inventory.ts::getItem",
+      "target": "example.com/chain/gateway::src/defaults.ts::DEFAULTS",
+      "level": "exact",
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 375,
+        "end": 383
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/chain/gateway::src/inventory.ts::getItem::(value)NOT_FOUND#0",
+      "caller": "example.com/chain/gateway::src/inventory.ts::getItem",
+      "target": "example.com/chain/gateway::src/inventory.ts::NOT_FOUND",
+      "level": "exact",
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 293,
+        "end": 302
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/gateway::src/inventory.ts::getItem::res.json#0",
       "caller": "example.com/chain/gateway::src/inventory.ts::getItem",
       "target": null,
@@ -506,6 +602,19 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/kafka.ts::(member)kafka#0",
+      "caller": "example.com/chain/gateway::src/kafka.ts",
+      "target": "example.com/chain/gateway::src/kafka.ts::kafka",
+      "level": "exact",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 134,
+        "end": 148
+      },
+      "kind": "member",
+      "holder": "example.com/chain/gateway::src/kafka.ts::producer"
+    },
+    {
       "id": "example.com/chain/gateway::src/kafka.ts::Kafka#0",
       "caller": "example.com/chain/gateway::src/kafka.ts",
       "target": null,
@@ -514,7 +623,8 @@
         "path": "src/kafka.ts",
         "start": 48,
         "end": 107
-      }
+      },
+      "holder": "example.com/chain/gateway::src/kafka.ts::kafka"
     },
     {
       "id": "example.com/chain/gateway::src/kafka.ts::kafka.producer#0",
@@ -525,7 +635,8 @@
         "path": "src/kafka.ts",
         "start": 134,
         "end": 150
-      }
+      },
+      "holder": "example.com/chain/gateway::src/kafka.ts::producer"
     },
     {
       "id": "example.com/chain/gateway::src/orders.ts::cancelOrder::(call_expression).end#0",
@@ -550,6 +661,18 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/orders.ts::listOrders::(type)Request#0",
+      "caller": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "target": "example.com/chain/gateway::src/orders.ts::Request",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 126,
+        "end": 133
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/chain/gateway::src/orders.ts::listOrders::productOf#0",
       "caller": "example.com/chain/gateway::src/orders.ts::listOrders",
       "target": "example.com/chain/gateway::src/catalog.ts::productOf",
@@ -572,6 +695,18 @@
       }
     },
     {
+      "id": "example.com/chain/gateway::src/ping.ts::(member)api#0",
+      "caller": "example.com/chain/gateway::src/ping.ts",
+      "target": "example.com/chain/gateway::src/routes.ts::api",
+      "level": "exact",
+      "span": {
+        "path": "src/ping.ts",
+        "start": 129,
+        "end": 136
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/chain/gateway::src/ping.ts::GET /api/ping::res.json#0",
       "caller": "example.com/chain/gateway::src/ping.ts::GET /api/ping",
       "target": null,
@@ -592,6 +727,54 @@
         "start": 129,
         "end": 201
       }
+    },
+    {
+      "id": "example.com/chain/gateway::src/routes.ts::(member)api#0",
+      "caller": "example.com/chain/gateway::src/routes.ts",
+      "target": "example.com/chain/gateway::src/routes.ts::api",
+      "level": "exact",
+      "span": {
+        "path": "src/routes.ts",
+        "start": 158,
+        "end": 165
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/chain/gateway::src/routes.ts::(value)cancelOrder#0",
+      "caller": "example.com/chain/gateway::src/routes.ts",
+      "target": "example.com/chain/gateway::src/orders.ts::cancelOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/routes.ts",
+        "start": 253,
+        "end": 264
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/chain/gateway::src/routes.ts::(value)createOrder#0",
+      "caller": "example.com/chain/gateway::src/routes.ts",
+      "target": "example.com/chain/gateway::src/checkout.ts::createOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/routes.ts",
+        "start": 213,
+        "end": 224
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/chain/gateway::src/routes.ts::(value)listOrders#0",
+      "caller": "example.com/chain/gateway::src/routes.ts",
+      "target": "example.com/chain/gateway::src/orders.ts::listOrders",
+      "level": "exact",
+      "span": {
+        "path": "src/routes.ts",
+        "start": 177,
+        "end": 187
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/gateway::src/routes.ts::POST /api/events::(call_expression).end#0",
@@ -624,7 +807,8 @@
         "path": "src/routes.ts",
         "start": 148,
         "end": 156
-      }
+      },
+      "holder": "example.com/chain/gateway::src/routes.ts::api"
     },
     {
       "id": "example.com/chain/gateway::src/routes.ts::api.delete#0",
@@ -669,6 +853,30 @@
         "start": 190,
         "end": 225
       }
+    },
+    {
+      "id": "example.com/chain/gateway::src/server.ts::(member)app#0",
+      "caller": "example.com/chain/gateway::src/server.ts",
+      "target": "example.com/chain/gateway::src/server.ts::app",
+      "level": "exact",
+      "span": {
+        "path": "src/server.ts",
+        "start": 151,
+        "end": 158
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/chain/gateway::src/server.ts::(value)api#0",
+      "caller": "example.com/chain/gateway::src/server.ts",
+      "target": "example.com/chain/gateway::src/routes.ts::api",
+      "level": "exact",
+      "span": {
+        "path": "src/server.ts",
+        "start": 167,
+        "end": 170
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/gateway::src/server.ts::GET /api/health::res.send#0",
@@ -723,7 +931,32 @@
         "path": "src/server.ts",
         "start": 76,
         "end": 85
-      }
+      },
+      "holder": "example.com/chain/gateway::src/server.ts::app"
+    },
+    {
+      "id": "example.com/chain/gateway::src/shelves.ts::(member)api#0",
+      "caller": "example.com/chain/gateway::src/shelves.ts",
+      "target": "example.com/chain/gateway::src/routes.ts::api",
+      "level": "exact",
+      "span": {
+        "path": "src/shelves.ts",
+        "start": 176,
+        "end": 183
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}::(value)SHELF#0",
+      "caller": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shelves.ts",
+        "start": 242,
+        "end": 247
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}::res.json#0",
@@ -735,6 +968,18 @@
         "start": 228,
         "end": 269
       }
+    },
+    {
+      "id": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves::(value)LIMITS#0",
+      "caller": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shelves.ts",
+        "start": 411,
+        "end": 417
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves::res.json#0",
@@ -1035,14 +1280,51 @@
       "name": "src",
       "members": [
         "example.com/chain/gateway::src/catalog.ts::productOf",
+        "example.com/chain/gateway::src/orders.ts::Request",
         "example.com/chain/gateway::src/orders.ts::listOrders"
       ]
     },
     {
       "name": "src#2",
       "members": [
+        "example.com/chain/gateway::src/checkout.ts::Request",
         "example.com/chain/gateway::src/checkout.ts::createOrder",
-        "example.com/chain/gateway::src/events.ts::publish"
+        "example.com/chain/gateway::src/events.ts::publish",
+        "example.com/chain/gateway::src/kafka.ts::producer",
+        "example.com/chain/gateway::src/topics.ts::ORDERS_CREATED"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/chain/gateway::src/defaults.ts::DEFAULTS",
+        "example.com/chain/gateway::src/inventory.ts::GET /api/inventory/{}/price",
+        "example.com/chain/gateway::src/inventory.ts::NOT_FOUND",
+        "example.com/chain/gateway::src/inventory.ts::getItem"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
+        "example.com/chain/gateway::src/kafka.ts::kafka"
+      ]
+    },
+    {
+      "name": "src#5",
+      "members": [
+        "example.com/chain/gateway::src/orders.ts::cancelOrder"
+      ]
+    },
+    {
+      "name": "src#6",
+      "members": [
+        "example.com/chain/gateway::src/routes.ts::api"
+      ]
+    },
+    {
+      "name": "src#7",
+      "members": [
+        "example.com/chain/gateway::src/server.ts::app"
       ]
     }
   ],

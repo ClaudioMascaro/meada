@@ -249,6 +249,19 @@
   ],
   "calls": [
     {
+      "id": "example.com/channels/api::src/amqp.ts::(member)connection#0",
+      "caller": "example.com/channels/api::src/amqp.ts",
+      "target": "example.com/channels/api::src/amqp.ts::connection",
+      "level": "exact",
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 146,
+        "end": 170
+      },
+      "kind": "member",
+      "holder": "example.com/channels/api::src/amqp.ts::channel"
+    },
+    {
       "id": "example.com/channels/api::src/amqp.ts::amqp.connect#0",
       "caller": "example.com/channels/api::src/amqp.ts",
       "target": null,
@@ -257,7 +270,20 @@
         "path": "src/amqp.ts",
         "start": 90,
         "end": 122
-      }
+      },
+      "holder": "example.com/channels/api::src/amqp.ts::connection"
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::announce::(member)channel#0",
+      "caller": "example.com/channels/api::src/amqp.ts::announce",
+      "target": "example.com/channels/api::src/amqp.ts::channel",
+      "level": "exact",
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 577,
+        "end": 592
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/channels/api::src/amqp.ts::announce::Buffer.from#0",
@@ -334,7 +360,20 @@
         "path": "src/amqp.ts",
         "start": 146,
         "end": 172
-      }
+      },
+      "holder": "example.com/channels/api::src/amqp.ts::channel"
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::dispatch::(member)channel#0",
+      "caller": "example.com/channels/api::src/amqp.ts::dispatch",
+      "target": "example.com/channels/api::src/amqp.ts::channel",
+      "level": "exact",
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 876,
+        "end": 891
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/channels/api::src/amqp.ts::dispatch::Buffer.from#0",
@@ -359,6 +398,18 @@
       }
     },
     {
+      "id": "example.com/channels/api::src/amqp.ts::kafkaOrder::(member)producer#0",
+      "caller": "example.com/channels/api::src/amqp.ts::kafkaOrder",
+      "target": "example.com/channels/api::src/kafka.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 395,
+        "end": 408
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/channels/api::src/amqp.ts::kafkaOrder::producer.send#0",
       "caller": "example.com/channels/api::src/amqp.ts::kafkaOrder",
       "target": null,
@@ -368,6 +419,18 @@
         "start": 395,
         "end": 456
       }
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::queueOrder::(member)channel#0",
+      "caller": "example.com/channels/api::src/amqp.ts::queueOrder",
+      "target": "example.com/channels/api::src/amqp.ts::channel",
+      "level": "exact",
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 289,
+        "end": 308
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/channels/api::src/amqp.ts::queueOrder::Buffer.from#0",
@@ -403,6 +466,18 @@
       }
     },
     {
+      "id": "example.com/channels/api::src/audit.ts::auditLog::(member)consumer#0",
+      "caller": "example.com/channels/api::src/audit.ts::auditLog",
+      "target": "example.com/channels/api::src/kafka.ts::consumer",
+      "level": "exact",
+      "span": {
+        "path": "src/audit.ts",
+        "start": 80,
+        "end": 98
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/channels/api::src/audit.ts::auditLog::consumer.run#0",
       "caller": "example.com/channels/api::src/audit.ts::auditLog",
       "target": null,
@@ -423,6 +498,18 @@
         "start": 80,
         "end": 122
       }
+    },
+    {
+      "id": "example.com/channels/api::src/dynamic.ts::announce::(member)producer#0",
+      "caller": "example.com/channels/api::src/dynamic.ts::announce",
+      "target": "example.com/channels/api::src/kafka.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/dynamic.ts",
+        "start": 368,
+        "end": 381
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/channels/api::src/dynamic.ts::announce::currentRegion#0",
@@ -447,6 +534,18 @@
       }
     },
     {
+      "id": "example.com/channels/api::src/dynamic.ts::replay::(member)producer#0",
+      "caller": "example.com/channels/api::src/dynamic.ts::replay",
+      "target": "example.com/channels/api::src/kafka.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/dynamic.ts",
+        "start": 181,
+        "end": 194
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/channels/api::src/dynamic.ts::replay::producer.send#0",
       "caller": "example.com/channels/api::src/dynamic.ts::replay",
       "target": null,
@@ -458,6 +557,19 @@
       }
     },
     {
+      "id": "example.com/channels/api::src/kafka.ts::(member)kafka#0",
+      "caller": "example.com/channels/api::src/kafka.ts",
+      "target": "example.com/channels/api::src/kafka.ts::kafka",
+      "level": "exact",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 206,
+        "end": 220
+      },
+      "kind": "member",
+      "holder": "example.com/channels/api::src/kafka.ts::producer"
+    },
+    {
       "id": "example.com/channels/api::src/kafka.ts::Kafka#0",
       "caller": "example.com/channels/api::src/kafka.ts",
       "target": null,
@@ -466,7 +578,8 @@
         "path": "src/kafka.ts",
         "start": 48,
         "end": 103
-      }
+      },
+      "holder": "example.com/channels/api::src/kafka.ts::kafka"
     },
     {
       "id": "example.com/channels/api::src/kafka.ts::kafka.consumer#0",
@@ -477,7 +590,8 @@
         "path": "src/kafka.ts",
         "start": 248,
         "end": 288
-      }
+      },
+      "holder": "example.com/channels/api::src/kafka.ts::consumer"
     },
     {
       "id": "example.com/channels/api::src/kafka.ts::kafka.producer#0",
@@ -488,7 +602,20 @@
         "path": "src/kafka.ts",
         "start": 206,
         "end": 222
-      }
+      },
+      "holder": "example.com/channels/api::src/kafka.ts::producer"
+    },
+    {
+      "id": "example.com/channels/api::src/orders.ts::audit::(member)producer#0",
+      "caller": "example.com/channels/api::src/orders.ts::audit",
+      "target": "example.com/channels/api::src/kafka.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 773,
+        "end": 786
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/channels/api::src/orders.ts::audit::producer.send#0",
@@ -502,6 +629,30 @@
       }
     },
     {
+      "id": "example.com/channels/api::src/orders.ts::createOrder::(member)producer#0",
+      "caller": "example.com/channels/api::src/orders.ts::createOrder",
+      "target": "example.com/channels/api::src/kafka.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 207,
+        "end": 220
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/channels/api::src/orders.ts::createOrder::(value)ORDERS_CREATED#0",
+      "caller": "example.com/channels/api::src/orders.ts::createOrder",
+      "target": "example.com/channels/api::src/topics.ts::ORDERS_CREATED",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 230,
+        "end": 244
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/channels/api::src/orders.ts::createOrder::producer.send#0",
       "caller": "example.com/channels/api::src/orders.ts::createOrder",
       "target": null,
@@ -511,6 +662,30 @@
         "start": 207,
         "end": 283
       }
+    },
+    {
+      "id": "example.com/channels/api::src/orders.ts::invoice::(member)producer#0",
+      "caller": "example.com/channels/api::src/orders.ts::invoice",
+      "target": "example.com/channels/api::src/kafka.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 389,
+        "end": 402
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/channels/api::src/orders.ts::invoice::(value)BILLING#0",
+      "caller": "example.com/channels/api::src/orders.ts::invoice",
+      "target": "example.com/channels/api::src/topics.ts::BILLING",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 415,
+        "end": 422
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/channels/api::src/orders.ts::invoice::producer.send#0",
@@ -524,6 +699,30 @@
       }
     },
     {
+      "id": "example.com/channels/api::src/orders.ts::mail::(member)mailer#0",
+      "caller": "example.com/channels/api::src/orders.ts::mail",
+      "target": "example.com/channels/api::src/orders.ts::mailer",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 1021,
+        "end": 1032
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/channels/api::src/orders.ts::mail::(value)ORDERS_CREATED#0",
+      "caller": "example.com/channels/api::src/orders.ts::mail",
+      "target": "example.com/channels/api::src/topics.ts::ORDERS_CREATED",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 1042,
+        "end": 1056
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/channels/api::src/orders.ts::mail::mailer.send#0",
       "caller": "example.com/channels/api::src/orders.ts::mail",
       "target": "example.com/channels/api::src/orders.ts::mailer.send",
@@ -533,6 +732,18 @@
         "start": 1021,
         "end": 1059
       }
+    },
+    {
+      "id": "example.com/channels/api::src/orders.ts::ship::(member)producer#0",
+      "caller": "example.com/channels/api::src/orders.ts::ship",
+      "target": "example.com/channels/api::src/kafka.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 576,
+        "end": 589
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/channels/api::src/orders.ts::ship::producer.send#0",
@@ -612,22 +823,65 @@
     {
       "name": "src",
       "members": [
-        "example.com/channels/api::src/audit.ts::auditLog.kafka audit.log",
-        "example.com/channels/api::src/audit.ts::store"
+        "example.com/channels/api::src/amqp.ts::announce",
+        "example.com/channels/api::src/amqp.ts::channel",
+        "example.com/channels/api::src/amqp.ts::dispatch",
+        "example.com/channels/api::src/amqp.ts::queueOrder"
       ]
     },
     {
       "name": "src#2",
       "members": [
-        "example.com/channels/api::src/dynamic.ts::announce",
-        "example.com/channels/api::src/dynamic.ts::currentRegion"
+        "example.com/channels/api::src/amqp.ts::connection"
       ]
     },
     {
       "name": "src#3",
       "members": [
+        "example.com/channels/api::src/amqp.ts::kafkaOrder",
+        "example.com/channels/api::src/dynamic.ts::announce",
+        "example.com/channels/api::src/dynamic.ts::currentRegion",
+        "example.com/channels/api::src/dynamic.ts::replay",
+        "example.com/channels/api::src/kafka.ts::producer",
+        "example.com/channels/api::src/orders.ts::audit",
+        "example.com/channels/api::src/orders.ts::ship"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
+        "example.com/channels/api::src/audit.ts::auditLog",
+        "example.com/channels/api::src/kafka.ts::consumer"
+      ]
+    },
+    {
+      "name": "src#5",
+      "members": [
+        "example.com/channels/api::src/audit.ts::auditLog.kafka audit.log",
+        "example.com/channels/api::src/audit.ts::store"
+      ]
+    },
+    {
+      "name": "src#6",
+      "members": [
+        "example.com/channels/api::src/kafka.ts::kafka"
+      ]
+    },
+    {
+      "name": "src#7",
+      "members": [
+        "example.com/channels/api::src/orders.ts::createOrder",
         "example.com/channels/api::src/orders.ts::mail",
-        "example.com/channels/api::src/orders.ts::mailer.send"
+        "example.com/channels/api::src/orders.ts::mailer",
+        "example.com/channels/api::src/orders.ts::mailer.send",
+        "example.com/channels/api::src/topics.ts::ORDERS_CREATED"
+      ]
+    },
+    {
+      "name": "src#8",
+      "members": [
+        "example.com/channels/api::src/orders.ts::invoice",
+        "example.com/channels/api::src/topics.ts::BILLING"
       ]
     }
   ],

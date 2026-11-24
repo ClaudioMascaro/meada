@@ -174,6 +174,19 @@
   ],
   "calls": [
     {
+      "id": "example.com/channels/worker::src/consumer.ts::(member)kafka#0",
+      "caller": "example.com/channels/worker::src/consumer.ts",
+      "target": "example.com/channels/worker::src/consumer.ts::kafka",
+      "level": "exact",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 125,
+        "end": 139
+      },
+      "kind": "member",
+      "holder": "example.com/channels/worker::src/consumer.ts::consumer"
+    },
+    {
       "id": "example.com/channels/worker::src/consumer.ts::Kafka#0",
       "caller": "example.com/channels/worker::src/consumer.ts",
       "target": null,
@@ -182,7 +195,8 @@
         "path": "src/consumer.ts",
         "start": 48,
         "end": 106
-      }
+      },
+      "holder": "example.com/channels/worker::src/consumer.ts::kafka"
     },
     {
       "id": "example.com/channels/worker::src/consumer.ts::kafka.consumer#0",
@@ -193,7 +207,32 @@
         "path": "src/consumer.ts",
         "start": 125,
         "end": 162
-      }
+      },
+      "holder": "example.com/channels/worker::src/consumer.ts::consumer"
+    },
+    {
+      "id": "example.com/channels/worker::src/consumer.ts::start::(member)consumer#0",
+      "caller": "example.com/channels/worker::src/consumer.ts::start",
+      "target": "example.com/channels/worker::src/consumer.ts::consumer",
+      "level": "exact",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 205,
+        "end": 223
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/channels/worker::src/consumer.ts::start::(value)handleOrder#0",
+      "caller": "example.com/channels/worker::src/consumer.ts::start",
+      "target": "example.com/channels/worker::src/consumer.ts::handleOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 311,
+        "end": 322
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/channels/worker::src/consumer.ts::start::consumer.run#0",
@@ -218,6 +257,19 @@
       }
     },
     {
+      "id": "example.com/channels/worker::src/pattern.ts::(member)kafka#0",
+      "caller": "example.com/channels/worker::src/pattern.ts",
+      "target": "example.com/channels/worker::src/pattern.ts::kafka",
+      "level": "exact",
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 129,
+        "end": 143
+      },
+      "kind": "member",
+      "holder": "example.com/channels/worker::src/pattern.ts::consumer"
+    },
+    {
       "id": "example.com/channels/worker::src/pattern.ts::Kafka#0",
       "caller": "example.com/channels/worker::src/pattern.ts",
       "target": null,
@@ -226,7 +278,8 @@
         "path": "src/pattern.ts",
         "start": 48,
         "end": 110
-      }
+      },
+      "holder": "example.com/channels/worker::src/pattern.ts::kafka"
     },
     {
       "id": "example.com/channels/worker::src/pattern.ts::kafka.consumer#0",
@@ -237,7 +290,32 @@
         "path": "src/pattern.ts",
         "start": 129,
         "end": 170
-      }
+      },
+      "holder": "example.com/channels/worker::src/pattern.ts::consumer"
+    },
+    {
+      "id": "example.com/channels/worker::src/pattern.ts::watchOrders::(member)consumer#0",
+      "caller": "example.com/channels/worker::src/pattern.ts::watchOrders",
+      "target": "example.com/channels/worker::src/pattern.ts::consumer",
+      "level": "exact",
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 286,
+        "end": 304
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/channels/worker::src/pattern.ts::watchOrders::(value)seen#0",
+      "caller": "example.com/channels/worker::src/pattern.ts::watchOrders",
+      "target": "example.com/channels/worker::src/pattern.ts::seen",
+      "level": "exact",
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 366,
+        "end": 370
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/channels/worker::src/pattern.ts::watchOrders::consumer.run#0",
@@ -262,6 +340,19 @@
       }
     },
     {
+      "id": "example.com/channels/worker::src/queues.ts::(member)connection#0",
+      "caller": "example.com/channels/worker::src/queues.ts",
+      "target": "example.com/channels/worker::src/queues.ts::connection",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 110,
+        "end": 134
+      },
+      "kind": "member",
+      "holder": "example.com/channels/worker::src/queues.ts::channel"
+    },
+    {
       "id": "example.com/channels/worker::src/queues.ts::amqp.connect#0",
       "caller": "example.com/channels/worker::src/queues.ts",
       "target": null,
@@ -270,7 +361,20 @@
         "path": "src/queues.ts",
         "start": 54,
         "end": 86
-      }
+      },
+      "holder": "example.com/channels/worker::src/queues.ts::connection"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::bind::(member)channel#0",
+      "caller": "example.com/channels/worker::src/queues.ts::bind",
+      "target": "example.com/channels/worker::src/queues.ts::channel",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 251,
+        "end": 268
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/channels/worker::src/queues.ts::bind::channel.bindQueue#0",
@@ -303,7 +407,20 @@
         "path": "src/queues.ts",
         "start": 110,
         "end": 136
-      }
+      },
+      "holder": "example.com/channels/worker::src/queues.ts::channel"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::lookalikes::(member)channel#0",
+      "caller": "example.com/channels/worker::src/queues.ts::lookalikes",
+      "target": "example.com/channels/worker::src/queues.ts::channel",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 782,
+        "end": 797
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/channels/worker::src/queues.ts::lookalikes::channel.consume#0",
@@ -326,6 +443,66 @@
         "start": 817,
         "end": 850
       }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::(member)channel#0",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": "example.com/channels/worker::src/queues.ts::channel",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 411,
+        "end": 426
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::(value)onAudit#0",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": "example.com/channels/worker::src/queues.ts::onAudit",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 520,
+        "end": 527
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::(value)onJob#0",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": "example.com/channels/worker::src/queues.ts::onJob",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 479,
+        "end": 484
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::(value)onOrder#0",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": "example.com/channels/worker::src/queues.ts::onOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 437,
+        "end": 444
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::(value)onShipment#0",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": "example.com/channels/worker::src/queues.ts::onShipment",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 567,
+        "end": 577
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/channels/worker::src/queues.ts::work::channel.consume#0",
@@ -427,6 +604,60 @@
       "exchange": "events",
       "pattern": "*.shipped",
       "site": "example.com/channels/worker::src/queues.ts::bind::channel.bindQueue#1"
+    }
+  ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/channels/worker::src/consumer.ts::consumer",
+        "example.com/channels/worker::src/consumer.ts::handleOrder",
+        "example.com/channels/worker::src/consumer.ts::start"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/channels/worker::src/consumer.ts::kafka"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/channels/worker::src/pattern.ts::consumer",
+        "example.com/channels/worker::src/pattern.ts::seen",
+        "example.com/channels/worker::src/pattern.ts::watchOrders"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
+        "example.com/channels/worker::src/pattern.ts::kafka"
+      ]
+    },
+    {
+      "name": "src#5",
+      "members": [
+        "example.com/channels/worker::src/queues.ts::bind",
+        "example.com/channels/worker::src/queues.ts::channel",
+        "example.com/channels/worker::src/queues.ts::lookalikes"
+      ]
+    },
+    {
+      "name": "src#6",
+      "members": [
+        "example.com/channels/worker::src/queues.ts::connection"
+      ]
+    },
+    {
+      "name": "src#7",
+      "members": [
+        "example.com/channels/worker::src/queues.ts::onAudit",
+        "example.com/channels/worker::src/queues.ts::onJob",
+        "example.com/channels/worker::src/queues.ts::onOrder",
+        "example.com/channels/worker::src/queues.ts::onShipment",
+        "example.com/channels/worker::src/queues.ts::work"
+      ]
     }
   ],
   "links": [
