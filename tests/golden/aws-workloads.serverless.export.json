@@ -19,6 +19,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/acme/serverless::other/send.ts::client",
+      "span": {
+        "path": "other/send.ts",
+        "start": 75,
+        "end": 101
+      },
+      "hash": "c6d3bd19fd0e2dd99de4c4b5714d0e7c71d784ea74608879bb91925205ee1670"
+    },
+    {
       "id": "example.com/acme/serverless::other/send.ts::dispatch",
       "span": {
         "path": "other/send.ts",
@@ -28,6 +37,15 @@
       "hash": "db873b81c164ea9605fac2b0b0fab8a30012e7b9059b3aa1dbaa65b155c73722"
     },
     {
+      "id": "example.com/acme/serverless::outside.ts::client",
+      "span": {
+        "path": "outside.ts",
+        "start": 75,
+        "end": 101
+      },
+      "hash": "c6d3bd19fd0e2dd99de4c4b5714d0e7c71d784ea74608879bb91925205ee1670"
+    },
+    {
       "id": "example.com/acme/serverless::outside.ts::dispatch",
       "span": {
         "path": "outside.ts",
@@ -35,6 +53,15 @@
         "end": 237
       },
       "hash": "db873b81c164ea9605fac2b0b0fab8a30012e7b9059b3aa1dbaa65b155c73722"
+    },
+    {
+      "id": "example.com/acme/serverless::worker/send.ts::client",
+      "span": {
+        "path": "worker/send.ts",
+        "start": 75,
+        "end": 101
+      },
+      "hash": "c6d3bd19fd0e2dd99de4c4b5714d0e7c71d784ea74608879bb91925205ee1670"
     },
     {
       "id": "example.com/acme/serverless::worker/send.ts::dispatch",

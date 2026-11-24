@@ -67,6 +67,15 @@
       "hash": "9d21b597cb7691cb42738687cdfa814ae9f380d9c16ffbc36c714d4045b079d0"
     },
     {
+      "id": "example.com/xlang-swift/web::src/orders.ts::API",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 6,
+        "end": 31
+      },
+      "hash": "21095d5562fa18a76ec2110a30a5e545803b6f2ec8dff32860bfa384a66ed1b1"
+    },
+    {
       "id": "example.com/xlang-swift/web::src/orders.ts::orderStatus",
       "span": {
         "path": "src/orders.ts",

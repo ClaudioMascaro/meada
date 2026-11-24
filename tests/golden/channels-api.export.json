@@ -40,6 +40,24 @@
       "hash": "ac2c08607e0b18390d9445d28424c6cbd31871f9d24e4177d2b5205840a1a07b"
     },
     {
+      "id": "example.com/channels/api::src/amqp.ts::channel",
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 130,
+        "end": 172
+      },
+      "hash": "c9a1004cbc12690211472d927c09e2fb1258fde43b620e06ae6a482735c6db36"
+    },
+    {
+      "id": "example.com/channels/api::src/amqp.ts::connection",
+      "span": {
+        "path": "src/amqp.ts",
+        "start": 71,
+        "end": 122
+      },
+      "hash": "709952080c3ce3041946bc4481e3341cefc3579af6c1b8c09cefa679b308b7f5"
+    },
+    {
       "id": "example.com/channels/api::src/amqp.ts::dispatch",
       "span": {
         "path": "src/amqp.ts",
@@ -130,6 +148,15 @@
       "hash": "c2c81b1b6531ca026243abbdef4206d462bf1bf740bec3a17fd47f7bb514e23b"
     },
     {
+      "id": "example.com/channels/api::src/kafka.ts::kafka",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 40,
+        "end": 103
+      },
+      "hash": "0b6383cb8efeeb623a2ece9a91bb71881128fcf4aae8905c9603ebda383ed6d3"
+    },
+    {
       "id": "example.com/channels/api::src/kafka.ts::producer",
       "span": {
         "path": "src/kafka.ts",
@@ -173,6 +200,15 @@
         "end": 1062
       },
       "hash": "4abfa5349c03889bac6ec399795308ebffc8d76d76793a2d917a88dd7d759a38"
+    },
+    {
+      "id": "example.com/channels/api::src/orders.ts::mailer",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 910,
+        "end": 984
+      },
+      "hash": "ea2b12ccb22053ae5f692b297b6fbbfa2b7add64e07bbba371e440e4dd0295de"
     },
     {
       "id": "example.com/channels/api::src/orders.ts::mailer.send",

@@ -228,6 +228,15 @@
       "hash": "08413b20bb4edc82596c4353d4f716dffa3f5c85e853af62deb3b09e1496d307"
     },
     {
+      "id": "example.com/acme/conformance::src/assigned.js::o",
+      "span": {
+        "path": "src/assigned.js",
+        "start": 254,
+        "end": 293
+      },
+      "hash": "b03771bf47613601507f0326a93d522c0e975cd6a1c5b6ab6f252ffc815eb2d8"
+    },
+    {
       "id": "example.com/acme/conformance::src/assigned.js::o.litM",
       "span": {
         "path": "src/assigned.js",
@@ -309,6 +318,33 @@
       "hash": "0d7900363a2a908bed8e659d8a182d8a4d744258b11203c8bf86ba3d478e99dc"
     },
     {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::JOBS",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 171,
+        "end": 184
+      },
+      "hash": "971fddec951fe7a57ca2fc9d067ad8ede4266eb90e6b9ff304c6c8d631a50ad8"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::REGION",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 150,
+        "end": 163
+      },
+      "hash": "952726e9bb965ba9d4ca44d9b2e4d825e8256e83f70c231e747dc053e295599c"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::dynamic",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 305,
+        "end": 348
+      },
+      "hash": "a37229d301fde9ac709b7efaa0edb324f18f269db23190bf7f3b55ca38b51d92"
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
       "span": {
         "path": "src/messages/bullmq.ts",
@@ -336,6 +372,33 @@
       "hash": "6a466124b78e1c42ef33e42b47dbce74beb5117e06ee0b34f443dc5a949ef8f9"
     },
     {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::fake",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 356,
+        "end": 384
+      },
+      "hash": "797fe87776c3f5258c808e1be45305e84f7c0c883d6e536ff09401d1774db1be"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::jobs",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 193,
+        "end": 250
+      },
+      "hash": "3667c379b86c06c5bfbac489503bd88f1d5a26af83bb44d7de3f5e04c681bf61"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::mail",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 258,
+        "end": 297
+      },
+      "hash": "f3cda4be0dab2fc80aea81b5890c6aac1bce8691fd435e884f97989f5fb0ddd2"
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/bullmq.ts::notBullmq",
       "span": {
         "path": "src/messages/bullmq.ts",
@@ -361,6 +424,15 @@
         "end": 1534
       },
       "hash": "c6fa2123830900fbd8d0b3a07b8fd029f38b1cec3c34a1282296722fb42400c3"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/bullmq.ts::seen",
+      "span": {
+        "path": "src/messages/bullmq.ts",
+        "start": 392,
+        "end": 416
+      },
+      "hash": "0ec9b2261c8740e16e8e0ab7fdf75fbc5ea9c4d23a331acca93e1b38bea930fb"
     },
     {
       "id": "example.com/acme/conformance::src/messages/bullmq.ts::startDynamic",
@@ -471,6 +543,15 @@
       "hash": "a5cacd6db08d2e1d48162b70b2bcadda5bf3cae0caa96dc679152bee6ff7bdf8"
     },
     {
+      "id": "example.com/acme/conformance::src/messages/exchanges.ts::EVENTS",
+      "span": {
+        "path": "src/messages/exchanges.ts",
+        "start": 43,
+        "end": 60
+      },
+      "hash": "160e7a1f1432036c362f69ede42a5ab0cfd0ea64f68026caceed4c7b74845bbf"
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/exchanges.ts::announce",
       "span": {
         "path": "src/messages/exchanges.ts",
@@ -552,6 +633,24 @@
       "hash": "a302bfe8dfac170ab285df7e9f2a5d20cc8e0ce1ae1f22f650eeca2b51e70ad9"
     },
     {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::kafka",
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 76,
+        "end": 147
+      },
+      "hash": "c5db55c83e22825e9d275c30135c2725c249c00533380dedc65673af995f8c6b"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::other",
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 373,
+        "end": 446
+      },
+      "hash": "1a665b479303ea46f11ab675585c98728cb80efeabaf5fc8e8dce83040d07598"
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/kafka.ts::producer",
       "span": {
         "path": "src/messages/kafka.ts",
@@ -570,6 +669,24 @@
       "hash": "b4127231ac63232bc58124d002b45e57709a19f056da4f55facd3c3c1e83e9f0"
     },
     {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::REGION",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 268,
+        "end": 281
+      },
+      "hash": "952726e9bb965ba9d4ca44d9b2e4d825e8256e83f70c231e747dc053e295599c"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::bus",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 1103,
+        "end": 1166
+      },
+      "hash": "269842f73edc3abeed4a9da8170b2e5d8b87a2e08fe0b85a8af100b73ed4a545"
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/nats.ts::bus.publish",
       "span": {
         "path": "src/messages/nats.ts",
@@ -577,6 +694,24 @@
         "end": 1163
       },
       "hash": "d0c9032010462b7e6cc3894496672255068a04860e93e15895f718d72ec8758a"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::fake",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 232,
+        "end": 260
+      },
+      "hash": "b0c1dafa03013d53bf030f390c1cbc6b50703b0b7340afa5d17c133c212e0778"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::nc",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 120,
+        "end": 164
+      },
+      "hash": "8abb090fe30ef3b699294ba696e40aa2520e9ef2ed9be21fe6703d54974b10a6"
     },
     {
       "id": "example.com/acme/conformance::src/messages/nats.ts::notPublished",
@@ -595,6 +730,15 @@
         "end": 1339
       },
       "hash": "dda606002cd9605b99a8ced33cd85083b5beb476e157c9b1ef3bb5f11ce41f58"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/nats.ts::other",
+      "span": {
+        "path": "src/messages/nats.ts",
+        "start": 172,
+        "end": 224
+      },
+      "hash": "33f8bb89e28f948dcb369fc58346f60aa9e68b6fc041a2dc5b04eb3a3f245d3b"
     },
     {
       "id": "example.com/acme/conformance::src/messages/nats.ts::publishAll",
@@ -678,6 +822,24 @@
       "hash": "98ea9b294c6e009add4028e5034009347bf852e3a44c711d6133daa73b516a76"
     },
     {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::fake",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1214,
+        "end": 1246
+      },
+      "hash": "c7da6b02df2440c7b7095f5bcd678e7c3159540c1ab091ef235867d62d209724"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::fakeProducer",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1254,
+        "end": 1284
+      },
+      "hash": "58e132e5268e12be88e31421ef9e0ce7641de8043939a82951326a98917d00a0"
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/produce.ts::notProduced",
       "span": {
         "path": "src/messages/produce.ts",
@@ -714,6 +876,15 @@
       "hash": "2cae9036f7696057cce2b9e11c939075f0e451311f945f1fdd9a5071a3a1057c"
     },
     {
+      "id": "example.com/acme/conformance::src/messages/produce.ts::transport",
+      "span": {
+        "path": "src/messages/produce.ts",
+        "start": 1129,
+        "end": 1206
+      },
+      "hash": "a6eeb6c4f3f21bb7ce1f458dc6bac966bbddd93162391c972b1bde287aa1a566"
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/produce.ts::transport.send",
       "span": {
         "path": "src/messages/produce.ts",
@@ -721,6 +892,15 @@
         "end": 1203
       },
       "hash": "585a4dfd61708fd857eef9dc9d5df6523e2aa82edf572658845820a028c82f7f"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/queues.ts::TASKS",
+      "span": {
+        "path": "src/messages/queues.ts",
+        "start": 95,
+        "end": 110
+      },
+      "hash": "f920b24e5c10c9bcd0df2d6bd535dde8de7a56bc6f1eec07afab42f69a9bc6ac"
     },
     {
       "id": "example.com/acme/conformance::src/messages/queues.ts::enqueue",
@@ -804,6 +984,24 @@
       "hash": "a97b65ae4c6e09098ffc7423737aee28862b322e387c404d0ff960ee63160dfc"
     },
     {
+      "id": "example.com/acme/conformance::src/messages/rabbit.ts::connection",
+      "span": {
+        "path": "src/messages/rabbit.ts",
+        "start": 35,
+        "end": 86
+      },
+      "hash": "709952080c3ce3041946bc4481e3341cefc3579af6c1b8c09cefa679b308b7f5"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::PREFIX",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 352,
+        "end": 369
+      },
+      "hash": "789da345f302aeea2094053d3dd0244f0faadcda70d3aa03b7bd4e57c8175818"
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/redis.ts::append",
       "span": {
         "path": "src/messages/redis.ts",
@@ -849,6 +1047,42 @@
       "hash": "91d6866d32215e970e5a5a77bb6044547448a3c4658db8b087c1c3da7531aac7"
     },
     {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::client",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 254,
+        "end": 277
+      },
+      "hash": "42c1a686a51a006200af4d2ce059b0d95c3499fb4a483e9f2d8699c9606a4b67"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::fake",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 325,
+        "end": 344
+      },
+      "hash": "143a65b0a425129a09bdfcd077cea3842fa691e016b8b4a826cb440e87335ebf"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::ioredis",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 179,
+        "end": 202
+      },
+      "hash": "717303f776ac2260252c6db564443ee71cd5801993382c666321dd8bd889bd0f"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::named",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 210,
+        "end": 246
+      },
+      "hash": "b11fb25e5338a873a35066c760b2f4f6066bddf33423484e615f6a72c61091a3"
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/redis.ts::notRedis",
       "span": {
         "path": "src/messages/redis.ts",
@@ -856,6 +1090,15 @@
         "end": 2306
       },
       "hash": "c6bd0f3355e7446882067ede9f7ffb65f13b19211f487194296ae96a163016d2"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/redis.ts::other",
+      "span": {
+        "path": "src/messages/redis.ts",
+        "start": 285,
+        "end": 317
+      },
+      "hash": "23a448643243ce814eedab359ecd571cc868e3ba844202add4faa52d595fc57d"
     },
     {
       "id": "example.com/acme/conformance::src/messages/redis.ts::read",
@@ -910,6 +1153,33 @@
         "end": 1743
       },
       "hash": "c295e7dc4b950a5f8e5e939367e01dc67d52b4dc22278c87735775d7fd4ffd35"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::JOBS",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 434,
+        "end": 496
+      },
+      "hash": "a3a7aeb1e8c8234d6f772d825e7f02d76897369cf19b231e519beaef6e993bc0"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::REGION_URL",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 333,
+        "end": 426
+      },
+      "hash": "aac9e5721dce5e4d03efca90bf9109a64fc94649d06e7cffedd3ece5fb1bd3ba"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/sqs.ts::client",
+      "span": {
+        "path": "src/messages/sqs.ts",
+        "start": 299,
+        "end": 325
+      },
+      "hash": "c6d3bd19fd0e2dd99de4c4b5714d0e7c71d784ea74608879bb91925205ee1670"
     },
     {
       "id": "example.com/acme/conformance::src/messages/sqs.ts::consumeAudit",

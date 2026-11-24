@@ -15,6 +15,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/acme/admin::src/http.ts::BASE",
+      "span": {
+        "path": "src/http.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "2f2ada0cebfcb88992d3fc3a4e5294658ec2e18c162138668dad8a2564263f3b"
+    },
+    {
       "id": "example.com/acme/admin::src/http.ts::backoff",
       "span": {
         "path": "src/http.ts",

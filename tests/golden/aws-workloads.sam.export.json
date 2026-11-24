@@ -15,6 +15,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/acme/sam::outside.ts::client",
+      "span": {
+        "path": "outside.ts",
+        "start": 75,
+        "end": 101
+      },
+      "hash": "c6d3bd19fd0e2dd99de4c4b5714d0e7c71d784ea74608879bb91925205ee1670"
+    },
+    {
       "id": "example.com/acme/sam::outside.ts::outside",
       "span": {
         "path": "outside.ts",
@@ -22,6 +31,15 @@
         "end": 236
       },
       "hash": "9ea1fc9356af563d25ed61f15a8ba9b61364a8cc80ea0c36398db887681820d5"
+    },
+    {
+      "id": "example.com/acme/sam::worker/send.ts::client",
+      "span": {
+        "path": "worker/send.ts",
+        "start": 75,
+        "end": 101
+      },
+      "hash": "c6d3bd19fd0e2dd99de4c4b5714d0e7c71d784ea74608879bb91925205ee1670"
     },
     {
       "id": "example.com/acme/sam::worker/send.ts::dispatch",

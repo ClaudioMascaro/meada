@@ -63,6 +63,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/acme/vets-web::src/block.ts::BASE",
+      "span": {
+        "path": "src/block.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
+    },
+    {
       "id": "example.com/acme/vets-web::src/block.ts::owners",
       "span": {
         "path": "src/block.ts",
@@ -99,6 +108,15 @@
       "hash": "e2159aa412e41387767e572bf16cfbf03cb4717eb9b6e8a2b34080581ecef242"
     },
     {
+      "id": "example.com/acme/vets-web::src/builder.ts::BASE",
+      "span": {
+        "path": "src/builder.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
+    },
+    {
       "id": "example.com/acme/vets-web::src/builder.ts::ownersUrl",
       "span": {
         "path": "src/builder.ts",
@@ -124,6 +142,15 @@
         "end": 207
       },
       "hash": "b224a4ba4ac7a56409b4fa43341b7ce64dfb2be1e71d85c1f1469694fa62f9de"
+    },
+    {
+      "id": "example.com/acme/vets-web::src/env.ts::BASE",
+      "span": {
+        "path": "src/env.ts",
+        "start": 6,
+        "end": 32
+      },
+      "hash": "8df73e915d5b22f084f2b8529593162b2c48edda23ee370611a752701db4d2b9"
     },
     {
       "id": "example.com/acme/vets-web::src/env.ts::owners",
@@ -196,6 +223,15 @@
         "end": 204
       },
       "hash": "d4bc161a9daac1cc3e76287cebd479e1f2eb9742340b50bc9ef9a7c421234a18"
+    },
+    {
+      "id": "example.com/acme/vets-web::src/join.ts::API",
+      "span": {
+        "path": "src/join.ts",
+        "start": 6,
+        "end": 37
+      },
+      "hash": "fbeb918c0e0c70186d0a964bfca6f12525367840d23ed22962b924e7cc002eab"
     },
     {
       "id": "example.com/acme/vets-web::src/join.ts::absolute",
@@ -360,6 +396,15 @@
       "hash": "e8832d7eb55f499f63dd9acc1e3f3055da1f16051b78dca2fc619543b1c857f4"
     },
     {
+      "id": "example.com/acme/vets-web::src/local.ts::BASE",
+      "span": {
+        "path": "src/local.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
+    },
+    {
       "id": "example.com/acme/vets-web::src/local.ts::url",
       "span": {
         "path": "src/local.ts",
@@ -376,6 +421,15 @@
         "end": 186
       },
       "hash": "e2159aa412e41387767e572bf16cfbf03cb4717eb9b6e8a2b34080581ecef242"
+    },
+    {
+      "id": "example.com/acme/vets-web::src/names.ts::BASE",
+      "span": {
+        "path": "src/names.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
     },
     {
       "id": "example.com/acme/vets-web::src/names.ts::vets",
@@ -459,6 +513,15 @@
       "hash": "e2159aa412e41387767e572bf16cfbf03cb4717eb9b6e8a2b34080581ecef242"
     },
     {
+      "id": "example.com/acme/vets-web::src/plain.js::BASE",
+      "span": {
+        "path": "src/plain.js",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
+    },
+    {
       "id": "example.com/acme/vets-web::src/plain.js::url",
       "span": {
         "path": "src/plain.js",
@@ -477,6 +540,15 @@
       "hash": "e2159aa412e41387767e572bf16cfbf03cb4717eb9b6e8a2b34080581ecef242"
     },
     {
+      "id": "example.com/acme/vets-web::src/statements.ts::BASE",
+      "span": {
+        "path": "src/statements.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
+    },
+    {
       "id": "example.com/acme/vets-web::src/statements.ts::url",
       "span": {
         "path": "src/statements.ts",
@@ -493,6 +565,15 @@
         "end": 222
       },
       "hash": "e2159aa412e41387767e572bf16cfbf03cb4717eb9b6e8a2b34080581ecef242"
+    },
+    {
+      "id": "example.com/acme/vets-web::src/whatwg.ts::BASE",
+      "span": {
+        "path": "src/whatwg.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
     },
     {
       "id": "example.com/acme/vets-web::src/whatwg.ts::get",
@@ -556,6 +637,15 @@
         "end": 871
       },
       "hash": "4857684ebf93feccce24e0ef52ac79dcf9d42c7fcb8ec6b0c39f58f44e635f18"
+    },
+    {
+      "id": "example.com/acme/vets-web::src/written.ts::BASE",
+      "span": {
+        "path": "src/written.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
     },
     {
       "id": "example.com/acme/vets-web::src/written.ts::owners",

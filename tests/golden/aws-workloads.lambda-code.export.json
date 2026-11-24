@@ -11,6 +11,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/acme/lambda::worker/send.ts::client",
+      "span": {
+        "path": "worker/send.ts",
+        "start": 75,
+        "end": 101
+      },
+      "hash": "c6d3bd19fd0e2dd99de4c4b5714d0e7c71d784ea74608879bb91925205ee1670"
+    },
+    {
       "id": "example.com/acme/lambda::worker/send.ts::dispatch",
       "span": {
         "path": "worker/send.ts",

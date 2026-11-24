@@ -54,6 +54,15 @@
       "hash": "19d0f9ff13d77d0ce198022ede5b67db427d97be643e17c629c18d3c79d145c8"
     },
     {
+      "id": "local/azure-sdk-values-env::worker.ts::secrets",
+      "span": {
+        "path": "worker.ts",
+        "start": 264,
+        "end": 309
+      },
+      "hash": "57413199d003f68711fe581e7cae6992aae5ca0e79dcd589df062790cc220201"
+    },
+    {
       "id": "local/azure-sdk-values-env::worker.ts::send",
       "span": {
         "path": "worker.ts",
@@ -61,6 +70,15 @@
         "end": 410
       },
       "hash": "c7c39b45ceca6a0f71bae50e959f952583c8cc2b06dae69ce0f7e38c99826cc0"
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::storage",
+      "span": {
+        "path": "worker.ts",
+        "start": 203,
+        "end": 256
+      },
+      "hash": "dcadeccbc118866fb28b1873d0fa6aae65202b831fec284c53f2f5c69dc00ede"
     },
     {
       "id": "local/azure-sdk-values-env::worker.ts::write",

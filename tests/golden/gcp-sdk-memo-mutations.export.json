@@ -40,6 +40,33 @@
       "hash": "29425b552c055d5c10f212b8995275ce51dfeae3722599b02f6546a55abef581"
     },
     {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::earlier",
+      "span": {
+        "path": "scene.js",
+        "start": 671,
+        "end": 716
+      },
+      "hash": "345c363c97b1fcd6b38008e814bde282839fa74a9b4dbb965195238cf8e70927"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::first",
+      "span": {
+        "path": "scene.js",
+        "start": 146,
+        "end": 165
+      },
+      "hash": "4f6ce7187573147e9fe0ab97555e1a3797befd10f51640734c2b5764ae08a30f"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::inline",
+      "span": {
+        "path": "scene.js",
+        "start": 442,
+        "end": 485
+      },
+      "hash": "3b17e92cf8da1feba5afb2703cd950f40a532e98e303a3935ad0980c2ec42a12"
+    },
+    {
       "id": "local/gcp-sdk-memo-mutations::scene.js::inlineBefore",
       "span": {
         "path": "scene.js",
@@ -94,6 +121,33 @@
       "hash": "7fd18e0f83261b75cdb2bebefacf4bb72fe4cd41d155a1fdc368697532f4f19a"
     },
     {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::omitted",
+      "span": {
+        "path": "scene.js",
+        "start": 909,
+        "end": 930
+      },
+      "hash": "de72bfce957864bdc3cb6075025f330b1a2dfd6467173d1f9073fcf6ea45898f"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::options",
+      "span": {
+        "path": "scene.js",
+        "start": 110,
+        "end": 138
+      },
+      "hash": "dd2011df650b55a21087890597f213baa187ac96ae869d875d5330a21f93f993"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.js::second",
+      "span": {
+        "path": "scene.js",
+        "start": 202,
+        "end": 222
+      },
+      "hash": "acc7e0d4f58299174c2f40d97ba99e4c29231d6612058edebf0b711421f4aea4"
+    },
+    {
       "id": "local/gcp-sdk-memo-mutations::scene.ts::after",
       "span": {
         "path": "scene.ts",
@@ -119,6 +173,33 @@
         "end": 998
       },
       "hash": "29425b552c055d5c10f212b8995275ce51dfeae3722599b02f6546a55abef581"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::earlier",
+      "span": {
+        "path": "scene.ts",
+        "start": 671,
+        "end": 716
+      },
+      "hash": "126f0563a707ac7889e9619fefff1c0eb2fce33e197603ff2186e7674ecd94ed"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::first",
+      "span": {
+        "path": "scene.ts",
+        "start": 146,
+        "end": 165
+      },
+      "hash": "4f6ce7187573147e9fe0ab97555e1a3797befd10f51640734c2b5764ae08a30f"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::inline",
+      "span": {
+        "path": "scene.ts",
+        "start": 442,
+        "end": 485
+      },
+      "hash": "8bbd29133b838e929189079b120f9d29b65e0ce018c02d6877b2e8d678d22974"
     },
     {
       "id": "local/gcp-sdk-memo-mutations::scene.ts::inlineBefore",
@@ -173,6 +254,33 @@
         "end": 435
       },
       "hash": "7fd18e0f83261b75cdb2bebefacf4bb72fe4cd41d155a1fdc368697532f4f19a"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::omitted",
+      "span": {
+        "path": "scene.ts",
+        "start": 909,
+        "end": 930
+      },
+      "hash": "de72bfce957864bdc3cb6075025f330b1a2dfd6467173d1f9073fcf6ea45898f"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::options",
+      "span": {
+        "path": "scene.ts",
+        "start": 110,
+        "end": 138
+      },
+      "hash": "098ddb2b2c34f94a0963901175d0ab2c6efb01c28c1580ae8eabb8a7e6f85836"
+    },
+    {
+      "id": "local/gcp-sdk-memo-mutations::scene.ts::second",
+      "span": {
+        "path": "scene.ts",
+        "start": 202,
+        "end": 222
+      },
+      "hash": "acc7e0d4f58299174c2f40d97ba99e4c29231d6612058edebf0b711421f4aea4"
     }
   ],
   "calls": [

@@ -463,8 +463,8 @@ pub struct Facts {
     /// `const` bindings that hold no function or class, such as `const USERS = "/users"` or
     /// `const app = express()`. Their values are not kept in the index (see `Call::args`).
     pub consts: Vec<Const>,
-    /// The top-level declarations the file exports that are no definitions (TS/JS), each a
-    /// symbol an import can target. Stored, unlike `consts`' values: `resolve_file` reads it
+    /// The top-level declarations of the file that are no definitions (TS/JS), exported or not,
+    /// each a symbol an import can target or a use can be held by. Stored, unlike `consts`' values: `resolve_file` reads it
     /// from the facts of files not parsed again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub declarations: Vec<Declaration>,
@@ -1258,8 +1258,8 @@ pub struct Field {
     pub default: Option<Value>,
 }
 
-/// A top-level declaration a file exports that is no definition: a constant holding no
-/// function or class, a type, an enum, or a default-exported expression (`default`).
+/// A top-level declaration of a file that is no definition, exported or not: a constant holding
+/// no function or class, a type, an enum, or a default-exported expression (`default`).
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Declaration {
     pub name: String,

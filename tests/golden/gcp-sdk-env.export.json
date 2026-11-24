@@ -101,6 +101,15 @@
       "hash": "c61460fdb2269c3ba1afe7e7f692e6e3dd66c872f58fe0c4f98319adcc5c5a94"
     },
     {
+      "id": "local/gcp-sdk-env::worker.js::bus",
+      "span": {
+        "path": "worker.js",
+        "start": 51,
+        "end": 69
+      },
+      "hash": "94b3456ac466544f5c39c828c34772b0d28322d63993aab66c290bdb3ce1db55"
+    },
+    {
       "id": "local/gcp-sdk-env::worker.js::publishJs",
       "span": {
         "path": "worker.js",
@@ -135,6 +144,15 @@
         "end": 280
       },
       "hash": "b62768ce1544a7f3b6512a446e3068b6cdf7fe7b2fc3295f05c5494f7a6ce606"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::bus",
+      "span": {
+        "path": "worker.ts",
+        "start": 177,
+        "end": 195
+      },
+      "hash": "94b3456ac466544f5c39c828c34772b0d28322d63993aab66c290bdb3ce1db55"
     },
     {
       "id": "local/gcp-sdk-env::worker.ts::handler",
@@ -216,6 +234,24 @@
         "end": 858
       },
       "hash": "705a106cf94efe5e3abed7b90b40c2d28bd20d163c542cda75a7aa9d76d6917c"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::secrets",
+      "span": {
+        "path": "worker.ts",
+        "start": 234,
+        "end": 276
+      },
+      "hash": "b5daa895515d3e36b13fe76a2e2ea7546984ab4b12868d19c44d302c5a7ce14c"
+    },
+    {
+      "id": "local/gcp-sdk-env::worker.ts::storage",
+      "span": {
+        "path": "worker.ts",
+        "start": 203,
+        "end": 226
+      },
+      "hash": "4981f13c6009e3a697ca018b3b3b2674af2cd0e0e23a9ae68e9f9fe157a1d475"
     },
     {
       "id": "local/gcp-sdk-env::worker.ts::unknown",

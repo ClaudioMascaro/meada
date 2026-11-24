@@ -496,6 +496,33 @@
       "hash": "d85ff235c1f6137d3cf02929e126218be013d7d6b1f2d727c49120056e6cca7d"
     },
     {
+      "id": "local/gcp-sdk-controls::control.js::a",
+      "span": {
+        "path": "control.js",
+        "start": 245,
+        "end": 269
+      },
+      "hash": "8988a601fa42fcc56ee39b0a29b2feef1f34df713643c19c05d552b80fd2b276"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::b",
+      "span": {
+        "path": "control.js",
+        "start": 277,
+        "end": 301
+      },
+      "hash": "55f26d4c4d07ed597fc1fe735fa5af69edeed1ba55316af0facfa0a9ad837f92"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::bus",
+      "span": {
+        "path": "control.js",
+        "start": 418,
+        "end": 436
+      },
+      "hash": "94b3456ac466544f5c39c828c34772b0d28322d63993aab66c290bdb3ce1db55"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.js::caught",
       "span": {
         "path": "control.js",
@@ -658,6 +685,24 @@
       "hash": "50ef0079f7cfdcc16dffc7d2b547184f4ec6b4a89bbf5d6802316228891fd465"
     },
     {
+      "id": "local/gcp-sdk-controls::control.js::secrets",
+      "span": {
+        "path": "control.js",
+        "start": 473,
+        "end": 515
+      },
+      "hash": "b5daa895515d3e36b13fe76a2e2ea7546984ab4b12868d19c44d302c5a7ce14c"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::store",
+      "span": {
+        "path": "control.js",
+        "start": 444,
+        "end": 465
+      },
+      "hash": "3bcb2e27392128ae7fea3f24333d07b38cb2581067637a667d46e0880313ae06"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.js::structured",
       "span": {
         "path": "control.js",
@@ -665,6 +710,24 @@
         "end": 2130
       },
       "hash": "460b4ffddecc67e902125cb3799cafd42ff9f12f1181aab280efb98d11dcaca4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::structuredA",
+      "span": {
+        "path": "control.js",
+        "start": 2137,
+        "end": 2189
+      },
+      "hash": "740ec9b3cf1d291809c3fd88be2c9e4cce2b40a8ae750bb836e1523e9c463b3a"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::structuredB",
+      "span": {
+        "path": "control.js",
+        "start": 2197,
+        "end": 2249
+      },
+      "hash": "5fd48e984ad7f8dd238960fca7c6b76b7db73c41e71598ef13a13c3781afe20a"
     },
     {
       "id": "local/gcp-sdk-controls::control.js::withoutNew",
@@ -892,6 +955,33 @@
       "hash": "d85ff235c1f6137d3cf02929e126218be013d7d6b1f2d727c49120056e6cca7d"
     },
     {
+      "id": "local/gcp-sdk-controls::control.ts::a",
+      "span": {
+        "path": "control.ts",
+        "start": 245,
+        "end": 269
+      },
+      "hash": "d154686dee80cea94b386639c0892b57376a24ec620a3edd6be63c16c468e2ef"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::b",
+      "span": {
+        "path": "control.ts",
+        "start": 277,
+        "end": 301
+      },
+      "hash": "44682dab830a43a50708397e520bc45d4da0e7483d234a8f7a43d0d1fcba228b"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::bus",
+      "span": {
+        "path": "control.ts",
+        "start": 418,
+        "end": 436
+      },
+      "hash": "94b3456ac466544f5c39c828c34772b0d28322d63993aab66c290bdb3ce1db55"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.ts::caught",
       "span": {
         "path": "control.ts",
@@ -1054,6 +1144,24 @@
       "hash": "50ef0079f7cfdcc16dffc7d2b547184f4ec6b4a89bbf5d6802316228891fd465"
     },
     {
+      "id": "local/gcp-sdk-controls::control.ts::secrets",
+      "span": {
+        "path": "control.ts",
+        "start": 473,
+        "end": 515
+      },
+      "hash": "b5daa895515d3e36b13fe76a2e2ea7546984ab4b12868d19c44d302c5a7ce14c"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::store",
+      "span": {
+        "path": "control.ts",
+        "start": 444,
+        "end": 465
+      },
+      "hash": "3bcb2e27392128ae7fea3f24333d07b38cb2581067637a667d46e0880313ae06"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.ts::structured",
       "span": {
         "path": "control.ts",
@@ -1061,6 +1169,24 @@
         "end": 2130
       },
       "hash": "460b4ffddecc67e902125cb3799cafd42ff9f12f1181aab280efb98d11dcaca4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::structuredA",
+      "span": {
+        "path": "control.ts",
+        "start": 2137,
+        "end": 2189
+      },
+      "hash": "e3bc997d68cb44e72887bf75689a5996ce11488db50c25aeaa4b0e36d32be19a"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::structuredB",
+      "span": {
+        "path": "control.ts",
+        "start": 2197,
+        "end": 2249
+      },
+      "hash": "5c0578e119cb77085423caa8af13363dc1da83ef02bb14deb4d6bb325d056ba7"
     },
     {
       "id": "local/gcp-sdk-controls::control.ts::withoutNew",

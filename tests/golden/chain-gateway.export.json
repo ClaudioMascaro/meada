@@ -48,6 +48,15 @@
       "hash": "4a2f3145d3e730c4a59d63d1a85244262f86dfa63db5646dc050f01e2f86ad3b"
     },
     {
+      "id": "example.com/chain/gateway::src/checkout.ts::Request",
+      "span": {
+        "path": "src/checkout.ts",
+        "start": 119,
+        "end": 165
+      },
+      "hash": "eed225b4fedf7034f9a1996affb7873644c5d4c241c2cf32753bc67fa267df74"
+    },
+    {
       "id": "example.com/chain/gateway::src/checkout.ts::createOrder",
       "span": {
         "path": "src/checkout.ts",
@@ -66,6 +75,15 @@
       "hash": "aba91460b15553a687d4ec3765417b83193820185a4e22b3c720769a91961ce4"
     },
     {
+      "id": "example.com/chain/gateway::src/kafka.ts::kafka",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 40,
+        "end": 107
+      },
+      "hash": "f553d3e87a4eb2b4db8a3c2192cfa8e6739bdbb86ee38692d86e87ea0e8e83a0"
+    },
+    {
       "id": "example.com/chain/gateway::src/kafka.ts::producer",
       "span": {
         "path": "src/kafka.ts",
@@ -73,6 +91,15 @@
         "end": 150
       },
       "hash": "f0f22c9a47dd2d709e73a4a017637a21743af686aab8fdd921b38ac6f91db3bc"
+    },
+    {
+      "id": "example.com/chain/gateway::src/orders.ts::Request",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 40,
+        "end": 86
+      },
+      "hash": "eed225b4fedf7034f9a1996affb7873644c5d4c241c2cf32753bc67fa267df74"
     },
     {
       "id": "example.com/chain/gateway::src/orders.ts::cancelOrder",
@@ -118,6 +145,15 @@
         "end": 225
       },
       "hash": "d20a5e68bc19266d19ea40faf79732e57fd758c7bc5c67974a7235a5dc03be85"
+    },
+    {
+      "id": "example.com/chain/gateway::src/server.ts::app",
+      "span": {
+        "path": "src/server.ts",
+        "start": 70,
+        "end": 85
+      },
+      "hash": "ab91d989774dae76bf44e54fdab42d07cca448bdbcf381d1046ad2b0927e8966"
     },
     {
       "id": "example.com/chain/gateway::src/topics.ts::ORDERS_CREATED",

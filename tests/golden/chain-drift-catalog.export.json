@@ -188,6 +188,24 @@
       "hash": "40d353d93cb68230363dd547fb9509b95f5c3d54e0e8a824cd7d5f26ec800a7c"
     },
     {
+      "id": "example.com/chain/catalog::app/api/labels/route.ts::Labels",
+      "span": {
+        "path": "app/api/labels/route.ts",
+        "start": 133,
+        "end": 178
+      },
+      "hash": "9b6cc44ac848fd43304d37e89a564ce59b0a23373f9300e477a6aac7c499017f"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/labels/route.ts::Reply",
+      "span": {
+        "path": "app/api/labels/route.ts",
+        "start": 180,
+        "end": 232
+      },
+      "hash": "b7c79e4cc6baaa3b58584aa747917341677e5d8c229609aa3525c587c75f600f"
+    },
+    {
       "id": "example.com/chain/catalog::app/api/offers/route.ts::GET",
       "span": {
         "path": "app/api/offers/route.ts",
@@ -222,6 +240,24 @@
         "end": 480
       },
       "hash": "46e81a797f2b71e321f4e7fcebde6f365b58fb0f7a40520ca8e69638f7592e4f"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::Page",
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 329,
+        "end": 392
+      },
+      "hash": "6f125010bd34ffe75f51dfcc667063a2be6ef97a58bead4102d05dfbc129bf2c"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::Profile",
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 216,
+        "end": 320
+      },
+      "hash": "d19cefb92169fd201b4edc9e0f22d7374d7717606880e701d4812f1f217de65d"
     },
     {
       "id": "example.com/chain/catalog::app/api/quotes/route.ts::GET",
@@ -260,6 +296,15 @@
       "hash": "94b0d9a0c6524833d520310568efa59d2a00e97269a247c8c3d1126aac41243e"
     },
     {
+      "id": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::SKUS",
+      "span": {
+        "path": "app/api/stock/[sku]/route.ts",
+        "start": 6,
+        "end": 19
+      },
+      "hash": "83e2cb11c0c02fc41e75e4a071ba309d41b3ab3a89238fe7c17d37699a1106e5"
+    },
+    {
       "id": "example.com/chain/catalog::app/api/stock/route.ts::GET",
       "span": {
         "path": "app/api/stock/route.ts",
@@ -267,6 +312,15 @@
         "end": 390
       },
       "hash": "a05f042d87945b0003313d156022cf6d62e13609ce8a6a99bd65f634b3e1b856"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/route.ts::HISTORY",
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 102,
+        "end": 118
+      },
+      "hash": "8136dfd4c0f40c77b574334df7ef4a7dd3647d0f8ca2fcef7043bf54694bc02a"
     },
     {
       "id": "example.com/chain/catalog::app/api/stock/route.ts::POST",
@@ -384,6 +438,15 @@
         "end": 144
       },
       "hash": "016a3137dbcbeeda777e4eed87965bdbdd1e3178c712030b08d5cf1dc6c5202a"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Labels",
+      "span": {
+        "path": "packages/contracts/src/receipt.ts",
+        "start": 316,
+        "end": 361
+      },
+      "hash": "9b6cc44ac848fd43304d37e89a564ce59b0a23373f9300e477a6aac7c499017f"
     },
     {
       "id": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",

@@ -18,6 +18,15 @@
       "hash": "789020317feaf9827a694ba8ecb69994283ff09a3bef7c9a5749560834c09369"
     },
     {
+      "id": "example.com/gcp/app::worker.ts::client",
+      "span": {
+        "path": "worker.ts",
+        "start": 75,
+        "end": 101
+      },
+      "hash": "c6d3bd19fd0e2dd99de4c4b5714d0e7c71d784ea74608879bb91925205ee1670"
+    },
+    {
       "id": "example.com/gcp/app::worker.ts::current",
       "span": {
         "path": "worker.ts",

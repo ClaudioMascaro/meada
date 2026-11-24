@@ -80,6 +80,33 @@
       "hash": "976e107073ea3c6f4a1908ad20a83d907d880006a0883b27bc05a1117124aeb1"
     },
     {
+      "id": "example.com/xlang/storefront::src/events.ts::kafka",
+      "span": {
+        "path": "src/events.ts",
+        "start": 40,
+        "end": 110
+      },
+      "hash": "56a587534d7287555e3868d119a1664ddb62720ae70563358db0d2cf70422c8e"
+    },
+    {
+      "id": "example.com/xlang/storefront::src/events.ts::producer",
+      "span": {
+        "path": "src/events.ts",
+        "start": 118,
+        "end": 145
+      },
+      "hash": "f0f22c9a47dd2d709e73a4a017637a21743af686aab8fdd921b38ac6f91db3bc"
+    },
+    {
+      "id": "example.com/xlang/storefront::src/inventory.ts::INVENTORY",
+      "span": {
+        "path": "src/inventory.ts",
+        "start": 6,
+        "end": 43
+      },
+      "hash": "882df85425aa7826b4a35ba4349957e6704b16cf1cd798c2b72b3e5fef2cff0c"
+    },
+    {
       "id": "example.com/xlang/storefront::src/inventory.ts::reserveStock",
       "span": {
         "path": "src/inventory.ts",

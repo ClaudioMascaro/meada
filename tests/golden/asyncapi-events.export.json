@@ -20,6 +20,33 @@
       "hash": "c29a4d1694811f9e628e604a03b37d8fca6e5c57516f05bc19ca689da5365b2e"
     },
     {
+      "id": "example.com/asyncapi/events::src/emit.ts::channel",
+      "span": {
+        "path": "src/emit.ts",
+        "start": 452,
+        "end": 494
+      },
+      "hash": "c9a1004cbc12690211472d927c09e2fb1258fde43b620e06ae6a482735c6db36"
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::connection",
+      "span": {
+        "path": "src/emit.ts",
+        "start": 393,
+        "end": 444
+      },
+      "hash": "709952080c3ce3041946bc4481e3341cefc3579af6c1b8c09cefa679b308b7f5"
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::kafka",
+      "span": {
+        "path": "src/emit.ts",
+        "start": 68,
+        "end": 134
+      },
+      "hash": "b5629939cd0cfdccf102bad6c366aa61e2e331de3a4d49eddc7424704766cbdb"
+    },
+    {
       "id": "example.com/asyncapi/events::src/emit.ts::onCancellation",
       "span": {
         "path": "src/emit.ts",
@@ -27,6 +54,15 @@
         "end": 716
       },
       "hash": "756594a0bbdf26e67b902ceeb84c2c9659aacfd2b6339f9a0b7a4625f8d68d19"
+    },
+    {
+      "id": "example.com/asyncapi/events::src/emit.ts::producer",
+      "span": {
+        "path": "src/emit.ts",
+        "start": 142,
+        "end": 169
+      },
+      "hash": "f0f22c9a47dd2d709e73a4a017637a21743af686aab8fdd921b38ac6f91db3bc"
     },
     {
       "id": "example.com/asyncapi/events::src/emit.ts::work",

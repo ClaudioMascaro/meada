@@ -67,6 +67,33 @@
       "hash": "039c91e5f95158e81a8dd583663734d75c55a38cca27b273363834abcdf4d161"
     },
     {
+      "id": "example.com/xlang-rust/web::src/events.ts::kafka",
+      "span": {
+        "path": "src/events.ts",
+        "start": 40,
+        "end": 103
+      },
+      "hash": "c2363845a452d94043ed924dadb475aa8709186c7d5846265c58a1d48f069fc4"
+    },
+    {
+      "id": "example.com/xlang-rust/web::src/events.ts::producer",
+      "span": {
+        "path": "src/events.ts",
+        "start": 111,
+        "end": 138
+      },
+      "hash": "f0f22c9a47dd2d709e73a4a017637a21743af686aab8fdd921b38ac6f91db3bc"
+    },
+    {
+      "id": "example.com/xlang-rust/web::src/orders.ts::API",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 6,
+        "end": 31
+      },
+      "hash": "21095d5562fa18a76ec2110a30a5e545803b6f2ec8dff32860bfa384a66ed1b1"
+    },
+    {
       "id": "example.com/xlang-rust/web::src/orders.ts::orderStatus",
       "span": {
         "path": "src/orders.ts",

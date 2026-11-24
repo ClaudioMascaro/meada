@@ -18,6 +18,15 @@
       "hash": "22951c86fa31bbd4f94f547f7c4822ca7c3717f564e0eb2dbf52345b8da3f424"
     },
     {
+      "id": "local/azure-sdk-mutations::worker.ts::bus",
+      "span": {
+        "path": "worker.ts",
+        "start": 61,
+        "end": 99
+      },
+      "hash": "5dde00246f08454dbd6b6b623b5377dc2f0fa0878945b2e31bdd60b9dff2ddcf"
+    },
+    {
       "id": "local/azure-sdk-mutations::worker.ts::mapping",
       "span": {
         "path": "worker.ts",

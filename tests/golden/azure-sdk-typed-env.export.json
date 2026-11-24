@@ -9,6 +9,15 @@
   ],
   "symbols": [
     {
+      "id": "local/azure-sdk-typed-env::worker.ts::bus",
+      "span": {
+        "path": "worker.ts",
+        "start": 61,
+        "end": 99
+      },
+      "hash": "5dde00246f08454dbd6b6b623b5377dc2f0fa0878945b2e31bdd60b9dff2ddcf"
+    },
+    {
       "id": "local/azure-sdk-typed-env::worker.ts::publish",
       "span": {
         "path": "worker.ts",

@@ -13,6 +13,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/provision/app::src/consumer.ts::client",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 120,
+        "end": 146
+      },
+      "hash": "c6d3bd19fd0e2dd99de4c4b5714d0e7c71d784ea74608879bb91925205ee1670"
+    },
+    {
       "id": "example.com/provision/app::src/consumer.ts::drain",
       "span": {
         "path": "src/consumer.ts",
@@ -38,6 +47,24 @@
         "end": 577
       },
       "hash": "6de8e3fec0e0e69f98c7b75ca6b7b66d5358a5cf96d2746a728ad5f34f8aaf0d"
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::BASE",
+      "span": {
+        "path": "src/producer.ts",
+        "start": 110,
+        "end": 137
+      },
+      "hash": "7b464647cdae0b87eb32329446cbcdedd14f7bb3180af13012667c4013aeb80a"
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::client",
+      "span": {
+        "path": "src/producer.ts",
+        "start": 76,
+        "end": 102
+      },
+      "hash": "c6d3bd19fd0e2dd99de4c4b5714d0e7c71d784ea74608879bb91925205ee1670"
     },
     {
       "id": "example.com/provision/app::src/producer.ts::enqueue",

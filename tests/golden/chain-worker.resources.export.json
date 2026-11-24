@@ -19,6 +19,24 @@
   ],
   "symbols": [
     {
+      "id": "example.com/chain/worker::src/consumer.ts::consumer",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 149,
+        "end": 197
+      },
+      "hash": "fbf336efebfb320958fb69873f0d1a68f410cd6f307ced8b2efc4eebfa2a891e"
+    },
+    {
+      "id": "example.com/chain/worker::src/consumer.ts::kafka",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 75,
+        "end": 141
+      },
+      "hash": "a9eff492768ac3309758a394fb912a3dbeca1af6f8c35fba51c24cb15bf59c6a"
+    },
+    {
       "id": "example.com/chain/worker::src/consumer.ts::onOrderCreated",
       "span": {
         "path": "src/consumer.ts",

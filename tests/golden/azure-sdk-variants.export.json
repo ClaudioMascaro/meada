@@ -353,6 +353,42 @@
       "hash": "bb6a7f177d53d76cd2071d8da15b46812123170cf5e53e44646664af5dd0411b"
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::blob",
+      "span": {
+        "path": "worker.js",
+        "start": 783,
+        "end": 833
+      },
+      "hash": "979b3bc9f7f7bdfbb46eb4023fa0393acbb267fe14ebccd0ea5b5dcf51194a63"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::bus",
+      "span": {
+        "path": "worker.js",
+        "start": 311,
+        "end": 336
+      },
+      "hash": "4249b64e6e06b675ae7bafdd3d99a42c9e7f12c4ee2c71c04755c0724a419d19"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::consumer",
+      "span": {
+        "path": "worker.js",
+        "start": 591,
+        "end": 656
+      },
+      "hash": "93200b7451726b3b3cb0b199c0789ae8c61442983f5eb7f3c28b2c427e06e8c1"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::container",
+      "span": {
+        "path": "worker.js",
+        "start": 715,
+        "end": 775
+      },
+      "hash": "6371233fdc858e43ffb94f0f5ea09322cec8df9d75b0aaa0dc917a37dfdb1070"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::handler",
       "span": {
         "path": "worker.js",
@@ -369,6 +405,15 @@
         "end": 1796
       },
       "hash": "ad1e34394a53271ab899f9bed7a8058daff8c75f71699ba8dfc07b2c73f85889"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::producer",
+      "span": {
+        "path": "worker.js",
+        "start": 527,
+        "end": 583
+      },
+      "hash": "1b28c72f39652d1b469918cc62382e655be61e68012f9e94e49bdc0354305284"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::read",
@@ -416,6 +461,15 @@
       "hash": "d1c752acb0a4201a1505bc0925098325b0f886d05cae12293cb9bca821ebbf3d"
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::receiver",
+      "span": {
+        "path": "worker.js",
+        "start": 398,
+        "end": 448
+      },
+      "hash": "d3821c20eae74c5988115cc5df4294e55959318ab23cb9756e728ce1a64a5121"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::repeatReads",
       "span": {
         "path": "worker.js",
@@ -432,6 +486,15 @@
         "end": 1423
       },
       "hash": "76f605e4f67458348d4a3f2c64fe746b84f4919ee1cbaba200ffd301f89cba33"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::secrets",
+      "span": {
+        "path": "worker.js",
+        "start": 841,
+        "end": 881
+      },
+      "hash": "1ca2642c750e31fdd2ffc55885fbf72a40a0161e4e1815b8dd1ee375e7bfd88a"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::send",
@@ -452,6 +515,15 @@
       "hash": "c4f9249be225cb452cdcae6ab663ec63d239f5d6823bd51121c0f7f0a65e45a6"
     },
     {
+      "id": "local/azure-sdk-variants::worker.js::sender",
+      "span": {
+        "path": "worker.js",
+        "start": 344,
+        "end": 390
+      },
+      "hash": "2726b566ca76d1a43bc130f86e29ceb68696c326eb21d46bc98ad452740dbb6a"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.js::staticStorage",
       "span": {
         "path": "worker.js",
@@ -459,6 +531,15 @@
         "end": 2280
       },
       "hash": "2f36fe6b850c21c5c419ab9db4d0233b102d0a3ec54995f96e8398834cd24fc5"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::storage",
+      "span": {
+        "path": "worker.js",
+        "start": 664,
+        "end": 707
+      },
+      "hash": "ba70f5fdfb990596e3e3fbb44a2d758661cec26eaeac04ad118a4af212a02a56"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::structuredBlob",
@@ -504,6 +585,15 @@
         "end": 1081
       },
       "hash": "3a0c547fe3632104956449afb287549e84c6fa0d94612ade878d05cb65ea41ca"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.js::subscription",
+      "span": {
+        "path": "worker.js",
+        "start": 456,
+        "end": 519
+      },
+      "hash": "03073d395618117bd6fa1987fe330638bfaffafa025ff198bee2c87e18b26161"
     },
     {
       "id": "local/azure-sdk-variants::worker.js::unknownHub",
@@ -767,6 +857,42 @@
       "hash": "bd6c2b3fb4fae1eba77d90f46b6a0b22521d0d02d20ca6dd0a46995dd0a2468a"
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::blob",
+      "span": {
+        "path": "worker.ts",
+        "start": 783,
+        "end": 833
+      },
+      "hash": "979b3bc9f7f7bdfbb46eb4023fa0393acbb267fe14ebccd0ea5b5dcf51194a63"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::bus",
+      "span": {
+        "path": "worker.ts",
+        "start": 311,
+        "end": 336
+      },
+      "hash": "4249b64e6e06b675ae7bafdd3d99a42c9e7f12c4ee2c71c04755c0724a419d19"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::consumer",
+      "span": {
+        "path": "worker.ts",
+        "start": 591,
+        "end": 656
+      },
+      "hash": "03aecabe187b6a4333e6cd7cbefe6eb770d306ad8c6ceb85adbb670f9b2b9ff0"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::container",
+      "span": {
+        "path": "worker.ts",
+        "start": 715,
+        "end": 775
+      },
+      "hash": "36b5c827ead1004024b58167a771769aefb2e6bdf7c4440c410b21c8ccf0823a"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::handler",
       "span": {
         "path": "worker.ts",
@@ -783,6 +909,15 @@
         "end": 1796
       },
       "hash": "ad1e34394a53271ab899f9bed7a8058daff8c75f71699ba8dfc07b2c73f85889"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::producer",
+      "span": {
+        "path": "worker.ts",
+        "start": 527,
+        "end": 583
+      },
+      "hash": "f3fc0a1d5366c032203ade22cf98a048018c1b7a439332d603f101e31806aed0"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::read",
@@ -830,6 +965,15 @@
       "hash": "d1c752acb0a4201a1505bc0925098325b0f886d05cae12293cb9bca821ebbf3d"
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::receiver",
+      "span": {
+        "path": "worker.ts",
+        "start": 398,
+        "end": 448
+      },
+      "hash": "e08874205243964317dca65f572be988faaa1261a7e7715369cd5e9b6649b15c"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::repeatReads",
       "span": {
         "path": "worker.ts",
@@ -846,6 +990,15 @@
         "end": 1423
       },
       "hash": "e90d5507b1680c7816c355c9322c65c638ed82d7c24a1227151da72365df2a21"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::secrets",
+      "span": {
+        "path": "worker.ts",
+        "start": 841,
+        "end": 881
+      },
+      "hash": "1ca2642c750e31fdd2ffc55885fbf72a40a0161e4e1815b8dd1ee375e7bfd88a"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::send",
@@ -866,6 +1019,15 @@
       "hash": "c4f9249be225cb452cdcae6ab663ec63d239f5d6823bd51121c0f7f0a65e45a6"
     },
     {
+      "id": "local/azure-sdk-variants::worker.ts::sender",
+      "span": {
+        "path": "worker.ts",
+        "start": 344,
+        "end": 390
+      },
+      "hash": "67d1a547dd9f948fe94afa04368000dc1a38c42dd0385cf451d09a787f7a2e89"
+    },
+    {
       "id": "local/azure-sdk-variants::worker.ts::staticStorage",
       "span": {
         "path": "worker.ts",
@@ -873,6 +1035,15 @@
         "end": 2280
       },
       "hash": "2f36fe6b850c21c5c419ab9db4d0233b102d0a3ec54995f96e8398834cd24fc5"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::storage",
+      "span": {
+        "path": "worker.ts",
+        "start": 664,
+        "end": 707
+      },
+      "hash": "ba70f5fdfb990596e3e3fbb44a2d758661cec26eaeac04ad118a4af212a02a56"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::structuredBlob",
@@ -918,6 +1089,15 @@
         "end": 1081
       },
       "hash": "3a0c547fe3632104956449afb287549e84c6fa0d94612ade878d05cb65ea41ca"
+    },
+    {
+      "id": "local/azure-sdk-variants::worker.ts::subscription",
+      "span": {
+        "path": "worker.ts",
+        "start": 456,
+        "end": 519
+      },
+      "hash": "b2cbba39bce9a7dcaedd8126667ce779704aa82b95884c32b58267d6aa29ba77"
     },
     {
       "id": "local/azure-sdk-variants::worker.ts::unknownHub",

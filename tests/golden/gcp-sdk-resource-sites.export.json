@@ -16,6 +16,24 @@
         "end": 536
       },
       "hash": "3669474d6fbfa9d7e5989375bdd3d0600a090d1766abadfe8bd8915fdf683417"
+    },
+    {
+      "id": "local/gcp-sdk-resource-sites::reads.ts::secrets",
+      "span": {
+        "path": "reads.ts",
+        "start": 155,
+        "end": 195
+      },
+      "hash": "bb27b4df803e74cd3b2004815a403c7bc8f1619a934688fc9d70d45c71c3ae7a"
+    },
+    {
+      "id": "local/gcp-sdk-resource-sites::reads.ts::storage",
+      "span": {
+        "path": "reads.ts",
+        "start": 126,
+        "end": 147
+      },
+      "hash": "fb525feef50d29fbbf5e783a89952e87e944f13fc41a9693d79e5cd2f3dec74c"
     }
   ],
   "calls": [

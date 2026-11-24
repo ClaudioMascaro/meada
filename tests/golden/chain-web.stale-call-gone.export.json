@@ -23,6 +23,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/chain/web::src/api/client.ts::BASE",
+      "span": {
+        "path": "src/api/client.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "4b91029ca5da7b89c17c424818d3b6d88572f84614a2b51603b4836346ba9d17"
+    },
+    {
       "id": "example.com/chain/web::src/api/client.ts::request",
       "span": {
         "path": "src/api/client.ts",

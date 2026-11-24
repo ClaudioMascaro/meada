@@ -117,6 +117,15 @@
       "hash": "d20a5e68bc19266d19ea40faf79732e57fd758c7bc5c67974a7235a5dc03be85"
     },
     {
+      "id": "example.com/acme/backend::src/server.ts::app",
+      "span": {
+        "path": "src/server.ts",
+        "start": 70,
+        "end": 85
+      },
+      "hash": "ab91d989774dae76bf44e54fdab42d07cca448bdbcf381d1046ad2b0927e8966"
+    },
+    {
       "id": "example.com/acme/backend::src/unreadable.ts::GET /guarded",
       "span": {
         "path": "src/unreadable.ts",
@@ -144,6 +153,15 @@
       "hash": "ca8a15c5be37945dca54aac1b30425058c1070c271f7e81069d802a3387e8826"
     },
     {
+      "id": "example.com/acme/backend::src/unreadable.ts::app",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 83,
+        "end": 97
+      },
+      "hash": "c6242bc67329139fdc2c3d29afba26c6f22bb63af819c2f3760b8c5bb3cce88c"
+    },
+    {
       "id": "example.com/acme/backend::src/unreadable.ts::auth",
       "span": {
         "path": "src/unreadable.ts",
@@ -151,6 +169,24 @@
         "end": 1201
       },
       "hash": "3e6098a41a27efa469aa7bcc93f9764adf360b91741d56b6f9b9f3a39b8749db"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::guarded",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 1075,
+        "end": 1093
+      },
+      "hash": "a7c6a71746e3184f4002883faa8d503848d4201d9611953c4ed768869be67999"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::legacy",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 574,
+        "end": 591
+      },
+      "hash": "482af69db47a787a264bd71dcff11db7d679b667b1c6e17c56d0f3d0f5d2f85b"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::mountAt",
@@ -178,6 +214,24 @@
         "end": 1068
       },
       "hash": "a955e62a59d80f71ef4f96263dcbbc7c8ac970c427ef1c72f01900c4fd687639"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::npmGuarded",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 1388,
+        "end": 1409
+      },
+      "hash": "801afab2d3da9ae19ea0d70cfd283b5b87ab62b552243480820bdc88616fe2a1"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::plugin",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 917,
+        "end": 934
+      },
+      "hash": "92ed8ac8ba83e3144f823d925189213e6a2cf32ad5a3f8742bb0ec05a8a4c9e5"
     }
   ],
   "calls": [

@@ -40,6 +40,15 @@
       "hash": "0fbdbdcb750cc4239b7160a846e7c267bf60e2b6a09980a50e187f1f8c301ccc"
     },
     {
+      "id": "local/azure-sdk-arrow-bindings::worker.js::bus",
+      "span": {
+        "path": "worker.js",
+        "start": 61,
+        "end": 97
+      },
+      "hash": "6e71b245607954f6310b05d151a859e9c3d3f8737e2d953ea8eba0e073e95849"
+    },
+    {
       "id": "local/azure-sdk-arrow-bindings::worker.js::commented",
       "span": {
         "path": "worker.js",
@@ -101,6 +110,15 @@
         "end": 834
       },
       "hash": "12565238d87108a4461d455d82cdab5648b88e1661c492e1104d46317a68d86d"
+    },
+    {
+      "id": "local/azure-sdk-arrow-bindings::worker.ts::bus",
+      "span": {
+        "path": "worker.ts",
+        "start": 61,
+        "end": 97
+      },
+      "hash": "6e71b245607954f6310b05d151a859e9c3d3f8737e2d953ea8eba0e073e95849"
     },
     {
       "id": "local/azure-sdk-arrow-bindings::worker.ts::commented",

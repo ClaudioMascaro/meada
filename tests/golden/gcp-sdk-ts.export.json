@@ -13,6 +13,15 @@
   ],
   "symbols": [
     {
+      "id": "local/gcp-sdk-ts::send.js::bus",
+      "span": {
+        "path": "send.js",
+        "start": 205,
+        "end": 220
+      },
+      "hash": "e7f048ee69e0744fce679e829fb55e456d32adc5bf548d10359f7a433d66134e"
+    },
+    {
       "id": "local/gcp-sdk-ts::send.js::handle",
       "span": {
         "path": "send.js",
@@ -29,6 +38,15 @@
         "end": 1158
       },
       "hash": "bf74b12c73a5cb73de2163bc04b55b944db83e7e9b04cd061d5ca40ffa6162f3"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.js::object",
+      "span": {
+        "path": "send.js",
+        "start": 396,
+        "end": 453
+      },
+      "hash": "a4b93b25c953773e1c2676760cc5405bedecd41b41434afacd770d3b48bc4f4d"
     },
     {
       "id": "local/gcp-sdk-ts::send.js::read",
@@ -58,6 +76,15 @@
       "hash": "9f1ef742884991dbd5796d995876bbef0a86674bde595a5faa5fd13e23f80d3f"
     },
     {
+      "id": "local/gcp-sdk-ts::send.js::secrets",
+      "span": {
+        "path": "send.js",
+        "start": 461,
+        "end": 484
+      },
+      "hash": "6fdf9b599f4e1103835b57a3e2f70ecea90357c086df51402afa24ca8ec32b2c"
+    },
+    {
       "id": "local/gcp-sdk-ts::send.js::send",
       "span": {
         "path": "send.js",
@@ -65,6 +92,33 @@
         "end": 544
       },
       "hash": "3d823496c816d9344071035246986eaeac991bc07b357bd9ef40d42e55eb5de7"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.js::storage",
+      "span": {
+        "path": "send.js",
+        "start": 367,
+        "end": 388
+      },
+      "hash": "3c3bfa59020875626932821797fc198fe797f7b3b38d83c88a34b611f66e80ae"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.js::subscription",
+      "span": {
+        "path": "send.js",
+        "start": 287,
+        "end": 359
+      },
+      "hash": "7b2e0303756488c1ff8ad0cc6433fc72dc36984af577ed86303b44cf970785d0"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.js::topic",
+      "span": {
+        "path": "send.js",
+        "start": 228,
+        "end": 279
+      },
+      "hash": "68e5d1614f73dfda5f082030008faadabf9a6ef2c5fb772ee7829aec906db72b"
     },
     {
       "id": "local/gcp-sdk-ts::send.js::unknown",
@@ -85,6 +139,15 @@
       "hash": "11a07516645a7f4c9169dbb21103c9672818d7ff16a96c34d87b3489e0efd0b5"
     },
     {
+      "id": "local/gcp-sdk-ts::send.ts::bus",
+      "span": {
+        "path": "send.ts",
+        "start": 205,
+        "end": 220
+      },
+      "hash": "e7f048ee69e0744fce679e829fb55e456d32adc5bf548d10359f7a433d66134e"
+    },
+    {
       "id": "local/gcp-sdk-ts::send.ts::handle",
       "span": {
         "path": "send.ts",
@@ -101,6 +164,15 @@
         "end": 1158
       },
       "hash": "bf74b12c73a5cb73de2163bc04b55b944db83e7e9b04cd061d5ca40ffa6162f3"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::object",
+      "span": {
+        "path": "send.ts",
+        "start": 396,
+        "end": 453
+      },
+      "hash": "107cd968443c821374166c92d2bae09015cf2ad1689fbee280ebcc208158a207"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::read",
@@ -130,6 +202,15 @@
       "hash": "19f902eaacd7f7f84ec91ecdb756a51a504d64d8e6748c8d95af03a61b428edd"
     },
     {
+      "id": "local/gcp-sdk-ts::send.ts::secrets",
+      "span": {
+        "path": "send.ts",
+        "start": 461,
+        "end": 484
+      },
+      "hash": "6fdf9b599f4e1103835b57a3e2f70ecea90357c086df51402afa24ca8ec32b2c"
+    },
+    {
       "id": "local/gcp-sdk-ts::send.ts::send",
       "span": {
         "path": "send.ts",
@@ -137,6 +218,33 @@
         "end": 544
       },
       "hash": "3d823496c816d9344071035246986eaeac991bc07b357bd9ef40d42e55eb5de7"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::storage",
+      "span": {
+        "path": "send.ts",
+        "start": 367,
+        "end": 388
+      },
+      "hash": "3c3bfa59020875626932821797fc198fe797f7b3b38d83c88a34b611f66e80ae"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::subscription",
+      "span": {
+        "path": "send.ts",
+        "start": 287,
+        "end": 359
+      },
+      "hash": "bc3c639606eeeeff48c08d30df880ec0d3cbc2b9710a131d55f7810265b70d3a"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::topic",
+      "span": {
+        "path": "send.ts",
+        "start": 228,
+        "end": 279
+      },
+      "hash": "5ef26f2b3438693df3b9fb8f15849639031e6def92746f07f851f529ec4a8b29"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::unknown",

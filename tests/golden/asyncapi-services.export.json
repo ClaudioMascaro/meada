@@ -15,6 +15,24 @@
   ],
   "symbols": [
     {
+      "id": "example.com/asyncapi/services::src/kafka.ts::consumer",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 116,
+        "end": 166
+      },
+      "hash": "66e95bcc2ef26559f1fe17ebef2d88894b9608dc61c8051ff3ab73bfb8f4fcfe"
+    },
+    {
+      "id": "example.com/asyncapi/services::src/kafka.ts::kafka",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 40,
+        "end": 108
+      },
+      "hash": "6004a0c2c40454f574eacab984bea992ffea1c86c829e6d12e11200d98f1f253"
+    },
+    {
       "id": "example.com/asyncapi/services::src/kafka.ts::listen",
       "span": {
         "path": "src/kafka.ts",
@@ -33,6 +51,15 @@
       "hash": "2e131d20f8486723233177c617713bc6f3afccc9bf22602b67bcfab0ffefda22"
     },
     {
+      "id": "example.com/asyncapi/services::src/kafka.ts::producer",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 174,
+        "end": 201
+      },
+      "hash": "f0f22c9a47dd2d709e73a4a017637a21743af686aab8fdd921b38ac6f91db3bc"
+    },
+    {
       "id": "example.com/asyncapi/services::src/kafka.ts::requestPayment",
       "span": {
         "path": "src/kafka.ts",
@@ -49,6 +76,24 @@
         "end": 597
       },
       "hash": "c48f0df6bbbb6f155d3741d555894a107558003aa43b35b5396907c41d41166e"
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::channel",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 94,
+        "end": 136
+      },
+      "hash": "c9a1004cbc12690211472d927c09e2fb1258fde43b620e06ae6a482735c6db36"
+    },
+    {
+      "id": "example.com/asyncapi/services::src/queues.ts::connection",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 35,
+        "end": 86
+      },
+      "hash": "709952080c3ce3041946bc4481e3341cefc3579af6c1b8c09cefa679b308b7f5"
     },
     {
       "id": "example.com/asyncapi/services::src/queues.ts::onInvoice",

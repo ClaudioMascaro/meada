@@ -18,6 +18,15 @@
         "end": 233
       },
       "hash": "5bc6e300481596247d7c357c3c45aa4e1438295a2a513faeb4874072fa7c3576"
+    },
+    {
+      "id": "example.com/acme/app::send.ts::sqs",
+      "span": {
+        "path": "send.ts",
+        "start": 75,
+        "end": 98
+      },
+      "hash": "395c7b24f7cf68bdd8bca41d3f952fca5b69190b18cf257bfe9deb9e96853694"
     }
   ],
   "calls": [

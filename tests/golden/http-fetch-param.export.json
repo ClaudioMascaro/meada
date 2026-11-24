@@ -11,6 +11,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/acme/portal::src/client.ts::BASE",
+      "span": {
+        "path": "src/client.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "a4c51ea4be9941ec2f27c3ed2094989dd103be26545d77ea8d89bfef18d1378a"
+    },
+    {
       "id": "example.com/acme/portal::src/client.ts::bare",
       "span": {
         "path": "src/client.ts",

@@ -19,6 +19,24 @@
   ],
   "symbols": [
     {
+      "id": "example.com/jobs/api::src/bullmq.ts::QUEUE",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 39,
+        "end": 55
+      },
+      "hash": "a498f6941d519c5fe07522c0229d3e4b7f0d93a4c9567c379591d57faacfb6de"
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::emails",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 63,
+        "end": 88
+      },
+      "hash": "d3b3894aebea1180d3161e5aa7a00ec4601397f9ed7cc79b3e4c7d3ca2b1e014"
+    },
+    {
       "id": "example.com/jobs/api::src/bullmq.ts::enqueue",
       "span": {
         "path": "src/bullmq.ts",
@@ -37,6 +55,15 @@
       "hash": "0d907d12cdbdee54412fb7292752a85119d7a7d110a79d1b5a983f6ac7ad8c7d"
     },
     {
+      "id": "example.com/jobs/api::src/bullmq.ts::reports",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 96,
+        "end": 126
+      },
+      "hash": "81bf90a68ddab489956c4fbdc7d2888e6788c94aa1f63c0e6621e1271e9f78f7"
+    },
+    {
       "id": "example.com/jobs/api::src/bullmq.ts::requestReport",
       "span": {
         "path": "src/bullmq.ts",
@@ -44,6 +71,15 @@
         "end": 403
       },
       "hash": "e793d6f0de4b0358e5b1d8ea8d9ae63ccaf1a1cd6c5b6a91acbb96bc6b634228"
+    },
+    {
+      "id": "example.com/jobs/api::src/bullmq.ts::seen",
+      "span": {
+        "path": "src/bullmq.ts",
+        "start": 134,
+        "end": 158
+      },
+      "hash": "0ec9b2261c8740e16e8e0ab7fdf75fbc5ea9c4d23a331acca93e1b38bea930fb"
     },
     {
       "id": "example.com/jobs/api::src/bullmq.ts::sendInvoice",
@@ -82,6 +118,15 @@
       "hash": "d3184ae37c20b3f98e624402315fb3a7f4f10907ade8d681c4331e16c8d31d84"
     },
     {
+      "id": "example.com/jobs/api::src/ioredis.ts::redis",
+      "span": {
+        "path": "src/ioredis.ts",
+        "start": 36,
+        "end": 55
+      },
+      "hash": "37ad6203fd9993537f9317aada1b78f82e39a6ec7aaff2dc9f07164953a86590"
+    },
+    {
       "id": "example.com/jobs/api::src/noderedis.ts::appendShipment",
       "span": {
         "path": "src/noderedis.ts",
@@ -89,6 +134,15 @@
         "end": 170
       },
       "hash": "e4dd2162f524947a82c8d174cd7a59f40ce3d72c0151eb2ce6d51f03534164c0"
+    },
+    {
+      "id": "example.com/jobs/api::src/noderedis.ts::client",
+      "span": {
+        "path": "src/noderedis.ts",
+        "start": 45,
+        "end": 68
+      },
+      "hash": "42c1a686a51a006200af4d2ce059b0d95c3499fb4a483e9f2d8699c9606a4b67"
     }
   ],
   "calls": [

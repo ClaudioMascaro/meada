@@ -434,6 +434,15 @@
       "hash": "564c575fa42a69f44bf7f0eb1aba916d9bb91acd64f9b84ce4c79beaea22b42a"
     },
     {
+      "id": "local/azure-sdk-origins::worker.js::bus",
+      "span": {
+        "path": "worker.js",
+        "start": 293,
+        "end": 318
+      },
+      "hash": "4249b64e6e06b675ae7bafdd3d99a42c9e7f12c4ee2c71c04755c0724a419d19"
+    },
+    {
       "id": "local/azure-sdk-origins::worker.js::guessName",
       "span": {
         "path": "worker.js",
@@ -702,6 +711,15 @@
         "end": 1483
       },
       "hash": "606f28b493c1ce7f3e61eccc5f727efb34c5138b86a3c0b8daeafe0493e4756f"
+    },
+    {
+      "id": "local/azure-sdk-origins::worker.ts::bus",
+      "span": {
+        "path": "worker.ts",
+        "start": 293,
+        "end": 318
+      },
+      "hash": "4249b64e6e06b675ae7bafdd3d99a42c9e7f12c4ee2c71c04755c0724a419d19"
     },
     {
       "id": "local/azure-sdk-origins::worker.ts::guessName",

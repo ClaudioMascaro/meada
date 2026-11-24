@@ -1734,43 +1734,30 @@ fn exports(node: Node, src: &[u8], out: &mut Vec<Export>) {
     }
 }
 
-/// The top-level declarations of `root` that a top-level `export` names and that are no
-/// definitions: `const`s holding no function or class, interfaces, type aliases, enums and an
-/// `export default` expression (named `default`). One per name: the first value one, else the
-/// first type one (a value and a type may share a name). Hashes are left for `hash_spans`.
+/// The top-level declarations of `root` that are no definitions, exported or not: `const`s
+/// holding no function or class, interfaces, type aliases, enums and an `export default`
+/// expression (named `default`). One per name: the first value one, else the first type one (a
+/// value and a type may share a name). Hashes are left for `hash_spans`.
 fn declarations(root: Node, src: &[u8], facts: &Facts) -> Vec<Declaration> {
     // (name, range, holds a value), in source order.
     let mut found: Vec<(&str, Range<usize>, bool)> = Vec::new();
-    let mut exported = HashSet::new();
     let not_value = |v: Node| v.kind() == "class" || FUNCTIONS.contains(&v.kind());
     for child in named(root) {
         let mut node = child;
         if child.kind() == "export_statement" {
             if let Some(declaration) = child.child_by_field_name("declaration") {
                 node = declaration;
-            } else if let Some(value) = child.child_by_field_name("value")
-                && children(child).any(|c| c.kind() == "default")
-            {
-                if value.kind() == "identifier" {
-                    exported.insert(text(value, src));
-                } else if !not_value(value) {
-                    exported.insert("default");
-                    found.push(("default", value.byte_range(), true));
-                }
-                continue;
             } else {
-                if child.child_by_field_name("source").is_none()
-                    && let Some(clause) = children(child).find(|c| c.kind() == "export_clause")
+                if let Some(value) = child.child_by_field_name("value")
+                    && children(child).any(|c| c.kind() == "default")
+                    && value.kind() != "identifier"
+                    && !not_value(value)
                 {
-                    let specifiers = children(clause).filter(|c| c.kind() == "export_specifier");
-                    for name in specifiers.filter_map(|s| s.child_by_field_name("name")) {
-                        exported.insert(text(name, src));
-                    }
+                    found.push(("default", value.byte_range(), true));
                 }
                 continue;
             }
         }
-        let names_it = child.kind() == "export_statement";
         match node.kind() {
             "lexical_declaration"
                 if node
@@ -1783,9 +1770,6 @@ fn declarations(root: Node, src: &[u8], facts: &Facts) -> Vec<Declaration> {
                     else {
                         continue;
                     };
-                    if names_it {
-                        exported.insert(text(name, src));
-                    }
                     if !declarator
                         .child_by_field_name("value")
                         .is_some_and(not_value)
@@ -1796,9 +1780,6 @@ fn declarations(root: Node, src: &[u8], facts: &Facts) -> Vec<Declaration> {
             }
             "interface_declaration" | "type_alias_declaration" | "enum_declaration" => {
                 if let Some(name) = node.child_by_field_name("name") {
-                    if names_it {
-                        exported.insert(text(name, src));
-                    }
                     let value = node.kind() == "enum_declaration";
                     found.push((text(name, src), node.byte_range(), value));
                 }
@@ -1810,7 +1791,7 @@ fn declarations(root: Node, src: &[u8], facts: &Facts) -> Vec<Declaration> {
     // The first value one, else the first type one: `found` is in source order.
     let mut kept: HashMap<&str, (Range<usize>, bool)> = HashMap::new();
     for (name, range, value) in found {
-        if !exported.contains(name) || defined.contains(name) {
+        if defined.contains(name) {
             continue;
         }
         let entry = kept.entry(name).or_insert((range.clone(), value));
@@ -3020,7 +3001,19 @@ mod tests {
     }
 
     #[test]
-    fn exported_top_level_declarations_are_recorded_once_each() {
+    fn a_file_records_its_top_level_declarations_exported_or_not() {
+        let src = "const limit = 3; type Shape = { a: number }; interface Props { s: Shape } enum Mode { A }\n\
+                   export const shown = 1; let later = 2; var old = 3; const run = () => 1;\n\
+                   if (x) { const inner = 4 }\n";
+        let mut names: Vec<_> = (parse(src).declarations.into_iter())
+            .map(|d| d.name)
+            .collect();
+        names.sort();
+        assert_eq!(names, ["Mode", "Props", "Shape", "limit", "shown"]);
+    }
+
+    #[test]
+    fn top_level_declarations_are_recorded_once_each() {
         let src = "export const aPlugin = createX({ id: 'a' });\n\
                    export type APlugin = typeof aPlugin;\n\
                    export interface P { a: string }\n\
@@ -3053,7 +3046,9 @@ mod tests {
                 ("P", "interface P { a: string }"),
                 ("S", "enum S { A = 'a' }"),
                 ("Foo", "Foo = z.object({})"),
+                ("z", "z = 2"),
                 ("y", "y = g()"),
+                ("hidden", "hidden = 1"),
                 ("default", "makeX({})"),
             ]
         );

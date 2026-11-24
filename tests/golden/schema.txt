@@ -431,12 +431,52 @@ sample.ts
   ],
   "declarations": [
     {
+      "name": "BASE",
+      "range": {
+        "start": 299,
+        "end": 347
+      },
+      "hash": "43f834f398c3187300c0f39c7857a738495b8a46114fe50854a9cbe232016c88"
+    },
+    {
+      "name": "app",
+      "range": {
+        "start": 355,
+        "end": 370
+      },
+      "hash": "ab91d989774dae76bf44e54fdab42d07cca448bdbcf381d1046ad2b0927e8966"
+    },
+    {
+      "name": "Row",
+      "range": {
+        "start": 971,
+        "end": 1002
+      },
+      "hash": "6a4b8532fa5f9842c34968a9e7f1dae450f3e634a2e3bf69b8ce0026dd27f74e"
+    },
+    {
+      "name": "Rows",
+      "range": {
+        "start": 1004,
+        "end": 1022
+      },
+      "hash": "91365655a301c55e54a2ae07351bd8958acb408584e27600cf05d29e16926ee1"
+    },
+    {
       "name": "default",
       "range": {
         "start": 1039,
         "end": 1047
       },
       "hash": "30c7e9dc02edc853988d780adb63b147bcdf280a5a709dacba620814e1b02bac"
+    },
+    {
+      "name": "sdk",
+      "range": {
+        "start": 1119,
+        "end": 1142
+      },
+      "hash": "aef0b61f476213db5784452ba322e4c9375d09eff711ceb67f22703c40727f76"
     }
   ],
   "locals": [

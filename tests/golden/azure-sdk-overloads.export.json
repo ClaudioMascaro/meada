@@ -143,6 +143,15 @@
       "hash": "114fe1c051df8fe5a2a5384978f6950cc0650090ad53dad902b1481905c0157c"
     },
     {
+      "id": "local/azure-sdk-overloads::worker.js::bus",
+      "span": {
+        "path": "worker.js",
+        "start": 61,
+        "end": 99
+      },
+      "hash": "5dde00246f08454dbd6b6b623b5377dc2f0fa0878945b2e31bdd60b9dff2ddcf"
+    },
+    {
       "id": "local/azure-sdk-overloads::worker.js::changedFields",
       "span": {
         "path": "worker.js",
@@ -240,6 +249,15 @@
         "end": 939
       },
       "hash": "134f1b5bbdf5ba3067236c3845754d54ef18c0d3b3b4726425c3d1f3c68d0990"
+    },
+    {
+      "id": "local/azure-sdk-overloads::worker.ts::bus",
+      "span": {
+        "path": "worker.ts",
+        "start": 61,
+        "end": 99
+      },
+      "hash": "5dde00246f08454dbd6b6b623b5377dc2f0fa0878945b2e31bdd60b9dff2ddcf"
     },
     {
       "id": "local/azure-sdk-overloads::worker.ts::changedFields",

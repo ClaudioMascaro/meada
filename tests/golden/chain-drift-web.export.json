@@ -75,6 +75,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/chain/web::src/api/body.ts::BASE",
+      "span": {
+        "path": "src/api/body.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "4b91029ca5da7b89c17c424818d3b6d88572f84614a2b51603b4836346ba9d17"
+    },
+    {
       "id": "example.com/chain/web::src/api/body.ts::get",
       "span": {
         "path": "src/api/body.ts",
@@ -82,6 +91,15 @@
         "end": 297
       },
       "hash": "d8eb6cb6032177c931ceda1e66a3cfb8b2db0dfdc79bf5f2ac4b49b0720cb762"
+    },
+    {
+      "id": "example.com/chain/web::src/api/client.ts::BASE",
+      "span": {
+        "path": "src/api/client.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "4b91029ca5da7b89c17c424818d3b6d88572f84614a2b51603b4836346ba9d17"
     },
     {
       "id": "example.com/chain/web::src/api/client.ts::request",
@@ -100,6 +118,24 @@
         "end": 103
       },
       "hash": "130c74282dad18369770f7d26fc22dbc1355788de1d5a765d7b9a4c6c8c84101"
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::BASE",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "2d68652f2602e2ea7b9258ecaacf13f6b9a468a59396ad3f4eb876d1704d1d64"
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::Envelope",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 786,
+        "end": 822
+      },
+      "hash": "546ba48c7740525a61bc9b6818e0e6f28e267c4c3a0f13c740e4ac55c68b3823"
     },
     {
       "id": "example.com/chain/web::src/api/typed.ts::enveloped",
@@ -145,6 +181,15 @@
         "end": 76
       },
       "hash": "739186290a142f7a531ea32af813358aedbef6f77396667ba1a856025efd09d7"
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::CATALOG",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 6,
+        "end": 39
+      },
+      "hash": "ca87cef0d546c7a3e41a1f1ac5cd4090ce3525dd72e073bb690e3df07f3cf834"
     },
     {
       "id": "example.com/chain/web::src/batches.ts::handed",
@@ -210,6 +255,15 @@
       "hash": "4a0ed54b5a941793ec88641996233628bbfb5c6bbe299ae087aaa79ef070d5b9"
     },
     {
+      "id": "example.com/chain/web::src/comments.ts::CATALOG",
+      "span": {
+        "path": "src/comments.ts",
+        "start": 6,
+        "end": 39
+      },
+      "hash": "ca87cef0d546c7a3e41a1f1ac5cd4090ce3525dd72e073bb690e3df07f3cf834"
+    },
+    {
       "id": "example.com/chain/web::src/comments.ts::comments",
       "span": {
         "path": "src/comments.ts",
@@ -253,6 +307,78 @@
         "end": 212
       },
       "hash": "c787308f2bdd2b995362f3de89985285809d0eb8afc7afb0405916b9dc5dba9d"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::CATALOG",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 182,
+        "end": 215
+      },
+      "hash": "ca87cef0d546c7a3e41a1f1ac5cd4090ce3525dd72e073bb690e3df07f3cf834"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Counts",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 832,
+        "end": 886
+      },
+      "hash": "89816946fb62659c7855df18f3eea436477df819de7c1d41c437097988a3a577"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Maybe",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1625,
+        "end": 1678
+      },
+      "hash": "2d81483b549d5629cd3108c06926c5533b02b11ff66403d690feb2d84f9e3bc7"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Page",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 527,
+        "end": 601
+      },
+      "hash": "bf38d115d0f257fd25ce13b111c3847c8929c52f6ac4b379363edf889b33b8ed"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Pages",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1343,
+        "end": 1401
+      },
+      "hash": "cf2aa424c36a1c490d023461c41d13939074e43b1e41cb786b7ea59b22c01f34"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Profile",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 393,
+        "end": 525
+      },
+      "hash": "912c5cf96c93cf282a9c1f27edd33d9c57fc60588cca92a9455aec9732a190b3"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Query",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2143,
+        "end": 2178
+      },
+      "hash": "aa8a98919dc908ec7d226c439707182781557475148ace83a4d80cee50bfe568"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Ranked",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1055,
+        "end": 1125
+      },
+      "hash": "3cd426c284d374bbcc0a11e4172862bd09cf1a8de60fc024542fe3a6e7c3b242"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::cast",
@@ -345,6 +471,15 @@
       "hash": "a3a21d8ce061b3514545be5ac564441967c55d979cc58c797379e92c1d883383"
     },
     {
+      "id": "example.com/chain/web::src/drift.ts::BASE",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 41,
+        "end": 71
+      },
+      "hash": "4b91029ca5da7b89c17c424818d3b6d88572f84614a2b51603b4836346ba9d17"
+    },
+    {
       "id": "example.com/chain/web::src/drift.ts::both",
       "span": {
         "path": "src/drift.ts",
@@ -435,6 +570,15 @@
       "hash": "a0da114084b14d354003e297fb44a2dc838ee28d46d5e737c8d20c8c2f1212a0"
     },
     {
+      "id": "example.com/chain/web::src/labels.ts::CATALOG",
+      "span": {
+        "path": "src/labels.ts",
+        "start": 6,
+        "end": 39
+      },
+      "hash": "ca87cef0d546c7a3e41a1f1ac5cd4090ce3525dd72e073bb690e3df07f3cf834"
+    },
+    {
       "id": "example.com/chain/web::src/labels.ts::labels",
       "span": {
         "path": "src/labels.ts",
@@ -487,6 +631,24 @@
         "end": 238
       },
       "hash": "6e3d64ac3f76355e2d40bc2ad7802e07734c283a7fd5dc716feb989af0f9fada"
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::CATALOG",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 216,
+        "end": 249
+      },
+      "hash": "ca87cef0d546c7a3e41a1f1ac5cd4090ce3525dd72e073bb690e3df07f3cf834"
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::GATEWAY",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 175,
+        "end": 208
+      },
+      "hash": "3abc25197de37c580df390e88b5aaac852d916dec85d2957d2c135d6ca83d1e5"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::annotated",
@@ -588,6 +750,15 @@
       "hash": "50b91ece7ba83928c015e0f23e0dd7312e52dc14b1b268d73269f57b5fcacb24"
     },
     {
+      "id": "example.com/chain/web::src/shipments.ts::BASE",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "4b91029ca5da7b89c17c424818d3b6d88572f84614a2b51603b4836346ba9d17"
+    },
+    {
       "id": "example.com/chain/web::src/shipments.ts::edgeShipment",
       "span": {
         "path": "src/shipments.ts",
@@ -658,6 +829,24 @@
         "end": 290
       },
       "hash": "f79e2f91eb6e6bcad447da1405be4ebb61d9e3ff29970e2fdc6f004595127ada"
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::CATALOG",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 47,
+        "end": 80
+      },
+      "hash": "ca87cef0d546c7a3e41a1f1ac5cd4090ce3525dd72e073bb690e3df07f3cf834"
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::GATEWAY",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 6,
+        "end": 39
+      },
+      "hash": "3abc25197de37c580df390e88b5aaac852d916dec85d2957d2c135d6ca83d1e5"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::cached",
