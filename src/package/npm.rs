@@ -5,7 +5,8 @@
 //! - `names_package`, `entries`: a bare specifier splits into its package (scoped or not) and
 //!   the subpath, and names the entry of the importing file's nearest `package.json`.
 //! - `carried`: the `default` a Backstage backend adds by `backend.add(import('<package>'))`
-//!   (`backstage::added_plugin`).
+//!   (`backstage::added_plugin`), and each a test backend starts with by
+//!   `startTestBackend({ features: [import('<package>')] })` (`backstage::test_features`).
 //! - `flag`: npm semver, by the `nodejs-semver` crate behind a comparator grammar check.
 //! - `reaches`: a `workspace:` range keeps a dependency inside its own repository.
 //! - `shapes`: shapes cross npm packages alone.
@@ -17,7 +18,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::{Ecosystem, Entry, Flag, MAX_BYTES, Providers, Summary, nearest, valid_name};
+use super::{Ecosystem, Entry, Flag, MAX_BYTES, Provided, Providers, Summary, nearest, valid_name};
 use crate::index::Export;
 use crate::lang::Call;
 use crate::lang::ts::EXTENSIONS;
@@ -121,9 +122,9 @@ impl Ecosystem for Npm {
         call: &'a Call,
     ) -> Vec<(String, String)> {
         let added = backstage::added_plugin(code, path, index, call);
-        added
+        let features = backstage::test_features(code, path, index, call);
+        (added.into_iter().chain(features))
             .map(|s| (s, "default".to_string()))
-            .into_iter()
             .collect()
     }
 
@@ -172,6 +173,20 @@ impl Ecosystem for Npm {
         ((to, _), _): ((&str, &Path), &str),
     ) -> bool {
         from.0 == to || !range.is_some_and(|r| r.starts_with(WORKSPACE))
+    }
+
+    /// Never: `imports` gives one at most per call, so several rows at one site are the imports
+    /// its arguments carry (`carried`, a test backend's `features`), each its own, not
+    /// candidates of one import for `import` to choose between.
+    fn declares<'e>(
+        &self,
+        _exports: &'e [Export],
+        _providers: &Providers,
+        _at: &dyn Fn(usize) -> &'e Provided<'e>,
+        _from: (usize, &str),
+        _import: (&str, &str),
+    ) -> bool {
+        false
     }
 
     /// Shapes cross npm packages alone.

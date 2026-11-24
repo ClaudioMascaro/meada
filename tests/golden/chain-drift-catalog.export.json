@@ -2091,6 +2091,11 @@
     },
     {
       "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/catalog::app/api/tags/route.ts::GET::(type)Tagged#0",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@chain/contracts",
       "site": "example.com/chain/catalog::package.json::dependencies::@chain/contracts",
       "via": null
     }
@@ -2109,6 +2114,16 @@
       "field": "dependencies",
       "name": "@chain/contracts",
       "range": "workspace:*"
+    }
+  ],
+  "imports": [
+    {
+      "site": "example.com/chain/catalog::app/api/tags/route.ts::GET::(type)Tagged#0",
+      "specifier": "@chain/contracts",
+      "name": "Tagged",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Tagged"
     }
   ],
   "communities": [
@@ -2213,6 +2228,13 @@
   ],
   "links": [
     {
+      "consumer": "example.com/chain/catalog::app/api/tags/route.ts::GET::(type)Tagged#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Tagged",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts workspace:* (local 1.0.0), range unchecked; import main"
+    },
+    {
       "consumer": "example.com/chain/catalog::package.json::dependencies::@chain/contracts",
       "provider": "example.com/chain/catalog::packages/contracts/package.json",
       "contract": "package::npm::@chain/contracts",
@@ -2239,6 +2261,20 @@
       "contract": "http::GET::/api/products/{}",
       "level": "exact",
       "reason": "host catalog.example.com is served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}::(value)SHELF#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/shelf.ts::SHELF",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
+      "consumer": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves::(value)LIMITS#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/shelf.ts::LIMITS",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
     },
     {
       "consumer": "example.com/chain/web::package.json::dependencies::@chain/contracts",
@@ -2481,6 +2517,13 @@
       "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
     },
     {
+      "consumer": "example.com/chain/web::src/shared.ts::annotated::(type)Receipt#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/chain/web::src/shared.ts::annotated::fetch#0",
       "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
       "contract": "http::GET::/api/receipts",
@@ -2493,6 +2536,13 @@
       }
     },
     {
+      "consumer": "example.com/chain/web::src/shared.ts::argument::(type)Receipt#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/chain/web::src/shared.ts::argument::getJson#0",
       "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
       "contract": "http::GET::/api/receipts",
@@ -2503,6 +2553,13 @@
           "paidAt": "inferred"
         }
       }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::inferred::(type)Quote#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/quote.ts::Quote",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
     },
     {
       "consumer": "example.com/chain/web::src/shared.ts::inferred::fetch#0",
@@ -2542,6 +2599,13 @@
       }
     },
     {
+      "consumer": "example.com/chain/web::src/shared.ts::receipt::(type)Receipt#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/chain/web::src/shared.ts::receipt::fetch#0",
       "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
       "contract": "http::GET::/api/receipts",
@@ -2552,6 +2616,13 @@
           "paidAt": "inferred"
         }
       }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::status::(type)Status#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Status",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
     },
     {
       "consumer": "example.com/chain/web::src/shared.ts::status::fetch#0",

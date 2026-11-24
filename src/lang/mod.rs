@@ -1294,6 +1294,29 @@ pub enum Use {
 }
 
 impl Use {
+    const ALL: [Use; 7] = [
+        Use::Jsx,
+        Use::Type,
+        Use::Value,
+        Use::Member,
+        Use::Extends,
+        Use::Reexport,
+        Use::Dynamic,
+    ];
+
+    /// Whether the row id `id` is a use's, `<caller>::(<kind>)<name>#<n>`: read off the id, so
+    /// it holds where the rows themselves are not read. No callee starts with a kind in
+    /// parentheses.
+    pub fn names(id: &str) -> bool {
+        let last = id.rsplit("::").next().unwrap_or(id);
+        (Self::ALL.iter()).any(|k| {
+            (last.strip_prefix('(')).is_some_and(|rest| {
+                rest.strip_prefix(k.as_str())
+                    .is_some_and(|r| r.starts_with(')'))
+            })
+        })
+    }
+
     /// The `calls.kind` value and the id prefix of a row of this kind.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -1940,6 +1963,27 @@ fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+
+    #[test]
+    fn a_use_id_is_told_from_a_call_id_by_its_last_segment() {
+        use super::Use;
+        for id in [
+            "r::a.ts::(value)X#0",
+            "r::a.ts::f::(member)tokens.gap#1",
+            "r::a.ts::(dynamic)default#0",
+        ] {
+            assert!(Use::names(id), "{id}");
+        }
+        for id in [
+            "r::a.ts::(import)#0",
+            "r::a.ts::f::g#0",
+            "r::a.ts::(values)X#0",
+            "r::a.ts::(value::x#0",
+            "r::(value)x::f::g#0",
+        ] {
+            assert!(!Use::names(id), "{id}");
+        }
+    }
 
     /// What a pack reads of positions: each definition's parameters, each call's arity, labels
     /// and argument counts. A comment inside a parameter or argument list changes none of it

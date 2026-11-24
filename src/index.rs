@@ -1674,6 +1674,7 @@ fn refresh_attempt(
         }
     }
     let mut calls: HashMap<&str, Vec<(String, String)>> = HashMap::new();
+    let mut references: HashMap<&str, Vec<(String, String)>> = HashMap::new();
     // One row per side; the shapes of the Founds of one side (a site reached through several
     // wrapper paths) merge into it.
     let mut rows: BTreeMap<_, Option<Shape>> = BTreeMap::new();
@@ -1693,6 +1694,14 @@ fn refresh_attempt(
                 let ids = calls
                     .entry(path)
                     .or_insert_with(|| call_ids(identity, path, all[path.as_str()], &names));
+                let Some((_, id)) = ids.get(*index) else {
+                    continue;
+                };
+                (path, id.clone())
+            }
+            Site::Reference { path, index } => {
+                let ids = (references.entry(path))
+                    .or_insert_with(|| reference_ids(identity, path, all[path.as_str()], &names));
                 let Some((_, id)) = ids.get(*index) else {
                     continue;
                 };
@@ -2879,28 +2888,18 @@ fn reference_rows(
     resolver: &Resolver,
     names: &Names,
 ) -> Vec<Resolved> {
-    let base = format!("{identity}::{path}");
-    let mut ordinals: HashMap<(String, &str, &str), usize> = HashMap::new();
+    let ids = reference_ids(identity, path, facts, names);
     let mut rows = Vec::new();
-    for (index, r) in facts.references.iter().enumerate() {
+    for ((index, r), (caller, id)) in facts.references.iter().enumerate().zip(ids) {
         let Some(target) = resolver.reference(path, index) else {
             continue;
         };
-        let scope = names.scope(path, &r.scope);
-        let caller = match scope.is_empty() {
-            true => base.clone(),
-            false => format!("{base}::{scope}"),
-        };
-        let kind = r.kind.as_str();
-        let ordinal = (ordinals.entry((scope, kind, r.name.as_str())))
-            .and_modify(|n| *n += 1)
-            .or_insert(0);
         let target = target.map(|(at, name)| {
             let name = names.def(at, name).unwrap_or_else(|| name.into());
             format!("{identity}::{at}::{name}")
         });
         rows.push(Resolved {
-            id: format!("{caller}::({kind}){}#{ordinal}", r.name),
+            id,
             caller,
             level: target.is_some().then_some(Level::Exact),
             target,
@@ -2909,11 +2908,40 @@ fn reference_rows(
             candidates: Vec::new(),
             narrowed: false,
             decorates: None,
-            kind: Some(kind),
+            kind: Some(r.kind.as_str()),
             holder: None,
         });
     }
     rows
+}
+
+/// The `(caller, id)` of each reference of the file `path` (`Facts::references`), in order, row
+/// or not: the caller its folded scope's symbol or the file, the id
+/// `<caller>::(<kind>)<name>#<n>`, `<n>` its ordinal among the file's references of one caller,
+/// kind and name. A package import names its site by it (`Site::Reference`).
+fn reference_ids(
+    identity: &str,
+    path: &str,
+    facts: &Facts,
+    names: &Names,
+) -> Vec<(String, String)> {
+    let base = format!("{identity}::{path}");
+    let mut ordinals: HashMap<(String, &str, &str), usize> = HashMap::new();
+    (facts.references.iter())
+        .map(|r| {
+            let scope = names.scope(path, &r.scope);
+            let caller = match scope.is_empty() {
+                true => base.clone(),
+                false => format!("{base}::{scope}"),
+            };
+            let kind = r.kind.as_str();
+            let ordinal = (ordinals.entry((scope, kind, r.name.as_str())))
+                .and_modify(|n| *n += 1)
+                .or_insert(0);
+            let id = format!("{caller}::({kind}){}#{ordinal}", r.name);
+            (caller, id)
+        })
+        .collect()
 }
 
 /// Sets the `holder` of each row whose caller is the file `file`: the innermost of `symbols`

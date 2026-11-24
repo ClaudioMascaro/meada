@@ -5675,6 +5675,11 @@ impl<'a> Code<'a> {
     }
 
     /// The arguments of the call at `index` of `path`, as written.
+    /// `Resolver::reference`: what the reference at `index` of `path` names.
+    pub fn reference(&self, path: &'a str, index: usize) -> Option<Option<(&'a str, &'a str)>> {
+        self.resolver.reference(path, index)
+    }
+
     pub fn args(&self, path: &'a str, index: usize) -> Option<&'a [Value]> {
         Some(self.call(path, index)?.args.as_slice())
     }

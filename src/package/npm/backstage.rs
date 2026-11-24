@@ -1,9 +1,10 @@
 //! The Backstage registrars of npm (`Npm::carried`): a backend that
 //! `@backstage/backend-defaults`' `createBackend` makes adds a plugin by
-//! `<b>.add(import('<package>'))` (`added_plugin`).
+//! `<b>.add(import('<package>'))` (`added_plugin`), and `@backstage/backend-test-utils`'
+//! `startTestBackend` starts with `features: [import('<package>')]` (`test_features`).
 
-use crate::lang::Call;
 use crate::lang::ts::dynamic_import;
+use crate::lang::{Call, Value};
 use crate::resolve::{Code, Follow, Form, Of};
 
 /// Whether the one name `name` in `scope` of the file `path` holds exactly the call of `export`,
@@ -61,4 +62,33 @@ pub(super) fn added_plugin<'a>(
         return None;
     };
     dynamic_import(argument).map(str::to_string)
+}
+
+/// The bare specifiers of the `import()` elements of `features` a `startTestBackend` of
+/// `@backstage/backend-test-utils` is handed, `startTestBackend({ features: [import('x')] })`:
+/// each feature is the module's `default`. The callee is the import itself (`Code::imported`),
+/// never a name match; an element that is no plain literal `import()` (`dynamic_import`) gives
+/// nothing. The arguments come through `Code::args`, as `added_plugin`'s.
+pub(super) fn test_features<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    index: usize,
+    call: &'a Call,
+) -> Vec<String> {
+    let started = code.imported(path, &call.scope, &call.callee);
+    if started.as_ref().map(|(p, n)| (*p, n.as_str()))
+        != Some(("@backstage/backend-test-utils", "startTestBackend"))
+    {
+        return Vec::new();
+    }
+    let Some([Value::Object(fields)]) = code.args(path, index) else {
+        return Vec::new();
+    };
+    let features = fields.iter().find(|(key, _)| key == "features");
+    let Some((_, Value::List(items))) = features else {
+        return Vec::new();
+    };
+    (items.iter())
+        .filter_map(|item| dynamic_import(item).map(str::to_string))
+        .collect()
 }

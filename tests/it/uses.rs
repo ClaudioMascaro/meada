@@ -290,3 +290,126 @@ fn processes_are_unchanged_by_uses() {
     }
     assert!(stepped > 0);
 }
+
+/// The export's `imports` rows at `file` that name `specifier`, whole and without their `site`,
+/// sorted by their JSON text (front 1's `rows_at`, `tests/it/packages.rs`).
+fn rows_at(repo: &Path, file: &str, specifier: &str) -> Vec<serde_json::Value> {
+    let json = export(repo);
+    let mut rows: Vec<serde_json::Value> = (json["imports"].as_array().into_iter().flatten())
+        .filter(|i| i["site"].as_str().and_then(|s| s.split("::").nth(1)) == Some(file))
+        .filter(|i| i["specifier"] == specifier)
+        .cloned()
+        .map(|mut i| {
+            i.as_object_mut().unwrap().remove("site");
+            i
+        })
+        .collect();
+    rows.sort_by_key(|r| r.to_string());
+    rows
+}
+
+/// (level, name, target) of each row of `rows`, the target cut, sorted and deduplicated.
+fn named(rows: &[serde_json::Value]) -> Vec<(String, String, String)> {
+    let mut found: Vec<_> = (rows.iter())
+        .map(|r| (text(&r["level"]), text(&r["name"]), text(&r["target"])))
+        .collect();
+    found.sort();
+    found.dedup();
+    found
+}
+
+fn exact(name: &str, target: &str) -> (String, String, String) {
+    ("exact".into(), name.into(), format!("packages/{target}"))
+}
+
+/// The export entry points of the export, cut.
+fn doors(json: &serde_json::Value) -> Vec<String> {
+    (json["processes"].as_array().unwrap().iter())
+        .filter(|p| p["kind"] == "export")
+        .map(|p| text(&p["entry_point"]))
+        .collect()
+}
+
+#[test]
+fn a_use_across_packages_gives_an_imports_row() {
+    let repo = uses_repo("uses_packages");
+    let rows = rows_at(&repo, "packages/app/src/LoginPage.tsx", "@scope/ui");
+    assert_eq!(
+        named(&rows),
+        [
+            exact("Base", "ui/src/index.ts::Base"),
+            exact("Button", "ui/src/Button.tsx::Button"),
+            exact("Mode", "ui/src/theme.ts::Mode"),
+            exact("Theme", "ui/src/theme.ts::Theme"),
+            exact("tokens", "ui/src/index.ts::tokens"),
+        ]
+    );
+}
+
+#[test]
+fn dynamic_imports_give_rows_for_the_member_they_take() {
+    let repo = uses_repo("uses_dynamic");
+    let lazy = rows_at(&repo, "packages/app/src/lazy.tsx", "@scope/a");
+    assert_eq!(named(&lazy), [exact("Page", "a/src/index.ts::Page")]);
+    let json = export(&repo);
+    let at = |caller: &str| -> Vec<String> {
+        let prefix = format!("{IDENTITY}::packages/app/src/dyn.ts::{caller}::");
+        (json["imports"].as_array().unwrap().iter())
+            .filter(|i| i["site"].as_str().unwrap().starts_with(&prefix))
+            .map(|i| format!("{} {}", text(&i["name"]), text(&i["target"])))
+            .collect()
+    };
+    for caller in ["one", "two"] {
+        assert_eq!(at(caller), ["X packages/a/src/index.ts::X"], "{caller}");
+    }
+    assert!(at("three").is_empty());
+}
+
+#[test]
+fn start_test_backend_features_import_their_default() {
+    let repo = uses_repo("uses_test_backend");
+    let json = export(&repo);
+    let at = |caller: &str, specifier: &str| -> Vec<(String, String, String)> {
+        let prefix = format!("{IDENTITY}::packages/app/src/test-backend.ts::{caller}::");
+        let rows: Vec<serde_json::Value> = (json["imports"].as_array().unwrap().iter())
+            .filter(|i| i["site"].as_str().unwrap().starts_with(&prefix))
+            .filter(|i| i["specifier"] == specifier)
+            .cloned()
+            .collect();
+        named(&rows)
+    };
+    assert_eq!(
+        at("run", "@scope/a"),
+        [exact("default", "a/src/index.ts::feature")]
+    );
+    // `@scope/b` has no default export: what a static `import d from '@scope/b'` gives.
+    assert!(
+        at("run", "@scope/b")
+            .iter()
+            .all(|(level, name, _)| name == "default" && level != "exact")
+    );
+    assert!(at("no", "@scope/a").is_empty());
+}
+
+#[test]
+fn a_default_a_test_backend_adds_is_no_export_door() {
+    let repo = uses_repo("uses_test_backend_door");
+    assert!(!doors(&export(&repo)).contains(&"packages/a/src/index.ts::feature".to_string()));
+    // Without the test backend nothing imports it: the drop above is what keeps it out.
+    let bare = uses_repo("uses_test_backend_no_door");
+    fs::remove_file(bare.join("packages/app/src/test-backend.ts")).unwrap();
+    assert!(doors(&export(&bare)).contains(&"packages/a/src/index.ts::feature".to_string()));
+}
+
+#[test]
+fn an_import_row_from_a_use_drops_no_door() {
+    let repo = uses_repo("uses_doors_kept");
+    let json = export(&repo);
+    // The row exists: the door stays although an imports row targets it. (`Button` is no door,
+    // `both` calls it; `Base` is a class, never one.)
+    let card = rows_at(&repo, "packages/app/src/card.tsx", "@scope/ui");
+    assert_eq!(named(&card), [exact("Card", "ui/src/index.ts::Card")]);
+    let doors = doors(&json);
+    let card = "packages/ui/src/index.ts::Card".to_string();
+    assert!(doors.contains(&card), "{card} not a door: {doors:?}");
+}

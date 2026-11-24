@@ -3922,6 +3922,11 @@
       "via": "env:GATEWAY_URL"
     },
     {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/web::src/shared.ts::annotated::(type)Receipt#0",
+      "via": null
+    },
+    {
       "contract": "http::GET::/api/receipts",
       "site": "example.com/chain/web::src/shared.ts::annotated::fetch#0",
       "via": "env:CATALOG_URL",
@@ -3942,6 +3947,11 @@
       }
     },
     {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/web::src/shared.ts::argument::(type)Receipt#0",
+      "via": null
+    },
+    {
       "contract": "http::GET::/api/receipts",
       "site": "example.com/chain/web::src/shared.ts::argument::getJson#0",
       "via": "env:CATALOG_URL",
@@ -3960,6 +3970,11 @@
           "total"
         ]
       }
+    },
+    {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/web::src/shared.ts::inferred::(type)Quote#0",
+      "via": null
     },
     {
       "contract": "http::GET::/api/receipts",
@@ -4009,6 +4024,11 @@
       }
     },
     {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/web::src/shared.ts::receipt::(type)Receipt#0",
+      "via": null
+    },
+    {
       "contract": "http::GET::/api/receipts",
       "site": "example.com/chain/web::src/shared.ts::receipt::fetch#0",
       "via": "env:CATALOG_URL",
@@ -4056,6 +4076,11 @@
           "max"
         ]
       }
+    },
+    {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/web::src/shared.ts::status::(type)Status#0",
+      "via": null
     },
     {
       "contract": "http::GET::/api/receipts",
@@ -4284,6 +4309,48 @@
       "field": "dependencies",
       "name": "@chain/contracts",
       "range": "^1.0.0"
+    }
+  ],
+  "imports": [
+    {
+      "site": "example.com/chain/web::src/shared.ts::annotated::(type)Receipt#0",
+      "specifier": "@chain/contracts",
+      "name": "Receipt",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt"
+    },
+    {
+      "site": "example.com/chain/web::src/shared.ts::argument::(type)Receipt#0",
+      "specifier": "@chain/contracts",
+      "name": "Receipt",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt"
+    },
+    {
+      "site": "example.com/chain/web::src/shared.ts::inferred::(type)Quote#0",
+      "specifier": "@chain/contracts",
+      "name": "Quote",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/quote.ts::Quote"
+    },
+    {
+      "site": "example.com/chain/web::src/shared.ts::receipt::(type)Receipt#0",
+      "specifier": "@chain/contracts",
+      "name": "Receipt",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt"
+    },
+    {
+      "site": "example.com/chain/web::src/shared.ts::status::(type)Status#0",
+      "specifier": "@chain/contracts",
+      "name": "Status",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Status"
     }
   ],
   "communities": [
@@ -4788,6 +4855,13 @@
       "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
     },
     {
+      "consumer": "example.com/chain/web::src/shared.ts::annotated::(type)Receipt#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/chain/web::src/shared.ts::annotated::fetch#0",
       "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
       "contract": "http::GET::/api/receipts",
@@ -4800,6 +4874,13 @@
       }
     },
     {
+      "consumer": "example.com/chain/web::src/shared.ts::argument::(type)Receipt#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/chain/web::src/shared.ts::argument::getJson#0",
       "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
       "contract": "http::GET::/api/receipts",
@@ -4810,6 +4891,13 @@
           "paidAt": "inferred"
         }
       }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::inferred::(type)Quote#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/quote.ts::Quote",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
     },
     {
       "consumer": "example.com/chain/web::src/shared.ts::inferred::fetch#0",
@@ -4849,6 +4937,13 @@
       }
     },
     {
+      "consumer": "example.com/chain/web::src/shared.ts::receipt::(type)Receipt#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/chain/web::src/shared.ts::receipt::fetch#0",
       "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
       "contract": "http::GET::/api/receipts",
@@ -4884,6 +4979,13 @@
           "max": ""
         }
       }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::status::(type)Status#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Status",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
     },
     {
       "consumer": "example.com/chain/web::src/shared.ts::status::fetch#0",

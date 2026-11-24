@@ -397,6 +397,7 @@ mod tests {
                     Site::Inline { path, def, name } => format!("{path}::{def} ({name})"),
                     Site::File(path) => path,
                     Site::Call { path, .. } => format!("{path} (call)"),
+                    Site::Reference { path, .. } => format!("{path} (use)"),
                 };
                 format!("{} {site}", f.contract.unwrap_or_default())
             })

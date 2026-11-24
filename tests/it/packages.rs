@@ -550,7 +550,6 @@ fn an_add_of_a_dynamic_import_on_another_receiver_links_nothing() {
         "chained.ts",
         "aliased.ts",
         "template.ts",
-        "then.ts",
         "set.ts",
         "wrapped.ts",
         "not-one-import.ts",
@@ -563,6 +562,12 @@ fn an_add_of_a_dynamic_import_on_another_receiver_links_nothing() {
         leaks.extend((sites.iter().filter(|s| s.starts_with(&prefix))).map(|s| s.to_string()));
     }
     assert!(leaks.is_empty(), "{leaks:#?}");
+    // A member taken off a dynamic import is a use of its own (front 2), not an `add`.
+    let prefix = "example.com/pkg/backend-add::packages/backend/src/then.ts::";
+    let then: Vec<&str> = (sites.iter().copied())
+        .filter(|s| s.starts_with(prefix))
+        .collect();
+    assert_eq!(then, [format!("{prefix}lazy::(dynamic)default#0")]);
 }
 
 #[test]

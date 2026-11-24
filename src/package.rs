@@ -36,7 +36,7 @@ use crate::entry;
 use crate::iac::actions::run::{self, Script, Word};
 use crate::index::{self, CallSite, Consumer, Export, Indexed, Provider};
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
-use crate::lang::{Call, MAX_BYTES};
+use crate::lang::{Call, MAX_BYTES, Use};
 use crate::literals::Literals;
 use crate::render::{Files, label, rank, section};
 use crate::resolve::{Ancestry, Code, Exported, Flexible};
@@ -63,6 +63,21 @@ use pypi::Pypi;
 use swiftpm::Swiftpm;
 
 pub struct Packages;
+
+/// An `Import` at `site` of `chain` off the package `specifier`.
+fn import_found(site: Site, specifier: String, chain: String) -> Found {
+    Found {
+        identity: None,
+        role: Role::Import,
+        site,
+        contract: None,
+        via: Some(specifier),
+        method: Some(chain),
+        fragments: Vec::new(),
+        shape: None,
+        lead: None,
+    }
+}
 
 /// The start of every package contract identifier.
 const PREFIX: &str = "package::";
@@ -2080,21 +2095,39 @@ impl ContractKind for Packages {
                     if chain.is_empty() || !ecosystem.names_package(&specifier) {
                         continue;
                     }
-                    found.push(Found {
-                        identity: None,
-                        role: Role::Import,
-                        site: Site::Call {
-                            path: path.to_string(),
-                            index,
-                        },
-                        contract: None,
-                        via: Some(specifier),
-                        method: Some(chain),
-                        fragments: Vec::new(),
-                        shape: None,
-                        lead: None,
-                    });
+                    let site = Site::Call {
+                        path: path.to_string(),
+                        index,
+                    };
+                    found.push(import_found(site, specifier, chain));
                 }
+            }
+            // A use of a name a bare specifier binds, or taken off a bare `import()` or
+            // re-exported from one: the rows `Code::reference` leaves with no target.
+            for (index, r) in facts.references.iter().enumerate() {
+                if code.reference(path, index) != Some(None) {
+                    continue;
+                }
+                let (specifier, mut chain) = match &r.from {
+                    Some(from) => (from.clone(), r.name.clone()),
+                    None => match code.imported(path, &r.scope, &r.name) {
+                        Some((specifier, chain)) => (specifier.to_string(), chain),
+                        None => continue,
+                    },
+                };
+                // A member read (`tokens.gap`, `Mode.A`) uses what the package exports, its
+                // head: the rest is a property of that value.
+                if r.kind == Use::Member {
+                    chain.truncate(chain.find('.').unwrap_or(chain.len()));
+                }
+                if chain.is_empty() || !ecosystem.names_package(&specifier) {
+                    continue;
+                }
+                let site = Site::Reference {
+                    path: path.to_string(),
+                    index,
+                };
+                found.push(import_found(site, specifier, chain));
             }
         }
         // The files an import of one of the repository's packages reaches: only they keep shapes.
@@ -2160,7 +2193,9 @@ impl ContractKind for Packages {
         import(exports, &providers);
         for export in exports.iter_mut() {
             let own = format!("{}::", export.repository);
+            // A use is no call: an import from one (`Site::Reference`) leaves a door open.
             let imported: HashSet<&str> = (export.imports.iter())
+                .filter(|i| !Use::names(&i.site))
                 .map(|i| i.target.as_str())
                 .filter(|t| t.starts_with(&own))
                 .collect();

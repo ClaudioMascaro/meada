@@ -1230,6 +1230,16 @@
       "contract": "http::GET::/api/products/{}",
       "site": "example.com/chain/gateway::src/orders.ts::listOrders::productOf#0",
       "via": "host:catalog.example.com"
+    },
+    {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}::(value)SHELF#0",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves::(value)LIMITS#0",
+      "via": null
     }
   ],
   "documents": [
@@ -1273,6 +1283,24 @@
       "field": "dependencies",
       "name": "@chain/contracts",
       "range": "^1.0.0"
+    }
+  ],
+  "imports": [
+    {
+      "site": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}::(value)SHELF#0",
+      "specifier": "@chain/contracts",
+      "name": "SHELF",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/shelf.ts::SHELF"
+    },
+    {
+      "site": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves::(value)LIMITS#0",
+      "specifier": "@chain/contracts",
+      "name": "LIMITS",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/shelf.ts::LIMITS"
     }
   ],
   "communities": [
@@ -1356,6 +1384,20 @@
       "contract": "http::GET::/api/products/{}",
       "level": "exact",
       "reason": "host catalog.example.com is served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}::(value)SHELF#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/shelf.ts::SHELF",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
+      "consumer": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves::(value)LIMITS#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/shelf.ts::LIMITS",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
     },
     {
       "consumer": "example.com/chain/web::src/dashboard.ts::cancel::cancelOrder#0",
