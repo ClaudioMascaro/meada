@@ -2768,7 +2768,8 @@ fn call_ids(identity: &str, path: &str, facts: &Facts, names: &Names) -> Vec<(St
         .collect()
 }
 
-/// The symbol and call rows of one file, in source order.
+/// The symbol and call rows of one file: its definitions then its declarations, each in source
+/// order, and its calls in source order.
 fn resolve_file<'a>(
     identity: &str,
     path: &'a str,

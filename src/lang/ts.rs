@@ -3071,6 +3071,13 @@ mod tests {
             .unwrap();
         let names: Vec<_> = js.declarations.iter().map(|d| d.name.as_str()).collect();
         assert_eq!(names, ["a", "z"]);
+        // A type written before the value of its name: the row is still the value's.
+        let src = "export type Bar = z.infer<typeof Bar>;\nexport const Bar = z.object({});\n";
+        let bar = parse(src);
+        let got: Vec<_> = (bar.declarations.iter())
+            .map(|d| (d.name.as_str(), &src[d.range.clone()]))
+            .collect();
+        assert_eq!(got, [("Bar", "Bar = z.object({})")]);
     }
 
     #[test]
