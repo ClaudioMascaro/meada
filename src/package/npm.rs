@@ -183,11 +183,15 @@ impl Ecosystem for Npm {
 /// of `@backstage/backend-defaults`' `createBackend` (a `const`, no method called on the result).
 ///
 /// `Follow::Constants`, not `Values`: a parameter fed `createBackend()` by every caller, or a
-/// local wrapper's return, would also link, and each may be handed another receiver. The
-/// arguments come through `Code::args` because the facts `extract` walks hold no values: this
-/// is the first read of full facts of the file, so the first pass misses it and the index parses
-/// it again (`src/index.rs`, the reparse loop). The two filters on the callee read nothing and
-/// only spare `origins` on the calls that cannot match (`Set.add`, `a.b.add`).
+/// local wrapper's return, would also link, and each may be handed another receiver. It spends
+/// no `EVAL_BUDGET` and goes at most `EVAL_DEPTH` constants deep per call.
+///
+/// The arguments come through `Code::args` because the facts `extract` walks hold no values. Its
+/// `None` is a miss, not an answer: the call's file may not be read in full yet (when the receiver's
+/// `const` is in another file, `origins` reads that one first), and the index parses it again
+/// (`src/index.rs`, the reparse loop). The two filters on the callee read nothing and only spare
+/// `origins` the calls that cannot match (`a.b.add`, `(call_expression).add`); the channel kind
+/// already pays the same `origins` read for every `.add` call (`channel/ts.rs`).
 fn added_plugin<'a>(
     code: &Code<'a>,
     path: &'a str,

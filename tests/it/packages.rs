@@ -554,6 +554,10 @@ fn an_add_of_a_dynamic_import_on_another_receiver_links_nothing() {
         "set.ts",
         "wrapped.ts",
         "not-one-import.ts",
+        "other-package.ts",
+        "specialized.ts",
+        "other-name.ts",
+        "hidden.ts",
     ] {
         let prefix = format!("example.com/pkg/backend-add::packages/backend/src/{file}::");
         leaks.extend((sites.iter().filter(|s| s.starts_with(&prefix))).map(|s| s.to_string()));
@@ -562,7 +566,7 @@ fn an_add_of_a_dynamic_import_on_another_receiver_links_nothing() {
 }
 
 #[test]
-fn a_reexported_create_backend_links_like_the_original() {
+fn a_create_backend_reached_by_another_spelling_links_like_the_original() {
     let repo = fixture_repo(
         "packages_backend_add_reexport",
         "pkg-backend-add",
@@ -575,8 +579,11 @@ fn a_reexported_create_backend_links_like_the_original() {
             "@scope/plugin-a",
         )
     };
-    assert_eq!(at("reexported.ts"), at("index.ts"));
     assert_eq!(at("index.ts").len(), 1);
+    // A relative re-export, an import under another name, a `const` imported from another file.
+    for file in ["reexported.ts", "renamed.ts", "imported-const.ts"] {
+        assert_eq!(at(file), at("index.ts"), "{file}");
+    }
 }
 
 #[test]
