@@ -601,3 +601,40 @@ fn consumers_in_the_same_repository_show_through_workspace_ranges() {
     // `^1.0.0`, which accepts 1.0.0, while `fork` also provides `@example/a` (`ambiguous`).
     assert_golden("pkg-mono.context-add.txt", &found);
 }
+
+#[test]
+fn exported_declarations_are_searchable_and_have_context() {
+    let repo = fixture_repo(
+        "packages_exported_search",
+        "pkg-exported",
+        Some("https://example.com/pkg/exported.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    let found = engine.search("aPlugin", Some("symbol"), None).unwrap();
+    assert!(
+        (found.lines()).any(|l| l == "example.com/pkg/exported packages/a/src/plugin.ts:1 aPlugin"),
+        "{found}"
+    );
+    let context = engine
+        .context(
+            "example.com/pkg/exported::packages/a/src/plugin.ts::aPlugin",
+            None,
+        )
+        .unwrap();
+    let consumers = context.split_once("consumers:\n").map(|(_, c)| c);
+    assert!(
+        consumers.is_some_and(|c| (c.lines())
+            .any(|l| l.starts_with("example.com/pkg/exported packages/b/src/use.ts:3 "))),
+        "{context}"
+    );
+    assert!(context.lines().any(|l| l == "callees: none"), "{context}");
+    // The same constant in two packages: a bare name fits both, and they are two copies.
+    let limit = engine.context("LIMIT", None).unwrap();
+    assert!(
+        limit.starts_with("`LIMIT` fits 2 symbols; pass one of:\n"),
+        "{limit}"
+    );
+    let copies = engine.search("LIMIT", Some("duplicate"), None).unwrap();
+    assert!(copies.starts_with("2 copies\n"), "{copies}");
+}

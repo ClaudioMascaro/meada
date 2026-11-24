@@ -658,3 +658,29 @@ fn selectors_do_not_equate_hcl_expressions_or_templates_with_literal_strings() {
         "{text}"
     );
 }
+
+#[test]
+fn a_via_naming_an_exported_constant_resolves_to_it() {
+    let (_, app) = via_workspace("resource_via_constant");
+    std::fs::write(app.join("limits.ts"), "export const LIMITS = { api: 1 };\n").unwrap();
+    let manifest = app.join("meada.toml");
+    let text = std::fs::read_to_string(&manifest).unwrap();
+    let via =
+        "via = [\"values.yaml#groups[name=availability].rules[alert=ApiDown].labels.support\"]";
+    assert!(text.contains(via), "{text}");
+    std::fs::write(
+        &manifest,
+        text.replace(via, "via = [\"limits.ts::LIMITS\"]"),
+    )
+    .unwrap();
+
+    let text = Engine::open(&app).unwrap().export().unwrap();
+    let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(json["providers"].as_array().unwrap().len(), 1, "{text}");
+    assert_eq!(
+        json["providers"][0]["site"],
+        "example.com/resource-via/app::limits.ts::LIMITS"
+    );
+    let status = engine::status(&app).unwrap();
+    assert!(!status.contains("matches no symbol"), "{status}");
+}
