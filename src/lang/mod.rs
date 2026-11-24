@@ -468,6 +468,11 @@ pub struct Facts {
     /// from the facts of files not parsed again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub declarations: Vec<Declaration>,
+    /// Each use of a name that is no call (TS/JS): one per scope, name and kind, first range
+    /// kept. Stored, as `declarations`: `resolve_file` resolves them from the facts of files not
+    /// parsed again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub references: Vec<Reference>,
     /// The scope and value of each `let` whose name is bound again in its scope or assigned
     /// again (Rust): no constant, since the name holds no one value, but a value that flows
     /// somewhere unread. Not kept in the index (see `Call::args`).
@@ -1266,6 +1271,60 @@ pub struct Declaration {
     pub range: Range<usize>,
     /// The BLAKE3 of the exact bytes of `range`, in hex; empty until `hash_spans` fills it.
     pub hash: String,
+}
+
+/// How a name is used where it is not called (`Reference::kind`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Use {
+    /// Rendered as a JSX element (`<Button/>`, `<Ns.Comp/>`).
+    Jsx,
+    /// Written as a type, or as `typeof x` in one.
+    Type,
+    /// Read as a value: an argument, an element, a property value, a returned value.
+    Value,
+    /// Read as a member chain (`config.url`), or the head of a dotted callee (`client`).
+    Member,
+    /// Extended or implemented by a class or an interface.
+    Extends,
+    /// Re-exported from another module (`export { X } from`, `*` for `export * from`).
+    Reexport,
+    /// Taken off a dynamic `import()` of a literal specifier (`Reference::from`).
+    Dynamic,
+}
+
+impl Use {
+    /// The `calls.kind` value and the id prefix of a row of this kind.
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "the index writes it from the next commit")
+    )]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Use::Jsx => "jsx",
+            Use::Type => "type",
+            Use::Value => "value",
+            Use::Member => "member",
+            Use::Extends => "extends",
+            Use::Reexport => "reexport",
+            Use::Dynamic => "dynamic",
+        }
+    }
+}
+
+/// A use of a name that is no call (`Facts::references`).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Reference {
+    /// The enclosing definition, as `Call::scope`.
+    pub scope: String,
+    /// The dotted name as written: `Button`, `Ns.Comp`, `config.url`; `*` for `export *`.
+    pub name: String,
+    pub kind: Use,
+    pub range: Range<usize>,
+    /// The specifier a `Reexport` re-exports from, or of the `import()` a `Dynamic` one takes
+    /// its name off; `None` for the other kinds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
 }
 
 /// A `const` binding, qualified by its enclosing definitions like `Def::name`.

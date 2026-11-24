@@ -40,7 +40,7 @@ mod values;
 /// Bump when extraction or resolution changes the rows an unchanged checkout should produce
 /// without changing their stored shape. The schema golden pins the revision alongside the shape.
 #[cfg(test)]
-const EXTRACTION_REVISION: u32 = 4;
+const EXTRACTION_REVISION: u32 = 5;
 
 /// The stored format's version, derived from its golden (`tests/golden/schema.txt`, kept by the
 /// unit test `the_stored_format_matches_its_golden`): re-blessing it after a change to `SCHEMA`,
@@ -4835,6 +4835,13 @@ mod tests {
             let facts = serde_json::to_string_pretty(&facts).unwrap();
             actual += &format!("\n{name}\n{facts}\n");
         }
+        // A `.tsx` file holds JSX, which `sample.ts` cannot: one use of each kind.
+        let src = fs::read(tests.join("fixtures/schema/sample.tsx")).unwrap();
+        let mut facts =
+            lang::LanguagePack::parse(&crate::lang::ts::TsJs, "sample.tsx", &src).unwrap();
+        lang::hash_spans(&mut facts, &src);
+        let facts = serde_json::to_string_pretty(&facts).unwrap();
+        actual += &format!("\nsample.tsx\n{facts}\n");
         for name in ["sample.openapi.yaml", "sample.asyncapi.yaml"] {
             let src = fs::read(tests.join("fixtures/schema").join(name)).unwrap();
             let summary = serde_json::to_string_pretty(&document::read(name, &src)).unwrap();

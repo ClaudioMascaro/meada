@@ -12,6 +12,7 @@ use super::{
 };
 use crate::{Result, package, qualify};
 
+mod references;
 mod types;
 mod uses;
 
@@ -93,6 +94,7 @@ impl LanguagePack for TsJs {
         let mut write_bytes = 0;
         let mut receiver_bytes = 0;
         let mut uses = uses::Uses::new(src, &parents);
+        let mut references = references::References::default();
         // The instance fields only their declaration or constructor may assign, or only their
         // class reach (`sealed_field`), by class and name, with their initializer; and every
         // member write, by name (`None`: any member of `this`) and scope (`member_writes`).
@@ -161,6 +163,7 @@ impl LanguagePack for TsJs {
                     ..Def::new(inner.clone(), kind, range)
                 });
             }
+            references.visit(node, &scope, src, &parents);
             match node.kind() {
                 "call_expression" | "new_expression" => {
                     // `new X(...)` is a call of `X`: constructors are how some libraries are
@@ -476,6 +479,7 @@ impl LanguagePack for TsJs {
                 .collect();
         }
         facts.declarations = declarations(root, src, &facts);
+        facts.references = references.into_vec();
         facts.loops = super::outermost(
             root,
             &[
@@ -2385,6 +2389,23 @@ fn unquote(node: Node, src: &[u8]) -> String {
         .to_string()
 }
 
+/// The specifier of a dynamic `import()` of one plain literal, as `value` gives the call: the
+/// one place that knows how the pack spells it (the callee `(import)`, the fallback `callee`
+/// gives a callee that is no name). `None` for a template hole, a second argument or any other
+/// call.
+pub(crate) fn dynamic_import(value: &Value) -> Option<&str> {
+    let Value::Call(call) = value else {
+        return None;
+    };
+    match (call.callee.as_str(), call.args.as_slice()) {
+        ("(import)", [Value::Str(parts)]) => match parts.as_slice() {
+            [Part::Text(specifier)] => Some(specifier),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 /// What a call or `new` expression calls. With type arguments under `await`, the grammar
 /// reads `await get<Row>(x)` as a call whose `function` is `await get`: the awaited call is
 /// `get<Row>(x)`, so the callee is the operand of that `await`.
@@ -2444,6 +2465,7 @@ fn callee(node: Node, src: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lang::Use;
 
     #[test]
     fn a_tsconfig_that_is_invalid_or_past_the_size_limit_declares_no_paths() {
@@ -2998,6 +3020,146 @@ mod tests {
 
     fn parse(src: &str) -> Facts {
         TsJs.parse("a.ts", src.as_bytes()).unwrap()
+    }
+
+    /// The `(scope, name, kind)` of each reference of `src` parsed as `path`, sorted.
+    fn uses_of(path: &str, src: &str) -> Vec<(String, String, &'static str)> {
+        let facts = TsJs.parse(path, src.as_bytes()).unwrap();
+        let mut got: Vec<_> = (facts.references.iter())
+            .map(|r| (r.scope.clone(), r.name.clone(), r.kind.as_str()))
+            .collect();
+        got.sort();
+        got
+    }
+
+    fn expected(rows: &[(&str, &str, &'static str)]) -> Vec<(String, String, &'static str)> {
+        let mut rows: Vec<_> = (rows.iter())
+            .map(|(s, n, k)| (s.to_string(), n.to_string(), *k))
+            .collect();
+        rows.sort();
+        rows
+    }
+
+    #[test]
+    fn non_call_uses_are_recorded_once_per_scope_name_and_kind() {
+        let src = "function Header() { return null }\n\
+                   export function LoginPage(t: Theme) {\n\
+                     config.url;\n\
+                     client.get();\n\
+                     Button();\n\
+                     const v = 1; f(v);\n\
+                     const o = { plugin };\n\
+                     return <div><Header/><Header/><Ui.Card/><Button onClick={handler}/></div>;\n\
+                   }\n\
+                   class Page extends Base implements Shape {}\n\
+                   interface P extends Q {}\n\
+                   type T = typeof tokens;\n\
+                   export { X } from '@scope/b';\n\
+                   export * from '@scope/s';\n";
+        // An interface or a type alias is no definition, so what it writes is at the scope
+        // around it (here the file's, ""), as for calls; the index lifts it to its declaration
+        // symbol (`holder`).
+        assert_eq!(
+            uses_of("a.tsx", src),
+            expected(&[
+                ("", "*", "reexport"),
+                ("", "X", "reexport"),
+                ("", "Q", "extends"),
+                ("", "tokens", "type"),
+                ("LoginPage", "Theme", "type"),
+                ("LoginPage", "Header", "jsx"),
+                ("LoginPage", "Ui.Card", "jsx"),
+                ("LoginPage", "Button", "jsx"),
+                ("LoginPage", "handler", "value"),
+                ("LoginPage", "config.url", "member"),
+                ("LoginPage", "client", "member"),
+                ("LoginPage", "plugin", "value"),
+                ("LoginPage", "v", "value"),
+                ("Page", "Base", "extends"),
+                ("Page", "Shape", "extends"),
+            ])
+        );
+        // The first occurrence's range is kept.
+        let facts = TsJs.parse("a.tsx", src.as_bytes()).unwrap();
+        let header = (facts.references.iter())
+            .find(|r| r.name == "Header" && r.kind == Use::Jsx)
+            .unwrap();
+        assert_eq!(header.range.start, src.find("Header/>").unwrap());
+    }
+
+    #[test]
+    fn type_parameters_and_written_names_are_no_uses() {
+        let src = "type Box<T> = { v: T };\n\
+                   function id<U>(u: U): U { return u }\n\
+                   type Inner<X> = X extends Array<infer E> ? E : never;\n\
+                   type Keys<O> = { [K in keyof O]: K };\n\
+                   function w() { target.field = 1; count = 2; for (const i of list) {} }\n\
+                   type Q = Ns.Model;\n";
+        assert_eq!(
+            uses_of("a.ts", src),
+            expected(&[
+                ("", "Array", "type"),
+                ("", "Ns.Model", "type"),
+                ("id", "u", "value"),
+                ("w", "list", "value"),
+            ])
+        );
+    }
+
+    #[test]
+    fn dynamic_imports_record_the_member_they_take() {
+        let src = "const Lazy = lazy(() => import('@scope/a').then(m => ({ default: m.Page })));\n\
+                   import('./local').then(m => m.helper);\n\
+                   async function g(s: string) {\n\
+                     const { X, Y: z } = await import('@scope/a');\n\
+                     (await import('@scope/a')).W;\n\
+                     import(`@scope/a${s}`).then(m => m.Q);\n\
+                   }\n";
+        let facts = TsJs.parse("a.tsx", src.as_bytes()).unwrap();
+        let mut got: Vec<_> = (facts.references.iter())
+            .filter(|r| r.kind == Use::Dynamic)
+            .map(|r| (r.name.as_str(), r.from.as_deref().unwrap()))
+            .collect();
+        got.sort();
+        assert_eq!(
+            got,
+            [
+                ("Page", "@scope/a"),
+                ("W", "@scope/a"),
+                ("X", "@scope/a"),
+                ("Y", "@scope/a"),
+                ("helper", "./local"),
+            ]
+        );
+        // Only a dynamic reference names a specifier.
+        assert!(
+            (facts.references.iter())
+                .all(|r| matches!(r.kind, Use::Dynamic | Use::Reexport) == r.from.is_some())
+        );
+    }
+
+    #[test]
+    fn js_and_jsx_files_record_their_uses() {
+        let src = "class A extends Base {}\nfunction C() { return <Card/> }\n";
+        assert_eq!(
+            uses_of("a.jsx", src),
+            expected(&[("A", "Base", "extends"), ("C", "Card", "jsx")])
+        );
+        assert_eq!(
+            uses_of("a.js", "class A extends ns.Base {}\n"),
+            expected(&[("A", "ns.Base", "extends")])
+        );
+    }
+
+    #[test]
+    fn dynamic_import_reads_only_a_plain_literal() {
+        let src = "f(import('x'));\nf(import(`x${y}`));\nf(import('x', o));\nf(g('x'));\n";
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let got: Vec<_> = (facts.calls.iter())
+            .filter(|c| c.callee == "f")
+            .map(|c| dynamic_import(&c.args[0]))
+            .collect();
+        assert_eq!(got, [Some("x"), None, None, None]);
     }
 
     #[test]
