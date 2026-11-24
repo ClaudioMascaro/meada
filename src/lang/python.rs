@@ -80,6 +80,7 @@ impl LanguagePack for Python {
             node: tree.root_node(),
             scope: String::new(),
             in_class: false,
+            decorated_class: false,
             flat: false,
             awaited: false,
         }];
@@ -87,12 +88,14 @@ impl LanguagePack for Python {
             node,
             scope,
             in_class,
+            decorated_class,
             flat,
             awaited,
         }) = stack.pop()
         {
             let mut inner = scope.clone();
             let mut inner_class = in_class;
+            let mut inner_decorated_class = decorated_class;
             let mut inner_flat = flat;
             // The body of a main guard, whose calls and bindings belong to the `__main__`
             // symbol.
@@ -131,6 +134,9 @@ impl LanguagePack for Python {
                 }
                 "function_definition" | "class_definition" => {
                     let is_class = node.kind() == "class_definition";
+                    let decorated = node
+                        .parent()
+                        .is_some_and(|n| n.kind() == "decorated_definition");
                     if let Some(name) = node.child_by_field_name("name") {
                         let name = text(name, src);
                         inner = qualify(&scope, name);
@@ -154,6 +160,9 @@ impl LanguagePack for Python {
                                 decorators: bare_names.remove(&inner).unwrap_or_default(),
                                 asynchronous: !is_class
                                     && children(node).any(|n| n.kind() == "async"),
+                                // A class decorator can replace its methods after the body
+                                // executes, even when each method has no decorator of its own.
+                                return_effects: !is_class && (decorated || decorated_class),
                                 return_values: if !is_class
                                     && !node
                                         .child_by_field_name("body")
@@ -174,6 +183,7 @@ impl LanguagePack for Python {
                         locals.classes.insert(inner.clone());
                     }
                     inner_class = is_class;
+                    inner_decorated_class = is_class && decorated;
                 }
                 "decorated_definition" if levels(&scope) < DEFINITION_DEPTH => {
                     let name = (node.child_by_field_name("definition"))
@@ -377,6 +387,7 @@ impl LanguagePack for Python {
                     false => inner.clone(),
                 },
                 in_class: inner_class,
+                decorated_class: inner_decorated_class,
                 flat: inner_flat,
                 awaited: node.kind() == "await"
                     || (node.kind() == "parenthesized_expression" && awaited),
@@ -464,6 +475,8 @@ struct Visit<'t> {
     /// Whether the node sits in a class body, outside any function in it: a function defined
     /// here is a method.
     in_class: bool,
+    /// Whether that class has a decorator, which can replace any method defined here.
+    decorated_class: bool,
     /// Whether the node sits in a function or class past `DEFINITION_DEPTH`, which is no
     /// definition: a `return` there is not the enclosing definition's.
     flat: bool,

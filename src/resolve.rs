@@ -7728,14 +7728,10 @@ impl<'a> Code<'a> {
         let (first, rest) = def.return_values.split_first()?;
         if extended {
             if stored.constructs
-                || !self.runs_alone(function)
+                || !(def.non_overridable || self.runs_alone(function))
+                || def.return_effects
                 || (def.asynchronous && !(awaited || stored.awaited))
                 || (javascript && !def.terminal_return)
-                || (self.pack.extensions().contains(&"py")
-                    && def
-                        .decorators
-                        .iter()
-                        .any(|name| !matches!(name.as_str(), "staticmethod" | "classmethod")))
             {
                 return None;
             }

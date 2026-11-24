@@ -1285,7 +1285,7 @@ Cómo saber si un enlace que falta es un bug:
 
 ### 8.1 Rutas HTTP
 
-Los clientes HTTP pueden usar la base que devuelve una función o método resuelto de forma exacta. Un wrapper puede pasar una clave de entorno literal o un identificador de plugin de Backstage. La ruta se conserva cuando las alternativas al final de la URL solo cambian la cadena de consulta. Las reasignaciones de parámetros y las alternativas de despacho pueden dejar abierto el origen.
+Los clientes HTTP pueden usar la base que devuelve una función o método resuelto de forma exacta. Un wrapper puede pasar una clave de entorno literal o un identificador de plugin de Backstage. La ruta se conserva cuando las alternativas al final de la URL solo cambian la cadena de consulta. Las reasignaciones de parámetros y las alternativas de despacho pueden dejar abierto el origen. Un decorador de clase de Python puede sustituir el método que proporciona la base. Meada mantiene abierta la solicitud con los candidatos que coinciden con la ruta conocida.
 
 Una ruta une a quien la **sirve** (el proveedor, el código que la trata) con quien la **llama**
 (el consumidor, una llamada de cliente HTTP). En todos los lenguajes, Meada normaliza la ruta:
