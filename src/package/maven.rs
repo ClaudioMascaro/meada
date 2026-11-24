@@ -560,7 +560,13 @@ impl Ecosystem for Maven {
     fn names_package(&self, name: &str) -> bool {
         name.split('.').all(jvm::literal)
     }
-    fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
+    fn imports<'a>(
+        &self,
+        code: &Code<'a>,
+        path: &'a str,
+        _index: usize,
+        call: &'a Call,
+    ) -> Vec<(String, String)> {
         imports(code, path, call, &["java.", "kotlin."])
     }
     /// Every artifact the manifests holding the file depend on, then those each module of the

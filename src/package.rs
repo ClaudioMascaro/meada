@@ -62,6 +62,14 @@ use nuget::Nuget;
 use pypi::Pypi;
 use swiftpm::Swiftpm;
 
+/// The import that binds the head of a call's callee (`Code::imported`), as `(specifier, chain)`.
+fn head_imports<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
+    let imported = code.imported(path, &call.scope, &call.callee);
+    (imported.into_iter())
+        .map(|(specifier, chain)| (specifier.to_string(), chain))
+        .collect()
+}
+
 pub struct Packages;
 
 /// The start of every package contract identifier.
@@ -90,13 +98,17 @@ trait Ecosystem {
     /// Whether a bare `specifier` may name one of its packages.
     fn names_package(&self, specifier: &str) -> bool;
 
-    /// The imports a call of the file `path` goes through, as `(specifier, chain)` (`Code::imported`):
-    /// the one import that binds its head.
-    fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
-        let imported = code.imported(path, &call.scope, &call.callee);
-        (imported.into_iter())
-            .map(|(specifier, chain)| (specifier.to_string(), chain))
-            .collect()
+    /// The imports the call at `index` of the file `path` goes through, as `(specifier, chain)`
+    /// (`head_imports`: the one import that binds its head). `index` lets an ecosystem read the
+    /// call's arguments (`Code::args`).
+    fn imports<'a>(
+        &self,
+        code: &Code<'a>,
+        path: &'a str,
+        _index: usize,
+        call: &'a Call,
+    ) -> Vec<(String, String)> {
+        head_imports(code, path, call)
     }
 
     /// The dependency entries an import of `specifier` by the file `from.1` of the repository
@@ -2057,7 +2069,7 @@ impl ContractKind for Packages {
             .filter_map(|(&path, facts)| Some((path, facts, of_source(path)?)));
         for (path, facts, ecosystem) in files {
             for (index, call) in facts.calls.iter().enumerate() {
-                for (specifier, chain) in ecosystem.imports(code, path, call) {
+                for (specifier, chain) in ecosystem.imports(code, path, index, call) {
                     if chain.is_empty() || !ecosystem.names_package(&specifier) {
                         continue;
                     }

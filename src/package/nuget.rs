@@ -184,7 +184,13 @@ impl Ecosystem for Nuget {
             .all(|s| !s.is_empty() && s.chars().all(|c| c.is_alphanumeric() || c == '_'))
     }
 
-    fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
+    fn imports<'a>(
+        &self,
+        code: &Code<'a>,
+        path: &'a str,
+        _index: usize,
+        call: &'a Call,
+    ) -> Vec<(String, String)> {
         // ponytail: a workspace type in `System.*` (a polyfill) is not followed.
         maven::imports(code, path, call, &["System."])
     }

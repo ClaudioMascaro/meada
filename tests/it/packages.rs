@@ -453,6 +453,78 @@ fn an_exported_constant_or_default_expression_is_an_import_target() {
     );
 }
 
+/// The export's `imports` rows at `file` that name `specifier`, whole and without their `site`,
+/// sorted by their JSON text.
+fn rows_at(repo: &Path, file: &str, specifier: &str) -> Vec<serde_json::Value> {
+    let json: serde_json::Value = serde_json::from_str(&export(repo)).unwrap();
+    let mut rows: Vec<serde_json::Value> = (json["imports"].as_array().into_iter().flatten())
+        .filter(|i| i["site"].as_str().and_then(|s| s.split("::").nth(1)) == Some(file))
+        .filter(|i| i["specifier"] == specifier)
+        .cloned()
+        .map(|mut i| {
+            i.as_object_mut().unwrap().remove("site");
+            i
+        })
+        .collect();
+    rows.sort_by_key(|r| r.to_string());
+    rows
+}
+
+#[test]
+fn a_backstage_backend_add_of_a_dynamic_import_links_its_default() {
+    let repo = fixture_repo(
+        "packages_backend_add",
+        "pkg-backend-add",
+        Some("https://example.com/pkg/backend-add.git"),
+    );
+    let sym =
+        |file: &str, name: &str| format!("example.com/pkg/backend-add::plugins/{file}::{name}");
+    let dynamic = |s: &str| rows_at(&repo, "packages/backend/src/index.ts", s);
+    let fixed = |s: &str| rows_at(&repo, "packages/static/src/index.ts", s);
+
+    for s in [
+        "@scope/plugin-a",
+        "@scope/plugin-b",
+        "@scope/plugin-c",
+        "@scope/plugin-d",
+        "@scope/plugin-e",
+        "@scope/nodefault",
+        "@backstage/plugin-external",
+    ] {
+        assert_eq!(dynamic(s), fixed(s), "{s}");
+        assert!(dynamic(s).iter().all(|r| r["name"] == "default"), "{s}");
+    }
+    // The `dist/` entry maps to no source: the candidates the static twin gets.
+    assert!(!dynamic("@scope/plugin-e").is_empty());
+
+    let what = |s: &str| -> Vec<(String, String, String)> {
+        let text = |r: &serde_json::Value, k: &str| r[k].as_str().unwrap().to_string();
+        (dynamic(s).iter())
+            .map(|r| (text(r, "level"), text(r, "how"), text(r, "target")))
+            .collect()
+    };
+    let exact = |how: &str, target: String| vec![("exact".to_string(), how.to_string(), target)];
+    assert_eq!(
+        what("@scope/plugin-a"),
+        exact("main", sym("plugin-a/src/plugin.ts", "aPlugin"))
+    );
+    assert_eq!(
+        what("@scope/plugin-b"),
+        exact("types", sym("plugin-b/src/plugin.ts", "bPlugin"))
+    );
+    assert_eq!(
+        what("@scope/plugin-c"),
+        exact("main", sym("plugin-c/src/index.ts", "default"))
+    );
+    assert_eq!(
+        what("@scope/plugin-d"),
+        exact("main", sym("plugin-d/src/index.ts", "root"))
+    );
+    // A relative module is no cross-package edge, and an external one has no `imports` row.
+    assert!(dynamic("./local").is_empty());
+    assert!(dynamic("@backstage/plugin-external").is_empty());
+}
+
 #[test]
 fn a_nested_tsconfig_that_is_invalid_or_leaves_the_repository_maps_nothing() {
     let p = packages("packages_tsconfig_hostile");

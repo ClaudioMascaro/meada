@@ -1,0 +1,1 @@
+{"name": "@example/backend-add", "private": true, "workspaces": ["packages/*", "plugins/*"]}
