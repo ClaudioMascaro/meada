@@ -4596,6 +4596,10 @@ impl<'a> Resolver<'a> {
             }
             let private: HashSet<&str> = facts.private.iter().map(String::as_str).collect();
             for export in &facts.exports {
+                if let Some(row) = self.sourced(path, export) {
+                    rows.insert((path, row.0, row.1));
+                    continue;
+                }
                 let found = match export {
                     Export::Local { exported, .. } | Export::From { exported, .. } => {
                         if private.contains(exported.as_str()) && !self.takers[path].takes(exported)
@@ -4609,7 +4613,7 @@ impl<'a> Resolver<'a> {
                         None => continue,
                     },
                 };
-                rows.extend(found.into_iter().map(|row| (path, row)));
+                rows.extend(found.into_iter().map(|row| (path, row, None)));
             }
             let mut names = BTreeSet::new();
             self.glob_names(path, &mut HashSet::new(), &mut names);
@@ -4617,16 +4621,38 @@ impl<'a> Resolver<'a> {
             let found = names
                 .into_iter()
                 .flat_map(|name| self.rows(path, name, false));
-            rows.extend(found.map(|row| (path, row)));
+            rows.extend(found.map(|row| (path, row, None)));
         }
         (rows.into_iter())
-            .map(|(path, (name, file, target))| Exported {
+            .map(|(path, (name, file, target), source)| Exported {
                 path: path.to_string(),
                 name: name.map(String::from),
                 file: file.map(String::from),
                 target: target.map(String::from),
+                source: source.map(String::from),
             })
             .collect()
+    }
+
+    /// The row of a TS/JS re-export from a bare specifier no file of the repository answers:
+    /// `(name, None, name there)` for `export { name } from '<pkg>'`, `("*", None, None)` for
+    /// `export * from '<pkg>'`, with the specifier (`Exported::source`).
+    fn sourced(&self, path: &'a str, export: &'a Export) -> Option<(Row<'a>, Option<&'a str>)> {
+        let (_, extension) = path.rsplit_once('.')?;
+        if !crate::lang::ts::EXTENSIONS.contains(&extension) {
+            return None;
+        }
+        let (row, source): (Row<'a>, &'a str) = match export {
+            Export::From {
+                exported,
+                source,
+                name: Imported::Name(name),
+            } => ((Some(exported), None, Some(name)), source),
+            Export::All { source } => ((Some("*"), None, None), source),
+            _ => return None,
+        };
+        let bare = !source.starts_with('.') && !source.starts_with('/');
+        (bare && self.module(path, source).is_none()).then_some((row, Some(source)))
     }
 
     /// The rows of `file` exporting `exported`: its name, the file and the definition it gives;
@@ -4870,8 +4896,12 @@ pub struct Exported {
     /// known, which ends the lookup of `name` in `path`.
     pub file: Option<String>,
     /// The qualified name of the definition, constant or type in `file`; `None` when `name` is
-    /// the whole file.
+    /// the whole file. For a re-export of another package (`source`), the name it has there.
     pub target: Option<String>,
+    /// The bare specifier a TS/JS file re-exports from (`export { X } from '<pkg>'`, the name
+    /// `*` for `export * from '<pkg>'`), whose module is outside the repository's files: an
+    /// import of the package follows it one package further (`package::Provided::reexport`).
+    pub source: Option<String>,
 }
 
 /// A public class's family past the class itself (`Resolver::ancestries`).

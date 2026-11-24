@@ -1139,6 +1139,7 @@ serve = "acme.cli:main"
                     name: Some("f".into()),
                     file: Some(p.to_string()),
                     target: Some("f".into()),
+                    source: None,
                 })
                 .collect(),
             ..Export::default()
@@ -1416,6 +1417,7 @@ serve = "acme.cli:main"
             name: Some(name.into()),
             file: Some(path.into()),
             target: Some(name.into()),
+            source: None,
         };
         let export = Export {
             repository: "lib".into(),

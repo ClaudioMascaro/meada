@@ -351,6 +351,7 @@ mod tests {
                     name: Some(stem(f)),
                     file: Some(f.to_string()),
                     target: Some(stem(f)),
+                    source: None,
                 })
                 .collect(),
             manifests,

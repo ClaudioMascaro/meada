@@ -180,7 +180,7 @@ CREATE TABLE manifests (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL
 );
-CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
+CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT, source TEXT);
 CREATE INDEX exports_path ON exports (path);
 CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
 CREATE TABLE flexible (path TEXT NOT NULL, name TEXT NOT NULL, least INTEGER NOT NULL, most INTEGER);
@@ -1754,8 +1754,8 @@ fn refresh_attempt(
     tx.execute("DELETE FROM exports", [])?;
     for e in &exported {
         tx.execute(
-            "INSERT INTO exports VALUES (?1, ?2, ?3, ?4)",
-            params![e.path, e.name, e.file, e.target],
+            "INSERT INTO exports VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![e.path, e.name, e.file, e.target, e.source],
         )?;
     }
     forget_rows_outside(&tx, "families", &kept_files)?;
@@ -2035,13 +2035,14 @@ fn resolver<'a>(
 /// The `exports` rows, in the order they were written.
 fn stored_exports(db: &Connection) -> Result<Vec<Exported>> {
     let mut statement =
-        db.prepare("SELECT path, name, file, target FROM exports ORDER BY rowid")?;
+        db.prepare("SELECT path, name, file, target, source FROM exports ORDER BY rowid")?;
     let rows = statement.query_map([], |r| {
         Ok(Exported {
             path: r.get(0)?,
             name: r.get(1)?,
             file: r.get(2)?,
             target: r.get(3)?,
+            source: r.get(4)?,
         })
     })?;
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
@@ -2054,7 +2055,7 @@ pub(crate) fn exports_of(db: &Connection, paths: &[String]) -> Result<Vec<Export
     }
     Ok(db
         .prepare(
-            "SELECT path, name, file, target FROM exports WHERE path IN \
+            "SELECT path, name, file, target, source FROM exports WHERE path IN \
          (SELECT value FROM json_each(?1)) ORDER BY path, name, file, target",
         )?
         .query_map(params![serde_json::to_string(paths)?], |r| {
@@ -2063,6 +2064,7 @@ pub(crate) fn exports_of(db: &Connection, paths: &[String]) -> Result<Vec<Export
                 name: r.get(1)?,
                 file: r.get(2)?,
                 target: r.get(3)?,
+                source: r.get(4)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?)
@@ -3541,7 +3543,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         false => Vec::new(),
         true => db
             .prepare(
-                "SELECT path, name, file, target FROM exports \
+                "SELECT path, name, file, target, source FROM exports \
                  ORDER BY path, name, file, target",
             )?
             .query_map([], |r| {
@@ -3550,6 +3552,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
                     name: r.get(1)?,
                     file: r.get(2)?,
                     target: r.get(3)?,
+                    source: r.get(4)?,
                 })
             })?
             .collect::<rusqlite::Result<_>>()?,

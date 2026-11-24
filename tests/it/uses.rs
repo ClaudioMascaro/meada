@@ -413,3 +413,16 @@ fn an_import_row_from_a_use_drops_no_door() {
     let card = "packages/ui/src/index.ts::Card".to_string();
     assert!(doors.contains(&card), "{card} not a door: {doors:?}");
 }
+
+#[test]
+fn a_name_reexported_from_another_package_links_to_the_original() {
+    let repo = uses_repo("uses_second_hop");
+    for specifier in ["@scope/b", "@scope/s"] {
+        let rows = rows_at(&repo, "packages/app/src/xb.ts", specifier);
+        assert_eq!(
+            named(&rows),
+            [exact("X", "a/src/index.ts::X")],
+            "{specifier}"
+        );
+    }
+}

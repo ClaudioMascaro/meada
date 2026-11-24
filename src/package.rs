@@ -311,15 +311,33 @@ trait Ecosystem {
 }
 
 /// `Ecosystem::resolutions` by its default rule: each entry the import may name and, in each
-/// provider the entry reaches, where `resolve` leads.
+/// provider the entry reaches, where `resolve` leads; where it leads nowhere because the
+/// provider's file re-exports the name from another package (`Provided::reexport`), where the
+/// import of that package from that file leads, one package further and no more, so a cycle
+/// of re-exports stops.
 fn resolutions_by_ways<'e, E: Ecosystem + ?Sized>(
     ecosystem: &E,
     exports: &'e [Export],
     providers: &Providers,
     at: &dyn Fn(usize) -> &'e Provided<'e>,
+    from: (usize, &str),
+    import: (&str, &str),
+    known: &dyn Fn(&Provided<'e>, &str) -> bool,
+) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
+    resolutions_hopping(ecosystem, exports, providers, at, from, import, known, true)
+}
+
+/// `resolutions_by_ways`, following a re-export of another package only when `hop`.
+#[expect(clippy::too_many_arguments)]
+fn resolutions_hopping<'e, E: Ecosystem + ?Sized>(
+    ecosystem: &E,
+    exports: &'e [Export],
+    providers: &Providers,
+    provider: &dyn Fn(usize) -> &'e Provided<'e>,
     (n, from): (usize, &str),
     (specifier, chain): (&str, &str),
     known: &dyn Fn(&Provided<'e>, &str) -> bool,
+    hop: bool,
 ) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
     let mut out = Vec::new();
     for (entry, subpath, reached) in reachable(ecosystem, exports, providers, (n, from), specifier)
@@ -327,14 +345,35 @@ fn resolutions_by_ways<'e, E: Ecosystem + ?Sized>(
         let mut resolved = Vec::new();
         for (m, i) in reached {
             let manifest = &exports[m].manifests[i];
-            let at = at(m);
-            let known = |id: &str| known(at, id);
+            let at = provider(m);
+            let known_here = |id: &str| known(at, id);
             let repository = &exports[m].repository;
             let import = ((entry, subpath.as_str()), (specifier, chain));
-            if let Some(r) = ecosystem.resolve(at, repository, manifest, import.0, import.1, &known)
-            {
+            let found =
+                ecosystem.resolve(at, repository, manifest, import.0, import.1, &known_here);
+            if let Some(r) = found {
                 resolved.push((m, manifest, at, r));
+                continue;
             }
+            let file = hop
+                .then(|| at.entry(manifest, &ecosystem.ways(manifest, &subpath)))
+                .flatten();
+            let Some((source, chain)) = file.as_ref().and_then(|(f, ..)| at.reexport(f, chain))
+            else {
+                continue;
+            };
+            let from = (m, file.as_ref().map_or("", |(f, ..)| f.as_str()));
+            let further = resolutions_hopping(
+                ecosystem,
+                exports,
+                providers,
+                provider,
+                from,
+                (&source, &chain),
+                known,
+                false,
+            );
+            resolved.extend(further.into_iter().flat_map(|(_, r)| r));
         }
         out.push((entry, resolved));
     }
@@ -1152,6 +1191,34 @@ impl<'e> Provided<'e> {
                 .find(|f| self.files.contains(f.as_str()))?;
             Some((found, None))
         })
+    }
+
+    /// The package `file` re-exports the head of `chain` from and the chain there
+    /// (`Exported::source`): its own `export { head } from '<pkg>'`, else its one
+    /// `export * from '<pkg>'` for any name but `default`. Two such stars give none, as two
+    /// local ones make a name ambiguous (`lookup`).
+    ///
+    /// ponytail: the file's own rows only, not those of a local `export *` it goes through;
+    /// follow them as `lookup` does when an entry re-exports a package two files deep.
+    fn reexport(&self, file: &str, chain: &str) -> Option<(String, String)> {
+        let (head, rest) = chain
+            .split_once('.')
+            .map_or((chain, None), |(h, r)| (h, Some(r)));
+        let rows = self.exported.get(file).map_or(&[][..], Vec::as_slice);
+        let renamed = |name: &str| rest.map_or(name.to_string(), |r| format!("{name}.{r}"));
+        if let Some(own) = rows.iter().find(|e| e.name.as_deref() == Some(head)) {
+            let source = own.source.clone()?;
+            return Some((source, renamed(own.target.as_deref().unwrap_or(head))));
+        }
+        let stars: Vec<&str> = (rows.iter())
+            .filter(|e| e.name.as_deref() == Some("*"))
+            .filter_map(|e| e.source.as_deref())
+            .collect();
+        match (head, stars.as_slice()) {
+            ("default", _) => None,
+            (_, [source]) => Some((source.to_string(), chain.to_string())),
+            _ => None,
+        }
     }
 
     /// What `file` exports as `name`: a file, and the qualified name of a definition in it or
@@ -3387,6 +3454,96 @@ mod tests {
         assert_eq!(kept_by(&[other, one(&["id"])]), None);
     }
 
+    /// Where `X`, imported from `b` by `src/a.ts` of a consumer, resolves when `b`'s
+    /// `index.ts` re-exports it from `d` and `d`'s `index.ts` holds what `d_rows` say.
+    fn second_hop(d_rows: Vec<Exported>) -> Vec<String> {
+        let sourced = |path: &str, name: &str, source: &str| Exported {
+            source: Some(source.into()),
+            ..row(path, Some(name), None, Some(name))
+        };
+        let consumer = repository("c", r#"{"dependencies": {"b": "^1.0.0"}}"#, &[], false);
+        let package = |name: &str, on: &str| {
+            let json = format!(
+                r#"{{"name": "{name}", "version": "1.0.0", "main": "index.ts", "dependencies": {{"{on}": "^1.0.0"}}}}"#
+            );
+            repository(name, &json, &[("index.ts", &[])], false)
+        };
+        let mut b = package("b", "d");
+        b.exported = vec![sourced("index.ts", "X", "d")];
+        let mut d = package("d", "b");
+        d.exported = d_rows;
+        let exports = [consumer, b, d];
+        let providers = Providers::new(&exports);
+        let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
+        let found = resolutions(
+            &exports,
+            &providers,
+            &provided,
+            (0, "src/a.ts"),
+            "b",
+            "X",
+            |_, _| true,
+        );
+        let mut ids: Vec<String> = (found.into_iter())
+            .flat_map(|(_, r)| r)
+            .flat_map(|(_, _, _, r)| r.targets)
+            .collect();
+        ids.sort();
+        ids
+    }
+
+    #[test]
+    fn a_re_export_of_another_package_resolves_one_package_further() {
+        let own = row("index.ts", Some("X"), Some("index.ts"), Some("X"));
+        assert_eq!(second_hop(vec![own]), ["d::index.ts::X"]);
+        let star = Exported {
+            source: Some("e".into()),
+            ..row("index.ts", Some("*"), None, None)
+        };
+        // A third package is one hop too many.
+        assert!(second_hop(vec![star]).is_empty());
+    }
+
+    #[test]
+    fn a_re_export_cycle_stops() {
+        // `d` re-exports `X` back from `b`: no row, no endless walk.
+        let back = Exported {
+            source: Some("b".into()),
+            ..row("index.ts", Some("X"), None, Some("X"))
+        };
+        assert!(second_hop(vec![back]).is_empty());
+    }
+
+    #[test]
+    fn a_re_exported_name_is_looked_up_by_its_own_name_then_a_lone_star() {
+        let rows = [
+            Exported {
+                source: Some("a".into()),
+                ..row("i.ts", Some("Y"), None, Some("X"))
+            },
+            Exported {
+                source: Some("s".into()),
+                ..row("i.ts", Some("*"), None, None)
+            },
+            row("i.ts", Some("own"), Some("i.ts"), Some("own")),
+            Exported {
+                source: Some("t".into()),
+                ..row("two.ts", Some("*"), None, None)
+            },
+            Exported {
+                source: Some("u".into()),
+                ..row("two.ts", Some("*"), None, None)
+            },
+        ];
+        let p = provided(&rows);
+        let to = |s: &str, c: &str| Some((s.to_string(), c.to_string()));
+        assert_eq!(p.reexport("i.ts", "Y.deep"), to("a", "X.deep"));
+        assert_eq!(p.reexport("i.ts", "Z"), to("s", "Z"));
+        assert_eq!(p.reexport("i.ts", "own"), None);
+        assert_eq!(p.reexport("i.ts", "default"), None);
+        assert_eq!(p.reexport("two.ts", "Z"), None);
+    }
+
     /// A provider whose files export what `rows` say.
     fn provided<'e>(rows: &'e [Exported]) -> Provided<'e> {
         let mut exported: HashMap<&str, Vec<&Exported>> = HashMap::new();
@@ -3415,6 +3572,7 @@ mod tests {
             name: name.map(Into::into),
             file: file.map(Into::into),
             target: target.map(Into::into),
+            source: None,
         }
     }
 
