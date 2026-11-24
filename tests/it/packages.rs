@@ -638,3 +638,65 @@ fn exported_declarations_are_searchable_and_have_context() {
     let copies = engine.search("LIMIT", Some("duplicate"), None).unwrap();
     assert!(copies.starts_with("2 copies\n"), "{copies}");
 }
+
+#[test]
+fn declaration_files_give_rows_and_a_committed_copy_is_a_duplicate() {
+    let repo = fixture_repo(
+        "packages_exported_dts",
+        "pkg-exported",
+        Some("https://example.com/pkg/exported.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let ids: Vec<&str> = (json["symbols"].as_array().unwrap().iter())
+        .map(|s| s["id"].as_str().unwrap())
+        .collect();
+    let shape = "example.com/pkg/exported::packages/a/dist/shape.d.ts::Shape";
+    assert!(ids.contains(&shape), "{ids:#?}");
+    // `dist/shape.d.ts` holds the same interface as `src/shape.ts`: one group of two.
+    let copies = engine.search("Shape", Some("duplicate"), None).unwrap();
+    assert!(copies.starts_with("2 copies\n"), "{copies}");
+    for path in ["packages/a/dist/shape.d.ts", "packages/a/src/shape.ts"] {
+        assert!(copies.contains(path), "{path} in {copies}");
+    }
+}
+
+#[test]
+fn an_exported_value_and_type_of_one_name_keep_their_zod_shapes() {
+    let repo = fixture_repo(
+        "packages_exported_zod",
+        "pkg-exported",
+        Some("https://example.com/pkg/exported.git"),
+    );
+    Engine::open(&repo).unwrap().export().unwrap();
+
+    // The type comes first in `schema.ts`; the one row is the value's.
+    let symbols = rows_of(
+        &repo,
+        "SELECT id, start || ' ' || end FROM symbols WHERE path = 'packages/a/src/schema.ts'",
+    );
+    let src = fs::read_to_string(repo.join("packages/a/src/schema.ts")).unwrap();
+    let at = src.find("Foo = z.object").unwrap();
+    let end = src.rfind(')').unwrap() + 1;
+    assert_eq!(
+        symbols,
+        [format!(
+            "example.com/pkg/exported::packages/a/src/schema.ts::Foo {at} {end}"
+        )]
+    );
+    // What meada 1.5.0 keeps for this fixture: the `Foo` row reaches `schema.ts` as before.
+    let shapes = rows_of(
+        &repo,
+        "SELECT method, via, shape FROM contracts WHERE role = 'shape' \
+         AND path = 'packages/a/src/schema.ts' ORDER BY method, via",
+    );
+    assert_eq!(
+        shapes,
+        [
+            r#"Foo infer {"source":{"zod":"packages/a/src/schema.ts"},"fields":["id","size"],"declared":["id","size"]}"#,
+            r#"Foo type {"source":{"reads":"packages/a/src/schema.ts"},"fields":["id","size"],"declared":["id","size"]}"#,
+            r#"Foo zod {"source":{"zod":"packages/a/src/schema.ts"},"fields":["id","size"],"scalars":["id","size"]}"#,
+        ]
+    );
+}
