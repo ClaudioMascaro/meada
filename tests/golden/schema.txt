@@ -1,4 +1,4 @@
-extraction revision 2
+extraction revision 3
 
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -427,6 +427,16 @@ sample.ts
     },
     {
       "name": "sdk"
+    }
+  ],
+  "declarations": [
+    {
+      "name": "default",
+      "range": {
+        "start": 1039,
+        "end": 1047
+      },
+      "hash": "30c7e9dc02edc853988d780adb63b147bcdf280a5a709dacba620814e1b02bac"
     }
   ],
   "locals": [

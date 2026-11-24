@@ -7,8 +7,8 @@ use std::rc::Rc;
 use tree_sitter::{Language, Node, Parser};
 
 use super::{
-    Binds, Call, ConfigInput, Const, Def, Export, Facts, Field, Import, Imported, Invocation, Kind,
-    LanguagePack, Modules, Param, Part, Ty, Value, children, named, text,
+    Binds, Call, ConfigInput, Const, Declaration, Def, Export, Facts, Field, Import, Imported,
+    Invocation, Kind, LanguagePack, Modules, Param, Part, Ty, Value, children, named, text,
 };
 use crate::{Result, package, qualify};
 
@@ -475,6 +475,7 @@ impl LanguagePack for TsJs {
                 .cloned()
                 .collect();
         }
+        facts.declarations = declarations(root, src, &facts);
         facts.loops = super::outermost(
             root,
             &[
@@ -1733,6 +1734,101 @@ fn exports(node: Node, src: &[u8], out: &mut Vec<Export>) {
     }
 }
 
+/// The top-level declarations of `root` that a top-level `export` names and that are no
+/// definitions: `const`s holding no function or class, interfaces, type aliases, enums and an
+/// `export default` expression (named `default`). One per name: the first value one, else the
+/// first type one (a value and a type may share a name). Hashes are left for `hash_spans`.
+fn declarations(root: Node, src: &[u8], facts: &Facts) -> Vec<Declaration> {
+    // (name, range, holds a value), in source order.
+    let mut found: Vec<(&str, Range<usize>, bool)> = Vec::new();
+    let mut exported = HashSet::new();
+    let not_value = |v: Node| v.kind() == "class" || FUNCTIONS.contains(&v.kind());
+    for child in named(root) {
+        let mut node = child;
+        if child.kind() == "export_statement" {
+            if let Some(declaration) = child.child_by_field_name("declaration") {
+                node = declaration;
+            } else if let Some(value) = child.child_by_field_name("value")
+                && children(child).any(|c| c.kind() == "default")
+            {
+                if value.kind() == "identifier" {
+                    exported.insert(text(value, src));
+                } else if !not_value(value) {
+                    exported.insert("default");
+                    found.push(("default", value.byte_range(), true));
+                }
+                continue;
+            } else {
+                if child.child_by_field_name("source").is_none()
+                    && let Some(clause) = children(child).find(|c| c.kind() == "export_clause")
+                {
+                    let specifiers = children(clause).filter(|c| c.kind() == "export_specifier");
+                    for name in specifiers.filter_map(|s| s.child_by_field_name("name")) {
+                        exported.insert(text(name, src));
+                    }
+                }
+                continue;
+            }
+        }
+        let names_it = child.kind() == "export_statement";
+        match node.kind() {
+            "lexical_declaration"
+                if node
+                    .child_by_field_name("kind")
+                    .is_some_and(|k| k.kind() == "const") =>
+            {
+                for declarator in children(node).filter(|c| c.kind() == "variable_declarator") {
+                    let Some(name) = (declarator.child_by_field_name("name"))
+                        .filter(|n| n.kind() == "identifier")
+                    else {
+                        continue;
+                    };
+                    if names_it {
+                        exported.insert(text(name, src));
+                    }
+                    if !declarator
+                        .child_by_field_name("value")
+                        .is_some_and(not_value)
+                    {
+                        found.push((text(name, src), declarator.byte_range(), true));
+                    }
+                }
+            }
+            "interface_declaration" | "type_alias_declaration" | "enum_declaration" => {
+                if let Some(name) = node.child_by_field_name("name") {
+                    if names_it {
+                        exported.insert(text(name, src));
+                    }
+                    let value = node.kind() == "enum_declaration";
+                    found.push((text(name, src), node.byte_range(), value));
+                }
+            }
+            _ => {}
+        }
+    }
+    let defined: HashSet<&str> = facts.defs.iter().map(|d| d.name.as_str()).collect();
+    // The first value one, else the first type one: `found` is in source order.
+    let mut kept: HashMap<&str, (Range<usize>, bool)> = HashMap::new();
+    for (name, range, value) in found {
+        if !exported.contains(name) || defined.contains(name) {
+            continue;
+        }
+        let entry = kept.entry(name).or_insert((range.clone(), value));
+        if value && !entry.1 {
+            *entry = (range, value);
+        }
+    }
+    let mut kept: Vec<_> = kept.into_iter().collect();
+    kept.sort_by_key(|(_, (range, _))| range.start);
+    (kept.into_iter())
+        .map(|(name, (range, _))| Declaration {
+            name: name.to_string(),
+            range,
+            hash: String::new(),
+        })
+        .collect()
+}
+
 /// The function written in place as `inline` within `scope`: `Unknown` when `scope` is as deep
 /// as definitions go, since no definition stands behind it.
 fn function(scope: &str, inline: &str) -> Value {
@@ -2921,6 +3017,60 @@ mod tests {
 
     fn parse(src: &str) -> Facts {
         TsJs.parse("a.ts", src.as_bytes()).unwrap()
+    }
+
+    #[test]
+    fn exported_top_level_declarations_are_recorded_once_each() {
+        let src = "export const aPlugin = createX({ id: 'a' });\n\
+                   export type APlugin = typeof aPlugin;\n\
+                   export interface P { a: string }\n\
+                   export interface P { b: string }\n\
+                   export enum S { A = 'a' }\n\
+                   export let l = f();\n\
+                   export const Foo = z.object({});\n\
+                   export type Foo = z.infer<typeof Foo>;\n\
+                   class C {}\n\
+                   export interface C {}\n\
+                   namespace N { export interface X {} }\n\
+                   namespace M { export const z = 1; }\n\
+                   const z = 2;\n\
+                   if (ok) { const y = 1; }\n\
+                   const y = g();\n\
+                   export { y as why };\n\
+                   const hidden = 1;\n\
+                   export const run = () => 1;\n\
+                   export default makeX({});\n";
+        let mut facts = parse(src);
+        crate::lang::hash_spans(&mut facts, src.as_bytes());
+        let got: Vec<_> = (facts.declarations.iter())
+            .map(|d| (d.name.as_str(), &src[d.range.clone()]))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                ("aPlugin", "aPlugin = createX({ id: 'a' })"),
+                ("APlugin", "type APlugin = typeof aPlugin;"),
+                ("P", "interface P { a: string }"),
+                ("S", "enum S { A = 'a' }"),
+                ("Foo", "Foo = z.object({})"),
+                ("y", "y = g()"),
+                ("default", "makeX({})"),
+            ]
+        );
+        assert_eq!(
+            facts.declarations[0].hash,
+            blake3::hash(b"aPlugin = createX({ id: 'a' })")
+                .to_hex()
+                .to_string()
+        );
+        let js = TsJs
+            .parse(
+                "a.js",
+                b"export const a = 1;\nconst z = 3;\nexport default z;\n",
+            )
+            .unwrap();
+        let names: Vec<_> = js.declarations.iter().map(|d| d.name.as_str()).collect();
+        assert_eq!(names, ["a", "z"]);
     }
 
     #[test]
