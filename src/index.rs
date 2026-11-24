@@ -2793,15 +2793,20 @@ fn resolve_file<'a>(
                 def.hash.as_str(),
             ))
         })
-        .chain(facts.declarations.iter().filter_map(|d| {
-            let name = names.def(path, &d.name)?;
-            Some((
-                format!("{identity}::{path}::{name}"),
-                d.range.start as i64,
-                d.range.end as i64,
-                d.hash.as_str(),
-            ))
-        }))
+        // A dropped file keeps no declaration rows: `meada status` names it by having no symbols.
+        .chain(
+            (facts.declarations.iter())
+                .filter(|_| facts.budget.is_none() && facts.usings.is_none() && !facts.misparsed)
+                .filter_map(|d| {
+                    let name = names.def(path, &d.name)?;
+                    Some((
+                        format!("{identity}::{path}::{name}"),
+                        d.range.start as i64,
+                        d.range.end as i64,
+                        d.hash.as_str(),
+                    ))
+                }),
+        )
         .collect();
     let calls = facts
         .calls
