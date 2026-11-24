@@ -372,13 +372,7 @@ impl Ecosystem for Swiftpm {
     /// under `import Kit`, `Greeter.init(name:)` for a construction, `Greeter.hello(to:)` for a
     /// method of a type the source writes for its receiver. The chain ends with the call's
     /// argument labels (`_` for none, `{}` for a trailing closure).
-    fn imports<'a>(
-        &self,
-        code: &Code<'a>,
-        path: &'a str,
-        _index: usize,
-        call: &'a Call,
-    ) -> Vec<(String, String)> {
+    fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
         let callee = call.callee.as_str();
         // `(type or module path, member)`
         let mut found: Vec<(String, String)> = Vec::new();

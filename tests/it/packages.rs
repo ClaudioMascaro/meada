@@ -867,3 +867,71 @@ fn an_exported_value_and_type_of_one_name_keep_their_zod_shapes() {
         ]
     );
 }
+
+const BACKEND_ADD: Option<&str> = Some("https://example.com/pkg/backend-add.git");
+
+#[test]
+fn a_backend_add_of_a_subpath_import_links_through_exports() {
+    let repo = fixture_repo(
+        "packages_backend_add_subpath",
+        "pkg-backend-add",
+        BACKEND_ADD,
+    );
+    let rows = rows_at(
+        &repo,
+        "packages/backend/src/subpath.ts",
+        "@scope/plugin-f/alpha",
+    );
+    let what: Vec<[&str; 4]> = (rows.iter())
+        .map(|r| ["level", "how", "name", "target"].map(|k| r[k].as_str().unwrap_or("")))
+        .collect();
+    assert_eq!(
+        what,
+        [[
+            "exact",
+            "exports",
+            "default",
+            "example.com/pkg/backend-add::plugins/plugin-f/src/alpha.ts::alphaPlugin"
+        ]]
+    );
+}
+
+#[test]
+fn a_backend_made_through_a_namespace_import_links_like_the_named_one() {
+    let repo = fixture_repo(
+        "packages_backend_add_namespace",
+        "pkg-backend-add",
+        BACKEND_ADD,
+    );
+    let at = |file: &str| {
+        rows_at(
+            &repo,
+            &format!("packages/backend/src/{file}"),
+            "@scope/plugin-a",
+        )
+    };
+    assert_eq!(at("index.ts").len(), 1);
+    assert_eq!(at("namespace.ts"), at("index.ts"));
+}
+
+#[test]
+fn the_default_a_backend_adds_is_no_export_door() {
+    let alpha = "example.com/pkg/backend-add::plugins/plugin-f/src/alpha.ts::alphaPlugin";
+    let doors = |repo: &Path| -> Vec<String> {
+        let json: serde_json::Value = serde_json::from_str(&export(repo)).unwrap();
+        (json["processes"].as_array().unwrap().iter())
+            .filter(|p| p["kind"] == "export")
+            .map(|p| p["entry_point"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let added = fixture_repo("packages_backend_add_door", "pkg-backend-add", BACKEND_ADD);
+    assert!(!doors(&added).iter().any(|d| d == alpha));
+    // Without the `add`, nothing imports it: the drop above is what keeps it out.
+    let bare = fixture_repo(
+        "packages_backend_add_no_door",
+        "pkg-backend-add",
+        BACKEND_ADD,
+    );
+    fs::remove_file(bare.join("packages/backend/src/subpath.ts")).unwrap();
+    assert!(doors(&bare).iter().any(|d| d == alpha));
+}
