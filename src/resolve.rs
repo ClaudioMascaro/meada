@@ -1392,8 +1392,11 @@ impl<'a> Resolver<'a> {
         };
         let work = &mut Work::default();
         match (r.kind, r.from.as_deref()) {
-            (Use::Dynamic | Use::Reexport, Some(from)) if bare(from) => {
-                return self.module(path, from).is_none().then_some(None);
+            // A package's specifier; a `paths` alias a file answers goes on like a relative one.
+            (Use::Dynamic | Use::Reexport, Some(from))
+                if bare(from) && self.module(path, from).is_none() =>
+            {
+                return Some(None);
             }
             (Use::Reexport, _) if name == "*" => return None,
             (Use::Reexport, Some(from)) => {
@@ -5704,12 +5707,12 @@ impl<'a> Code<'a> {
         self.resolver.files
     }
 
-    /// The arguments of the call at `index` of `path`, as written.
     /// `Resolver::reference`: what the reference at `index` of `path` names.
     pub fn reference(&self, path: &'a str, index: usize) -> Option<Option<(&'a str, &'a str)>> {
         self.resolver.reference(path, index)
     }
 
+    /// The arguments of the call at `index` of `path`, as written.
     pub fn args(&self, path: &'a str, index: usize) -> Option<&'a [Value]> {
         Some(self.call(path, index)?.args.as_slice())
     }

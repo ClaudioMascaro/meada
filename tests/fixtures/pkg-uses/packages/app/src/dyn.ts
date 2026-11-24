@@ -14,3 +14,7 @@ export async function three(s: string) {
 export async function four() {
   return import('./client').then((m) => m.client);
 }
+
+export async function six() {
+  return [(await import('@scope/a')).X, (await import('@scope/b')).X];
+}

@@ -165,12 +165,17 @@ fn a_use_of_a_value_and_type_name_links_once() {
 #[test]
 fn a_warm_index_keeps_the_use_rows() {
     let repo = uses_repo("uses_warm");
-    let cold = edges(&repo);
+    let cold = (edges(&repo), export(&repo));
     let app = repo.join("packages/app/src/App.tsx");
     let mut src = fs::read_to_string(&app).unwrap();
     src.push_str("// touched\n");
     fs::write(&app, src).unwrap();
-    assert_eq!(edges(&repo), cold);
+    let warm = (edges(&repo), export(&repo));
+    assert_eq!(warm.0, cold.0);
+    // The doors the stored rows keep open, and the package rows (the second hop included).
+    for section in ["processes", "imports"] {
+        assert_eq!(warm.1[section], cold.1[section], "{section}");
+    }
 }
 
 #[test]
@@ -425,4 +430,41 @@ fn a_name_reexported_from_another_package_links_to_the_original() {
             "{specifier}"
         );
     }
+}
+
+#[test]
+fn a_paths_alias_a_file_answers_is_no_package() {
+    let repo = uses_repo("uses_alias");
+    let found = edges(&repo);
+    for (caller, kind) in [
+        ("packages/app/src/alias.ts::five", "dynamic"),
+        ("packages/app/src/alias.ts", "reexport"),
+    ] {
+        let want = (
+            caller.to_string(),
+            kind.to_string(),
+            "packages/app/src/client.ts::client".to_string(),
+            "exact".to_string(),
+        );
+        assert!(found.contains(&want), "{want:?} not in {found:#?}");
+    }
+}
+
+#[test]
+fn one_name_taken_off_two_imports_in_one_scope_keeps_two_rows() {
+    let repo = uses_repo("uses_ordinal");
+    let json = export(&repo);
+    let prefix = format!("{IDENTITY}::packages/app/src/dyn.ts::six::(dynamic)X#");
+    let mut sites: Vec<(String, String)> = (json["imports"].as_array().unwrap().iter())
+        .filter(|i| i["site"].as_str().unwrap().starts_with(&prefix))
+        .map(|i| (text(&i["site"]), text(&i["specifier"])))
+        .collect();
+    sites.sort();
+    let at = |n: usize, s: &str| {
+        (
+            format!("packages/app/src/dyn.ts::six::(dynamic)X#{n}"),
+            s.to_string(),
+        )
+    };
+    assert_eq!(sites, [at(0, "@scope/a"), at(1, "@scope/b")]);
 }
