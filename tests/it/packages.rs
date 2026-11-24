@@ -526,6 +526,94 @@ fn a_backstage_backend_add_of_a_dynamic_import_links_its_default() {
 }
 
 #[test]
+fn an_add_of_a_dynamic_import_on_another_receiver_links_nothing() {
+    let repo = fixture_repo(
+        "packages_backend_add_no_link",
+        "pkg-backend-add",
+        Some("https://example.com/pkg/backend-add.git"),
+    );
+    let json: serde_json::Value = serde_json::from_str(&export(&repo)).unwrap();
+    let sites: Vec<&str> = (json["imports"].as_array().unwrap().iter())
+        .map(|i| i["site"].as_str().unwrap())
+        .collect();
+    // The one backend that does link is in the same package: the case is not vacuous.
+    assert!(
+        sites
+            .iter()
+            .any(|s| s.contains("packages/backend/src/index.ts::"))
+    );
+    let mut leaks = Vec::new();
+    for file in [
+        "wired.ts",
+        "other.ts",
+        "reassigned.ts",
+        "chained.ts",
+        "aliased.ts",
+        "template.ts",
+        "then.ts",
+        "set.ts",
+        "wrapped.ts",
+        "not-one-import.ts",
+    ] {
+        let prefix = format!("example.com/pkg/backend-add::packages/backend/src/{file}::");
+        leaks.extend((sites.iter().filter(|s| s.starts_with(&prefix))).map(|s| s.to_string()));
+    }
+    assert!(leaks.is_empty(), "{leaks:#?}");
+}
+
+#[test]
+fn a_reexported_create_backend_links_like_the_original() {
+    let repo = fixture_repo(
+        "packages_backend_add_reexport",
+        "pkg-backend-add",
+        Some("https://example.com/pkg/backend-add.git"),
+    );
+    let at = |file: &str| {
+        rows_at(
+            &repo,
+            &format!("packages/backend/src/{file}"),
+            "@scope/plugin-a",
+        )
+    };
+    assert_eq!(at("reexported.ts"), at("index.ts"));
+    assert_eq!(at("index.ts").len(), 1);
+}
+
+#[test]
+fn a_warm_index_keeps_the_rows_of_an_unchanged_backend() {
+    let url = Some("https://example.com/pkg/backend-add.git");
+    let imports = |repo: &Path| -> Vec<serde_json::Value> {
+        let json: serde_json::Value = serde_json::from_str(&export(repo)).unwrap();
+        json["imports"].as_array().unwrap().clone()
+    };
+    // Another file of the backend's package changes, so the package is extracted again while
+    // `index.ts` keeps its stored facts, which hold no argument.
+    let touch = |repo: &Path| {
+        let set = repo.join("packages/backend/src/set.ts");
+        let text = fs::read_to_string(&set).unwrap();
+        fs::write(&set, format!("{text}\n")).unwrap();
+    };
+    let warm = fixture_repo("packages_backend_add_warm", "pkg-backend-add", url);
+    age(&warm);
+    let before = imports(&warm);
+    touch(&warm);
+    let after = imports(&warm);
+
+    let cold = fixture_repo("packages_backend_add_cold", "pkg-backend-add", url);
+    touch(&cold);
+
+    assert!((after.iter()).any(|i| {
+        i["site"]
+            .as_str()
+            .unwrap()
+            .contains("backend/src/index.ts::")
+            && i["specifier"] == "@scope/plugin-a"
+    }));
+    assert_eq!(after, before);
+    assert_eq!(after, imports(&cold));
+}
+
+#[test]
 fn a_nested_tsconfig_that_is_invalid_or_leaves_the_repository_maps_nothing() {
     let p = packages("packages_tsconfig_hostile");
     let nested = p.shared.join("sealed/tsconfig.json");
