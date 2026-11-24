@@ -6,5 +6,7 @@ async function handleOrder({ message }: { message: { value: string } }) {
 }
 callers: none
 callees: none
+used by:
+example.com/channels/worker src/consumer.ts:8 start (value)
 contracts:
 example.com/channels/worker src/consumer.ts:11 consumes channel::kafka::orders.created (no provisioner in the workspace)

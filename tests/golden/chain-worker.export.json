@@ -209,19 +209,19 @@
       "name": "src",
       "members": [
         "example.com/chain/worker::src/consumer.ts::consumer",
-        "example.com/chain/worker::src/consumer.ts::start"
+        "example.com/chain/worker::src/consumer.ts::kafka"
       ]
     },
     {
       "name": "src#2",
       "members": [
-        "example.com/chain/worker::src/consumer.ts::kafka"
+        "example.com/chain/worker::src/consumer.ts::onOrderCreated",
+        "example.com/chain/worker::src/consumer.ts::start"
       ]
     },
     {
       "name": "src#3",
       "members": [
-        "example.com/chain/worker::src/consumer.ts::onOrderCreated",
         "example.com/chain/worker::src/jobs.ts::settleOrders",
         "example.com/chain/worker::src/notify.ts::notify"
       ]

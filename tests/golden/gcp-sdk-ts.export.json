@@ -1037,27 +1037,9 @@
     {
       "name": ".",
       "members": [
-        "local/gcp-sdk-ts::send.js::bus"
-      ]
-    },
-    {
-      "name": ".#10",
-      "members": [
-        "local/gcp-sdk-ts::send.ts::secret",
-        "local/gcp-sdk-ts::send.ts::secrets"
-      ]
-    },
-    {
-      "name": ".#11",
-      "members": [
-        "local/gcp-sdk-ts::send.ts::send",
-        "local/gcp-sdk-ts::send.ts::topic"
-      ]
-    },
-    {
-      "name": ".#12",
-      "members": [
-        "local/gcp-sdk-ts::send.ts::storage"
+        "local/gcp-sdk-ts::send.js::bus",
+        "local/gcp-sdk-ts::send.js::send",
+        "local/gcp-sdk-ts::send.js::topic"
       ]
     },
     {
@@ -1073,6 +1055,7 @@
       "members": [
         "local/gcp-sdk-ts::send.js::object",
         "local/gcp-sdk-ts::send.js::read",
+        "local/gcp-sdk-ts::send.js::storage",
         "local/gcp-sdk-ts::send.js::write"
       ]
     },
@@ -1086,24 +1069,13 @@
     {
       "name": ".#5",
       "members": [
-        "local/gcp-sdk-ts::send.js::send",
-        "local/gcp-sdk-ts::send.js::topic"
+        "local/gcp-sdk-ts::send.ts::bus",
+        "local/gcp-sdk-ts::send.ts::send",
+        "local/gcp-sdk-ts::send.ts::topic"
       ]
     },
     {
       "name": ".#6",
-      "members": [
-        "local/gcp-sdk-ts::send.js::storage"
-      ]
-    },
-    {
-      "name": ".#7",
-      "members": [
-        "local/gcp-sdk-ts::send.ts::bus"
-      ]
-    },
-    {
-      "name": ".#8",
       "members": [
         "local/gcp-sdk-ts::send.ts::handle",
         "local/gcp-sdk-ts::send.ts::receive",
@@ -1111,11 +1083,19 @@
       ]
     },
     {
-      "name": ".#9",
+      "name": ".#7",
       "members": [
         "local/gcp-sdk-ts::send.ts::object",
         "local/gcp-sdk-ts::send.ts::read",
+        "local/gcp-sdk-ts::send.ts::storage",
         "local/gcp-sdk-ts::send.ts::write"
+      ]
+    },
+    {
+      "name": ".#8",
+      "members": [
+        "local/gcp-sdk-ts::send.ts::secret",
+        "local/gcp-sdk-ts::send.ts::secrets"
       ]
     }
   ],

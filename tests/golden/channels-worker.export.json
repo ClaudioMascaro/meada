@@ -612,45 +612,30 @@
       "members": [
         "example.com/channels/worker::src/consumer.ts::consumer",
         "example.com/channels/worker::src/consumer.ts::handleOrder",
+        "example.com/channels/worker::src/consumer.ts::kafka",
         "example.com/channels/worker::src/consumer.ts::start"
       ]
     },
     {
       "name": "src#2",
       "members": [
-        "example.com/channels/worker::src/consumer.ts::kafka"
-      ]
-    },
-    {
-      "name": "src#3",
-      "members": [
         "example.com/channels/worker::src/pattern.ts::consumer",
+        "example.com/channels/worker::src/pattern.ts::kafka",
         "example.com/channels/worker::src/pattern.ts::seen",
         "example.com/channels/worker::src/pattern.ts::watchOrders"
       ]
     },
     {
-      "name": "src#4",
-      "members": [
-        "example.com/channels/worker::src/pattern.ts::kafka"
-      ]
-    },
-    {
-      "name": "src#5",
+      "name": "src#3",
       "members": [
         "example.com/channels/worker::src/queues.ts::bind",
         "example.com/channels/worker::src/queues.ts::channel",
+        "example.com/channels/worker::src/queues.ts::connection",
         "example.com/channels/worker::src/queues.ts::lookalikes"
       ]
     },
     {
-      "name": "src#6",
-      "members": [
-        "example.com/channels/worker::src/queues.ts::connection"
-      ]
-    },
-    {
-      "name": "src#7",
+      "name": "src#4",
       "members": [
         "example.com/channels/worker::src/queues.ts::onAudit",
         "example.com/channels/worker::src/queues.ts::onJob",

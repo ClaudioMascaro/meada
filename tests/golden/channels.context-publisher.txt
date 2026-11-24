@@ -14,6 +14,8 @@ example.com/channels/api src/amqp.ts:20 (unresolved) Buffer.from
 example.com/channels/api src/amqp.ts:18 (unresolved) channel.publish
 example.com/channels/api src/amqp.ts:19 (unresolved) channel.publish
 example.com/channels/api src/amqp.ts:20 (unresolved) channel.publish
+uses:
+example.com/channels/api src/amqp.ts:5 channel (member)
 contracts:
 example.com/channels/api src/amqp.ts:18 publishes events order.created
 example.com/channels/api src/amqp.ts:18 produces channel::amqp::audit [exact: channel::amqp::audit binding events order.created]

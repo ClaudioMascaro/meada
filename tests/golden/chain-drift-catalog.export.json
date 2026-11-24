@@ -2123,14 +2123,9 @@
       "name": "app/api/comments",
       "members": [
         "example.com/chain/catalog::app/api/comments/route.ts::GET",
-        "example.com/chain/catalog::lib/schemas.ts::Comments"
-      ]
-    },
-    {
-      "name": "app/api/comments#2",
-      "members": [
         "example.com/chain/catalog::app/api/comments/route.ts::POST",
-        "example.com/chain/catalog::lib/schemas.ts::Comment"
+        "example.com/chain/catalog::lib/schemas.ts::Comment",
+        "example.com/chain/catalog::lib/schemas.ts::Comments"
       ]
     },
     {
@@ -2144,25 +2139,15 @@
       "name": "app/api/labels",
       "members": [
         "example.com/chain/catalog::app/api/labels/route.ts::GET",
+        "example.com/chain/catalog::app/api/labels/route.ts::Labels",
         "example.com/chain/catalog::app/api/labels/route.ts::Reply"
-      ]
-    },
-    {
-      "name": "app/api/labels#2",
-      "members": [
-        "example.com/chain/catalog::app/api/labels/route.ts::Labels"
       ]
     },
     {
       "name": "app/api/profiles",
       "members": [
         "example.com/chain/catalog::app/api/profiles/route.ts::GET",
-        "example.com/chain/catalog::app/api/profiles/route.ts::Page"
-      ]
-    },
-    {
-      "name": "app/api/profiles#2",
-      "members": [
+        "example.com/chain/catalog::app/api/profiles/route.ts::Page",
         "example.com/chain/catalog::app/api/profiles/route.ts::Profile"
       ]
     },
@@ -2209,7 +2194,8 @@
     {
       "name": "packages/contracts/src#3",
       "members": [
-        "example.com/chain/catalog::packages/contracts/src/receipt.ts::Labels"
+        "example.com/chain/catalog::packages/contracts/src/receipt.ts::Labels",
+        "example.com/chain/catalog::packages/contracts/src/receipt.ts::Tagged"
       ]
     },
     {
@@ -2222,12 +2208,6 @@
       "name": "packages/contracts/src#5",
       "members": [
         "example.com/chain/catalog::packages/contracts/src/receipt.ts::Status"
-      ]
-    },
-    {
-      "name": "packages/contracts/src#6",
-      "members": [
-        "example.com/chain/catalog::packages/contracts/src/receipt.ts::Tagged"
       ]
     }
   ],

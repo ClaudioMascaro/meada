@@ -333,25 +333,15 @@
       "name": "src",
       "members": [
         "example.com/xlang-rust/web::src/events.ts::announceShipment",
+        "example.com/xlang-rust/web::src/events.ts::kafka",
         "example.com/xlang-rust/web::src/events.ts::producer"
       ]
     },
     {
       "name": "src#2",
       "members": [
-        "example.com/xlang-rust/web::src/events.ts::kafka"
-      ]
-    },
-    {
-      "name": "src#3",
-      "members": [
         "example.com/xlang-rust/web::src/orders.ts::API",
-        "example.com/xlang-rust/web::src/orders.ts::orderStatus"
-      ]
-    },
-    {
-      "name": "src#4",
-      "members": [
+        "example.com/xlang-rust/web::src/orders.ts::orderStatus",
         "example.com/xlang-rust/web::src/orders.ts::reserveOrder",
         "example.com/xlang-rust/web::src/sync.ts::syncOrders"
       ]

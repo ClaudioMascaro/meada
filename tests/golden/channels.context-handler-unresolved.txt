@@ -1,10 +1,12 @@
 example.com/channels/worker src/pattern.ts:12-14 seen
-community: src#3
+community: src#2
 processes: 1 (1 channel; 1 repository): channel::kafka (unresolved) (example.com/channels/worker)
 async function seen({ message }: { message: { value: string } }) {
   return message.value;
 }
 callers: none
 callees: none
+used by:
+example.com/channels/worker src/pattern.ts:9 watchOrders (value)
 contracts:
 example.com/channels/worker src/pattern.ts:12 consumes channel::kafka (unresolved)

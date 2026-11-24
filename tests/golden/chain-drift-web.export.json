@@ -4302,34 +4302,20 @@
     {
       "name": "src#10",
       "members": [
-        "example.com/chain/web::src/shared.ts::CATALOG",
-        "example.com/chain/web::src/shared.ts::annotated",
-        "example.com/chain/web::src/shared.ts::inferred",
-        "example.com/chain/web::src/shared.ts::offer",
-        "example.com/chain/web::src/shared.ts::quote",
-        "example.com/chain/web::src/shared.ts::receipt",
-        "example.com/chain/web::src/shared.ts::status",
-        "example.com/chain/web::src/shared.ts::tags",
-        "example.com/chain/web::src/shared.ts::ticket"
-      ]
-    },
-    {
-      "name": "src#11",
-      "members": [
         "example.com/chain/web::src/shared.ts::GATEWAY",
         "example.com/chain/web::src/shared.ts::shelf",
         "example.com/chain/web::src/shared.ts::shelves"
       ]
     },
     {
-      "name": "src#12",
+      "name": "src#11",
       "members": [
         "example.com/chain/web::src/shipments.ts::BASE",
         "example.com/chain/web::src/shipments.ts::shipment"
       ]
     },
     {
-      "name": "src#13",
+      "name": "src#12",
       "members": [
         "example.com/chain/web::src/stock.ts::CATALOG",
         "example.com/chain/web::src/stock.ts::cached",
@@ -4340,7 +4326,7 @@
       ]
     },
     {
-      "name": "src#14",
+      "name": "src#13",
       "members": [
         "example.com/chain/web::src/stock.ts::GATEWAY",
         "example.com/chain/web::src/stock.ts::image",
@@ -4386,6 +4372,23 @@
     {
       "name": "src#4",
       "members": [
+        "example.com/chain/web::src/api/types.ts::Entity",
+        "example.com/chain/web::src/declared.ts::CATALOG",
+        "example.com/chain/web::src/declared.ts::Maybe",
+        "example.com/chain/web::src/declared.ts::Page",
+        "example.com/chain/web::src/declared.ts::Pages",
+        "example.com/chain/web::src/declared.ts::Profile",
+        "example.com/chain/web::src/declared.ts::Ranked",
+        "example.com/chain/web::src/declared.ts::cast",
+        "example.com/chain/web::src/declared.ts::foreign",
+        "example.com/chain/web::src/declared.ts::pages",
+        "example.com/chain/web::src/declared.ts::plain",
+        "example.com/chain/web::src/declared.ts::ranked"
+      ]
+    },
+    {
+      "name": "src#5",
+      "members": [
         "example.com/chain/web::src/batches.ts::CATALOG",
         "example.com/chain/web::src/batches.ts::handed",
         "example.com/chain/web::src/batches.ts::ids",
@@ -4397,7 +4400,7 @@
       ]
     },
     {
-      "name": "src#5",
+      "name": "src#6",
       "members": [
         "example.com/chain/web::src/comments.ts::CATALOG",
         "example.com/chain/web::src/comments.ts::comments",
@@ -4406,28 +4409,7 @@
       ]
     },
     {
-      "name": "src#6",
-      "members": [
-        "example.com/chain/web::src/declared.ts::CATALOG",
-        "example.com/chain/web::src/declared.ts::Maybe",
-        "example.com/chain/web::src/declared.ts::Page",
-        "example.com/chain/web::src/declared.ts::Pages",
-        "example.com/chain/web::src/declared.ts::Ranked",
-        "example.com/chain/web::src/declared.ts::cast",
-        "example.com/chain/web::src/declared.ts::foreign",
-        "example.com/chain/web::src/declared.ts::pages",
-        "example.com/chain/web::src/declared.ts::plain",
-        "example.com/chain/web::src/declared.ts::ranked"
-      ]
-    },
-    {
       "name": "src#7",
-      "members": [
-        "example.com/chain/web::src/declared.ts::Profile"
-      ]
-    },
-    {
-      "name": "src#8",
       "members": [
         "example.com/chain/web::src/drift.ts::BASE",
         "example.com/chain/web::src/drift.ts::firstOrderId",
@@ -4438,16 +4420,24 @@
       ]
     },
     {
-      "name": "src#9",
+      "name": "src#8",
       "members": [
         "example.com/chain/web::src/labels.ts::CATALOG",
         "example.com/chain/web::src/labels.ts::labels"
       ]
     },
     {
-      "name": "src/api",
+      "name": "src#9",
       "members": [
-        "example.com/chain/web::src/api/types.ts::Entity"
+        "example.com/chain/web::src/shared.ts::CATALOG",
+        "example.com/chain/web::src/shared.ts::annotated",
+        "example.com/chain/web::src/shared.ts::inferred",
+        "example.com/chain/web::src/shared.ts::offer",
+        "example.com/chain/web::src/shared.ts::quote",
+        "example.com/chain/web::src/shared.ts::receipt",
+        "example.com/chain/web::src/shared.ts::status",
+        "example.com/chain/web::src/shared.ts::tags",
+        "example.com/chain/web::src/shared.ts::ticket"
       ]
     }
   ],

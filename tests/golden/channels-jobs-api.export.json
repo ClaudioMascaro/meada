@@ -422,39 +422,34 @@
     {
       "name": "src",
       "members": [
-        "example.com/jobs/api::src/bullmq.ts::QUEUE"
-      ]
-    },
-    {
-      "name": "src#2",
-      "members": [
+        "example.com/jobs/api::src/bullmq.ts::QUEUE",
         "example.com/jobs/api::src/bullmq.ts::emails",
         "example.com/jobs/api::src/bullmq.ts::sendWelcome"
       ]
     },
     {
-      "name": "src#3",
+      "name": "src#2",
       "members": [
         "example.com/jobs/api::src/bullmq.ts::enqueue",
         "example.com/jobs/api::src/bullmq.ts::sendInvoice"
       ]
     },
     {
-      "name": "src#4",
+      "name": "src#3",
       "members": [
         "example.com/jobs/api::src/bullmq.ts::remember",
         "example.com/jobs/api::src/bullmq.ts::seen"
       ]
     },
     {
-      "name": "src#5",
+      "name": "src#4",
       "members": [
         "example.com/jobs/api::src/bullmq.ts::reports",
         "example.com/jobs/api::src/bullmq.ts::requestReport"
       ]
     },
     {
-      "name": "src#6",
+      "name": "src#5",
       "members": [
         "example.com/jobs/api::src/ioredis.ts::appendOrder",
         "example.com/jobs/api::src/ioredis.ts::appendRefund",
@@ -462,7 +457,7 @@
       ]
     },
     {
-      "name": "src#7",
+      "name": "src#6",
       "members": [
         "example.com/jobs/api::src/noderedis.ts::appendShipment",
         "example.com/jobs/api::src/noderedis.ts::client"

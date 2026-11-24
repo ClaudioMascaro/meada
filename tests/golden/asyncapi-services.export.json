@@ -430,6 +430,7 @@
       "name": "src",
       "members": [
         "example.com/asyncapi/services::src/kafka.ts::consumer",
+        "example.com/asyncapi/services::src/kafka.ts::kafka",
         "example.com/asyncapi/services::src/kafka.ts::listen",
         "example.com/asyncapi/services::src/kafka.ts::onOrder"
       ]
@@ -437,32 +438,21 @@
     {
       "name": "src#2",
       "members": [
-        "example.com/asyncapi/services::src/kafka.ts::kafka"
-      ]
-    },
-    {
-      "name": "src#3",
-      "members": [
         "example.com/asyncapi/services::src/kafka.ts::producer",
         "example.com/asyncapi/services::src/kafka.ts::requestPayment"
       ]
     },
     {
-      "name": "src#4",
+      "name": "src#3",
       "members": [
         "example.com/asyncapi/services::src/queues.ts::cancel",
         "example.com/asyncapi/services::src/queues.ts::channel",
+        "example.com/asyncapi/services::src/queues.ts::connection",
         "example.com/asyncapi/services::src/queues.ts::ship"
       ]
     },
     {
-      "name": "src#5",
-      "members": [
-        "example.com/asyncapi/services::src/queues.ts::connection"
-      ]
-    },
-    {
-      "name": "src#6",
+      "name": "src#4",
       "members": [
         "example.com/asyncapi/services::src/queues.ts::onInvoice",
         "example.com/asyncapi/services::src/queues.ts::work"

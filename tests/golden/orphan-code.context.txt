@@ -11,5 +11,7 @@ callers: none
 callees:
 example.com/orphan/app app.ts:10 (unresolved) SendMessageCommand
 example.com/orphan/app app.ts:10 (unresolved) client.send
+uses:
+example.com/orphan/app app.ts:3 client (member)
 contracts:
 example.com/orphan/app app.ts:10 produces channel::sqs::unmanaged (no provisioner in the workspace)

@@ -714,29 +714,24 @@
       "name": "src#3",
       "members": [
         "example.com/chain/gateway::src/events.ts::publish",
+        "example.com/chain/gateway::src/kafka.ts::kafka",
         "example.com/chain/gateway::src/kafka.ts::producer"
       ]
     },
     {
       "name": "src#4",
       "members": [
-        "example.com/chain/gateway::src/kafka.ts::kafka"
+        "example.com/chain/gateway::src/orders.ts::cancelOrder"
       ]
     },
     {
       "name": "src#5",
       "members": [
-        "example.com/chain/gateway::src/orders.ts::cancelOrder"
-      ]
-    },
-    {
-      "name": "src#6",
-      "members": [
         "example.com/chain/gateway::src/routes.ts::api"
       ]
     },
     {
-      "name": "src#7",
+      "name": "src#6",
       "members": [
         "example.com/chain/gateway::src/server.ts::app"
       ]

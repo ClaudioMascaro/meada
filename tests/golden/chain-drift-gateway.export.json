@@ -1289,8 +1289,6 @@
       "members": [
         "example.com/chain/gateway::src/checkout.ts::Request",
         "example.com/chain/gateway::src/checkout.ts::createOrder",
-        "example.com/chain/gateway::src/events.ts::publish",
-        "example.com/chain/gateway::src/kafka.ts::producer",
         "example.com/chain/gateway::src/topics.ts::ORDERS_CREATED"
       ]
     },
@@ -1306,7 +1304,9 @@
     {
       "name": "src#4",
       "members": [
-        "example.com/chain/gateway::src/kafka.ts::kafka"
+        "example.com/chain/gateway::src/events.ts::publish",
+        "example.com/chain/gateway::src/kafka.ts::kafka",
+        "example.com/chain/gateway::src/kafka.ts::producer"
       ]
     },
     {

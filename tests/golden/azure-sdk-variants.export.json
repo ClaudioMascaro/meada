@@ -6083,6 +6083,10 @@
         "local/azure-sdk-variants::worker.js::blob",
         "local/azure-sdk-variants::worker.js::readBuffer",
         "local/azure-sdk-variants::worker.js::readFile",
+        "local/azure-sdk-variants::worker.js::repeatReads",
+        "local/azure-sdk-variants::worker.js::secret",
+        "local/azure-sdk-variants::worker.js::secrets",
+        "local/azure-sdk-variants::worker.js::structuredSecret",
         "local/azure-sdk-variants::worker.js::write",
         "local/azure-sdk-variants::worker.js::writeData",
         "local/azure-sdk-variants::worker.js::writeFile",
@@ -6092,82 +6096,32 @@
     {
       "name": ".#10",
       "members": [
-        "local/azure-sdk-variants::worker.ts::blob",
-        "local/azure-sdk-variants::worker.ts::readBuffer",
-        "local/azure-sdk-variants::worker.ts::readFile",
-        "local/azure-sdk-variants::worker.ts::write",
-        "local/azure-sdk-variants::worker.ts::writeData",
-        "local/azure-sdk-variants::worker.ts::writeFile",
-        "local/azure-sdk-variants::worker.ts::writeStream"
+        "local/azure-sdk-variants::worker.ts::container",
+        "local/azure-sdk-variants::worker.ts::read",
+        "local/azure-sdk-variants::worker.ts::storage",
+        "local/azure-sdk-variants::worker.ts::structuredBlob"
       ]
     },
     {
       "name": ".#11",
-      "members": [
-        "local/azure-sdk-variants::worker.ts::bus",
-        "local/azure-sdk-variants::worker.ts::structuredQueue",
-        "local/azure-sdk-variants::worker.ts::structuredSub",
-        "local/azure-sdk-variants::worker.ts::wrongService"
-      ]
-    },
-    {
-      "name": ".#12",
-      "members": [
-        "local/azure-sdk-variants::worker.ts::consumer",
-        "local/azure-sdk-variants::worker.ts::handler",
-        "local/azure-sdk-variants::worker.ts::receiveEvents",
-        "local/azure-sdk-variants::worker.ts::subscribe",
-        "local/azure-sdk-variants::worker.ts::subscription"
-      ]
-    },
-    {
-      "name": ".#13",
-      "members": [
-        "local/azure-sdk-variants::worker.ts::container",
-        "local/azure-sdk-variants::worker.ts::read"
-      ]
-    },
-    {
-      "name": ".#14",
       "members": [
         "local/azure-sdk-variants::worker.ts::producer",
         "local/azure-sdk-variants::worker.ts::sendEvents"
       ]
     },
     {
-      "name": ".#15",
+      "name": ".#12",
       "members": [
         "local/azure-sdk-variants::worker.ts::receive",
         "local/azure-sdk-variants::worker.ts::receiver"
       ]
     },
     {
-      "name": ".#16",
-      "members": [
-        "local/azure-sdk-variants::worker.ts::repeatReads",
-        "local/azure-sdk-variants::worker.ts::secret",
-        "local/azure-sdk-variants::worker.ts::secrets",
-        "local/azure-sdk-variants::worker.ts::structuredSecret"
-      ]
-    },
-    {
-      "name": ".#17",
-      "members": [
-        "local/azure-sdk-variants::worker.ts::send",
-        "local/azure-sdk-variants::worker.ts::sender"
-      ]
-    },
-    {
-      "name": ".#18",
-      "members": [
-        "local/azure-sdk-variants::worker.ts::storage",
-        "local/azure-sdk-variants::worker.ts::structuredBlob"
-      ]
-    },
-    {
       "name": ".#2",
       "members": [
         "local/azure-sdk-variants::worker.js::bus",
+        "local/azure-sdk-variants::worker.js::send",
+        "local/azure-sdk-variants::worker.js::sender",
         "local/azure-sdk-variants::worker.js::structuredQueue",
         "local/azure-sdk-variants::worker.js::structuredSub",
         "local/azure-sdk-variants::worker.js::wrongService"
@@ -6187,7 +6141,9 @@
       "name": ".#4",
       "members": [
         "local/azure-sdk-variants::worker.js::container",
-        "local/azure-sdk-variants::worker.js::read"
+        "local/azure-sdk-variants::worker.js::read",
+        "local/azure-sdk-variants::worker.js::storage",
+        "local/azure-sdk-variants::worker.js::structuredBlob"
       ]
     },
     {
@@ -6207,24 +6163,38 @@
     {
       "name": ".#7",
       "members": [
-        "local/azure-sdk-variants::worker.js::repeatReads",
-        "local/azure-sdk-variants::worker.js::secret",
-        "local/azure-sdk-variants::worker.js::secrets",
-        "local/azure-sdk-variants::worker.js::structuredSecret"
+        "local/azure-sdk-variants::worker.ts::blob",
+        "local/azure-sdk-variants::worker.ts::readBuffer",
+        "local/azure-sdk-variants::worker.ts::readFile",
+        "local/azure-sdk-variants::worker.ts::repeatReads",
+        "local/azure-sdk-variants::worker.ts::secret",
+        "local/azure-sdk-variants::worker.ts::secrets",
+        "local/azure-sdk-variants::worker.ts::structuredSecret",
+        "local/azure-sdk-variants::worker.ts::write",
+        "local/azure-sdk-variants::worker.ts::writeData",
+        "local/azure-sdk-variants::worker.ts::writeFile",
+        "local/azure-sdk-variants::worker.ts::writeStream"
       ]
     },
     {
       "name": ".#8",
       "members": [
-        "local/azure-sdk-variants::worker.js::send",
-        "local/azure-sdk-variants::worker.js::sender"
+        "local/azure-sdk-variants::worker.ts::bus",
+        "local/azure-sdk-variants::worker.ts::send",
+        "local/azure-sdk-variants::worker.ts::sender",
+        "local/azure-sdk-variants::worker.ts::structuredQueue",
+        "local/azure-sdk-variants::worker.ts::structuredSub",
+        "local/azure-sdk-variants::worker.ts::wrongService"
       ]
     },
     {
       "name": ".#9",
       "members": [
-        "local/azure-sdk-variants::worker.js::storage",
-        "local/azure-sdk-variants::worker.js::structuredBlob"
+        "local/azure-sdk-variants::worker.ts::consumer",
+        "local/azure-sdk-variants::worker.ts::handler",
+        "local/azure-sdk-variants::worker.ts::receiveEvents",
+        "local/azure-sdk-variants::worker.ts::subscribe",
+        "local/azure-sdk-variants::worker.ts::subscription"
       ]
     }
   ],

@@ -885,130 +885,70 @@
       "name": ".",
       "members": [
         "local/gcp-sdk-memo-mutations::scene.js::after",
+        "local/gcp-sdk-memo-mutations::scene.js::before",
+        "local/gcp-sdk-memo-mutations::scene.js::first",
+        "local/gcp-sdk-memo-mutations::scene.js::make",
+        "local/gcp-sdk-memo-mutations::scene.js::options",
         "local/gcp-sdk-memo-mutations::scene.js::second"
-      ]
-    },
-    {
-      "name": ".#10",
-      "members": [
-        "local/gcp-sdk-memo-mutations::scene.js::options"
-      ]
-    },
-    {
-      "name": ".#11",
-      "members": [
-        "local/gcp-sdk-memo-mutations::scene.ts::after",
-        "local/gcp-sdk-memo-mutations::scene.ts::second"
-      ]
-    },
-    {
-      "name": ".#12",
-      "members": [
-        "local/gcp-sdk-memo-mutations::scene.ts::before",
-        "local/gcp-sdk-memo-mutations::scene.ts::first"
-      ]
-    },
-    {
-      "name": ".#13",
-      "members": [
-        "local/gcp-sdk-memo-mutations::scene.ts::defaultChanged",
-        "local/gcp-sdk-memo-mutations::scene.ts::omitted"
-      ]
-    },
-    {
-      "name": ".#14",
-      "members": [
-        "local/gcp-sdk-memo-mutations::scene.ts::earlier",
-        "local/gcp-sdk-memo-mutations::scene.ts::inlineBefore"
-      ]
-    },
-    {
-      "name": ".#15",
-      "members": [
-        "local/gcp-sdk-memo-mutations::scene.ts::inline",
-        "local/gcp-sdk-memo-mutations::scene.ts::inlineChanged"
-      ]
-    },
-    {
-      "name": ".#16",
-      "members": [
-        "local/gcp-sdk-memo-mutations::scene.ts::make"
-      ]
-    },
-    {
-      "name": ".#17",
-      "members": [
-        "local/gcp-sdk-memo-mutations::scene.ts::makeBefore"
-      ]
-    },
-    {
-      "name": ".#18",
-      "members": [
-        "local/gcp-sdk-memo-mutations::scene.ts::makeDefault"
-      ]
-    },
-    {
-      "name": ".#19",
-      "members": [
-        "local/gcp-sdk-memo-mutations::scene.ts::makeInline"
       ]
     },
     {
       "name": ".#2",
       "members": [
-        "local/gcp-sdk-memo-mutations::scene.js::before",
-        "local/gcp-sdk-memo-mutations::scene.js::first"
-      ]
-    },
-    {
-      "name": ".#20",
-      "members": [
-        "local/gcp-sdk-memo-mutations::scene.ts::options"
+        "local/gcp-sdk-memo-mutations::scene.js::defaultChanged",
+        "local/gcp-sdk-memo-mutations::scene.js::makeDefault",
+        "local/gcp-sdk-memo-mutations::scene.js::omitted"
       ]
     },
     {
       "name": ".#3",
       "members": [
-        "local/gcp-sdk-memo-mutations::scene.js::defaultChanged",
-        "local/gcp-sdk-memo-mutations::scene.js::omitted"
+        "local/gcp-sdk-memo-mutations::scene.js::earlier",
+        "local/gcp-sdk-memo-mutations::scene.js::inlineBefore",
+        "local/gcp-sdk-memo-mutations::scene.js::makeBefore"
       ]
     },
     {
       "name": ".#4",
       "members": [
-        "local/gcp-sdk-memo-mutations::scene.js::earlier",
-        "local/gcp-sdk-memo-mutations::scene.js::inlineBefore"
+        "local/gcp-sdk-memo-mutations::scene.js::inline",
+        "local/gcp-sdk-memo-mutations::scene.js::inlineChanged",
+        "local/gcp-sdk-memo-mutations::scene.js::makeInline"
       ]
     },
     {
       "name": ".#5",
       "members": [
-        "local/gcp-sdk-memo-mutations::scene.js::inline",
-        "local/gcp-sdk-memo-mutations::scene.js::inlineChanged"
+        "local/gcp-sdk-memo-mutations::scene.ts::after",
+        "local/gcp-sdk-memo-mutations::scene.ts::before",
+        "local/gcp-sdk-memo-mutations::scene.ts::first",
+        "local/gcp-sdk-memo-mutations::scene.ts::make",
+        "local/gcp-sdk-memo-mutations::scene.ts::options",
+        "local/gcp-sdk-memo-mutations::scene.ts::second"
       ]
     },
     {
       "name": ".#6",
       "members": [
-        "local/gcp-sdk-memo-mutations::scene.js::make"
+        "local/gcp-sdk-memo-mutations::scene.ts::defaultChanged",
+        "local/gcp-sdk-memo-mutations::scene.ts::makeDefault",
+        "local/gcp-sdk-memo-mutations::scene.ts::omitted"
       ]
     },
     {
       "name": ".#7",
       "members": [
-        "local/gcp-sdk-memo-mutations::scene.js::makeBefore"
+        "local/gcp-sdk-memo-mutations::scene.ts::earlier",
+        "local/gcp-sdk-memo-mutations::scene.ts::inlineBefore",
+        "local/gcp-sdk-memo-mutations::scene.ts::makeBefore"
       ]
     },
     {
       "name": ".#8",
       "members": [
-        "local/gcp-sdk-memo-mutations::scene.js::makeDefault"
-      ]
-    },
-    {
-      "name": ".#9",
-      "members": [
-        "local/gcp-sdk-memo-mutations::scene.js::makeInline"
+        "local/gcp-sdk-memo-mutations::scene.ts::inline",
+        "local/gcp-sdk-memo-mutations::scene.ts::inlineChanged",
+        "local/gcp-sdk-memo-mutations::scene.ts::makeInline"
       ]
     }
   ],

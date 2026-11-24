@@ -1456,77 +1456,39 @@
       "name": ".",
       "members": [
         "local/azure-sdk-ts::worker.js::blob",
+        "local/azure-sdk-ts::worker.js::container",
+        "local/azure-sdk-ts::worker.js::read",
+        "local/azure-sdk-ts::worker.js::storage",
         "local/azure-sdk-ts::worker.js::write"
       ]
     },
     {
       "name": ".#10",
       "members": [
-        "local/azure-sdk-ts::worker.ts::blob",
-        "local/azure-sdk-ts::worker.ts::write"
-      ]
-    },
-    {
-      "name": ".#11",
-      "members": [
-        "local/azure-sdk-ts::worker.ts::bus"
-      ]
-    },
-    {
-      "name": ".#12",
-      "members": [
-        "local/azure-sdk-ts::worker.ts::consumer",
-        "local/azure-sdk-ts::worker.ts::handler",
-        "local/azure-sdk-ts::worker.ts::receiveEvents",
-        "local/azure-sdk-ts::worker.ts::subscribe",
-        "local/azure-sdk-ts::worker.ts::subscription"
-      ]
-    },
-    {
-      "name": ".#13",
-      "members": [
-        "local/azure-sdk-ts::worker.ts::container",
-        "local/azure-sdk-ts::worker.ts::read"
-      ]
-    },
-    {
-      "name": ".#14",
-      "members": [
         "local/azure-sdk-ts::worker.ts::producer",
         "local/azure-sdk-ts::worker.ts::sendEvents"
       ]
     },
     {
-      "name": ".#15",
+      "name": ".#11",
       "members": [
         "local/azure-sdk-ts::worker.ts::receive",
         "local/azure-sdk-ts::worker.ts::receiver"
       ]
     },
     {
-      "name": ".#16",
+      "name": ".#12",
       "members": [
         "local/azure-sdk-ts::worker.ts::secret",
         "local/azure-sdk-ts::worker.ts::secrets"
       ]
     },
     {
-      "name": ".#17",
-      "members": [
-        "local/azure-sdk-ts::worker.ts::send",
-        "local/azure-sdk-ts::worker.ts::sender"
-      ]
-    },
-    {
-      "name": ".#18",
-      "members": [
-        "local/azure-sdk-ts::worker.ts::storage"
-      ]
-    },
-    {
       "name": ".#2",
       "members": [
-        "local/azure-sdk-ts::worker.js::bus"
+        "local/azure-sdk-ts::worker.js::bus",
+        "local/azure-sdk-ts::worker.js::send",
+        "local/azure-sdk-ts::worker.js::sender"
       ]
     },
     {
@@ -1542,42 +1504,50 @@
     {
       "name": ".#4",
       "members": [
-        "local/azure-sdk-ts::worker.js::container",
-        "local/azure-sdk-ts::worker.js::read"
-      ]
-    },
-    {
-      "name": ".#5",
-      "members": [
         "local/azure-sdk-ts::worker.js::producer",
         "local/azure-sdk-ts::worker.js::sendEvents"
       ]
     },
     {
-      "name": ".#6",
+      "name": ".#5",
       "members": [
         "local/azure-sdk-ts::worker.js::receive",
         "local/azure-sdk-ts::worker.js::receiver"
       ]
     },
     {
-      "name": ".#7",
+      "name": ".#6",
       "members": [
         "local/azure-sdk-ts::worker.js::secret",
         "local/azure-sdk-ts::worker.js::secrets"
       ]
     },
     {
+      "name": ".#7",
+      "members": [
+        "local/azure-sdk-ts::worker.ts::blob",
+        "local/azure-sdk-ts::worker.ts::container",
+        "local/azure-sdk-ts::worker.ts::read",
+        "local/azure-sdk-ts::worker.ts::storage",
+        "local/azure-sdk-ts::worker.ts::write"
+      ]
+    },
+    {
       "name": ".#8",
       "members": [
-        "local/azure-sdk-ts::worker.js::send",
-        "local/azure-sdk-ts::worker.js::sender"
+        "local/azure-sdk-ts::worker.ts::bus",
+        "local/azure-sdk-ts::worker.ts::send",
+        "local/azure-sdk-ts::worker.ts::sender"
       ]
     },
     {
       "name": ".#9",
       "members": [
-        "local/azure-sdk-ts::worker.js::storage"
+        "local/azure-sdk-ts::worker.ts::consumer",
+        "local/azure-sdk-ts::worker.ts::handler",
+        "local/azure-sdk-ts::worker.ts::receiveEvents",
+        "local/azure-sdk-ts::worker.ts::subscribe",
+        "local/azure-sdk-ts::worker.ts::subscription"
       ]
     }
   ],

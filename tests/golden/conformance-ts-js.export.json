@@ -5004,44 +5004,21 @@
     {
       "name": "src/messages",
       "members": [
-        "example.com/acme/conformance::src/messages/bullmq.ts::JOBS"
+        "example.com/acme/conformance::src/messages/bullmq.ts::JOBS",
+        "example.com/acme/conformance::src/messages/bullmq.ts::REGION",
+        "example.com/acme/conformance::src/messages/bullmq.ts::dynamic",
+        "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
+        "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
+        "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice",
+        "example.com/acme/conformance::src/messages/bullmq.ts::fake",
+        "example.com/acme/conformance::src/messages/bullmq.ts::jobs",
+        "example.com/acme/conformance::src/messages/bullmq.ts::mail",
+        "example.com/acme/conformance::src/messages/bullmq.ts::seen",
+        "example.com/acme/conformance::src/messages/bullmq.ts::startMail"
       ]
     },
     {
       "name": "src/messages#10",
-      "members": [
-        "example.com/acme/conformance::src/messages/consume.ts::listen",
-        "example.com/acme/conformance::src/messages/consume.ts::listenRetries",
-        "example.com/acme/conformance::src/messages/kafka.ts::retrier"
-      ]
-    },
-    {
-      "name": "src/messages#11",
-      "members": [
-        "example.com/acme/conformance::src/messages/kafka.ts::kafka"
-      ]
-    },
-    {
-      "name": "src/messages#12",
-      "members": [
-        "example.com/acme/conformance::src/messages/kafka.ts::other"
-      ]
-    },
-    {
-      "name": "src/messages#13",
-      "members": [
-        "example.com/acme/conformance::src/messages/nats.ts::REGION",
-        "example.com/acme/conformance::src/messages/nats.ts::nc",
-        "example.com/acme/conformance::src/messages/nats.ts::onAudit",
-        "example.com/acme/conformance::src/messages/nats.ts::other",
-        "example.com/acme/conformance::src/messages/nats.ts::publishAll",
-        "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
-        "example.com/acme/conformance::src/messages/nats.ts::subscribeOne",
-        "example.com/acme/conformance::src/messages/nats.ts::subscribeRest"
-      ]
-    },
-    {
-      "name": "src/messages#14",
       "members": [
         "example.com/acme/conformance::src/messages/nats.ts::bus",
         "example.com/acme/conformance::src/messages/nats.ts::bus.publish",
@@ -5050,21 +5027,16 @@
       ]
     },
     {
-      "name": "src/messages#15",
+      "name": "src/messages#11",
       "members": [
         "example.com/acme/conformance::src/messages/nats.ts::record",
         "example.com/acme/conformance::src/messages/nats.ts::subscribeRest.nats jobs.>"
       ]
     },
     {
-      "name": "src/messages#16",
+      "name": "src/messages#12",
       "members": [
-        "example.com/acme/conformance::src/messages/produce.ts::fake"
-      ]
-    },
-    {
-      "name": "src/messages#17",
-      "members": [
+        "example.com/acme/conformance::src/messages/produce.ts::fake",
         "example.com/acme/conformance::src/messages/produce.ts::fakeProducer",
         "example.com/acme/conformance::src/messages/produce.ts::notProduced",
         "example.com/acme/conformance::src/messages/produce.ts::transport",
@@ -5072,27 +5044,14 @@
       ]
     },
     {
-      "name": "src/messages#18",
+      "name": "src/messages#13",
       "members": [
         "example.com/acme/conformance::src/messages/queues.ts::record",
         "example.com/acme/conformance::src/messages/queues.ts::work.amqp tasks"
       ]
     },
     {
-      "name": "src/messages#19",
-      "members": [
-        "example.com/acme/conformance::src/messages/rabbit.ts::connection"
-      ]
-    },
-    {
-      "name": "src/messages#2",
-      "members": [
-        "example.com/acme/conformance::src/messages/bullmq.ts::REGION",
-        "example.com/acme/conformance::src/messages/bullmq.ts::startMail"
-      ]
-    },
-    {
-      "name": "src/messages#20",
+      "name": "src/messages#14",
       "members": [
         "example.com/acme/conformance::src/messages/redis.ts::PREFIX",
         "example.com/acme/conformance::src/messages/redis.ts::append",
@@ -5106,7 +5065,7 @@
       ]
     },
     {
-      "name": "src/messages#21",
+      "name": "src/messages#15",
       "members": [
         "example.com/acme/conformance::src/messages/redis.ts::appendNodeRedis",
         "example.com/acme/conformance::src/messages/redis.ts::client",
@@ -5118,14 +5077,14 @@
       ]
     },
     {
-      "name": "src/messages#22",
+      "name": "src/messages#16",
       "members": [
         "example.com/acme/conformance::src/messages/redis.ts::fake",
         "example.com/acme/conformance::src/messages/redis.ts::notRedis"
       ]
     },
     {
-      "name": "src/messages#23",
+      "name": "src/messages#17",
       "members": [
         "example.com/acme/conformance::src/messages/sqs.ts::JOBS",
         "example.com/acme/conformance::src/messages/sqs.ts::REGION_URL",
@@ -5143,27 +5102,14 @@
       ]
     },
     {
-      "name": "src/messages#24",
+      "name": "src/messages#18",
       "members": [
         "example.com/acme/conformance::src/messages/sqs.ts::consumeMail.sqs mail",
         "example.com/acme/conformance::src/messages/sqs.ts::record"
       ]
     },
     {
-      "name": "src/messages#3",
-      "members": [
-        "example.com/acme/conformance::src/messages/bullmq.ts::dynamic",
-        "example.com/acme/conformance::src/messages/bullmq.ts::enqueue",
-        "example.com/acme/conformance::src/messages/bullmq.ts::enqueueAll",
-        "example.com/acme/conformance::src/messages/bullmq.ts::enqueueTwice",
-        "example.com/acme/conformance::src/messages/bullmq.ts::fake",
-        "example.com/acme/conformance::src/messages/bullmq.ts::jobs",
-        "example.com/acme/conformance::src/messages/bullmq.ts::mail",
-        "example.com/acme/conformance::src/messages/bullmq.ts::seen"
-      ]
-    },
-    {
-      "name": "src/messages#4",
+      "name": "src/messages#2",
       "members": [
         "example.com/acme/conformance::src/messages/bullmq.ts::notBullmq",
         "example.com/acme/conformance::src/messages/bullmq.ts::runJob",
@@ -5172,17 +5118,18 @@
       ]
     },
     {
-      "name": "src/messages#5",
+      "name": "src/messages#3",
       "members": [
         "example.com/acme/conformance::src/messages/bullmq.ts::record",
         "example.com/acme/conformance::src/messages/bullmq.ts::startMail.bullmq mail-eu"
       ]
     },
     {
-      "name": "src/messages#6",
+      "name": "src/messages#4",
       "members": [
         "example.com/acme/conformance::src/messages/consume.ts::consumeOrders",
         "example.com/acme/conformance::src/messages/kafka.ts::consumer",
+        "example.com/acme/conformance::src/messages/kafka.ts::kafka",
         "example.com/acme/conformance::src/messages/kafka.ts::producer",
         "example.com/acme/conformance::src/messages/produce.ts::deliver",
         "example.com/acme/conformance::src/messages/produce.ts::emit",
@@ -5195,7 +5142,7 @@
       ]
     },
     {
-      "name": "src/messages#7",
+      "name": "src/messages#5",
       "members": [
         "example.com/acme/conformance::src/messages/consume.ts::consumeOrders.kafka orders.created orders.shipped",
         "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds.kafka refunds",
@@ -5203,7 +5150,7 @@
       ]
     },
     {
-      "name": "src/messages#8",
+      "name": "src/messages#6",
       "members": [
         "example.com/acme/conformance::src/messages/consume.ts::consumePayments",
         "example.com/acme/conformance::src/messages/exchanges.ts::EVENTS",
@@ -5221,14 +5168,37 @@
         "example.com/acme/conformance::src/messages/queues.ts::work",
         "example.com/acme/conformance::src/messages/queues.ts::workReports",
         "example.com/acme/conformance::src/messages/rabbit.ts::channel",
-        "example.com/acme/conformance::src/messages/rabbit.ts::confirming"
+        "example.com/acme/conformance::src/messages/rabbit.ts::confirming",
+        "example.com/acme/conformance::src/messages/rabbit.ts::connection"
+      ]
+    },
+    {
+      "name": "src/messages#7",
+      "members": [
+        "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds",
+        "example.com/acme/conformance::src/messages/kafka.ts::auditor",
+        "example.com/acme/conformance::src/messages/kafka.ts::other"
+      ]
+    },
+    {
+      "name": "src/messages#8",
+      "members": [
+        "example.com/acme/conformance::src/messages/consume.ts::listen",
+        "example.com/acme/conformance::src/messages/consume.ts::listenRetries",
+        "example.com/acme/conformance::src/messages/kafka.ts::retrier"
       ]
     },
     {
       "name": "src/messages#9",
       "members": [
-        "example.com/acme/conformance::src/messages/consume.ts::consumeRefunds",
-        "example.com/acme/conformance::src/messages/kafka.ts::auditor"
+        "example.com/acme/conformance::src/messages/nats.ts::REGION",
+        "example.com/acme/conformance::src/messages/nats.ts::nc",
+        "example.com/acme/conformance::src/messages/nats.ts::onAudit",
+        "example.com/acme/conformance::src/messages/nats.ts::other",
+        "example.com/acme/conformance::src/messages/nats.ts::publishAll",
+        "example.com/acme/conformance::src/messages/nats.ts::subscribeMiddle",
+        "example.com/acme/conformance::src/messages/nats.ts::subscribeOne",
+        "example.com/acme/conformance::src/messages/nats.ts::subscribeRest"
       ]
     }
   ],

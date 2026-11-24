@@ -3,10 +3,12 @@ example.com/chain/catalog lib/products.ts:10 find
   example.com/chain/catalog lib/products.ts:3 load
     example.com/chain/catalog app/api/products/[id]/route.ts:4 GET
       →[exact: host catalog.example.com is served by example.com/chain/catalog] example.com/chain/gateway src/checkout.ts:10 createOrder
+        example.com/chain/gateway src/routes.ts:7 (top level) (value)
         →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/orders.ts:14 createOrder
       →[exact: host catalog.example.com is served by example.com/chain/catalog] example.com/chain/gateway src/orders.ts:6 listOrders
+        example.com/chain/gateway src/routes.ts:6 (top level) (value) (see above)
         →[inferred: base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway] example.com/chain/web src/orders.ts:6 listOrders
           example.com/chain/web src/dashboard.ts:7 dashboard
     example.com/chain/catalog lib/products.ts:7 parent
       example.com/chain/catalog lib/products.ts:3 load (cycle)
-chain: inferred · 4 hops · 3 repos · 254 tokens
+chain: inferred · 4 hops · 3 repos · 292 tokens

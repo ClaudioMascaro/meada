@@ -2234,8 +2234,9 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
     Ok(configs_digest(digest, &manifest_rows(db)?, &mappings) == configs)
 }
 
-/// What communities read of a file's rows (`write_communities`): its symbols, and the caller and
-/// target of each of its `exact` and `inferred` calls, sorted.
+/// What communities read of a file's rows (`write_communities`): its symbols, and the caller (its
+/// holder, for a row its file makes) and target of each of its `exact` and `inferred` rows, uses
+/// included, sorted.
 type Graph = (Vec<String>, Vec<(String, String)>);
 
 /// The graph a file's stored rows give.
@@ -2244,8 +2245,8 @@ fn stored_graph(tx: &Transaction, path: &str) -> Result<Graph> {
         .query_map(params![path], |r| r.get(0))?
         .collect::<rusqlite::Result<_>>()?;
     let mut calls: Vec<(String, String)> = (tx.prepare_cached(
-        "SELECT caller, target FROM calls WHERE path = ?1 AND level IN ('exact', 'inferred') \
-         AND target IS NOT NULL",
+        "SELECT COALESCE(holder, caller), target FROM calls WHERE path = ?1 \
+         AND level IN ('exact', 'inferred') AND target IS NOT NULL",
     )?)
     .query_map(params![path], |r| Ok((r.get(0)?, r.get(1)?)))?
     .collect::<rusqlite::Result<_>>()?;
@@ -2259,15 +2260,21 @@ fn graph(rows: &Rows) -> Graph {
     let mut symbols: Vec<String> = rows.symbols.iter().map(|(id, ..)| id.clone()).collect();
     let mut calls: Vec<(String, String)> = (rows.calls.iter())
         .filter(|c| matches!(c.level, Some(Level::Exact | Level::Inferred)))
-        .filter_map(|c| Some((c.caller.clone(), c.target.clone()?)))
+        .filter_map(|c| {
+            Some((
+                c.holder.as_ref().unwrap_or(&c.caller).clone(),
+                c.target.clone()?,
+            ))
+        })
         .collect();
     symbols.sort();
     calls.sort();
     (symbols, calls)
 }
 
-/// Rewrites the `communities` rows from the stored calls at `exact` or `inferred` between two
-/// symbols, each named after its members' parent directories.
+/// Rewrites the `communities` rows from the stored rows at `exact` or `inferred` between two
+/// symbols (calls and uses; a row a file makes counts from the symbol holding it), each named
+/// after its members' parent directories.
 fn write_communities(tx: &Transaction) -> Result<()> {
     let dirs: HashMap<String, String> = tx
         .prepare("SELECT id, path FROM symbols")?
@@ -2275,8 +2282,8 @@ fn write_communities(tx: &Transaction) -> Result<()> {
         .collect::<rusqlite::Result<_>>()?;
     let calls: Vec<(String, String)> = tx
         .prepare(
-            "SELECT caller, target FROM calls WHERE level IN ('exact', 'inferred') \
-             AND target IS NOT NULL",
+            "SELECT COALESCE(holder, caller), target FROM calls \
+             WHERE level IN ('exact', 'inferred') AND target IS NOT NULL",
         )?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;

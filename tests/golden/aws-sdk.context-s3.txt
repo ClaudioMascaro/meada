@@ -14,6 +14,8 @@ example.com/aws/app app.ts:9 (unresolved) PutObjectCommand
 example.com/aws/app app.ts:9 (unresolved) s3.send
 example.com/aws/app app.ts:10 (unresolved) s3.send
 example.com/aws/app app.ts:11 (unresolved) s3.send
+uses:
+example.com/aws/app app.ts:7 s3 (member)
 contracts:
 example.com/aws/app app.ts:9 produces resource::s3::orders-bucket (no provisioner in the workspace)
 example.com/aws/app app.ts:11 unresolved environment BUCKET

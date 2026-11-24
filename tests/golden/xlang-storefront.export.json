@@ -383,26 +383,16 @@
       "name": "src",
       "members": [
         "example.com/xlang/storefront::src/events.ts::announceRestock",
+        "example.com/xlang/storefront::src/events.ts::kafka",
         "example.com/xlang/storefront::src/events.ts::producer"
       ]
     },
     {
       "name": "src#2",
       "members": [
-        "example.com/xlang/storefront::src/events.ts::kafka"
-      ]
-    },
-    {
-      "name": "src#3",
-      "members": [
         "example.com/xlang/storefront::src/inventory.ts::INVENTORY",
-        "example.com/xlang/storefront::src/inventory.ts::stockLevel"
-      ]
-    },
-    {
-      "name": "src#4",
-      "members": [
         "example.com/xlang/storefront::src/inventory.ts::reserveStock",
+        "example.com/xlang/storefront::src/inventory.ts::stockLevel",
         "example.com/xlang/storefront::src/sync.ts::syncInventory"
       ]
     }

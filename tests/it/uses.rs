@@ -8,7 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use common::fixture_repo;
-use meada::engine::Engine;
+use meada::engine::{Direction, Engine, Start};
 
 const IDENTITY: &str = "example.com/pkg/uses";
 
@@ -183,4 +183,110 @@ fn doors_and_calls_stay_invocation_only() {
         .map(|p| p["entry_point"].as_str().unwrap_or_default().to_string())
         .collect();
     assert!(doors.contains(&id), "{id} not a door in {doors:#?}");
+}
+
+fn app(id: &str) -> String {
+    format!("{IDENTITY}::packages/app/src/{id}")
+}
+
+#[test]
+fn trace_up_walks_uses_and_holders() {
+    let repo = uses_repo("uses_trace");
+    let engine = Engine::open(&repo).unwrap();
+    let up = |id: &str| {
+        engine
+            .trace(Start::From(&app(id)), Direction::Up, None)
+            .unwrap()
+    };
+    // Header is rendered by LoginPage, which `routes` renders, which App reads.
+    let from_header = up("LoginPage.tsx::Header");
+    for name in ["LoginPage (jsx)", "routes (jsx)", "App (value)"] {
+        assert!(
+            from_header.contains(name),
+            "{name} missing from:\n{from_header}"
+        );
+    }
+    // helper is called inside `plugin`'s initializer, which `wire` reads.
+    let from_helper = up("plugin.ts::helper");
+    for name in [" plugin", "wire (value)"] {
+        assert!(
+            from_helper.contains(name),
+            "{name} missing from:\n{from_helper}"
+        );
+    }
+}
+
+#[test]
+fn context_lists_uses_apart_from_calls() {
+    let repo = uses_repo("uses_context");
+    let engine = Engine::open(&repo).unwrap();
+    let page = engine
+        .context(&app("LoginPage.tsx::LoginPage"), None)
+        .unwrap();
+    let section = |text: &str, name: &str| -> Vec<String> {
+        let lines: Vec<&str> = text.lines().collect();
+        let Some(at) = lines.iter().position(|l| *l == format!("{name}:")) else {
+            return Vec::new();
+        };
+        (lines[at + 1..].iter())
+            .take_while(|l| !l.ends_with(':') && !l.ends_with(": none"))
+            .map(|l| l.to_string())
+            .collect()
+    };
+    let uses = section(&page, "uses");
+    for want in ["Header (jsx)", "handler (value)"] {
+        assert!(
+            uses.iter().any(|l| l.ends_with(want)),
+            "{want} not in uses:\n{page}"
+        );
+    }
+    assert!(
+        !section(&page, "callees")
+            .iter()
+            .any(|l| l.contains("Header")),
+        "{page}"
+    );
+    let header = engine.context(&app("LoginPage.tsx::Header"), None).unwrap();
+    let used_by = section(&header, "used by");
+    assert!(
+        used_by.iter().any(|l| l.ends_with("LoginPage (jsx)")),
+        "{header}"
+    );
+    assert!(header.contains("callers: none"), "{header}");
+}
+
+#[test]
+fn processes_are_unchanged_by_uses() {
+    let repo = uses_repo("uses_processes");
+    let json = export(&repo);
+    let calls: std::collections::HashSet<(String, String)> = (json["calls"].as_array().unwrap())
+        .iter()
+        .filter(|c| c.get("kind").is_none())
+        .filter_map(|c| {
+            Some((
+                c["caller"].as_str()?.to_string(),
+                c["target"].as_str()?.to_string(),
+            ))
+        })
+        .collect();
+    let mut stepped = 0;
+    for p in json["processes"].as_array().unwrap() {
+        let mut path: Vec<String> = Vec::new();
+        for step in p["steps"].as_array().unwrap() {
+            let depth = step["depth"].as_u64().unwrap() as usize;
+            let node = step["node"].as_str().unwrap().to_string();
+            path.truncate(depth);
+            if let Some(parent) = path.last()
+                && step["via"] == "call"
+            {
+                stepped += 1;
+                assert!(
+                    calls.contains(&(parent.clone(), node.clone())),
+                    "{parent} -> {node} is no call"
+                );
+            }
+            path.push(node);
+        }
+    }
+    assert!(stepped > 0);
 }

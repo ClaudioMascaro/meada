@@ -317,17 +317,18 @@
   "consumers": [],
   "communities": [
     {
+      "name": "app/api/health",
+      "members": [
+        "example.com/acme/api::app/api/health/route.js::GET",
+        "example.com/acme/api::lib/log.js::withLogging"
+      ]
+    },
+    {
       "name": "app/api/users",
       "members": [
         "example.com/acme/api::app/api/users/[id]/route.ts::GET",
         "example.com/acme/api::app/api/users/route.ts::GET",
         "example.com/acme/api::lib/db.ts::query"
-      ]
-    },
-    {
-      "name": "lib",
-      "members": [
-        "example.com/acme/api::lib/log.js::withLogging"
       ]
     }
   ],

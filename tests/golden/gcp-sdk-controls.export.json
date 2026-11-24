@@ -4632,70 +4632,78 @@
     {
       "name": ".#10",
       "members": [
-        "local/gcp-sdk-controls::control.js::bus",
-        "local/gcp-sdk-controls::control.js::envReceive",
-        "local/gcp-sdk-controls::control.js::envSend",
-        "local/gcp-sdk-controls::control.js::handler"
-      ]
-    },
-    {
-      "name": ".#11",
-      "members": [
         "local/gcp-sdk-controls::control.js::envBucket",
         "local/gcp-sdk-controls::control.js::store"
       ]
     },
     {
-      "name": ".#12",
+      "name": ".#11",
       "members": [
         "local/gcp-sdk-controls::control.js::envSecret",
         "local/gcp-sdk-controls::control.js::secrets"
       ]
     },
     {
-      "name": ".#13",
+      "name": ".#12",
       "members": [
         "local/gcp-sdk-controls::control.js::firstStructured",
-        "local/gcp-sdk-controls::control.js::structuredA"
+        "local/gcp-sdk-controls::control.js::secondStructured",
+        "local/gcp-sdk-controls::control.js::structured",
+        "local/gcp-sdk-controls::control.js::structuredA",
+        "local/gcp-sdk-controls::control.js::structuredB"
       ]
     },
     {
-      "name": ".#14",
-      "members": [
-        "local/gcp-sdk-controls::control.js::make"
-      ]
-    },
-    {
-      "name": ".#15",
+      "name": ".#13",
       "members": [
         "local/gcp-sdk-controls::control.js::mixed",
         "local/gcp-sdk-controls::control.js::opaque"
       ]
     },
     {
-      "name": ".#16",
-      "members": [
-        "local/gcp-sdk-controls::control.js::secondStructured",
-        "local/gcp-sdk-controls::control.js::structuredB"
-      ]
-    },
-    {
-      "name": ".#17",
-      "members": [
-        "local/gcp-sdk-controls::control.js::structured"
-      ]
-    },
-    {
-      "name": ".#18",
+      "name": ".#14",
       "members": [
         "local/gcp-sdk-controls::control.py::Factory.make_client",
         "local/gcp-sdk-controls::control.py::guessed"
       ]
     },
     {
-      "name": ".#19",
+      "name": ".#15",
       "members": [
         "local/gcp-sdk-controls::control.py::make"
+      ]
+    },
+    {
+      "name": ".#16",
+      "members": [
+        "local/gcp-sdk-controls::control.py::mixed",
+        "local/gcp-sdk-controls::control.py::opaque"
+      ]
+    },
+    {
+      "name": ".#17",
+      "members": [
+        "local/gcp-sdk-controls::control.ts::a",
+        "local/gcp-sdk-controls::control.ts::b",
+        "local/gcp-sdk-controls::control.ts::first",
+        "local/gcp-sdk-controls::control.ts::make",
+        "local/gcp-sdk-controls::control.ts::second"
+      ]
+    },
+    {
+      "name": ".#18",
+      "members": [
+        "local/gcp-sdk-controls::control.ts::bus",
+        "local/gcp-sdk-controls::control.ts::envReceive",
+        "local/gcp-sdk-controls::control.ts::envSend",
+        "local/gcp-sdk-controls::control.ts::handler"
+      ]
+    },
+    {
+      "name": ".#19",
+      "members": [
+        "local/gcp-sdk-controls::control.ts::envBucket",
+        "local/gcp-sdk-controls::control.ts::store"
       ]
     },
     {
@@ -4708,72 +4716,25 @@
     {
       "name": ".#20",
       "members": [
-        "local/gcp-sdk-controls::control.py::mixed",
-        "local/gcp-sdk-controls::control.py::opaque"
-      ]
-    },
-    {
-      "name": ".#21",
-      "members": [
-        "local/gcp-sdk-controls::control.ts::a",
-        "local/gcp-sdk-controls::control.ts::first"
-      ]
-    },
-    {
-      "name": ".#22",
-      "members": [
-        "local/gcp-sdk-controls::control.ts::b",
-        "local/gcp-sdk-controls::control.ts::second"
-      ]
-    },
-    {
-      "name": ".#23",
-      "members": [
-        "local/gcp-sdk-controls::control.ts::bus",
-        "local/gcp-sdk-controls::control.ts::envReceive",
-        "local/gcp-sdk-controls::control.ts::envSend",
-        "local/gcp-sdk-controls::control.ts::handler"
-      ]
-    },
-    {
-      "name": ".#24",
-      "members": [
-        "local/gcp-sdk-controls::control.ts::envBucket",
-        "local/gcp-sdk-controls::control.ts::store"
-      ]
-    },
-    {
-      "name": ".#25",
-      "members": [
         "local/gcp-sdk-controls::control.ts::envSecret",
         "local/gcp-sdk-controls::control.ts::secrets"
       ]
     },
     {
-      "name": ".#26",
+      "name": ".#21",
       "members": [
         "local/gcp-sdk-controls::control.ts::firstStructured",
-        "local/gcp-sdk-controls::control.ts::structuredA"
+        "local/gcp-sdk-controls::control.ts::secondStructured",
+        "local/gcp-sdk-controls::control.ts::structured",
+        "local/gcp-sdk-controls::control.ts::structuredA",
+        "local/gcp-sdk-controls::control.ts::structuredB"
       ]
     },
     {
-      "name": ".#27",
-      "members": [
-        "local/gcp-sdk-controls::control.ts::make"
-      ]
-    },
-    {
-      "name": ".#28",
+      "name": ".#22",
       "members": [
         "local/gcp-sdk-controls::control.ts::mixed",
         "local/gcp-sdk-controls::control.ts::opaque"
-      ]
-    },
-    {
-      "name": ".#29",
-      "members": [
-        "local/gcp-sdk-controls::control.ts::secondStructured",
-        "local/gcp-sdk-controls::control.ts::structuredB"
       ]
     },
     {
@@ -4781,12 +4742,6 @@
       "members": [
         "local/gcp-sdk-controls::Control.cs::Control.Mixed(bool,PublisherClient)",
         "local/gcp-sdk-controls::Control.cs::Control.Opaque(bool,PublisherClient)"
-      ]
-    },
-    {
-      "name": ".#30",
-      "members": [
-        "local/gcp-sdk-controls::control.ts::structured"
       ]
     },
     {
@@ -4836,14 +4791,19 @@
       "name": ".#8",
       "members": [
         "local/gcp-sdk-controls::control.js::a",
-        "local/gcp-sdk-controls::control.js::first"
+        "local/gcp-sdk-controls::control.js::b",
+        "local/gcp-sdk-controls::control.js::first",
+        "local/gcp-sdk-controls::control.js::make",
+        "local/gcp-sdk-controls::control.js::second"
       ]
     },
     {
       "name": ".#9",
       "members": [
-        "local/gcp-sdk-controls::control.js::b",
-        "local/gcp-sdk-controls::control.js::second"
+        "local/gcp-sdk-controls::control.js::bus",
+        "local/gcp-sdk-controls::control.js::envReceive",
+        "local/gcp-sdk-controls::control.js::envSend",
+        "local/gcp-sdk-controls::control.js::handler"
       ]
     }
   ],

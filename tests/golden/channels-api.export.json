@@ -825,6 +825,7 @@
       "members": [
         "example.com/channels/api::src/amqp.ts::announce",
         "example.com/channels/api::src/amqp.ts::channel",
+        "example.com/channels/api::src/amqp.ts::connection",
         "example.com/channels/api::src/amqp.ts::dispatch",
         "example.com/channels/api::src/amqp.ts::queueOrder"
       ]
@@ -832,43 +833,32 @@
     {
       "name": "src#2",
       "members": [
-        "example.com/channels/api::src/amqp.ts::connection"
-      ]
-    },
-    {
-      "name": "src#3",
-      "members": [
         "example.com/channels/api::src/amqp.ts::kafkaOrder",
         "example.com/channels/api::src/dynamic.ts::announce",
         "example.com/channels/api::src/dynamic.ts::currentRegion",
         "example.com/channels/api::src/dynamic.ts::replay",
+        "example.com/channels/api::src/kafka.ts::kafka",
         "example.com/channels/api::src/kafka.ts::producer",
         "example.com/channels/api::src/orders.ts::audit",
         "example.com/channels/api::src/orders.ts::ship"
       ]
     },
     {
-      "name": "src#4",
+      "name": "src#3",
       "members": [
         "example.com/channels/api::src/audit.ts::auditLog",
         "example.com/channels/api::src/kafka.ts::consumer"
       ]
     },
     {
-      "name": "src#5",
+      "name": "src#4",
       "members": [
         "example.com/channels/api::src/audit.ts::auditLog.kafka audit.log",
         "example.com/channels/api::src/audit.ts::store"
       ]
     },
     {
-      "name": "src#6",
-      "members": [
-        "example.com/channels/api::src/kafka.ts::kafka"
-      ]
-    },
-    {
-      "name": "src#7",
+      "name": "src#5",
       "members": [
         "example.com/channels/api::src/orders.ts::createOrder",
         "example.com/channels/api::src/orders.ts::mail",
@@ -878,7 +868,7 @@
       ]
     },
     {
-      "name": "src#8",
+      "name": "src#6",
       "members": [
         "example.com/channels/api::src/orders.ts::invoice",
         "example.com/channels/api::src/topics.ts::BILLING"

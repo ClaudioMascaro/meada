@@ -365,6 +365,7 @@
       "name": "src",
       "members": [
         "example.com/asyncapi/events::src/emit.ts::announceUpdate",
+        "example.com/asyncapi/events::src/emit.ts::kafka",
         "example.com/asyncapi/events::src/emit.ts::producer"
       ]
     },
@@ -372,20 +373,9 @@
       "name": "src#2",
       "members": [
         "example.com/asyncapi/events::src/emit.ts::channel",
+        "example.com/asyncapi/events::src/emit.ts::connection",
         "example.com/asyncapi/events::src/emit.ts::onCancellation",
         "example.com/asyncapi/events::src/emit.ts::work"
-      ]
-    },
-    {
-      "name": "src#3",
-      "members": [
-        "example.com/asyncapi/events::src/emit.ts::connection"
-      ]
-    },
-    {
-      "name": "src#4",
-      "members": [
-        "example.com/asyncapi/events::src/emit.ts::kafka"
       ]
     }
   ],
