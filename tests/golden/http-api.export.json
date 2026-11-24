@@ -44,6 +44,15 @@
       "hash": "9d21b597cb7691cb42738687cdfa814ae9f380d9c16ffbc36c714d4045b079d0"
     },
     {
+      "id": "example.com/acme/api::app/api/health/route.js::GET",
+      "span": {
+        "path": "app/api/health/route.js",
+        "start": 125,
+        "end": 168
+      },
+      "hash": "626e5e9781b266d961effc0d7e885337cf022334d487baedb088cebb3c544178"
+    },
+    {
       "id": "example.com/acme/api::app/api/users/[id]/route.ts::DELETE",
       "span": {
         "path": "app/api/users/[id]/route.ts",

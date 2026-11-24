@@ -185,6 +185,9 @@ struct Seen<'a> {
     /// The links the walks around it had followed when it began (`Resolver::links`): a link cut
     /// past them depends on those walks (`Resolver::cut_link`).
     from: usize,
+    /// Set by `Resolver::row` alone: `gives` may answer a top-level declaration the scope
+    /// leaves unknown (an enum, an `export default` expression, `Facts::declarations`).
+    rows: bool,
 }
 
 /// What a pair exports, and whether it met a cycle (`Seen::looped`).
@@ -4370,7 +4373,17 @@ impl<'a> Resolver<'a> {
                     _ => ("", local.as_str()),
                 };
                 let reading = if value { Reading::Value } else { Reading::Any };
-                Some(self.lexical_as(path, scope, bare, seen, reading))
+                let found = self.lexical_as(path, scope, bare, seen, reading);
+                // An export row targets a declaration symbol (`Facts::declarations`) no reading
+                // binds; every other reader keeps it unknown.
+                if seen.rows
+                    && scope.is_empty()
+                    && matches!(found, Binding::Unknown)
+                    && (self.files[path].declarations.iter()).any(|d| d.name == bare)
+                {
+                    return Some(Binding::Const(path, bare));
+                }
+                Some(found)
             }
             Export::From {
                 exported,
@@ -4528,11 +4541,16 @@ impl<'a> Resolver<'a> {
 
     /// The row of `file` exporting `exported`, read as an item when `value`.
     fn row(&self, path: &'a str, exported: &'a str, value: bool) -> Row<'a> {
-        match self.export_as(path, exported, &mut Seen::new(), value) {
+        let mut seen = Seen {
+            rows: true,
+            ..Seen::new()
+        };
+        match self.export_as(path, exported, &mut seen, value) {
             Binding::Def(t) => (Some(exported), Some(t.path), Some(t.name)),
             Binding::Module(m) => (Some(exported), Some(m), None),
-            // A constant or a type: the shape a package keeps of it (issue #175) is found
-            // through it; it is no symbol a call reaches.
+            // A constant, a type, an enum or a default-exported expression: the shape a package
+            // keeps of it (issue #175) is found through it, and an exported top-level one is a
+            // symbol an import reaches (`Facts::declarations`).
             Binding::Const(at, c) => (Some(exported), Some(at), Some(c)),
             _ => (Some(exported), None, None),
         }

@@ -1,0 +1,1 @@
+{"name": "@scope/b", "dependencies": {"@scope/a": "workspace:*", "@scope/c": "workspace:*"}}

@@ -296,6 +296,24 @@
       "hash": "20c12b832d579d491f80c334c59767d82bbcdbbf9bd9a0103727f18acf956c02"
     },
     {
+      "id": "example.com/chain/catalog::lib/limits.ts::LIMIT",
+      "span": {
+        "path": "lib/limits.ts",
+        "start": 13,
+        "end": 23
+      },
+      "hash": "0cd64386c0c247db37519b5cd06fdc0429afd5f2ca3fff047390c41357dec01d"
+    },
+    {
+      "id": "example.com/chain/catalog::lib/limits.ts::TAGS",
+      "span": {
+        "path": "lib/limits.ts",
+        "start": 38,
+        "end": 63
+      },
+      "hash": "56f3ebeb7e2b161ad67bcda07bb4577bd9467bde41179341f63184c85ddb9397"
+    },
+    {
       "id": "example.com/chain/catalog::lib/products.ts::find",
       "span": {
         "path": "lib/products.ts",
@@ -321,6 +339,96 @@
         "end": 275
       },
       "hash": "a6e21edf5db8f717b6387dc48a723fdbbe22bbf282fd42e01ddb7e5b85ba7ec7"
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::Comment",
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 129,
+        "end": 320
+      },
+      "hash": "315760f9cbe76871dd073d3f1cbe342ef1b4437627c3a2b601f09035918a9591"
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::Comments",
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 336,
+        "end": 363
+      },
+      "hash": "f3b1c05ff2c242bf9a9f53bd087de269b7414c31c3341d9fb945e86abcd76967"
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::Summary",
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 379,
+        "end": 441
+      },
+      "hash": "0f8b3ea15c0e100c157af1cf68cfbb0f701ec4dce3806f01efd4847e41307837"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/index.ts::Ticket",
+      "span": {
+        "path": "packages/contracts/src/index.ts",
+        "start": 288,
+        "end": 343
+      },
+      "hash": "be473f3cc7ae4c646c608eaf058375b436dc6350c9498714f5c6ee920e7d585e"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/quote.ts::Quote",
+      "span": {
+        "path": "packages/contracts/src/quote.ts",
+        "start": 88,
+        "end": 144
+      },
+      "hash": "016a3137dbcbeeda777e4eed87965bdbdd1e3178c712030b08d5cf1dc6c5202a"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "span": {
+        "path": "packages/contracts/src/receipt.ts",
+        "start": 43,
+        "end": 113
+      },
+      "hash": "e485007272c262008c5f697d8ac38f239cff6baee210cad187c9c692ffda6e7c"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Status",
+      "span": {
+        "path": "packages/contracts/src/receipt.ts",
+        "start": 184,
+        "end": 238
+      },
+      "hash": "7ffa1ebac4dd1a098b291f6135fe582e26b47c72cece590bef753151af903cbd"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Tagged",
+      "span": {
+        "path": "packages/contracts/src/receipt.ts",
+        "start": 370,
+        "end": 424
+      },
+      "hash": "15fdadf6d2abe178f4d6acb897ac03c8153b45508faf6c8be848a293371d7cf4"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/shelf.ts::LIMITS",
+      "span": {
+        "path": "packages/contracts/src/shelf.ts",
+        "start": 207,
+        "end": 242
+      },
+      "hash": "b181f97d1735c7bf30a8c8603dd32533866ab380eacbffc3981bcbe277202215"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/shelf.ts::SHELF",
+      "span": {
+        "path": "packages/contracts/src/shelf.ts",
+        "start": 80,
+        "end": 120
+      },
+      "hash": "ac1cb315c1aa2253b09bcd61d10e9108981117104c734882e85c658f9e900e45"
     }
   ],
   "calls": [

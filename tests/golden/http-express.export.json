@@ -36,6 +36,15 @@
       "hash": "9d6941c4e45f60ec202f78616c33e73cf8fc379892ca6f758ebf88b3dd1adbbe"
     },
     {
+      "id": "example.com/acme/backend::src/routes/index.ts::api",
+      "span": {
+        "path": "src/routes/index.ts",
+        "start": 77,
+        "end": 91
+      },
+      "hash": "d18f54012bb74ff6a8e680320ac76ff0d1843edbc0964a63c9613fb5cec53085"
+    },
+    {
       "id": "example.com/acme/backend::src/routes/users.ts::find",
       "span": {
         "path": "src/routes/users.ts",
@@ -88,6 +97,15 @@
         "end": 483
       },
       "hash": "849b22a03a28c6283bede6dc048cf96a9521d2865009450945d92055bafad265"
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::users",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 83,
+        "end": 99
+      },
+      "hash": "ebdf53a2664104409964cd2e02bf02d2420998d43b64861187503c99c88266a7"
     },
     {
       "id": "example.com/acme/backend::src/server.ts::GET /health",

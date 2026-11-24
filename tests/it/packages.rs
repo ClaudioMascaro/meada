@@ -343,6 +343,116 @@ fn build_output_is_inferred_and_an_unmappable_entry_lists_its_candidates() {
     assert!(items.iter().all(|i| i.path != "src/text.ts"));
 }
 
+/// The rows a query asks of the index of `repo`, one line each with its columns spaced.
+fn rows_of(repo: &Path, sql: &str) -> Vec<String> {
+    let db = rusqlite::Connection::open(repo.join(".meada/index.db")).unwrap();
+    let mut rows = db.prepare(sql).unwrap();
+    let count = rows.column_count();
+    rows.query_map([], |row| {
+        let cols = (0..count).map(|n| {
+            row.get::<_, Option<String>>(n)
+                .map(|v| v.unwrap_or("-".into()))
+        });
+        cols.collect::<Result<Vec<_>, _>>().map(|c| c.join(" "))
+    })
+    .unwrap()
+    .map(Result::unwrap)
+    .collect()
+}
+
+#[test]
+fn an_exported_constant_or_default_expression_is_an_import_target() {
+    let repo = fixture_repo(
+        "packages_exported",
+        "pkg-exported",
+        Some("https://example.com/pkg/exported.git"),
+    );
+    let at = |callee: &str| {
+        format!("example.com/pkg/exported::packages/b/src/use.ts::useAll::{callee}#0")
+    };
+    let sym = |file: &str, name: &str| format!("example.com/pkg/exported::packages/{file}::{name}");
+    let exact = |target: String| vec![("exact".to_string(), "main".to_string(), target)];
+
+    let plugin = exact(sym("a/src/plugin.ts", "aPlugin"));
+    assert_eq!(imports_of(&repo, &at("a")), plugin);
+    assert_eq!(imports_of(&repo, &at("aPlugin")), plugin);
+    assert_eq!(
+        imports_of(&repo, &at("handler")),
+        exact(sym("c/src/index.ts", "default"))
+    );
+
+    let json: serde_json::Value = serde_json::from_str(&export(&repo)).unwrap();
+    let ids: Vec<&str> = (json["symbols"].as_array().unwrap().iter())
+        .map(|s| s["id"].as_str().unwrap())
+        .collect();
+    for (file, name) in [
+        ("a/src/plugin.ts", "aPlugin"),
+        ("a/src/plugin.ts", "APlugin"),
+        ("a/src/status.ts", "S"),
+        ("a/src/status.ts", "EXTRA"),
+        ("c/src/index.ts", "default"),
+    ] {
+        assert!(ids.contains(&sym(file, name).as_str()), "{file} {name}");
+    }
+    let exports = rows_of(
+        &repo,
+        "SELECT path, name, file, target FROM exports ORDER BY path, name",
+    );
+    for row in [
+        "packages/a/src/index.ts S packages/a/src/status.ts S",
+        "packages/c/src/index.ts default packages/c/src/index.ts default",
+    ] {
+        assert!(exports.iter().any(|r| r == row), "{row} in {exports:#?}");
+    }
+    // A URL built from an enum member reads as before: no contract.
+    let fetches: Vec<&serde_json::Value> = (json["consumers"].as_array().unwrap().iter())
+        .filter(|c| (c["site"].as_str()).is_some_and(|s| s.contains("use.ts::useAll::fetch")))
+        .collect();
+    assert_eq!(fetches.len(), 1, "{fetches:#?}");
+    assert!(fetches[0]["contract"].is_null(), "{fetches:#?}");
+    // The `S` row alone does not bring `status.ts` into the package's surface.
+    let shapes = rows_of(
+        &repo,
+        "SELECT path, method FROM contracts WHERE role = 'shape' ORDER BY path, method",
+    );
+    assert!(
+        shapes
+            .iter()
+            .all(|s| !s.starts_with("packages/a/src/status.ts")),
+        "{shapes:#?}"
+    );
+
+    // A refresh resolves `plugin.ts` from its stored facts and writes the same rows.
+    let symbols = rows_of(
+        &repo,
+        "SELECT id, start || ' ' || end, hash FROM symbols ORDER BY id",
+    );
+    let imports = (
+        json["imports"].as_array().unwrap().clone(),
+        json["symbols"].clone(),
+    );
+    let use_ts = repo.join("packages/b/src/use.ts");
+    let mut text = fs::read_to_string(&use_ts).unwrap();
+    text.push('\n');
+    fs::write(&use_ts, text).unwrap();
+    Engine::open(&repo).unwrap().refresh().unwrap();
+    assert_eq!(
+        rows_of(
+            &repo,
+            "SELECT id, start || ' ' || end, hash FROM symbols ORDER BY id"
+        ),
+        symbols
+    );
+    let again: serde_json::Value = serde_json::from_str(&export(&repo)).unwrap();
+    assert_eq!(
+        (
+            again["imports"].as_array().unwrap().clone(),
+            again["symbols"].clone()
+        ),
+        imports
+    );
+}
+
 #[test]
 fn a_nested_tsconfig_that_is_invalid_or_leaves_the_repository_maps_nothing() {
     let p = packages("packages_tsconfig_hostile");

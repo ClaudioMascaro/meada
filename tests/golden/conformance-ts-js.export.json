@@ -534,6 +534,42 @@
       "hash": "f2b49a914ddcefa672f00ed73ec4f1367e30cdedc6f5b0341cef821ce09cbd4d"
     },
     {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::auditor",
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 461,
+        "end": 507
+      },
+      "hash": "499590353a9e6edf10c67c1cc7e502467fc560d164afead324f79869c1daa4ef"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::consumer",
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 205,
+        "end": 253
+      },
+      "hash": "a302bfe8dfac170ab285df7e9f2a5d20cc8e0ce1ae1f22f650eeca2b51e70ad9"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::producer",
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 163,
+        "end": 190
+      },
+      "hash": "f0f22c9a47dd2d709e73a4a017637a21743af686aab8fdd921b38ac6f91db3bc"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/kafka.ts::retrier",
+      "span": {
+        "path": "src/messages/kafka.ts",
+        "start": 268,
+        "end": 316
+      },
+      "hash": "b4127231ac63232bc58124d002b45e57709a19f056da4f55facd3c3c1e83e9f0"
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/nats.ts::bus.publish",
       "span": {
         "path": "src/messages/nats.ts",
@@ -750,6 +786,24 @@
       "hash": "dab5b73cb873097e2f92464c9827c4be240b64998f0f11ba9ec0f62923c3503b"
     },
     {
+      "id": "example.com/acme/conformance::src/messages/rabbit.ts::channel",
+      "span": {
+        "path": "src/messages/rabbit.ts",
+        "start": 169,
+        "end": 211
+      },
+      "hash": "c9a1004cbc12690211472d927c09e2fb1258fde43b620e06ae6a482735c6db36"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/rabbit.ts::confirming",
+      "span": {
+        "path": "src/messages/rabbit.ts",
+        "start": 226,
+        "end": 278
+      },
+      "hash": "a97b65ae4c6e09098ffc7423737aee28862b322e387c404d0ff960ee63160dfc"
+    },
+    {
       "id": "example.com/acme/conformance::src/messages/redis.ts::append",
       "span": {
         "path": "src/messages/redis.ts",
@@ -964,6 +1018,24 @@
         "end": 971
       },
       "hash": "d729a01fb9d63e13124d14f739daa449d68a865e63acdcea86cd3a8e93fc0a64"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/topics.ts::CREATED",
+      "span": {
+        "path": "src/messages/topics.ts",
+        "start": 45,
+        "end": 74
+      },
+      "hash": "a0497b310200f91d31c9d82d1490b042dcd8684dd8d6cc729836c259349a99df"
+    },
+    {
+      "id": "example.com/acme/conformance::src/messages/topics.ts::ORDERS",
+      "span": {
+        "path": "src/messages/topics.ts",
+        "start": 13,
+        "end": 30
+      },
+      "hash": "f9f0a85eba459f21fe883854f364466d6f8fd01a9e8cc6ae7edd85c28b9bb838"
     },
     {
       "id": "example.com/acme/conformance::src/shadow.ts::again",

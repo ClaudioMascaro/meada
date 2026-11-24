@@ -1,0 +1,1 @@
+{"name": "@example/exported", "private": true, "workspaces": ["packages/*"]}

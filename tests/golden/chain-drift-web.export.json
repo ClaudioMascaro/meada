@@ -93,6 +93,15 @@
       "hash": "5cc3a63c2d48ea68365d5e97e54a4425c16d6ce5399c954dae54469e16e91111"
     },
     {
+      "id": "example.com/chain/web::src/api/paths.ts::ORDERS_PATH",
+      "span": {
+        "path": "src/api/paths.ts",
+        "start": 76,
+        "end": 103
+      },
+      "hash": "130c74282dad18369770f7d26fc22dbc1355788de1d5a765d7b9a4c6c8c84101"
+    },
+    {
       "id": "example.com/chain/web::src/api/typed.ts::enveloped",
       "span": {
         "path": "src/api/typed.ts",
@@ -127,6 +136,15 @@
         "end": 570
       },
       "hash": "18e5d17cd63ab07811478d861f9b15d561b29153a9ad2e16d1b9b6d20d8bb22a"
+    },
+    {
+      "id": "example.com/chain/web::src/api/types.ts::Entity",
+      "span": {
+        "path": "src/api/types.ts",
+        "start": 42,
+        "end": 76
+      },
+      "hash": "739186290a142f7a531ea32af813358aedbef6f77396667ba1a856025efd09d7"
     },
     {
       "id": "example.com/chain/web::src/batches.ts::handed",

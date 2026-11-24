@@ -121,6 +121,24 @@
       "hash": "73e139cef1cb69dce8a8009afb9adb68bf78952519603cb676012876834c25df"
     },
     {
+      "id": "example.com/channels/api::src/kafka.ts::consumer",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 237,
+        "end": 288
+      },
+      "hash": "c2c81b1b6531ca026243abbdef4206d462bf1bf740bec3a17fd47f7bb514e23b"
+    },
+    {
+      "id": "example.com/channels/api::src/kafka.ts::producer",
+      "span": {
+        "path": "src/kafka.ts",
+        "start": 195,
+        "end": 222
+      },
+      "hash": "f0f22c9a47dd2d709e73a4a017637a21743af686aab8fdd921b38ac6f91db3bc"
+    },
+    {
       "id": "example.com/channels/api::src/orders.ts::audit",
       "span": {
         "path": "src/orders.ts",
@@ -173,6 +191,24 @@
         "end": 648
       },
       "hash": "89a02aed34b96a0807659ed8b2e18daaf281eb79d1602a4c6ddbb0c1f6969ded"
+    },
+    {
+      "id": "example.com/channels/api::src/topics.ts::BILLING",
+      "span": {
+        "path": "src/topics.ts",
+        "start": 61,
+        "end": 80
+      },
+      "hash": "10bf4830096605cdc83b6f88ca030722c24156bcf20bfb9c60b4708441e82410"
+    },
+    {
+      "id": "example.com/channels/api::src/topics.ts::ORDERS_CREATED",
+      "span": {
+        "path": "src/topics.ts",
+        "start": 13,
+        "end": 46
+      },
+      "hash": "dcb16584c95851d79024100b416a02d4f1821623ea65823defe3cd816d257809"
     }
   ],
   "calls": [

@@ -19,6 +19,33 @@
   ],
   "symbols": [
     {
+      "id": "example.com/acme/paths::src/routes.ts::API_HOST",
+      "span": {
+        "path": "src/routes.ts",
+        "start": 65,
+        "end": 101
+      },
+      "hash": "c37b83adde5d600c6038a7645a16f54e219773d1abe63cc2007ba08af195dbcd"
+    },
+    {
+      "id": "example.com/acme/paths::src/routes.ts::USER",
+      "span": {
+        "path": "src/routes.ts",
+        "start": 151,
+        "end": 172
+      },
+      "hash": "dbab69a2c63b9d9bdaeac2ed84fb60ae0d3ea2ed6d9ac5364df01ebde8ebb73d"
+    },
+    {
+      "id": "example.com/acme/paths::src/routes.ts::USERS",
+      "span": {
+        "path": "src/routes.ts",
+        "start": 116,
+        "end": 136
+      },
+      "hash": "0a09a54d6c250066daf0d8163826702568ecbe7e2d35be9aa60d710970b81c34"
+    },
+    {
       "id": "example.com/acme/paths::src/users.ts::firstPage",
       "span": {
         "path": "src/users.ts",
