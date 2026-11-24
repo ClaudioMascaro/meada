@@ -3,6 +3,23 @@
 LLM-free code graph for agents and people: indexes repositories with tree-sitter, links them
 through the contracts they share, answers over MCP. Rust, Apache-2.0.
 
+## Superpowers workflow
+
+- Work runs on Superpowers: brainstorming → spec (design doc) → claims check → plan
+  (`superpowers:writing-plans`).
+- Claims check: once the spec is written, a fresh-context agent verifies each of its claims
+  against the code, and the spec is fixed before the plan.
+- Execution: a fresh session, not the one that wrote the spec and not subagents, runs the plan
+  inline in batches (`superpowers:executing-plans`) with the spec and the plan as its brief. No
+  `superpowers:subagent-driven-development`.
+- Deviation check: after the final delivery, a fresh-context agent compares it with the spec and
+  the plan. Each deviation that shows a missing rule becomes a line in `AGENTS.md` in the same PR.
+- mattpocock skills are off (implement, implement-spec, tdd, handoff, to-spec, to-tickets, triage,
+  wayfinder and the rest). Allowed: `/grill-me`, `/pr`, `/retro` (with `writing-for-agents`).
+- Issues, specs, ADRs and `CONTEXT.md`/`GLOSSARY.md` written with the mattpocock skills are
+  questionable: check them against the code before relying on them. ADRs most of all: they don't
+  relate to each other, have no hierarchy, and stop reflecting intent as the code moves on.
+
 ## Language
 
 - Code, identifiers, comments, commit messages, ADRs, specs and maintainer-written issues and
@@ -148,7 +165,8 @@ Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents
 
 ### Vendored skills
 
-The `mattpocock/skills` set and the prove-it trio of `ray-amjad/skills` live in `.agents/skills/`
+The kept mattpocock skills (grill-me, grilling, pr, retro, writing-for-agents) and the prove-it
+trio of `ray-amjad/skills` live in `.agents/skills/`
 (linked from `.claude/skills/`), pinned by `.agents/skills-lock.json`: a skill whose `tree` differs
 from its `upstreamTree` carries a local adjustment. An edit to a skill updates its `tree` in the
 lock, and `scripts/check` names the value. The plugins that ship the same skills stay disabled in
