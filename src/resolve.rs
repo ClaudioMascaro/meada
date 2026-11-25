@@ -8138,6 +8138,16 @@ impl<'a> Code<'a> {
                 }
                 folded
             }
+            // A field whose tag names a variable (`Facts::env_fields`, in the file defining
+            // the struct) is that read wherever the types reach it: a write by name elsewhere
+            // (a test setting a config field) does not count, one to this struct's field does.
+            Binding::Local(at, class, field)
+                if !self.resolver.written_in.contains(&(class, field))
+                    && let Some(var) = (self.resolver.files[at].env_fields.iter())
+                        .find(|e| e.class == class && e.field == field) =>
+            {
+                Value::Str(vec![Part::Env(var.var.clone())])
+            }
             // A field no file assigns holds what an annotation on it injects, else the
             // environment read every composite literal that sets it gives it.
             Binding::Local(at, class, field) if !self.field_written_in(class, field) => {

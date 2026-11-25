@@ -1311,6 +1311,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         });
     }
     walk.std = values::Std::new(tree.root_node(), src, &walk.facts.imports);
+    walk.facts.env_fields = values::env_fields(tree.root_node(), src);
     let mut top = Vec::new();
     let mut inits: HashMap<&str, usize> = HashMap::new();
     for node in named(tree.root_node()) {

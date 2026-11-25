@@ -479,6 +479,11 @@ pub struct Facts {
     /// parsed again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub references: Vec<Reference>,
+    /// Each struct field whose tag names an environment variable (Go's `env:"X"`): the read of
+    /// the field wherever the types reach it. Stored, as `declarations`: a file of another
+    /// package resolves through it from the facts of files not parsed again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub env_fields: Vec<EnvField>,
     /// The scope and value of each `let` whose name is bound again in its scope or assigned
     /// again (Rust): no constant, since the name holds no one value, but a value that flows
     /// somewhere unread. Not kept in the index (see `Call::args`).
@@ -1362,6 +1367,16 @@ pub struct Reference {
     /// its name off; `None` for the other kinds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<String>,
+}
+
+/// A struct field whose tag names the environment variable it is read from
+/// (`Facts::env_fields`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EnvField {
+    /// The struct, as `Def::name`.
+    pub class: String,
+    pub field: String,
+    pub var: String,
 }
 
 /// A `const` binding, qualified by its enclosing definitions like `Def::name`.

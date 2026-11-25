@@ -295,6 +295,10 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         ("tagOptions", "TAG_CAARLO_URL"),
         ("Client.OrdersDirect", "FIELD_URL"),
         ("Client.Orders", "FIELD_URL"),
+        ("Cross.Get", "CROSS_URL"),
+        ("Typed.Get", "CROSS_URL"),
+        ("TwinA.Get", "TWIN_A_URL"),
+        ("TwinB.Get", "TWIN_B_URL"),
     ];
     for (function, variable) in read {
         let expected = format!("env:{variable}");
@@ -337,6 +341,7 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         "uncalled.get",
         "matched.get",
         "literal.get",
+        "Unknown.Get",
     ];
     for function in unread {
         assert_eq!(vias.get(function), Some(&None), "{function}");

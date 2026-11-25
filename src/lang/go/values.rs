@@ -9,7 +9,7 @@ use std::collections::{BTreeSet, HashMap};
 use tree_sitter::Node;
 
 use super::{DEFINITION_DEPTH, callee, type_name};
-use crate::lang::{Import, Invocation, Part, Value, named, text};
+use crate::lang::{EnvField, Import, Invocation, Part, Value, named, text};
 use crate::qualify;
 
 /// How many nested expressions a value is read through (`f(g(h(..)))`); a deeper one is
@@ -157,6 +157,44 @@ fn tagged(root: Node, src: &[u8]) -> HashMap<String, String> {
     out.into_iter()
         .filter_map(|(k, v)| v.map(|v| (k, v)))
         .collect()
+}
+
+/// Each field of a named struct type of the file whose tag names an environment variable, by
+/// the rules `tagged` applies (`env_tag`); a field of a nested anonymous struct has no class to
+/// be reached by and is left to `tagged`.
+pub(super) fn env_fields(root: Node, src: &[u8]) -> Vec<EnvField> {
+    let mut out = Vec::new();
+    let mut cursor = root.walk();
+    let decls = root.children(&mut cursor);
+    for spec in decls
+        .filter(|d| d.kind() == "type_declaration")
+        .flat_map(named)
+    {
+        let (Some(name), Some(body)) = (
+            spec.child_by_field_name("name"),
+            (spec
+                .child_by_field_name("type")
+                .filter(|t| t.kind() == "struct_type"))
+            .and_then(|b| named(b).find(|n| n.kind() == "field_declaration_list")),
+        ) else {
+            continue;
+        };
+        for field in named(body).filter(|f| f.kind() == "field_declaration") {
+            let tag = field.child_by_field_name("tag").map(|t| text(t, src));
+            let Some(var) = tag.and_then(env_tag) else {
+                continue;
+            };
+            let mut cursor = field.walk();
+            for each in field.children_by_field_name("name", &mut cursor) {
+                out.push(EnvField {
+                    class: text(name, src).to_string(),
+                    field: text(each, src).to_string(),
+                    var: var.clone(),
+                });
+            }
+        }
+    }
+    out
 }
 
 /// The variable a struct tag literal (`` `env:"X" env-required:"true"` ``) reads: the value of

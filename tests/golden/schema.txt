@@ -1,4 +1,4 @@
-extraction revision 6
+extraction revision 7
 
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -1624,11 +1624,21 @@ sample.go
       "hash": "f75a453ef683fdbb85a2400d741944a6787e67bfcf9019f1b0f43c866372ac18"
     },
     {
-      "name": "Getter",
+      "name": "Settings",
       "kind": "Class",
       "range": {
         "start": 140,
-        "end": 184
+        "end": 189
+      },
+      "params": [],
+      "hash": "3cafee809ffb6d8f9539dc7c211d08f0ee6c1cf7480b3e53ad577a3db8c10abe"
+    },
+    {
+      "name": "Getter",
+      "kind": "Class",
+      "range": {
+        "start": 196,
+        "end": 240
       },
       "params": [],
       "hash": "e5d75616a1a42155674b4895cbd817dc1acd2d8537eab8dd8e89ea901fc912e4"
@@ -1637,8 +1647,8 @@ sample.go
       "name": "Getter.Get",
       "kind": "Method",
       "range": {
-        "start": 160,
-        "end": 182
+        "start": 216,
+        "end": 238
       },
       "params": [
         {
@@ -1655,8 +1665,8 @@ sample.go
       "name": "New",
       "kind": "Function",
       "range": {
-        "start": 186,
-        "end": 290
+        "start": 242,
+        "end": 346
       },
       "params": [
         {
@@ -1673,8 +1683,8 @@ sample.go
       "name": "Store.Get",
       "kind": "Method",
       "range": {
-        "start": 292,
-        "end": 354
+        "start": 348,
+        "end": 410
       },
       "params": [
         {
@@ -1720,6 +1730,12 @@ sample.go
     },
     {
       "Local": {
+        "exported": "Settings",
+        "local": "Settings"
+      }
+    },
+    {
+      "Local": {
         "exported": "Getter",
         "local": "Getter"
       }
@@ -1737,24 +1753,24 @@ sample.go
       "scope": "New",
       "callee": "fmt.Sprint",
       "range": {
-        "start": 231,
-        "end": 255
+        "start": 287,
+        "end": 311
       }
     },
     {
       "scope": "New",
       "callee": "db.Open",
       "range": {
-        "start": 257,
-        "end": 271
+        "start": 313,
+        "end": 327
       }
     },
     {
       "scope": "Store.Get",
       "callee": "Meters",
       "range": {
-        "start": 341,
-        "end": 352
+        "start": 397,
+        "end": 408
       }
     }
   ],
@@ -1764,6 +1780,13 @@ sample.go
     },
     {
       "name": "New.label"
+    }
+  ],
+  "env_fields": [
+    {
+      "class": "Settings",
+      "field": "URL",
+      "var": "STORE_URL"
     }
   ],
   "receivers": [
@@ -1786,6 +1809,13 @@ sample.go
       "name": "s",
       "class": {
         "Type": "Store"
+      }
+    },
+    {
+      "scope": "Settings",
+      "name": "URL",
+      "class": {
+        "Type": "string"
       }
     },
     {
