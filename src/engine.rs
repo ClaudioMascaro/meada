@@ -684,6 +684,14 @@ impl Engine {
             trace::affected::roots(&graph, &changes)
         };
         trace::read_affected(&mut partial, &links, roots.clone())?;
+        // What the changed lines read, so the answer can place it.
+        let read: Vec<String> = {
+            let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
+            let read = trace::affected::reads(&graph, &changes, &roots).into_iter();
+            read.map(|(id, _)| id.to_string()).collect()
+        };
+        partial.symbols(None, &read)?;
+        partial.calls(None, &read)?;
         let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
         Ok(then(&graph, &changes, &roots, open))
     }

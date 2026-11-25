@@ -21,7 +21,7 @@ pub struct Affected {
     changed: Vec<Changed>,
     open: Vec<Open>,
     files: Vec<File>,
-    reads: Vec<File>,
+    reads: Vec<Read>,
     packages: Packages,
     iac: Vec<Reached>,
     sides: Vec<Side>,
@@ -70,6 +70,17 @@ struct File {
     narrowed: bool,
     /// Whether the file's package is in the manifest's reverse closure of a changed package.
     manifest: bool,
+}
+
+/// A file a changed line reads, with the evidence of its strongest edge.
+#[derive(Serialize, Debug, PartialEq)]
+struct Read {
+    repo: String,
+    path: String,
+    tier: Tier,
+    level: Level,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    candidates: Option<usize>,
 }
 
 /// How certain an affected node is: the rank of the weakest edge of its strongest chain.
@@ -652,15 +663,86 @@ pub(crate) fn answer<'g>(
         certain: certain.into_iter().collect(),
     };
     sides.sort();
+    let mut read: BTreeMap<(usize, &str), (Key, Evidence)> = BTreeMap::new();
+    for (id, evidence) in reads(graph, changes, roots) {
+        let Some(place) = graph.file_of(id) else {
+            continue;
+        };
+        let key = Key::of(&evidence);
+        let best = read.entry(place).or_insert((key, evidence));
+        if key < best.0 {
+            *best = (key, evidence);
+        }
+    }
+    let reads = (read.into_iter())
+        .map(|((n, path), (key, e))| Read {
+            repo: graph.workspace.repos[n].identity.clone(),
+            path: path.to_string(),
+            tier: key.tier,
+            level: e.level,
+            candidates: (e.candidates > 0).then_some(e.candidates),
+        })
+        .collect();
     Affected {
         changed,
         open,
         files,
+        reads,
         packages,
         iac,
         sides,
-        ..Affected::default()
     }
+}
+
+/// What the rows on changed lines read, one hop down, with each edge's evidence: a row's
+/// target or candidates, and the provider of every link whose consumer it is (a package link
+/// to a bare specifier, HTTP, the writer of what it reads). A row is on a changed line when its
+/// span overlaps one; every row of a file whose own id roots is (a whole file, or a changed
+/// line in no symbol, which rebinds the file's calls). Rows are read by span from the export,
+/// uses included, not through `Graph::callees`.
+pub(crate) fn reads<'g>(
+    graph: &'g Graph<'g>,
+    changes: &[(String, Change)],
+    roots: &[String],
+) -> Vec<(&'g str, Evidence<'g>)> {
+    let repo = &graph.workspace.repos[0];
+    let mut files = Files::new(&repo.root);
+    let changed: HashMap<&str, &Change> = changes.iter().map(|(p, c)| (p.as_str(), c)).collect();
+    let roots: HashSet<&str> = roots.iter().map(String::as_str).collect();
+    let mut out = Vec::new();
+    for c in &graph.exports[0].calls {
+        let path = c.span.path.as_str();
+        let on_line = match changed.get(path) {
+            None | Some(Change::Deleted) => false,
+            _ if roots.contains(format!("{}::{path}", repo.identity).as_str()) => true,
+            Some(Change::Untracked) => true,
+            Some(Change::Lines(ranges)) => {
+                let first = files.line(path, c.span.start);
+                let last = files.line(path, (c.span.end - 1).max(c.span.start));
+                first
+                    .zip(last)
+                    .is_some_and(|(f, l)| ranges.iter().any(|&(a, b)| a <= l && f <= b))
+            }
+        };
+        if !on_line {
+            continue;
+        }
+        match &c.target {
+            Some(target) => out.push((target.as_str(), Evidence::call(c))),
+            None => out.extend(c.candidates.iter().map(|t| {
+                let evidence = Evidence {
+                    level: Level::Ambiguous,
+                    candidates: c.candidates.len(),
+                    ..Evidence::call(c)
+                };
+                (t.as_str(), evidence)
+            })),
+        }
+        for &link in graph.out.get(c.id.as_str()).into_iter().flatten() {
+            out.push((link.provider.as_str(), graph.evidence(link)));
+        }
+    }
+    out
 }
 
 /// `seeds` and the packages of `export`'s repository that depend on them through its
@@ -749,6 +831,9 @@ impl<'a> Graph<'a> {
         }
         if let Some(&(n, node)) = self.iac.get(id) {
             return Some((n, &node.path));
+        }
+        if let Some(&(n, call)) = self.calls.get(id) {
+            return Some((n, &call.span.path));
         }
         (self.exports.iter().enumerate()).find_map(|(n, e)| {
             let site = e.config_sites.iter().find(|s| s.id == id)?;

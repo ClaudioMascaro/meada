@@ -1,0 +1,92 @@
+{
+  "changed": [
+    {
+      "change": "whole",
+      "path": "packages/a/src/f.ts",
+      "repo": "example.com/scope/mono"
+    }
+  ],
+  "files": [
+    {
+      "level": "exact",
+      "manifest": true,
+      "package": "packages/a",
+      "path": "packages/a/src/f.ts",
+      "repo": "example.com/scope/mono",
+      "test": false,
+      "tier": "certain"
+    },
+    {
+      "level": "exact",
+      "manifest": true,
+      "package": "packages/a",
+      "path": "packages/a/src/index.ts",
+      "repo": "example.com/scope/mono",
+      "test": false,
+      "tier": "certain"
+    },
+    {
+      "level": "exact",
+      "manifest": true,
+      "package": "packages/a",
+      "path": "packages/a/src/twice.ts",
+      "repo": "example.com/scope/mono",
+      "test": false,
+      "tier": "certain"
+    },
+    {
+      "level": "exact",
+      "manifest": true,
+      "package": "packages/b",
+      "path": "packages/b/src/g.ts",
+      "reason": "package::npm::@scope/a workspace:* (local 1.0.0), range unchecked; import types",
+      "repo": "example.com/scope/mono",
+      "test": false,
+      "tier": "certain"
+    },
+    {
+      "level": "exact",
+      "manifest": true,
+      "package": "packages/b",
+      "path": "packages/b/src/index.ts",
+      "repo": "example.com/scope/mono",
+      "test": false,
+      "tier": "certain"
+    },
+    {
+      "level": "exact",
+      "manifest": true,
+      "package": "packages/b",
+      "path": "packages/b/src/routes.ts",
+      "repo": "example.com/scope/mono",
+      "test": false,
+      "tier": "certain"
+    },
+    {
+      "level": "exact",
+      "manifest": true,
+      "package": "packages/c",
+      "path": "packages/c/src/g.test.ts",
+      "reason": "package::npm::@scope/b workspace:* (local 1.0.0), range unchecked; import types",
+      "repo": "example.com/scope/mono",
+      "test": true,
+      "tier": "certain"
+    }
+  ],
+  "iac": [],
+  "open": [],
+  "packages": {
+    "certain": [
+      "packages/a",
+      "packages/b",
+      "packages/c"
+    ],
+    "inferred": [],
+    "manifest_only": [
+      "packages/d",
+      "packages/e"
+    ]
+  },
+  "reads": [],
+  "sides": []
+}

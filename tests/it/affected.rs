@@ -4,6 +4,7 @@
 
 use crate::common;
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -514,5 +515,144 @@ fn a_document_side_is_listed_in_sides() {
     assert_eq!(
         (&shipments["place"], &shipments["level"]),
         (&json!("document"), &json!("exact"))
+    );
+}
+
+/// The queue's criterion at the certain tier: A and B conflict when what A affects meets what
+/// B touches or reads, or the other way round.
+fn conflicts(a: &Value, b: &Value) -> bool {
+    let at = |x: &Value, key: &str, certain: bool| -> BTreeSet<(String, String)> {
+        (x[key].as_array().into_iter().flatten())
+            .filter(|e| !certain || e["tier"] == "certain")
+            .map(|e| {
+                (
+                    e["repo"].as_str().unwrap().into(),
+                    e["path"].as_str().unwrap().into(),
+                )
+            })
+            .collect()
+    };
+    let one_way = |a: &Value, b: &Value| {
+        let mut b_side = at(b, "changed", false);
+        b_side.extend(at(b, "open", false));
+        b_side.extend(at(b, "reads", true));
+        !at(a, "files", true).is_disjoint(&b_side)
+    };
+    one_way(a, b) || one_way(b, a)
+}
+
+/// Whether the certain `files` of `a` and `b` meet: the plain intersection.
+fn files_meet(a: &Value, b: &Value) -> bool {
+    let certain = |x: &Value| -> BTreeSet<String> {
+        (x["files"].as_array().into_iter().flatten())
+            .filter(|f| f["tier"] == "certain")
+            .map(|f| f["path"].as_str().unwrap().to_string())
+            .collect()
+    };
+    !certain(a).is_disjoint(&certain(b))
+}
+
+/// The answers of two changes made on one base, each its own commit checked out in turn and
+/// answered as a range.
+fn pair(case: &str, a: impl FnOnce(&Path), b: impl FnOnce(&Path)) -> (Value, Value) {
+    let repo = affected_repo(case);
+    (side(&repo, "a", a), side(&repo, "b", b))
+}
+
+/// The answer of `edit` committed on a branch `branch` from `main`, as a range.
+fn side(repo: &Path, branch: &str, edit: impl FnOnce(&Path)) -> Value {
+    common::git(repo, &["checkout", "-q", "main"]);
+    common::git(repo, &["checkout", "-q", "-b", branch]);
+    edit(repo);
+    commit_all(repo, branch);
+    let range = Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    affected(repo, range)
+}
+
+fn replace(repo: &Path, path: &str, old: &str, new: &str) {
+    let file = repo.join(path);
+    let text = fs::read_to_string(&file).unwrap();
+    assert!(text.contains(old), "{path}: {old}");
+    fs::write(&file, text.replace(old, new)).unwrap();
+}
+
+#[test]
+fn a_new_call_into_a_changed_function_conflicts() {
+    let (a, b) = pair(
+        "affected_pair_new_call",
+        |r| replace(r, "packages/a/src/f.ts", "return 1;", "return 2;"),
+        |r| {
+            let h = "import { f } from '@scope/a';\n\nexport function h(): number {\n  return f();\n}\n";
+            fs::write(r.join("packages/e/src/h.ts"), h).unwrap();
+        },
+    );
+    let reads = paths(&b, "reads");
+    assert!(reads.contains(&"packages/a/src/f.ts".to_string()), "{b:#}");
+    assert!(conflicts(&a, &b));
+    assert!(!files_meet(&a, &b), "plain intersection sees no conflict");
+}
+
+#[test]
+fn an_import_line_rebinding_an_unchanged_call_conflicts() {
+    let (a, b) = pair(
+        "affected_pair_rebind",
+        |r| replace(r, "packages/b/src/fallback.ts", "return 0;", "return 9;"),
+        |r| {
+            replace(
+                r,
+                "packages/b/src/g.ts",
+                "from '@scope/a'",
+                "from './fallback'",
+            )
+        },
+    );
+    let reads = paths(&b, "reads");
+    assert!(
+        reads.contains(&"packages/b/src/fallback.ts".to_string()),
+        "{b:#}"
+    );
+    assert!(conflicts(&a, &b));
+    assert!(!files_meet(&a, &b), "plain intersection sees no conflict");
+}
+
+#[test]
+fn two_edits_of_one_yaml_conflict() {
+    let ci = ".github/workflows/ci.yml";
+    let (a, b) = pair(
+        "affected_pair_yaml",
+        |r| replace(r, ci, "run: yarn test", "run: yarn test --ci"),
+        |r| replace(r, ci, "runs-on: ubuntu-latest", "runs-on: ubuntu-24.04"),
+    );
+    assert!(conflicts(&a, &b));
+}
+
+#[test]
+fn a_deletion_and_a_new_call_to_it_conflict() {
+    let (a, b) = pair(
+        "affected_pair_deletion",
+        |r| {
+            let thrice = "import { twice } from './twice';\n\nexport function thrice(): number {\n  return twice() + 1;\n}\n";
+            fs::write(r.join("packages/a/src/thrice.ts"), thrice).unwrap();
+        },
+        |r| fs::remove_file(r.join("packages/a/src/twice.ts")).unwrap(),
+    );
+    assert!(
+        paths(&a, "reads").contains(&"packages/a/src/twice.ts".to_string()),
+        "{a:#}"
+    );
+    assert!(conflicts(&a, &b));
+    assert!(!files_meet(&a, &b), "plain intersection sees no conflict");
+}
+
+#[test]
+fn the_affected_answer_of_the_fixture_is_golden() {
+    let repo = affected_repo("affected_golden");
+    let answer = of_files(&repo, &["packages/a/src/f.ts"]);
+    common::assert_golden(
+        "trace-affected.json",
+        &serde_json::to_string_pretty(&answer).unwrap(),
     );
 }
