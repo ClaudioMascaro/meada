@@ -93,6 +93,10 @@ pub struct Export {
     /// The dependency entries naming a package of the workspace, by manifest, field, name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dependencies: Vec<Dependency>,
+    /// What each dependency of a workspace member resolves to in a Yarn Berry lockfile, by
+    /// manifest, then name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub resolved: Vec<Resolved>,
     /// The imports resolved into a package of the workspace, by call site, then target.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub imports: Vec<Import>,
@@ -152,6 +156,7 @@ impl Default for Export {
             publishes: Vec::new(),
             packages: Vec::new(),
             dependencies: Vec::new(),
+            resolved: Vec::new(),
             imports: Vec::new(),
             communities: Vec::new(),
             iac_nodes: Vec::new(),
@@ -455,6 +460,23 @@ pub struct Dependency {
     pub alias: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range: Option<String>,
+}
+
+/// The resolved version of a workspace member's dependency: the version its lockfile installs
+/// and where it comes from, beside the range the member's manifest declares.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[non_exhaustive]
+pub struct Resolved {
+    /// The path of the member's `package.json`.
+    pub manifest: String,
+    /// The dependency's key in that manifest.
+    pub name: String,
+    /// The range the manifest declares; absent when it has no entry by that name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range: Option<String>,
+    /// Where the version comes from: the lockfile's protocol (`npm`, `workspace`, `patch`...).
+    pub origin: String,
+    pub version: String,
 }
 
 /// What resolved an import in a provider: the declared field or rule that named the entry, or

@@ -1426,6 +1426,9 @@ impl Engine {
             };
             let exports = partial.exports;
             let mut lines = self.contract_sides(&exports, &links, contract, view, kind);
+            if contract.starts_with("package::npm::") {
+                lines.extend(resolved_lines(&exports, repos, contract));
+            }
             if view.follows_drift() {
                 let entries = drift_view::entries(repos, &exports, &links);
                 lines.extend(drift_view::consumers(&entries, contract));
@@ -2402,6 +2405,24 @@ fn relative(from: &Path, to: &Path) -> String {
     }
 }
 
+/// What the dependencies of the manifest providing the npm package `contract` resolve to, one
+/// line each: `  <name> resolves <range or -> to <version> (<origin>)`.
+fn resolved_lines(exports: &[Export], repos: &[Repository], contract: &str) -> Vec<String> {
+    let mut lines = Vec::new();
+    for (export, repo) in exports.iter().zip(repos) {
+        let manifests = (export.providers.iter())
+            .filter(|p| p.contract == contract)
+            .filter_map(|p| p.site.strip_prefix(&repo.identity)?.strip_prefix("::"));
+        for manifest in manifests {
+            for r in export.resolved.iter().filter(|r| r.manifest == manifest) {
+                let range = r.range.as_deref().unwrap_or("-");
+                let (name, version, origin) = (&r.name, &r.version, &r.origin);
+                lines.push(format!("  {name} resolves {range} to {version} ({origin})"));
+            }
+        }
+    }
+    lines
+}
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;

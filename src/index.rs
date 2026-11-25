@@ -29,7 +29,8 @@ use crate::iac;
 use crate::kube;
 use crate::lang::{self, Facts};
 use crate::msg::{Fix, Msg};
-use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package};
+use crate::package::{self, Config, Dependency, Hop, Import, ImportCall, Manifest, Package, lock};
+use crate::repo;
 use crate::resolve::{Ancestry, Code, Exported, Flexible, Resolution, Resolver, Target};
 use crate::shape::{Shape, Want};
 pub(crate) use meada_core::export as written;
@@ -232,6 +233,15 @@ CREATE INDEX iac_images_address ON iac_images (root, address);
 CREATE TABLE iac_unresolved (
     root TEXT NOT NULL, path TEXT NOT NULL, entry TEXT NOT NULL, reason TEXT NOT NULL
 );
+CREATE TABLE lockfiles (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    state TEXT NOT NULL
+);
+CREATE TABLE resolved (
+    lockfile TEXT NOT NULL, manifest TEXT NOT NULL, name TEXT NOT NULL, origin TEXT NOT NULL,
+    version TEXT NOT NULL
+);
+CREATE INDEX resolved_lockfile ON resolved (lockfile);
 ";
 
 /// A file modified this close to a refresh may change again within the same mtime tick, so
@@ -926,7 +936,7 @@ fn refresh_attempt(
                  DELETE FROM valued; DELETE FROM config_files; DELETE FROM taken; DELETE FROM dockerfiles; DELETE FROM contract_configs; DELETE FROM config_values; \
                  INSERT INTO config_search (config_search) VALUES ('delete-all'); \
                  DELETE FROM iac_nodes; DELETE FROM iac_references; DELETE FROM iac_images; \
-                 DELETE FROM iac_unresolved;",
+                 DELETE FROM iac_unresolved; DELETE FROM lockfiles; DELETE FROM resolved;",
             )?;
             None
         }
@@ -963,6 +973,19 @@ fn refresh_attempt(
             false => Ok(serde_json::to_string(&package::read_manifest(path, src))?),
         },
     )?;
+    // A lockfile holds no code and is in no digest: a change to it rewrites its own rows alone.
+    let gone = refresh_stamped(
+        &tx,
+        "lockfiles",
+        &lockfiles_found(&all),
+        now,
+        |_| Ok(false),
+        |abs| read_up_to(abs, lock::MAX_LOCK_BYTES),
+        |path, src| resolve_lockfile(&tx, root, path, src),
+    )?;
+    for path in gone {
+        tx.execute("DELETE FROM resolved WHERE lockfile = ?1", params![path])?;
+    }
     // Config values hold no code either: an edited config file changes its rows alone.
     // A `.tfvars` file is redacted for the sensitive variables of other files (they sort last,
     // so those are stored first) and is read again when they change.
@@ -2164,6 +2187,7 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
             document::DOCUMENT_BYTES_MAX,
         ),
         ("manifests", manifests_found(&all), lang::MAX_BYTES),
+        ("lockfiles", lockfiles_found(&all), lock::MAX_LOCK_BYTES),
         ("config_files", config_files.clone(), lang::MAX_BYTES),
         (
             "contract_configs",
@@ -2416,6 +2440,89 @@ fn manifests_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
         .collect()
 }
 
+/// The `yarn.lock` files of a repository (path and absolute path), but those under a
+/// `node_modules` directory.
+fn lockfiles_found(walked: &[(String, PathBuf)]) -> Vec<(String, PathBuf)> {
+    let is_lockfile = |path: &str| {
+        path.rsplit('/').next() == Some("yarn.lock")
+            && !path.split('/').any(|s| s == "node_modules")
+    };
+    (walked.iter())
+        .filter(|(path, _)| is_lockfile(path))
+        .cloned()
+        .collect()
+}
+
+/// Reads the lockfile at `path` and rewrites its `resolved` rows: what each workspace's
+/// dependencies resolve to, each workspace's manifest being `<dir>/package.json` under the
+/// lockfile's folder. The root manifest beside it gives its `resolutions`. Answers the
+/// `lockfiles.state`: `read`, or why not (`lock::Unread`).
+fn resolve_lockfile(tx: &Transaction, root: &Path, path: &str, src: &[u8]) -> Result<String> {
+    tx.execute("DELETE FROM resolved WHERE lockfile = ?1", params![path])?;
+    let folder = path.rsplit_once('/').map_or("", |(dir, _)| dir);
+    let manifest = repo::relative(folder, "package.json").unwrap_or_default();
+    let overrides: BTreeMap<String, String> = read_up_to(&root.join(&manifest), lang::MAX_BYTES)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .and_then(|json| {
+            let resolutions = json.get("resolutions")?.as_object()?;
+            Some(
+                (resolutions.iter())
+                    .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_string())))
+                    .collect(),
+            )
+        })
+        .unwrap_or_default();
+    let lock = match lock::read(src, &overrides) {
+        Ok(lock) => lock,
+        Err(unread) => return Ok(unread.name().to_string()),
+    };
+    for r in lock::direct(&lock) {
+        // A workspace directory outside the repository has no manifest of it.
+        let Some(member) = repo::relative(folder, &format!("{}/package.json", r.dir))
+            .filter(|m| m != ".." && !m.starts_with("../"))
+        else {
+            continue;
+        };
+        tx.execute(
+            "INSERT INTO resolved (lockfile, manifest, name, origin, version) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![path, member, r.name, r.origin, r.version],
+        )?;
+    }
+    Ok("read".to_string())
+}
+
+/// The `resolved` rows with the range each manifest of `manifests` declares, by manifest, then
+/// name.
+fn resolved_rows(db: &Connection, manifests: &[Manifest]) -> Result<Vec<written::Resolved>> {
+    let mut rows = db.prepare(
+        "SELECT DISTINCT manifest, name, origin, version FROM resolved \
+         ORDER BY manifest, name, origin, version",
+    )?;
+    let rows = rows.query_map([], |r| {
+        let mut resolved = written::Resolved::default();
+        resolved.manifest = r.get(0)?;
+        resolved.name = r.get(1)?;
+        resolved.origin = r.get(2)?;
+        resolved.version = r.get(3)?;
+        Ok(resolved)
+    })?;
+    let mut out = Vec::new();
+    for row in rows {
+        let mut resolved = row?;
+        resolved.range = (manifests.iter())
+            .find(|m| m.path == resolved.manifest)
+            .and_then(|m| {
+                (m.summary.dependencies.iter())
+                    .find(|e| e.name == resolved.name && e.range.is_some())
+            })
+            .and_then(|e| e.range.clone());
+        out.push(resolved);
+    }
+    Ok(out)
+}
+
 /// The folders the index holds a `Dockerfile` in (`dockerfiles`), sorted.
 fn stored_dockerfiles(db: &Connection) -> Result<Vec<String>> {
     let mut rows = db.prepare("SELECT folder FROM dockerfiles ORDER BY folder")?;
@@ -2515,9 +2622,15 @@ fn refresh_stamped(
             continue;
         }
         let summary = summarize(path, &src)?;
+        // `lockfiles` keeps whether the file was read, not a summary.
+        let column = if table == "lockfiles" {
+            "state"
+        } else {
+            "summary"
+        };
         tx.execute(
             &format!(
-                "INSERT OR REPLACE INTO {table} (path, hash, mtime, size, summary) \
+                "INSERT OR REPLACE INTO {table} (path, hash, mtime, size, {column}) \
                  VALUES (?1, ?2, ?3, ?4, ?5)"
             ),
             params![path, hash, mtime, size, summary],
@@ -3042,6 +3155,9 @@ pub(crate) struct Export {
     pub(crate) packages: Vec<Package>,
     /// The dependency entries naming a package of the workspace, by manifest, field, name.
     pub(crate) dependencies: Vec<Dependency>,
+    /// What each dependency of a workspace member resolves to (`resolved` rows, #537), with the
+    /// range its manifest declares.
+    pub(crate) resolved: Vec<written::Resolved>,
     /// The calls through a binding imported from a bare specifier, by site. Not exported:
     /// `package::import` resolves those that name a package of the workspace.
     pub(crate) import_calls: Vec<ImportCall>,
@@ -3166,6 +3282,7 @@ impl Export {
         out.publishes = self.publishes;
         out.packages = self.packages.into_iter().map(Package::written).collect();
         out.dependencies = self.dependencies;
+        out.resolved = self.resolved;
         out.imports = self.imports;
         out.communities = self.communities;
         out.links = self.links;
@@ -3519,6 +3636,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
     let (manifests, tsconfigs) = read_manifests(rows)?;
+    let resolved = resolved_rows(db, &manifests)?;
     // Only a repository with a manifest can import a package, and only one with a named
     // manifest provides one: the rows that resolve imports are read for those alone.
     let import_calls = match manifests.is_empty() {
@@ -3649,6 +3767,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         tsconfigs,
         packages: Vec::new(),
         dependencies: Vec::new(),
+        resolved,
         import_calls,
         exported,
         ancestries,

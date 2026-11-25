@@ -61,6 +61,7 @@ mod items;
 mod jvmpkg;
 mod kotlinpkg;
 mod kubernetes;
+mod lockfile;
 mod manifest;
 mod mcp;
 mod nugetpkg;

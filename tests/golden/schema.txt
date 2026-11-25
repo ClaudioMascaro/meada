@@ -86,6 +86,15 @@ CREATE INDEX iac_images_address ON iac_images (root, address);
 CREATE TABLE iac_unresolved (
     root TEXT NOT NULL, path TEXT NOT NULL, entry TEXT NOT NULL, reason TEXT NOT NULL
 );
+CREATE TABLE lockfiles (
+    path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
+    state TEXT NOT NULL
+);
+CREATE TABLE resolved (
+    lockfile TEXT NOT NULL, manifest TEXT NOT NULL, name TEXT NOT NULL, origin TEXT NOT NULL,
+    version TEXT NOT NULL
+);
+CREATE INDEX resolved_lockfile ON resolved (lockfile);
 
 receiver_identity
 [

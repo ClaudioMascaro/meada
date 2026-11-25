@@ -3391,6 +3391,7 @@ mod tests {
             .collect(),
             packages: Vec::new(),
             dependencies: Vec::new(),
+            resolved: Vec::new(),
             import_calls: Vec::new(),
             communities: Vec::new(),
             ancestries: Vec::new(),
