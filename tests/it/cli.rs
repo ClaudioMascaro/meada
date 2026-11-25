@@ -1423,3 +1423,64 @@ fn a_reader_that_closed_its_end_drops_the_output_quietly() {
         );
     }
 }
+
+/// Runs `meada <args>` in `repo` under an English `LANG`; returns its output.
+fn meada_args(repo: &Path, args: &[&str]) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_meada"))
+        .current_dir(repo)
+        .args(args)
+        .env("LANG", "en_US.UTF-8")
+        .output()
+        .expect("meada runs")
+}
+
+/// stdout of a run that succeeded with nothing on stderr.
+fn stdout_of(out: std::process::Output) -> String {
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        out.status.success() && stderr.is_empty(),
+        "{}: {stderr}",
+        out.status
+    );
+    String::from_utf8(out.stdout).expect("UTF-8")
+}
+
+/// `meada trace` prints what the MCP tool answers, from `Engine::trace`, in both directions and
+/// under a budget.
+#[test]
+fn the_trace_command_prints_the_engine_answer() {
+    use meada::engine::{Direction, Engine, Start};
+    let (web, _, _) = chain("cli_trace");
+    let engine = || Engine::open(&web).unwrap();
+    let cases: [(&[&str], Direction, Option<usize>); 3] = [
+        (&["trace", "dashboard"], Direction::Down, None),
+        (&["trace", "dashboard", "--up"], Direction::Up, None),
+        (
+            &["trace", "dashboard", "--budget", "50"],
+            Direction::Down,
+            Some(50),
+        ),
+    ];
+    for (args, direction, budget) in cases {
+        let printed = stdout_of(meada_args(&web, args));
+        let answer = (engine().trace(Start::From("dashboard"), direction, budget)).unwrap();
+        assert_eq!(printed, answer, "{args:?}");
+    }
+}
+
+/// `meada trace --changes uncommitted` answers as the MCP tool's `changes: uncommitted`.
+#[test]
+fn trace_changes_uncommitted_prints_the_engine_answer() {
+    use meada::engine::{Direction, Engine, Start};
+    let repo = fixture_repo("cli_trace_uncommitted", "ts-basic", None);
+    let math = repo.join("src/math.ts");
+    let text = fs::read_to_string(&math).unwrap();
+    fs::write(&math, text.replace("return a + b;", "return b + a;")).unwrap();
+    let printed = stdout_of(meada_args(&repo, &["trace", "--changes", "uncommitted"]));
+    let engine = Engine::open(&repo).unwrap();
+    let answer = engine
+        .trace(Start::Uncommitted, Direction::Down, None)
+        .unwrap();
+    assert!(answer.contains("add"), "{answer}");
+    assert_eq!(printed, answer);
+}

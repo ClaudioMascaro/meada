@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use meada::decide;
-use meada::engine::{self, Engine};
+use meada::engine::{self, Direction, Engine, Start};
 use meada::msg::{self, Msg};
 
 #[derive(Parser)]
@@ -60,6 +60,16 @@ enum Command {
         show_request: bool,
         #[arg(long, requires = "decider", allow_negative_numbers = true)]
         min_p: Option<f64>,
+    },
+    #[command(group(clap::ArgGroup::new("start").required(true).args(["from", "changes"])))]
+    Trace {
+        from: Option<String>,
+        #[arg(long)]
+        changes: Option<String>,
+        #[arg(long)]
+        up: bool,
+        #[arg(long)]
+        budget: Option<usize>,
     },
     #[cfg(feature = "snapshot")]
     Snapshot {
@@ -688,6 +698,13 @@ fn main() -> ExitCode {
                     a.help(Msg::DecideShowRequestHelp.text())
                 })
                 .mut_arg("min_p", |a| a.help(Msg::DecideMinPHelp.text()))
+        })
+        .mut_subcommand("trace", |c| {
+            c.about(Msg::Trace.text())
+                .mut_arg("from", |a| a.help(Msg::TraceFrom.text()))
+                .mut_arg("changes", |a| a.help(Msg::TraceChanges.text()))
+                .mut_arg("up", |a| a.help(Msg::TraceUp.text()))
+                .mut_arg("budget", |a| a.help(Msg::TraceBudget.text()))
         });
     #[cfg(feature = "snapshot")]
     let matches = matches.mut_subcommand("snapshot", |c| {
@@ -1185,6 +1202,24 @@ fn main() -> ExitCode {
                 &mut std::io::stdin().lock(),
                 &mut std::io::stdout(),
             )
+        })(),
+        Command::Trace {
+            from,
+            changes,
+            up,
+            budget,
+        } => (|| {
+            let start = match (from.as_deref(), changes.as_deref()) {
+                (Some(from), _) => Start::From(from),
+                (None, Some("uncommitted")) => Start::Uncommitted,
+                (None, other) => {
+                    return Err(Msg::TraceChangesValue(other.unwrap_or_default())
+                        .text()
+                        .into());
+                }
+            };
+            let direction = if up { Direction::Up } else { Direction::Down };
+            Engine::open(here)?.trace(start, direction, budget).map(out)
         })(),
         command => Engine::open(here).and_then(|engine| match command {
             Command::Export { .. } => engine.export().map(out),

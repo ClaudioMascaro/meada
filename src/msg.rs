@@ -1491,6 +1491,13 @@ pub enum Msg<'a> {
     AnswerUnknown(&'a str),
     DecideMinP,
     DecideMinPHelp,
+    Trace,
+    TraceFrom,
+    TraceChanges,
+    TraceUp,
+    TraceBudget,
+    /// `meada trace --changes` given what it does not take.
+    TraceChangesValue(&'a str),
     DecideFailures(usize),
     DeciderInvalid(&'a str),
     DeciderProtocol,
@@ -5530,6 +5537,54 @@ impl Msg<'_> {
                 format!("With --decider: write a model decision only from this probability up (default {}).", crate::decider::MIN_P),
                 format!("Com --decider: grava a decisão do modelo só a partir desta probabilidade (padrão {}).", crate::decider::MIN_P),
                 format!("Con --decider: escribe la decisión del modelo solo a partir de esta probabilidad (por defecto {}).", crate::decider::MIN_P),
+            ),
+            Msg::Trace => pick(
+                "Follow a chain through calls and cross-repository links, down or up, until it \
+                 ends, as the MCP trace tool answers."
+                    .into(),
+                "Segue uma cadeia por chamadas e links entre repositórios, para baixo ou para \
+                 cima, até o fim, como responde a ferramenta trace do MCP."
+                    .into(),
+                "Sigue una cadena por llamadas y links entre repositorios, hacia abajo o hacia \
+                 arriba, hasta que termina, como responde la herramienta trace del MCP."
+                    .into(),
+            ),
+            Msg::TraceFrom => pick(
+                "Where the chain starts: a symbol, a route or a call site, by identity or by \
+                 name, or process::<entry point>."
+                    .into(),
+                "Onde a cadeia começa: um símbolo, uma rota ou um ponto de chamada, por \
+                 identidade ou por nome, ou process::<ponto de entrada>."
+                    .into(),
+                "Dónde empieza la cadena: un símbolo, una ruta o un punto de llamada, por \
+                 identidad o por nombre, o process::<punto de entrada>."
+                    .into(),
+            ),
+            Msg::TraceChanges => pick(
+                "Start from the symbols a change touches: uncommitted (the working tree against \
+                 HEAD)."
+                    .into(),
+                "Começa pelos símbolos que uma mudança toca: uncommitted (a árvore de trabalho \
+                 contra o HEAD)."
+                    .into(),
+                "Empieza por los símbolos que toca un cambio: uncommitted (el árbol de trabajo \
+                 frente a HEAD)."
+                    .into(),
+            ),
+            Msg::TraceUp => pick(
+                "Walk up, to what calls or reaches the start, instead of down.".into(),
+                "Sobe, até o que chama ou alcança o início, em vez de descer.".into(),
+                "Sube, hasta lo que llama o alcanza el inicio, en vez de bajar.".into(),
+            ),
+            Msg::TraceBudget => pick(
+                format!("Token budget of the answer (default {}).", meada_core::render::DEFAULT_BUDGET),
+                format!("Orçamento de tokens da resposta (padrão {}).", meada_core::render::DEFAULT_BUDGET),
+                format!("Presupuesto de tokens de la respuesta (por defecto {}).", meada_core::render::DEFAULT_BUDGET),
+            ),
+            Msg::TraceChangesValue(value) => pick(
+                format!("`--changes` takes `uncommitted`, not `{value}`"),
+                format!("`--changes` aceita `uncommitted`, não `{value}`"),
+                format!("`--changes` acepta `uncommitted`, no `{value}`"),
             ),
             Msg::DecideFailures(n) => pick(
                 format!("{n} item(s) failed, see above; the other decisions were handled"),
