@@ -62,7 +62,7 @@ fn shown(links: &[&Value]) -> Vec<(String, String, String)> {
 fn declared(reason: &str) -> (String, String, String) {
     (
         "declared".into(),
-        format!("{MONO}::svc-b/main.go::run"),
+        format!("{MONO}::svc-b/routes.go::Routes.run"),
         format!("{reason}, declared for svc-b/ in meada.toml; served by {MONO}"),
     )
 }
@@ -159,7 +159,7 @@ fn a_declared_gateway_match_stays_inferred() {
         shown(&of(&found, "web/src/api.ts::gatewayRun")),
         [(
             "inferred".into(),
-            format!("{MONO}::svc-b/main.go::run"),
+            format!("{MONO}::svc-b/routes.go::Routes.run"),
             "gateway prefix /api".into()
         )],
         "{found:#?}"
@@ -171,7 +171,8 @@ fn a_declaration_reaches_only_its_own_repository() {
     let declared = links(&with_peer("base_url_own_declared"));
     let repo = with_peer("base_url_own_undeclared");
     let text = std::fs::read_to_string(repo.join("meada.toml")).unwrap();
-    let peer_only = text.replace("[[base_url]]\nenv = [\"B_URL\"]\ndir = \"svc-b\"\n", "");
+    let declaration = "[[base_url]]\nenv = [\"B_URL\", \"B_BASE_URL\"]\ndir = \"svc-b\"\n";
+    let peer_only = text.replace(declaration, "");
     assert_ne!(peer_only, text);
     std::fs::write(repo.join("meada.toml"), peer_only).unwrap();
     let undeclared = links(&repo);
@@ -189,7 +190,7 @@ fn a_relative_url_in_a_package_that_serves_it_links_there() {
     let test = shown(&of(&found, "svc-b/router_test.go::TestRun"));
     assert_eq!(test.len(), 1, "{found:#?}");
     assert_eq!(test[0].0, "inferred");
-    assert_eq!(test[0].1, format!("{MONO}::svc-b/main.go::run"));
+    assert_eq!(test[0].1, format!("{MONO}::svc-b/routes.go::Routes.run"));
     assert!(!test[0].2.contains("providers fit"), "{test:?}");
 }
 
@@ -201,7 +202,7 @@ fn a_relative_url_its_package_does_not_serve_keeps_every_fit() {
     assert_eq!(
         providers,
         [
-            format!("{MONO}::svc-b/main.go::run"),
+            format!("{MONO}::svc-b/routes.go::Routes.run"),
             format!("{MONO}::svc-c/main.go::run")
         ],
         "{found:#?}"
@@ -224,7 +225,84 @@ fn a_relative_url_drops_other_repositories_too() {
     let providers: Vec<&str> = test.iter().map(|(_, p, _)| p.as_str()).collect();
     assert_eq!(
         providers,
-        [format!("{MONO}::svc-b/main.go::run")],
+        [format!("{MONO}::svc-b/routes.go::Routes.run")],
         "{found:#?}"
     );
+}
+
+#[test]
+fn the_go_client_links_each_route_declared() {
+    let found = links(&mono("base_url_go_client"));
+    let reason =
+        format!("base URL from B_BASE_URL, declared for svc-b/ in meada.toml; served by {MONO}");
+    let at = |site: &str, provider: &str| {
+        let row = (
+            "declared".to_string(),
+            format!("{MONO}::{provider}"),
+            reason.clone(),
+        );
+        assert_eq!(shown(&of(&found, site)), [row], "{found:#?}");
+    };
+    at(
+        "svc-a/client/client.go::Client.Run",
+        "svc-b/routes.go::Routes.run",
+    );
+    at(
+        "svc-a/client/client.go::Client.Cancel",
+        "svc-b/routes.go::Routes.cancel",
+    );
+}
+
+#[test]
+fn without_the_declaration_the_go_client_is_not_declared() {
+    let repo = mono("base_url_go_undeclared");
+    std::fs::remove_file(repo.join("meada.toml")).unwrap();
+    let found = links(&repo);
+    let run = shown(&of(&found, "svc-a/client/client.go::Client.Run"));
+    let providers: Vec<&str> = run.iter().map(|(_, p, _)| p.as_str()).collect();
+    assert_eq!(
+        providers,
+        [
+            format!("{MONO}::svc-b/routes.go::Routes.run"),
+            format!("{MONO}::svc-c/main.go::run")
+        ],
+        "{found:#?}"
+    );
+    for (level, _, reason) in &run {
+        assert_eq!(level, "ambiguous");
+        let why = "2 providers fit; base URL from B_BASE_URL, no peer's base_url_env; ";
+        assert!(reason.starts_with(why), "{reason}");
+    }
+    let cancel = shown(&of(&found, "svc-a/client/client.go::Client.Cancel"));
+    assert_eq!(cancel.len(), 1, "{found:#?}");
+    assert_eq!(cancel[0].0, "inferred");
+    assert_eq!(
+        cancel[0].1,
+        format!("{MONO}::svc-b/routes.go::Routes.cancel")
+    );
+}
+
+#[test]
+fn a_request_struct_change_reaches_both_consumers() {
+    let repo = mono("base_url_lock");
+    let file = repo.join("svc-b/svc/types.go");
+    let text = std::fs::read_to_string(&file).unwrap();
+    let renamed = text.replace("`json:\"name\"`", "`json:\"job\"`");
+    assert_ne!(renamed, text);
+    std::fs::write(&file, renamed).unwrap();
+    crate::common::git(&repo, &["add", "-A"]);
+    crate::common::git(&repo, &["commit", "-q", "-m", "rename"]);
+    let changes = meada::engine::Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    let answer = Engine::open(&repo).unwrap().affected(changes).unwrap();
+    let answer = serde_json::to_value(answer).unwrap();
+    for path in ["svc-a/client/client.go", "web/src/api.ts"] {
+        let entry = (answer["files"].as_array().into_iter().flatten())
+            .find(|f| f["path"] == path)
+            .unwrap_or_else(|| panic!("{path}: {answer:#}"));
+        let certain = ["exact", "declared"].contains(&entry["level"].as_str().unwrap());
+        assert!(certain, "{path}: {entry}");
+    }
 }
