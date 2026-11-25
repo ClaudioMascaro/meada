@@ -667,7 +667,7 @@ fn drained(serve: impl FnOnce() -> meada::Result<()>) -> meada::Result<()> {
 /// labelled "".
 fn blocks(text: &str) -> Vec<(String, Vec<String>)> {
     let mut blocks: Vec<(String, Vec<String>)> = Vec::new();
-    for line in text.lines().map(|l| l.trim_end_matches('\r')) {
+    for line in text.lines() {
         match line.strip_prefix("@@") {
             Some(label) => blocks.push((label.to_string(), Vec::new())),
             None if line.is_empty() => {}

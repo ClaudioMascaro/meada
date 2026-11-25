@@ -994,6 +994,55 @@ mod tests {
         assert_eq!((r2.key, r2.evidence), (CERTAIN, None));
     }
 
+    #[test]
+    fn a_decided_link_is_certain_only_when_a_human_decided() {
+        let decided = |by| Evidence {
+            level: Level::Decided,
+            by,
+            p: None,
+            candidates: 0,
+            reason: None,
+            narrowed: false,
+        };
+        assert_eq!(Tier::of(&decided(Some("human"))), Tier::Certain);
+        assert_eq!(Tier::of(&decided(Some("a-model"))), Tier::Model);
+        assert_eq!(Tier::of(&decided(None)), Tier::Model);
+    }
+
+    #[test]
+    fn an_ambiguous_link_counts_the_links_of_its_consumer_and_contract() {
+        let (workspace, exports) =
+            repository(&["x", "p1", "p2", "p3"], &[("x", None, Level::Exact, &[])]);
+        let link = |provider: &str, contract: &str| {
+            let (consumer, provider) = (format!("{}@0", id("x")), id(provider));
+            let reason = "2 providers fit".to_string();
+            Link::new(
+                consumer,
+                provider,
+                contract.into(),
+                Level::Ambiguous,
+                reason,
+                None,
+                None,
+                None,
+            )
+        };
+        let links = [
+            link("p1", "http::GET::/a"),
+            link("p2", "http::GET::/a"),
+            link("p3", "http::GET::/b"),
+        ];
+        let graph = Graph::new(&workspace, &exports, &links);
+
+        let dependents = graph.dependents(&id("p1"));
+
+        let x = dependents.iter().find(|d| d.to == id("x")).expect("x");
+        assert_eq!(
+            (x.evidence.level, x.evidence.candidates),
+            (Level::Ambiguous, 2)
+        );
+    }
+
     /// What a breadth-first walk over certain edges only reaches from `roots`: a node an
     /// ending edge reaches is not walked on.
     fn certain_walk<'g>(graph: &'g Graph<'g>, roots: &'g [String]) -> BTreeSet<&'g str> {

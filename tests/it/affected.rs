@@ -698,4 +698,47 @@ fn a_batch_answers_each_block_as_one_line() {
         single["label"] = json!(label);
         assert_eq!(line, single, "{label}");
     }
+    // Paths before any label form a block labelled "", with CRLF and blank lines read.
+    fs::write(&batch, "packages/a/src/f.ts\r\n\r\n").unwrap();
+    let run = |batch: &Path| {
+        Command::new(env!("CARGO_BIN_EXE_meada"))
+            .current_dir(&repo)
+            .args(["trace", "--affected", "--batch"])
+            .arg(batch)
+            .output()
+            .expect("meada runs")
+    };
+    let unlabelled = run(&batch);
+    let mut single = of_files(&repo, &["packages/a/src/f.ts"]);
+    single["label"] = json!("");
+    assert_eq!(
+        serde_json::from_slice::<Value>(&unlabelled.stdout).unwrap(),
+        single
+    );
+    assert!(!run(&repo.join("../no-such-batch.txt")).status.success());
+}
+
+#[test]
+fn a_changed_line_reads_the_candidates_of_its_call() {
+    let repo = affected_repo("affected_reads_candidates");
+    let answer = edited(
+        &repo,
+        "packages/e/src/loose.ts",
+        "y.run();",
+        "y.run(); // again",
+    );
+    let reads: Vec<&Value> = answer["reads"].as_array().unwrap().iter().collect();
+    let runners = reads
+        .iter()
+        .find(|r| r["path"] == "packages/e/src/runners.ts");
+    let runners = runners.unwrap_or_else(|| panic!("{answer:#}"));
+    assert_eq!(
+        (&runners["tier"], &runners["candidates"]),
+        (&json!("ambiguous"), &json!(2))
+    );
+    // `x.uniqueName()` sits on a line the change left alone.
+    assert!(
+        !reads.iter().any(|r| r["path"] == "packages/a/src/named.ts"),
+        "{answer:#}"
+    );
 }
