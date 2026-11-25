@@ -1581,3 +1581,88 @@ fn a_patch_rehash_roots_hoisted_importers_through_the_wrapped_range() {
         locked_paths(&answer)
     );
 }
+
+#[test]
+fn a_checksum_alone_moving_roots_hoisted_importers() {
+    let repo = lockfile_repo("lockfile_checksum_only");
+    let answer = edited(
+        &repo,
+        "web/yarn.lock",
+        "checksum: 10c0/lodash41720\n",
+        "checksum: 10c0/lodash41720b\n",
+    );
+    assert!(
+        locked_paths(&answer).contains(&"web/packages/d/src/hoisted.ts".to_string()),
+        "{:?}",
+        locked_paths(&answer)
+    );
+}
+
+#[test]
+fn a_member_declaring_its_own_resolution_is_not_hoisted() {
+    let repo = lockfile_repo("lockfile_own_resolution");
+    // `c` declares `lodash@^3`, its own entry; `a` declares `lodash@^4.17.0`, which does not move.
+    replace(
+        &repo,
+        "web/packages/c/package.json",
+        "{\"typescript\": \"^5.4.0\"}",
+        "{\"lodash\": \"^3.10.0\", \"typescript\": \"^5.4.0\"}",
+    );
+    replace(
+        &repo,
+        "web/yarn.lock",
+        "  dependencies:\n    typescript: \"npm:^5.4.0\"\n",
+        "  dependencies:\n    lodash: \"npm:^3.10.0\"\n    typescript: \"npm:^5.4.0\"\n",
+    );
+    let lock = repo.join("web/yarn.lock");
+    let mut text = fs::read_to_string(&lock).unwrap();
+    text.push_str(&format!(
+        "\n\"lodash@npm:^3.10.0\":\n{}  languageName: node\n  linkType: hard\n",
+        entry("lodash", "3.10.1", "lodash3101")
+    ));
+    fs::write(&lock, text).unwrap();
+    commit_all(&repo, "a second lodash");
+    let answer = bumped(
+        &repo,
+        "lodash",
+        ("3.10.1", "lodash3101"),
+        ("3.10.2", "lodash3102"),
+    );
+    let locked = locked_paths(&answer);
+    // The undeclared importer is rooted; `a`, which declares its own lodash, is not.
+    assert!(
+        locked.contains(&"web/packages/d/src/hoisted.ts".to_string()),
+        "{locked:?}"
+    );
+    assert!(
+        !locked.iter().any(|p| p.starts_with("web/packages/a/")),
+        "{locked:?}"
+    );
+}
+
+#[test]
+fn a_nested_lockfile_roots_no_file_outside_its_folder() {
+    let repo = lockfile_repo("lockfile_outside_folder");
+    fs::create_dir_all(repo.join("tools/src")).unwrap();
+    fs::write(
+        repo.join("tools/package.json"),
+        "{\"name\": \"tools\", \"version\": \"1.0.0\"}\n",
+    )
+    .unwrap();
+    fs::write(
+        repo.join("tools/src/x.ts"),
+        "import { uniq } from 'lodash';\n\nexport function tool(xs: number[]) {\n  return uniq(xs);\n}\n",
+    )
+    .unwrap();
+    commit_all(&repo, "a tool outside the workspace");
+    let answer = bumped(&repo, "lodash", LODASH, LODASH_NEXT);
+    let locked = locked_paths(&answer);
+    assert!(
+        locked.contains(&"web/packages/d/src/hoisted.ts".to_string()),
+        "{locked:?}"
+    );
+    assert!(
+        !locked.iter().any(|p| p.starts_with("tools/")),
+        "{locked:?}"
+    );
+}
