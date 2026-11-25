@@ -864,8 +864,11 @@ fn opened(answer: &Value) -> Vec<(String, String, Option<String>)> {
 fn a_direct_bump_roots_only_the_importing_files() {
     let repo = lockfile_repo("lockfile_direct");
     let answer = bumped(&repo, "lodash", LODASH, LODASH_NEXT);
+    let in_a: Vec<String> = (locked_paths(&answer).into_iter())
+        .filter(|p| p.starts_with("web/packages/a/"))
+        .collect();
     assert_eq!(
-        locked_paths(&answer),
+        in_a,
         ["web/packages/a/src/fp.ts", "web/packages/a/src/uses.ts"]
     );
     for path in ["web/packages/a/src/fp.ts", "web/packages/a/src/uses.ts"] {
@@ -1159,4 +1162,129 @@ fn a_single_package_lockfile_roots_its_importers() {
         json!([{"package": ".", "via": ["lodash"], "whole": false}])
     );
     assert!(opened(&answer).is_empty(), "{:?}", opened(&answer));
+}
+
+#[test]
+fn a_root_only_tooling_bump_is_all_packages() {
+    let repo = lockfile_repo("lockfile_root_tooling");
+    let answer = bumped(
+        &repo,
+        "eslint",
+        ("9.0.0", "eslint900"),
+        ("9.0.1", "eslint901"),
+    );
+    assert_eq!(
+        opened(&answer),
+        [(
+            "web/yarn.lock".to_string(),
+            "all-packages".to_string(),
+            None
+        )]
+    );
+    // Still attributed.
+    assert_eq!(
+        answer["lockfiles"][0]["packages"],
+        json!([{"package": "web", "via": ["eslint"], "whole": true}])
+    );
+}
+
+#[test]
+fn a_hoisted_import_of_a_reached_name_is_rooted() {
+    let repo = lockfile_repo("lockfile_hoisted");
+    let answer = bumped(&repo, "lodash", LODASH, LODASH_NEXT);
+    assert!(
+        locked(&answer).contains(&(
+            "web/packages/d/src/hoisted.ts".into(),
+            "web/yarn.lock".into()
+        )),
+        "{:?}",
+        locked(&answer)
+    );
+    // `b` does not load `lodash`: nothing of it is rooted.
+    assert!(
+        !locked_paths(&answer)
+            .iter()
+            .any(|p| p.starts_with("web/packages/b/"))
+    );
+}
+
+/// A commit that bumps `lodash` to `^4.17.21` in `a`'s manifest and the lockfile, with
+/// `also` replacing more of the manifest.
+fn range_bump(repo: &Path, also: Option<(&str, &str)>) -> Value {
+    let manifest = "web/packages/a/package.json";
+    replace(
+        repo,
+        manifest,
+        "\"lodash\": \"^4.17.0\"",
+        "\"lodash\": \"^4.17.21\"",
+    );
+    if let Some((old, new)) = also {
+        replace(repo, manifest, old, new);
+    }
+    let lock = "web/yarn.lock";
+    replace(
+        repo,
+        lock,
+        "    lodash: \"npm:^4.17.0\"",
+        "    lodash: \"npm:^4.17.21\"",
+    );
+    replace(
+        repo,
+        lock,
+        "\"lodash@npm:^4.17.0\":",
+        "\"lodash@npm:^4.17.21\":",
+    );
+    replace(
+        repo,
+        lock,
+        &entry("lodash", LODASH.0, LODASH.1),
+        &entry("lodash", LODASH_NEXT.0, LODASH_NEXT.1),
+    );
+    commit_all(repo, "bump lodash");
+    affected(
+        repo,
+        Changes::Range {
+            base: "HEAD~1",
+            head: "HEAD",
+        },
+    )
+}
+
+#[test]
+fn a_manifest_whose_only_change_is_the_bumped_range_is_covered() {
+    let repo = lockfile_repo("lockfile_manifest_covered");
+    let answer = range_bump(&repo, None);
+    assert_eq!(
+        answer["lockfiles"][0]["manifests"],
+        json!(["web/packages/a/package.json"])
+    );
+    assert!(opened(&answer).is_empty(), "{:?}", opened(&answer));
+    assert!(in_repo(&answer, WEB, "web/packages/a/src/plain.ts").is_none());
+    assert!(locked_paths(&answer).contains(&"web/packages/a/src/uses.ts".to_string()));
+}
+
+#[test]
+fn a_manifest_that_also_changes_main_stays_manifest() {
+    let repo = lockfile_repo("lockfile_manifest_main");
+    let answer = range_bump(&repo, Some(("src/uses.ts", "src/fp.ts")));
+    assert_eq!(answer["lockfiles"][0]["manifests"], json!([]));
+    assert_eq!(
+        opened(&answer),
+        [(
+            "web/packages/a/package.json".to_string(),
+            "manifest".to_string(),
+            Some("web/packages/a".to_string())
+        )]
+    );
+}
+
+#[test]
+fn lockfile_roots_seed_the_manifest_tier() {
+    let repo = lockfile_repo("lockfile_manifest_tier");
+    let answer = bumped(&repo, "lodash", LODASH, LODASH_NEXT);
+    assert!(
+        packages(&answer, "manifest_only").contains(&"web/packages/e".to_string()),
+        "{}",
+        answer["packages"]
+    );
 }

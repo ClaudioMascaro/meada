@@ -1,1 +1,1 @@
-{"name": "web-root", "private": true, "workspaces": ["packages/*"]}
+{"name": "web-root", "private": true, "workspaces": ["packages/*"], "devDependencies": {"eslint": "^9.0.0"}}

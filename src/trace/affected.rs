@@ -68,6 +68,10 @@ struct LockPackage {
 pub(crate) struct Attributed {
     lockfiles: Vec<Lockfile>,
     pub(crate) files: BTreeMap<String, String>,
+    /// The lockfiles read whose root reaches a name no file loads: tooling of every package.
+    all_packages: BTreeSet<String>,
+    /// The member manifests of the change whose only edits a lockfile read covers.
+    covered: BTreeSet<String>,
 }
 
 impl Attributed {
@@ -536,10 +540,55 @@ fn resolutions(path: &std::path::Path) -> BTreeMap<String, String> {
         .collect()
 }
 
-/// Whether a file of `facts` loads a package named in `names`.
-fn loads_any(facts: &Facts, names: &BTreeSet<String>) -> bool {
+/// The packages of `names` a file of `facts` loads.
+fn loaded_names<'n>(facts: &Facts, names: &BTreeSet<&'n str>) -> BTreeSet<&'n str> {
     (lang::loaded(facts).into_iter())
-        .any(|s| npm::split(s).is_some_and(|(name, _)| names.contains(name)))
+        .filter_map(|s| names.get(npm::split(s)?.0).copied())
+        .collect()
+}
+
+/// The dependency tables of a `package.json`.
+const DEPENDENCY_FIELDS: [&str; 4] = [
+    "dependencies",
+    "devDependencies",
+    "peerDependencies",
+    "optionalDependencies",
+];
+
+/// Whether the change to the member manifest `path` since `base` is one a lockfile covers:
+/// only its dependency tables changed, and only in names of `via`.
+fn covered(root: &std::path::Path, base: Option<&str>, path: &str, via: &BTreeSet<String>) -> bool {
+    let json = |bytes: Option<Vec<u8>>| {
+        bytes.and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+    };
+    let before = json(base.and_then(|rev| repo::show(root, rev, path).ok().flatten()));
+    let after = json(std::fs::read(root.join(path)).ok());
+    let (Some(serde_json::Value::Object(before)), Some(serde_json::Value::Object(after))) =
+        (before, after)
+    else {
+        return false;
+    };
+    let keys: BTreeSet<&String> = before.keys().chain(after.keys()).collect();
+    keys.into_iter().all(|key| {
+        let (b, a) = (before.get(key), after.get(key));
+        if b == a {
+            return true;
+        }
+        if !DEPENDENCY_FIELDS.contains(&key.as_str()) {
+            return false;
+        }
+        let table = |v: Option<&'_ serde_json::Value>| -> Option<serde_json::Map<_, _>> {
+            match v {
+                None => Some(serde_json::Map::new()),
+                Some(v) => v.as_object().cloned(),
+            }
+        };
+        let (Some(b), Some(a)) = (table(b), table(a)) else {
+            return false;
+        };
+        let names: BTreeSet<&String> = b.keys().chain(a.keys()).collect();
+        (names.into_iter()).all(|n| b.get(n) == a.get(n) || via.contains(n))
+    })
 }
 
 /// What the `yarn.lock` files of `changes` root in the repository where Meada runs. A lockfile
@@ -608,7 +657,14 @@ pub(crate) fn attribute<'g>(
         let moved = lock::diff(&before, &after);
         let reached = lock::reached(&before, &after, &moved);
         let names: BTreeSet<&str> = reached.values().flatten().map(String::as_str).collect();
-        let loaded = facts(&names.into_iter().collect::<Vec<_>>())?;
+        let loaded = facts(&names.iter().copied().collect::<Vec<_>>())?;
+        // What each file of this workspace loads among the reached names.
+        let inside = |p: &str| folder.is_empty() || p.starts_with(&format!("{folder}/"));
+        let loads: BTreeMap<&str, BTreeSet<&str>> = (loaded.iter())
+            .filter(|(p, _)| inside(p))
+            .map(|(p, f)| (p.as_str(), loaded_names(f, &names)))
+            .filter(|(_, n)| !n.is_empty())
+            .collect();
         let dirs = dirs.get_or_insert_with(|| {
             (export.files.iter())
                 .filter_map(|f| {
@@ -629,7 +685,7 @@ pub(crate) fn attribute<'g>(
                 .map(|(p, _)| *p)
                 .collect();
             let loading: Vec<&str> = (owned.iter().copied())
-                .filter(|p| loaded.get(*p).is_some_and(|f| loads_any(f, via)))
+                .filter(|p| (loads.get(p)).is_some_and(|l| l.iter().any(|n| via.contains(*n))))
                 .collect();
             let whole = loading.is_empty();
             for file in if whole { owned } else { loading } {
@@ -643,13 +699,55 @@ pub(crate) fn attribute<'g>(
                 whole,
             });
         }
+        // A file that loads a reached name its own package does not declare (one hoisted from
+        // another workspace, the root's tooling) depends on it all the same.
+        for (file, loading) in &loads {
+            let Some(manifest) = package::owner_of(&export.manifests, file) else {
+                continue;
+            };
+            let entries = &manifest.summary.dependencies;
+            if loading
+                .iter()
+                .any(|n| !entries.iter().any(|e| e.name == *n))
+            {
+                out.files
+                    .entry(file.to_string())
+                    .or_insert_with(|| path.clone());
+            }
+        }
+        // A name the root's entry reaches that no file loads is tooling of every package.
+        let loaded_anywhere: BTreeSet<&str> = loads.values().flatten().copied().collect();
+        if (reached.get(".").into_iter().flatten()).any(|n| !loaded_anywhere.contains(n.as_str())) {
+            out.all_packages.insert(path.clone());
+        }
+        let mut manifests = Vec::new();
+        for (member, change) in changes {
+            let Some(dir) = member.strip_suffix("package.json") else {
+                continue;
+            };
+            let dir = dir.trim_end_matches('/');
+            let at = match folder {
+                "" => dir,
+                _ => dir
+                    .strip_prefix(folder)
+                    .map_or("..", |d| d.trim_start_matches('/')),
+            };
+            let via = reached.get(at).filter(|_| !at.is_empty() && at != "..");
+            if let Some(via) = via
+                && !matches!(change, Change::Deleted)
+                && covered(&repo.root, base, member, via)
+            {
+                out.covered.insert(member.clone());
+                manifests.push(member.clone());
+            }
+        }
         out.lockfiles.push(Lockfile {
             repo: repo.identity.clone(),
             path: path.clone(),
             state: LockState::Read {
                 entries: moved,
                 packages,
-                manifests: Vec::new(),
+                manifests,
             },
         });
     }
@@ -758,14 +856,18 @@ pub(crate) fn roots<'g>(
         }
         let owner = owners.owner(0, path);
         let global = match attributed.lockfile(path) {
-            Some(l) => matches!(l.state, LockState::Unread { .. }),
+            Some(l) => {
+                matches!(l.state, LockState::Unread { .. })
+                    || attributed.all_packages.contains(path)
+            }
             None => owner.is_some_and(|(m, root)| root && root_global(directory(&m.path), path)),
         };
         let reason = match () {
             // First: a deleted root file or one with symbols affects every package all the same.
             _ if global => Some("all-packages"),
-            // A lockfile read roots what moved in it.
-            _ if attributed.lockfile(path).is_some() => None,
+            // A lockfile read roots what moved in it, and covers a member manifest whose only
+            // edits are the dependencies that moved.
+            _ if attributed.lockfile(path).is_some() || attributed.covered.contains(path) => None,
             _ if matches!(change, Change::Deleted) => Some("deleted"),
             _ if iac => Some("iac"),
             // A manifest or a path the workspace root owns stays open even when it roots
@@ -847,6 +949,7 @@ pub(crate) fn answer<'g>(
     // The packages the change touches, and what depends on them through the manifests.
     let seeds = (changed.iter().map(|c| c.path.as_str()))
         .chain(open.iter().map(|o| o.path.as_str()))
+        .chain(attributed.files.keys().map(String::as_str))
         .filter_map(|path| owners.package(0, path))
         .collect();
     let closure = closure(&graph.exports[0], seeds);
