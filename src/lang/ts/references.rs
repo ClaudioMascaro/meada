@@ -36,6 +36,13 @@ impl<'t> References<'t> {
         range: Range<usize>,
         from: Option<String>,
     ) {
+        // A name a type parameter or a block's own type declares there is no file-level name.
+        let head = name.split('.').next().unwrap_or(&name);
+        let hidden =
+            (self.params.get(head)).is_some_and(|rs| rs.iter().any(|r| r.contains(&range.start)));
+        if from.is_none() && hidden {
+            return;
+        }
         if self
             .seen
             .insert((scope.to_string(), name.clone(), kind, from.clone()))
@@ -88,6 +95,15 @@ impl<'t> References<'t> {
                 if let (Some(name), Some(owner)) =
                     (named(node).find(|c| c.kind() == "type_identifier"), owner)
                 {
+                    self.declare(text(name, src), owner.byte_range());
+                }
+            }
+            // An interface, type or enum declared inside a block is the block's: no symbol, and
+            // it hides a file-level one of its name there. (A use before it in the block slips.)
+            "interface_declaration" | "type_alias_declaration" | "enum_declaration"
+                if parent.is_some_and(|p| !matches!(p.kind(), "program" | "export_statement")) =>
+            {
+                if let (Some(name), Some(owner)) = (node.child_by_field_name("name"), parent) {
                     self.declare(text(name, src), owner.byte_range());
                 }
             }

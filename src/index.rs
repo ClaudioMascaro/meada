@@ -3895,6 +3895,17 @@ pub(crate) fn calls_by<S: AsRef<str>>(
     calls_where(db, filter, &listed(callers), held)
 }
 
+/// The use rows a file makes that one of `holders` holds (`calls.holder`); `held` as
+/// `calls_where` takes it.
+pub(crate) fn uses_held<S: AsRef<str>>(
+    db: &Connection,
+    holders: &[S],
+    held: &dyn Fn(&str) -> bool,
+) -> Result<Vec<CallSite>> {
+    let filter = "WHERE kind IS NOT NULL AND holder IN (SELECT value FROM json_each(?1))";
+    calls_where(db, filter, &listed(holders), held)
+}
+
 /// The calls that may reach one of `targets`: their target, and, with `candidates`, one of
 /// the candidates of an ambiguous call; `held` as `calls_where` takes it.
 pub(crate) fn calls_to<S: AsRef<str>>(

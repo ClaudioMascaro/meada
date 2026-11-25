@@ -258,6 +258,14 @@ fn context_lists_uses_apart_from_calls() {
         "{header}"
     );
     assert!(header.contains("callers: none"), "{header}");
+    // A top-level declaration lists the uses its initializer makes, as `used by:` names it.
+    let routes = engine.context(&app("LoginPage.tsx::routes"), None).unwrap();
+    assert!(
+        section(&routes, "uses")
+            .iter()
+            .any(|l| l.ends_with("LoginPage (jsx)")),
+        "{routes}"
+    );
 }
 
 #[test]

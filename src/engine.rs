@@ -1542,7 +1542,8 @@ impl Engine {
         let id = symbol_found.id.as_str();
         let callers = partial.callers(Some(n), &[id], true)?;
         partial.callers_of(&callers)?;
-        let callees = partial.callees(Some(n), &[id])?;
+        let mut callees = partial.callees(Some(n), &[id])?;
+        callees.extend(partial.uses_held(Some(n), &[id])?);
         let targets: Vec<&str> = (callees.iter())
             .flat_map(|(_, c)| c.target.iter().chain(&c.candidates))
             .map(String::as_str)
@@ -1836,8 +1837,9 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
             )
         })
         .collect();
+    // A use its file makes is the holding symbol's, as `used by:` reads it.
     let (mut calls, uses): (Vec<_>, Vec<_>) = (export.calls.iter())
-        .filter(|c| c.caller == id)
+        .filter(|c| c.caller == id || c.kind.is_some() && c.holder.as_deref() == Some(id))
         .partition(|c| c.kind.is_none());
     let mut uses: Vec<String> = (uses.iter())
         .filter_map(|c| {

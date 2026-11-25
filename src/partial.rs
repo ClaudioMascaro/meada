@@ -147,6 +147,15 @@ impl<'d> Partial<'d> {
         self.read_calls(at, callers, index::calls_by)
     }
 
+    /// Reads the use rows one of `holders` holds (`index::uses_held`); returns the rows read.
+    pub(crate) fn uses_held<S: AsRef<str>>(
+        &mut self,
+        at: Option<usize>,
+        holders: &[S],
+    ) -> Result<Vec<(usize, CallSite)>> {
+        self.read_calls(at, holders, index::uses_held)
+    }
+
     /// Reads the calls whose target is one of `targets`, or, with `candidates`, that list one
     /// among their candidates; returns the rows read.
     pub(crate) fn callers<S: AsRef<str>>(

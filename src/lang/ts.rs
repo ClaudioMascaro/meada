@@ -3107,6 +3107,23 @@ mod tests {
     }
 
     #[test]
+    fn a_type_declared_inside_a_block_hides_the_top_level_one() {
+        let src = "interface Props { a: number }\n\
+                   enum E { A }\n\
+                   function f() { interface Props { b: string }; const p: Props = null; return p }\n\
+                   function h() { enum E { B }; return E.B }\n\
+                   function g(q: Props) { return E.A }\n";
+        assert_eq!(
+            uses_of("a.ts", src),
+            expected(&[
+                ("f", "p", "value"),
+                ("g", "E.A", "member"),
+                ("g", "Props", "type"),
+            ])
+        );
+    }
+
+    #[test]
     fn dynamic_imports_record_the_member_they_take() {
         let src = "const Lazy = lazy(() => import('@scope/a').then(m => ({ default: m.Page })));\n\
                    import('./local').then(m => m.helper);\n\
