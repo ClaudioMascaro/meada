@@ -656,3 +656,46 @@ fn the_affected_answer_of_the_fixture_is_golden() {
         &serde_json::to_string_pretty(&answer).unwrap(),
     );
 }
+
+#[test]
+fn a_batch_answers_each_block_as_one_line() {
+    let repo = affected_repo("affected_batch");
+    let blocks = [
+        ("one", vec!["packages/a/src/f.ts"]),
+        (
+            "two",
+            vec![
+                "packages/a/src/named.ts",
+                "packages/e/src/runners.ts",
+                "gone.ts",
+            ],
+        ),
+    ];
+    let mut text = String::new();
+    for (label, paths) in &blocks {
+        text.push_str(&format!("@@{label}\n{}\n", paths.join("\n")));
+    }
+    let batch = repo.join("../blocks.txt");
+    fs::write(&batch, text).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_meada"))
+        .current_dir(&repo)
+        .args(["trace", "--affected", "--batch"])
+        .arg(&batch)
+        .env("LANG", "en_US.UTF-8")
+        .output()
+        .expect("meada runs");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let lines: Vec<Value> = (String::from_utf8(out.stdout).unwrap().lines())
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(lines.len(), blocks.len());
+    for (line, (label, paths)) in lines.into_iter().zip(&blocks) {
+        let mut single = of_files(&repo, paths);
+        single["label"] = json!(label);
+        assert_eq!(line, single, "{label}");
+    }
+}

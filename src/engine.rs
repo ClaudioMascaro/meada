@@ -662,38 +662,68 @@ impl Engine {
     /// Everything `changes` may affect (`meada trace --affected`): the walk up over the edges
     /// that mean "depends on", with what it could not place listed apart.
     pub fn affected(&self, changes: Changes) -> Result<Affected> {
-        self.walked(changes, |graph, changes, roots, open| {
+        let changes = [changes.read(&self.root)?];
+        let mut answers = self.walked(&changes, |graph, changes, roots, open| {
             trace::affected::answer(graph, changes, roots, open)
-        })
+        })?;
+        Ok(answers.remove(0))
     }
 
-    /// Reads what `changes` touch and what the affected walk from them needs, then hands
-    /// `then` the graph, the changes, the ids they root and the paths left open.
+    /// `affected` for many changes in one run, each a block of whole files with its label:
+    /// one refresh, one reading over every block's starts, one graph, one walk per block.
+    pub fn affected_batch(
+        &self,
+        blocks: Vec<(String, Vec<String>)>,
+    ) -> Result<Vec<(String, Affected)>> {
+        let changes = (blocks.iter())
+            .map(|(_, paths)| Changes::Files(paths).read(&self.root))
+            .collect::<Result<Vec<_>>>()?;
+        let answers = self.walked(&changes, |graph, changes, roots, open| {
+            trace::affected::answer(graph, changes, roots, open)
+        })?;
+        Ok(blocks
+            .into_iter()
+            .map(|(label, _)| label)
+            .zip(answers)
+            .collect())
+    }
+
+    /// Reads what each block of `blocks` touches and what the affected walk from them needs,
+    /// then hands `then`, per block, the graph, its changes, the ids they root and the paths
+    /// left open.
     pub(crate) fn walked<R>(
         &self,
-        changes: Changes,
-        then: impl FnOnce(&trace::Graph<'_>, &[(String, Change)], &[String], Vec<Open>) -> R,
-    ) -> Result<R> {
-        let changes = changes.read(&self.root)?;
+        blocks: &[Vec<(String, Change)>],
+        mut then: impl FnMut(&trace::Graph<'_>, &[(String, Change)], &[String], Vec<Open>) -> R,
+    ) -> Result<Vec<R>> {
         self.refresh()?;
         let mut partial = self.partial()?;
         let links = self.links(&partial.exports);
-        trace::starts(&mut partial, Start::Changes, Some(&changes), Direction::Up)?;
-        let (roots, open) = {
+        for changes in blocks {
+            trace::starts(&mut partial, Start::Changes, Some(changes), Direction::Up)?;
+        }
+        let rooted: Vec<(Vec<String>, Vec<Open>)> = {
             let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
-            trace::affected::roots(&graph, &changes)
+            (blocks.iter())
+                .map(|changes| trace::affected::roots(&graph, changes))
+                .collect()
         };
-        trace::read_affected(&mut partial, &links, roots.clone())?;
+        let every: Vec<String> = rooted.iter().flat_map(|(roots, _)| roots.clone()).collect();
+        trace::read_affected(&mut partial, &links, every)?;
         // What the changed lines read, so the answer can place it.
         let read: Vec<String> = {
             let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
-            let read = trace::affected::reads(&graph, &changes, &roots).into_iter();
-            read.map(|(id, _)| id.to_string()).collect()
+            (blocks.iter().zip(&rooted))
+                .flat_map(|(changes, (roots, _))| trace::affected::reads(&graph, changes, roots))
+                .map(|(id, _)| id.to_string())
+                .collect()
         };
         partial.symbols(None, &read)?;
         partial.calls(None, &read)?;
         let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
-        Ok(then(&graph, &changes, &roots, open))
+        Ok((blocks.iter().zip(rooted))
+            .map(|(changes, (roots, open))| then(&graph, changes, &roots, open))
+            .collect())
     }
 
     /// `trace`'s body: `changes` holds what a change start touches.

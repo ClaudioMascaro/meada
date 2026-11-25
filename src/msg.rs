@@ -1500,6 +1500,7 @@ pub enum Msg<'a> {
     TraceChangesValue(&'a str),
     TraceFiles,
     TraceAffected,
+    TraceBatch,
     /// A `meada trace --changes <base>..<head>` whose head is not the checked-out commit.
     RangeNotCheckedOut {
         head: &'a str,
@@ -5606,6 +5607,21 @@ impl Msg<'_> {
                 "Con --changes o --files: imprime, en JSON, todo lo que el cambio puede afectar, \
                  archivo por archivo, cada uno con el eslabón más débil de su cadena más fuerte, y \
                  lo que queda abierto."
+                    .into(),
+            ),
+            Msg::TraceBatch => pick(
+                "With --affected: answer many changes in one run. The file holds blocks, a line \
+                 `@@<label>` then one repository-relative path per line, each path a whole file; \
+                 prints one JSON line per block, with its label."
+                    .into(),
+                "Com --affected: responde a muitas mudanças numa execução. O arquivo traz blocos, \
+                 uma linha `@@<rótulo>` e depois um caminho relativo ao repositório por linha, \
+                 cada caminho um arquivo inteiro; imprime uma linha JSON por bloco, com o rótulo."
+                    .into(),
+                "Con --affected: responde a muchos cambios en una ejecución. El archivo trae \
+                 bloques, una línea `@@<etiqueta>` y luego una ruta relativa al repositorio por \
+                 línea, cada ruta un archivo entero; imprime una línea JSON por bloque, con su \
+                 etiqueta."
                     .into(),
             ),
             Msg::RangeNotCheckedOut { head } => pick(

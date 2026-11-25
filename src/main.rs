@@ -61,7 +61,7 @@ enum Command {
         #[arg(long, requires = "decider", allow_negative_numbers = true)]
         min_p: Option<f64>,
     },
-    #[command(group(clap::ArgGroup::new("start").required(true).args(["from", "changes", "files"])))]
+    #[command(group(clap::ArgGroup::new("start").required(true).args(["from", "changes", "files", "batch"])))]
     Trace {
         from: Option<String>,
         #[arg(long)]
@@ -74,6 +74,8 @@ enum Command {
         budget: Option<usize>,
         #[arg(long, conflicts_with = "from")]
         affected: bool,
+        #[arg(long, requires = "affected")]
+        batch: Option<PathBuf>,
     },
     #[cfg(feature = "snapshot")]
     Snapshot {
@@ -660,6 +662,24 @@ fn drained(serve: impl FnOnce() -> meada::Result<()>) -> meada::Result<()> {
 
 /// Prints `text` on stdout, as `print!` does, but a reader that closed its end early
 /// (`meada export | head`) is no error: the rest is dropped and the command ends as it would.
+/// The blocks of a `meada trace --batch` file: a line `@@<label>` opens one, each other
+/// non-empty line is a path of the open block; paths before the first label form a block
+/// labelled "".
+fn blocks(text: &str) -> Vec<(String, Vec<String>)> {
+    let mut blocks: Vec<(String, Vec<String>)> = Vec::new();
+    for line in text.lines().map(|l| l.trim_end_matches('\r')) {
+        match line.strip_prefix("@@") {
+            Some(label) => blocks.push((label.to_string(), Vec::new())),
+            None if line.is_empty() => {}
+            None => match blocks.last_mut() {
+                Some((_, paths)) => paths.push(line.to_string()),
+                None => blocks.push((String::new(), vec![line.to_string()])),
+            },
+        }
+    }
+    blocks
+}
+
 fn out(text: impl std::fmt::Display) {
     use std::io::Write;
     let mut stdout = std::io::stdout().lock();
@@ -711,6 +731,7 @@ fn main() -> ExitCode {
                 .mut_arg("up", |a| a.help(Msg::TraceUp.text()))
                 .mut_arg("budget", |a| a.help(Msg::TraceBudget.text()))
                 .mut_arg("affected", |a| a.help(Msg::TraceAffected.text()))
+                .mut_arg("batch", |a| a.help(Msg::TraceBatch.text()))
         });
     #[cfg(feature = "snapshot")]
     let matches = matches.mut_subcommand("snapshot", |c| {
@@ -1216,7 +1237,18 @@ fn main() -> ExitCode {
             up,
             budget,
             affected,
+            batch,
         } => (|| {
+            if let Some(batch) = batch {
+                let text = std::fs::read_to_string(&batch).map_err(|e| e.to_string())?;
+                let answers = Engine::open(here)?.affected_batch(blocks(&text))?;
+                for (label, answer) in answers {
+                    let mut json = serde_json::to_value(&answer).map_err(|e| e.to_string())?;
+                    json["label"] = label.into();
+                    out(format_args!("{json}\n"));
+                }
+                return Ok(());
+            }
             let direction = if up { Direction::Up } else { Direction::Down };
             let start = match (from.as_deref(), changes.as_deref()) {
                 (Some(from), _) => Ok(Start::From(from)),

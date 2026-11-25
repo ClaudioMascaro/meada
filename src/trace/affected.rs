@@ -1061,20 +1061,21 @@ mod tests {
     fn assert_certain_filter_is_a_certain_walk(repo: &Path, files: &[&str]) {
         let files: Vec<String> = files.iter().map(|f| f.to_string()).collect();
         let engine = Engine::open(repo).unwrap();
-        let (certain, walked, all) =
-            (engine.walked(Changes::Files(&files), |graph, _, roots, _| {
-                let fan = graph.fan(roots);
-                let certain: BTreeSet<String> = (fan.iter())
-                    .filter(|(_, s)| s.key.tier == Tier::Certain)
-                    .map(|(node, _)| node.to_string())
-                    .collect();
-                let walked = certain_walk(graph, roots)
-                    .into_iter()
-                    .map(str::to_string)
-                    .collect();
-                (certain, walked, fan.len())
-            }))
-            .unwrap();
+        let changes = [Changes::Files(&files).read(repo).unwrap()];
+        let (certain, walked, all) = (engine.walked(&changes, |graph, _, roots, _| {
+            let fan = graph.fan(roots);
+            let certain: BTreeSet<String> = (fan.iter())
+                .filter(|(_, s)| s.key.tier == Tier::Certain)
+                .map(|(node, _)| node.to_string())
+                .collect();
+            let walked = certain_walk(graph, roots)
+                .into_iter()
+                .map(str::to_string)
+                .collect();
+            (certain, walked, fan.len())
+        }))
+        .unwrap()
+        .remove(0);
         assert_eq!(certain, walked);
         // The filter leaves something out, or the equivalence says nothing.
         assert!(all > certain.len(), "{all} nodes, all certain");
