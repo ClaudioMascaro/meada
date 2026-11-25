@@ -14,8 +14,10 @@ use crate::partial::{self, Partial};
 use crate::render::{
     DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mark, rank, section, unresolved,
 };
+use crate::repo::Change;
 pub use crate::repo::Changes;
 pub use crate::trace::affected::Affected;
+use crate::trace::affected::Open;
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Manifest, Missing, Repository, Workspace};
 use crate::{
@@ -660,6 +662,18 @@ impl Engine {
     /// Everything `changes` may affect (`meada trace --affected`): the walk up over the edges
     /// that mean "depends on", with what it could not place listed apart.
     pub fn affected(&self, changes: Changes) -> Result<Affected> {
+        self.walked(changes, |graph, changes, roots, open| {
+            trace::affected::answer(graph, changes, roots, open)
+        })
+    }
+
+    /// Reads what `changes` touch and what the affected walk from them needs, then hands
+    /// `then` the graph, the changes, the ids they root and the paths left open.
+    pub(crate) fn walked<R>(
+        &self,
+        changes: Changes,
+        then: impl FnOnce(&trace::Graph<'_>, &[(String, Change)], &[String], Vec<Open>) -> R,
+    ) -> Result<R> {
         let changes = changes.read(&self.root)?;
         self.refresh()?;
         let mut partial = self.partial()?;
@@ -671,7 +685,7 @@ impl Engine {
         };
         trace::read_affected(&mut partial, &links, roots.clone())?;
         let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
-        Ok(trace::affected::answer(&graph, &changes, &roots, open))
+        Ok(then(&graph, &changes, &roots, open))
     }
 
     /// `trace`'s body: `changes` holds what a change start touches.

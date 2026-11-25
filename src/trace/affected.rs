@@ -3,7 +3,8 @@
 //! IaC nodes and document sides it touches; a path that roots nothing is `open`, with its
 //! reason, never dropped.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet};
 
 use serde::Serialize;
 
@@ -96,6 +97,41 @@ impl Tier {
             Level::Ambiguous => Tier::Ambiguous,
         }
     }
+}
+
+/// The key of an edge, a chain or a node: its tier, then its candidates (0 off `ambiguous`).
+/// A chain's key is its largest edge key; a node's, the smallest chain key reaching it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Key {
+    pub(crate) tier: Tier,
+    pub(crate) candidates: usize,
+}
+
+impl Key {
+    /// A root's key, the smallest.
+    const ROOT: Key = Key {
+        tier: Tier::Certain,
+        candidates: 0,
+    };
+
+    fn of(evidence: &Evidence) -> Self {
+        let tier = Tier::of(evidence);
+        let candidates = if tier == Tier::Ambiguous {
+            evidence.candidates
+        } else {
+            0
+        };
+        Key { tier, candidates }
+    }
+}
+
+/// A node the fan settled: its key, the weakest edge of its strongest chain (none for a root),
+/// and whether the walk ends there.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Settled<'g> {
+    pub(crate) key: Key,
+    pub(crate) evidence: Option<Evidence<'g>>,
+    pub(crate) ends: bool,
 }
 
 /// A reached IaC node: a workload that runs the code, or a CI node that runs its program.
@@ -515,24 +551,30 @@ pub(crate) fn answer<'g>(
         })
         .collect();
     changed.sort();
-    // A file's entry comes from the first of its nodes the walk settles.
-    let mut files: BTreeMap<(usize, &str), Option<Evidence>> = BTreeMap::new();
+    // A file's entry comes from its best node, smallest by `(key, id)`; a touched file is a
+    // root.
+    let mut files: BTreeMap<(usize, &str), (Key, &str, Option<Evidence>)> = BTreeMap::new();
     let touched =
         (changed.iter().map(|c| c.path.as_str())).chain(open.iter().map(|o| o.path.as_str()));
     for path in touched {
-        files.insert((0, path), None);
+        files.insert((0, path), (Key::ROOT, "", None));
     }
     let mut iac = BTreeMap::new();
-    for (id, (evidence, ends)) in walk(graph, roots) {
-        if ends {
-            iac.entry(id).or_insert(evidence);
+    for (id, node) in graph.fan(roots) {
+        if node.ends {
+            iac.insert(id, node.evidence);
         }
-        if let Some(place) = graph.file_of(id) {
-            files.entry(place).or_insert(evidence);
+        let Some(place) = graph.file_of(id) else {
+            continue;
+        };
+        let entry = (node.key, id, node.evidence);
+        let best = files.entry(place).or_insert(entry);
+        if (entry.0, entry.1) < (best.0, best.1) {
+            *best = entry;
         }
     }
     let files = (files.into_iter())
-        .map(|((n, path), evidence)| {
+        .map(|((n, path), (_, _, evidence))| {
             let root = Evidence {
                 level: Level::Exact,
                 by: None,
@@ -575,26 +617,56 @@ pub(crate) fn answer<'g>(
     }
 }
 
-/// Every node reached from `roots` over `Graph::dependents`, breadth first, with the edge that
-/// first reached it (none for a root) and whether the walk ends there.
-fn walk<'g>(
-    graph: &'g Graph<'g>,
-    roots: &'g [String],
-) -> Vec<(&'g str, (Option<Evidence<'g>>, bool))> {
-    let mut seen: HashSet<&str> = roots.iter().map(String::as_str).collect();
-    let mut reached: Vec<_> = roots.iter().map(|r| (r.as_str(), (None, false))).collect();
-    let mut queue: VecDeque<&str> = roots.iter().map(String::as_str).collect();
-    while let Some(id) = queue.pop_front() {
-        for d in graph.dependents(id) {
-            if seen.insert(d.to) {
-                reached.push((d.to, (Some(d.evidence), d.ends)));
-                if !d.ends {
-                    queue.push_back(d.to);
+impl<'a> Graph<'a> {
+    /// Every node reached from `roots` over `dependents`, each with its key: the smallest,
+    /// over the chains reaching it, of the largest edge key on the chain. Settles each node
+    /// once from a priority queue, equal keys in id order, so the first predecessor to offer a
+    /// key is the smallest by `(key, id)`; a root is `Certain` whatever reaches it. No depth
+    /// limit and no budget: the settled set ends cycles.
+    pub(crate) fn fan<'g>(&'g self, roots: &'g [String]) -> BTreeMap<&'g str, Settled<'g>> {
+        let root = |r: &'g String| {
+            let settled = Settled {
+                key: Key::ROOT,
+                evidence: None,
+                ends: false,
+            };
+            (r.as_str(), settled)
+        };
+        let mut best: HashMap<&str, Settled> = roots.iter().map(root).collect();
+        let mut heap: BinaryHeap<_> = best.keys().map(|&r| Reverse((Key::ROOT, r))).collect();
+        let mut settled = BTreeMap::new();
+        while let Some(Reverse((key, id))) = heap.pop() {
+            if settled.contains_key(id) {
+                continue;
+            }
+            let node = best[id];
+            settled.insert(id, node);
+            if node.ends {
+                continue;
+            }
+            for d in self.dependents(id) {
+                let edge = Key::of(&d.evidence);
+                let reached = Settled {
+                    key: key.max(edge),
+                    // The edge sets the chain's key unless an earlier edge is weaker.
+                    evidence: if edge >= key {
+                        Some(d.evidence)
+                    } else {
+                        node.evidence
+                    },
+                    ends: d.ends,
+                };
+                if settled.contains_key(d.to)
+                    || best.get(d.to).is_some_and(|b| b.key <= reached.key)
+                {
+                    continue;
                 }
+                best.insert(d.to, reached);
+                heap.push(Reverse((reached.key, d.to)));
             }
         }
+        settled
     }
-    reached
 }
 
 impl<'a> Graph<'a> {
@@ -612,5 +684,275 @@ impl<'a> Graph<'a> {
             let site = e.config_sites.iter().find(|s| s.id == id)?;
             Some((n, site.path.as_str()))
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeSet, HashSet, VecDeque};
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
+
+    use super::*;
+    use crate::config::Config;
+    use crate::decisions::Decisions;
+    use crate::engine::{Changes, Engine};
+    use crate::index::{Export, Span, Symbol};
+    use crate::workspace::{Repository, Workspace};
+
+    /// `r::a.ts::<name>`.
+    fn id(name: &str) -> String {
+        format!("r::a.ts::{name}")
+    }
+
+    /// A workspace of one repository `r` whose file `a.ts` defines `names` and makes `calls`,
+    /// `(caller, target, level, candidates)` by name: an ambiguous call has no target.
+    fn repository(
+        names: &[&str],
+        calls: &[(&str, Option<&str>, Level, &[&str])],
+    ) -> (Workspace, [Export; 1]) {
+        let span = || {
+            let mut span = Span::default();
+            span.path = "a.ts".into();
+            span
+        };
+        let export = Export {
+            repository: "r".into(),
+            symbols: (names.iter())
+                .map(|name| {
+                    let mut symbol = Symbol::default();
+                    symbol.id = id(name);
+                    symbol.span = span();
+                    symbol
+                })
+                .collect(),
+            calls: (calls.iter().enumerate())
+                .map(|(n, (caller, target, level, candidates))| {
+                    let mut call = CallSite::default();
+                    call.id = format!("{}@{n}", id(caller));
+                    call.caller = id(caller);
+                    call.target = target.map(id);
+                    call.candidates = candidates.iter().map(|c| id(c)).collect();
+                    call.level = Some(*level);
+                    call.span = span();
+                    call
+                })
+                .collect(),
+            ..Export::default()
+        };
+        let workspace = Workspace {
+            repos: vec![Repository {
+                root: "r".into(),
+                identity: "r".into(),
+                config: Config::default(),
+                decisions: Decisions::default(),
+                index: "".into(),
+            }],
+            missing: Vec::new(),
+        };
+        (workspace, [export])
+    }
+
+    fn fanned(graph: &Graph, roots: &[&str]) -> BTreeMap<String, Key> {
+        let roots: Vec<String> = roots.iter().map(|r| id(r)).collect();
+        (graph.fan(&roots).into_iter())
+            .map(|(node, s)| (node.to_string(), s.key))
+            .collect()
+    }
+
+    const CERTAIN: Key = Key {
+        tier: Tier::Certain,
+        candidates: 0,
+    };
+
+    #[test]
+    fn a_node_reached_by_exact_and_inferred_chains_is_certain() {
+        // root -inferred-> x, and root -exact-> y -exact-> x: the inferred route is shorter.
+        let calls = [
+            ("x", Some("root"), Level::Inferred, &[][..]),
+            ("y", Some("root"), Level::Exact, &[]),
+            ("x", Some("y"), Level::Exact, &[]),
+        ];
+        let (workspace, exports) = repository(&["root", "x", "y"], &calls);
+        let graph = Graph::new(&workspace, &exports, &[]);
+
+        let fan = fanned(&graph, &["root"]);
+
+        assert_eq!(fan[&id("x")], CERTAIN);
+    }
+
+    #[test]
+    fn an_ambiguous_chain_keeps_the_fewest_candidates() {
+        // x lists root among 3 candidates; y among 2, and x calls y.
+        let calls = [
+            ("x", None, Level::Ambiguous, &["root", "o1", "o2"][..]),
+            ("y", None, Level::Ambiguous, &["root", "o1"]),
+            ("x", Some("y"), Level::Exact, &[]),
+        ];
+        let (workspace, exports) = repository(&["root", "x", "y", "o1", "o2"], &calls);
+        let graph = Graph::new(&workspace, &exports, &[]);
+        let roots = [id("root")];
+
+        let fan = graph.fan(&roots);
+
+        let x = &fan[id("x").as_str()];
+        let two = Key {
+            tier: Tier::Ambiguous,
+            candidates: 2,
+        };
+        assert_eq!(x.key, two);
+        // The weakest edge of the chain is y's call, not x's exact one.
+        let evidence = x.evidence.unwrap();
+        assert_eq!((evidence.level, evidence.candidates), (Level::Ambiguous, 2));
+    }
+
+    #[test]
+    fn a_cycle_settles_each_node_once() {
+        let calls = [
+            ("a", Some("root"), Level::Exact, &[][..]),
+            ("b", Some("a"), Level::Exact, &[]),
+            ("a", Some("b"), Level::Exact, &[]),
+        ];
+        let (workspace, exports) = repository(&["root", "a", "b"], &calls);
+        let graph = Graph::new(&workspace, &exports, &[]);
+
+        let fan = fanned(&graph, &["root"]);
+
+        let expected = BTreeMap::from([
+            (id("a"), CERTAIN),
+            (id("b"), CERTAIN),
+            (id("root"), CERTAIN),
+        ]);
+        assert_eq!(fan, expected);
+    }
+
+    #[test]
+    fn a_root_is_certain_whatever_reaches_it() {
+        let calls = [("r2", None, Level::Ambiguous, &["r1", "o1"][..])];
+        let (workspace, exports) = repository(&["r1", "r2", "o1"], &calls);
+        let graph = Graph::new(&workspace, &exports, &[]);
+        let roots = [id("r1"), id("r2")];
+
+        let fan = graph.fan(&roots);
+
+        let r2 = &fan[id("r2").as_str()];
+        assert_eq!((r2.key, r2.evidence), (CERTAIN, None));
+    }
+
+    /// What a breadth-first walk over certain edges only reaches from `roots`: a node an
+    /// ending edge reaches is not walked on.
+    fn certain_walk<'g>(graph: &'g Graph<'g>, roots: &'g [String]) -> BTreeSet<&'g str> {
+        let mut seen: HashSet<&str> = roots.iter().map(String::as_str).collect();
+        let mut queue: VecDeque<&str> = roots.iter().map(String::as_str).collect();
+        while let Some(node) = queue.pop_front() {
+            for d in graph.dependents(node) {
+                if Tier::of(&d.evidence) == Tier::Certain && seen.insert(d.to) && !d.ends {
+                    queue.push_back(d.to);
+                }
+            }
+        }
+        seen.into_iter().collect()
+    }
+
+    /// `tests/fixtures/<fixture>` copied under `case` as a git repository with `origin`.
+    fn fixture(case: &str, fixture: &str, origin: &str) -> PathBuf {
+        fn copy(from: &Path, to: &Path) {
+            std::fs::create_dir_all(to).unwrap();
+            for entry in std::fs::read_dir(from).unwrap() {
+                let entry = entry.unwrap();
+                let target = to.join(entry.file_name());
+                match entry.file_type().unwrap().is_dir() {
+                    true => copy(&entry.path(), &target),
+                    false => drop(std::fs::copy(entry.path(), target).unwrap()),
+                }
+            }
+        }
+        let scratch = std::env::temp_dir().join(format!("meada-affected-{}", std::process::id()));
+        let dir = scratch.join(case).join(fixture);
+        let _ = std::fs::remove_dir_all(&dir);
+        copy(
+            &Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures")
+                .join(fixture),
+            &dir,
+        );
+        for args in [
+            &["-c", "init.defaultBranch=main", "init", "-q"][..],
+            &["remote", "add", "origin", origin],
+            &["add", "-A"],
+            &[
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@example.com",
+                "commit",
+                "-q",
+                "-m",
+                "f",
+            ],
+        ] {
+            let status = Command::new("git")
+                .args(args)
+                .current_dir(&dir)
+                .status()
+                .unwrap();
+            assert!(status.success(), "git {args:?}");
+        }
+        dir
+    }
+
+    /// The nodes `fan` settles `certain` from what `files` roots in `repo` are the nodes a
+    /// walk over certain edges reaches.
+    fn assert_certain_filter_is_a_certain_walk(repo: &Path, files: &[&str]) {
+        let files: Vec<String> = files.iter().map(|f| f.to_string()).collect();
+        let engine = Engine::open(repo).unwrap();
+        let (certain, walked, all) =
+            (engine.walked(Changes::Files(&files), |graph, _, roots, _| {
+                let fan = graph.fan(roots);
+                let certain: BTreeSet<String> = (fan.iter())
+                    .filter(|(_, s)| s.key.tier == Tier::Certain)
+                    .map(|(node, _)| node.to_string())
+                    .collect();
+                let walked = certain_walk(graph, roots)
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect();
+                (certain, walked, fan.len())
+            }))
+            .unwrap();
+        assert_eq!(certain, walked);
+        // The filter leaves something out, or the equivalence says nothing.
+        assert!(all > certain.len(), "{all} nodes, all certain");
+    }
+
+    #[test]
+    fn the_certain_filter_equals_a_certain_only_walk() {
+        let mono = fixture(
+            "certain_mono",
+            "trace-affected",
+            "https://example.com/scope/mono.git",
+        );
+        let changed = [
+            "packages/a/src/f.ts",
+            "packages/a/src/named.ts",
+            "packages/e/src/runners.ts",
+        ];
+        assert_certain_filter_is_a_certain_walk(&mono, &changed);
+
+        let chain = |name: &str, origin: &str| fixture("certain_chain", name, origin);
+        chain("chain-worker", "https://example.com/chain/worker.git");
+        chain("chain-web", "https://example.com/chain/web.git");
+        chain("chain-catalog", "https://example.com/chain/catalog.git");
+        let gateway = chain("chain-gateway", "git@example.com:chain/gateway.git");
+        let sources = [
+            "orders.ts",
+            "checkout.ts",
+            "routes.ts",
+            "catalog.ts",
+            "server.ts",
+        ];
+        let changed: Vec<String> = sources.iter().map(|s| format!("src/{s}")).collect();
+        let changed: Vec<&str> = changed.iter().map(String::as_str).collect();
+        assert_certain_filter_is_a_certain_walk(&gateway, &changed);
     }
 }

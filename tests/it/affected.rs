@@ -417,3 +417,20 @@ fn a_changed_document_affects_the_consumers_of_its_sides() {
     assert!(consumer.is_some(), "{answer:#}");
     assert_eq!(answer["open"], Value::Array(Vec::new()));
 }
+
+#[test]
+fn an_affected_answer_is_the_same_over_two_runs() {
+    let repo = affected_repo("affected_twice");
+    let files = [
+        "packages/a/src/f.ts".to_string(),
+        "packages/e/src/runners.ts".to_string(),
+    ];
+    let run = || {
+        let answer = Engine::open(&repo)
+            .unwrap()
+            .affected(Changes::Files(&files))
+            .unwrap();
+        serde_json::to_string(&answer).unwrap()
+    };
+    assert_eq!(run(), run());
+}
