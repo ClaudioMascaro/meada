@@ -1511,6 +1511,10 @@ pub enum Msg<'a> {
     PathOutside {
         path: &'a str,
     },
+    /// A `meada trace --files` path that names a directory.
+    PathIsDirectory {
+        path: &'a str,
+    },
     DecideFailures(usize),
     DeciderInvalid(&'a str),
     DeciderProtocol,
@@ -5653,6 +5657,11 @@ impl Msg<'_> {
                 format!("`{path}` is not a path inside the repository"),
                 format!("`{path}` não é um caminho dentro do repositório"),
                 format!("`{path}` no es una ruta dentro del repositorio"),
+            ),
+            Msg::PathIsDirectory { path } => pick(
+                format!("`{path}` is a directory: name its files"),
+                format!("`{path}` é um diretório: nomeie os arquivos dele"),
+                format!("`{path}` es un directorio: nombra sus archivos"),
             ),
             Msg::TraceUp => pick(
                 "Walk up, to what calls or reaches the start, instead of down.".into(),

@@ -153,6 +153,10 @@ impl Changes<'_> {
         match *self {
             Changes::Uncommitted => working_tree(root, true),
             Changes::Range { base, head } => {
+                // `git diff` would take a revision starting with `-` as an option.
+                if let Some(rev) = [base, head].into_iter().find(|r| r.starts_with('-')) {
+                    return Err(Msg::TraceChangesValue(rev).text().into());
+                }
                 if !resolves_to_head(root, head) {
                     return Err(Msg::RangeNotCheckedOut { head }.text().into());
                 }
@@ -169,7 +173,11 @@ impl Changes<'_> {
                     else {
                         return Err(Msg::PathOutside { path }.text().into());
                     };
-                    let change = match root.join(&rel).exists() {
+                    let full = root.join(&rel);
+                    if full.is_dir() {
+                        return Err(Msg::PathIsDirectory { path }.text().into());
+                    }
+                    let change = match full.exists() {
                         true => Change::Untracked,
                         false => Change::Deleted,
                     };
@@ -541,6 +549,33 @@ mod tests {
                 ("gone.ts".to_string(), Change::Deleted),
             ]
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_range_refuses_a_revision_shaped_as_an_option() {
+        let dir = scratch("range-option");
+        write(&dir, "a.ts", b"a\n");
+        commit(&dir, "base");
+        let written = dir.join("written");
+        let base = format!("--output={}", written.display());
+        let refused = range(&base, "HEAD").read(&dir).err().map(|e| e.to_string());
+        assert!(refused.is_some_and(|e| e.contains("`--changes` takes")));
+        assert!(!written.exists(), "git took the base as an option");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn files_refuse_a_directory() {
+        let dir = scratch("files-directory");
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        write(&dir, "sub/a.ts", b"a\n");
+        let files = ["sub".to_string()];
+        let refused = Changes::Files(&files)
+            .read(&dir)
+            .err()
+            .map(|e| e.to_string());
+        assert!(refused.is_some_and(|e| e.contains("`sub` is a directory")));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

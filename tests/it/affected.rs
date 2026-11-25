@@ -742,3 +742,35 @@ fn a_changed_line_reads_the_candidates_of_its_call() {
         "{answer:#}"
     );
 }
+
+#[test]
+fn a_manifest_others_depend_on_stays_open() {
+    let repo = affected_repo("affected_depended_manifest");
+    let answer = of_files(&repo, &["packages/a/package.json"]);
+    let manifest = json!({"repo": "example.com/scope/mono", "path": "packages/a/package.json",
+        "reason": "manifest", "package": "packages/a"});
+    assert_eq!(answer["open"], json!([manifest]), "{answer:#}");
+}
+
+/// The worker's `settleOrders` reads `resource::postgres::orders` as a symbol, not a call.
+#[test]
+fn a_changed_reader_reads_the_writer_of_what_it_reads() {
+    let (web, _, _) = common::chain("affected_reads_writer");
+    let worker = common::worker(&web);
+    let answer = of_files(&worker, &["src/jobs.ts"]);
+    let reads = answer["reads"].as_array().unwrap();
+    let writer =
+        |r: &&Value| r["repo"] == "example.com/chain/gateway" && r["path"] == "src/orders.ts";
+    assert!(reads.iter().any(|r| writer(&r)), "{answer:#}");
+}
+
+/// The web's `shipment` calls a route only the gateway's document lists.
+#[test]
+fn a_call_to_a_documented_route_reads_its_document() {
+    let (web, _, _) = common::documented_chain("affected_reads_document");
+    let answer = of_files(&web, &["src/shipments.ts"]);
+    let reads = answer["reads"].as_array().unwrap();
+    let document =
+        |r: &&Value| r["repo"] == "example.com/chain/gateway" && r["path"] == "openapi.yaml";
+    assert!(reads.iter().any(|r| document(&r)), "{answer:#}");
+}

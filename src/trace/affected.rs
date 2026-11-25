@@ -532,9 +532,11 @@ pub(crate) fn roots<'g>(
         let reason = match () {
             _ if matches!(change, Change::Deleted) => Some("deleted"),
             _ if iac => Some("iac"),
-            _ if rooted => None,
+            // A manifest or a path the workspace root owns stays open even when it roots
+            // something (a manifest is the provider of its package's links).
             _ if owner.is_some_and(|(m, root)| m.path == *path && !root) => Some("manifest"),
             _ if owner.is_some_and(|(_, root)| root) => Some("root"),
+            _ if rooted => None,
             _ => Some("no-symbols"),
         };
         if let Some(reason) = reason {
@@ -665,7 +667,17 @@ pub(crate) fn answer<'g>(
     sides.sort();
     let mut read: BTreeMap<(usize, &str), (Key, Evidence)> = BTreeMap::new();
     for (id, evidence) in reads(graph, changes, roots) {
-        let Some(place) = graph.file_of(id) else {
+        // A side only a document lists is read at the document's path.
+        let document = || {
+            let path = *graph.documented.get(id)?;
+            let mut repos = graph.workspace.repos.iter();
+            let n = repos.position(|m| {
+                id.strip_prefix(&m.identity)
+                    .is_some_and(|rest| rest.starts_with("::"))
+            })?;
+            Some((n, path))
+        };
+        let Some(place) = graph.file_of(id).or_else(document) else {
             continue;
         };
         let key = Key::of(&evidence);
@@ -708,6 +720,7 @@ pub(crate) fn reads<'g>(
     let repo = &graph.workspace.repos[0];
     let mut files = Files::new(&repo.root);
     let changed: HashMap<&str, &Change> = changes.iter().map(|(p, c)| (p.as_str(), c)).collect();
+    let roots_in_order = roots;
     let roots: HashSet<&str> = roots.iter().map(String::as_str).collect();
     let mut out = Vec::new();
     for c in &graph.exports[0].calls {
@@ -739,6 +752,13 @@ pub(crate) fn reads<'g>(
             })),
         }
         for &link in graph.out.get(c.id.as_str()).into_iter().flatten() {
+            out.push((link.provider.as_str(), graph.evidence(link)));
+        }
+    }
+    // A root that consumes as a symbol (a handler, a reader, a client method) reads the
+    // provider of each link it consumes.
+    for root in roots_in_order {
+        for &link in graph.out.get(root.as_str()).into_iter().flatten() {
             out.push((link.provider.as_str(), graph.evidence(link)));
         }
     }
