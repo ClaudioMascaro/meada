@@ -6,7 +6,7 @@ use crate::common;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use common::{assert_golden, fixture_repo};
+use common::{assert_golden, fixture_repo, without_processes};
 use meada::engine::Engine;
 use serde_json::Value;
 
@@ -19,7 +19,12 @@ fn berry(case: &str) -> PathBuf {
 }
 
 fn export(repo: &Path) -> Value {
-    serde_json::from_str(&Engine::open(repo).unwrap().export().unwrap()).unwrap()
+    serde_json::from_str(&export_text(repo)).unwrap()
+}
+
+/// The export as `meada export` writes it, the form an export golden holds.
+fn export_text(repo: &Path) -> String {
+    Engine::open(repo).unwrap().export().unwrap()
 }
 
 /// The `resolved` rows as `(manifest, name, range, origin, version)`.
@@ -52,7 +57,8 @@ fn row(
 #[test]
 fn the_index_records_each_direct_dependency_resolution() {
     let repo = berry("lockfile_resolved");
-    let export = export(&repo);
+    let text = export_text(&repo);
+    let export: Value = serde_json::from_str(&text).unwrap();
     assert_eq!(
         resolved(&export),
         [
@@ -79,10 +85,7 @@ fn the_index_records_each_direct_dependency_resolution() {
             ),
         ]
     );
-    assert_golden(
-        "lockfile-berry.export.json",
-        &serde_json::to_string_pretty(&export).unwrap(),
-    );
+    assert_golden("lockfile-berry.export.json", &without_processes(&text));
 }
 
 #[test]
