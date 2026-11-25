@@ -369,3 +369,54 @@ fn a_read_inside_a_test_file_keeps_every_caller() {
     let found = links(&repo);
     assert_no_base(&found, "svc-a/client/client_test.go::probe");
 }
+
+#[test]
+fn a_declared_link_never_leaves_its_repository() {
+    let repo = with_peer("base_url_peer_dir");
+    // The peer serves `POST /run` under a directory named like the declared one.
+    let peer = repo.parent().unwrap().join("base-url-peer");
+    crate::common::git(&peer, &["mv", "api", "svc-b"]);
+    crate::common::git(&peer, &["commit", "-q", "-m", "svc-b"]);
+    let found = links(&repo);
+    let in_peer = |l: &Value| {
+        let provider = l["provider"].as_str().unwrap();
+        provider.starts_with("example.com/acme/peer::svc-b/")
+    };
+    assert!(found.iter().any(in_peer), "{found:#?}");
+    assert_eq!(
+        shown(&of(&found, "web/src/api.ts::runJob")),
+        [declared("base URL from B_URL")],
+        "{found:#?}"
+    );
+}
+
+#[test]
+fn a_variable_base_url_keeps_every_fit_its_own_package_serves_too() {
+    let repo = mono("base_url_variable_own");
+    let caller = r#"package main
+
+import (
+	"net/http"
+	"os"
+)
+
+func callRun() { _, _ = http.Post(os.Getenv("RUN_URL")+"/run", "application/json", nil) }
+"#;
+    std::fs::write(repo.join("svc-b/caller.go"), caller).unwrap();
+    let found = links(&repo);
+    let run = shown(&of(&found, "svc-b/caller.go::callRun"));
+    let providers: Vec<&str> = run.iter().map(|(_, p, _)| p.as_str()).collect();
+    assert_eq!(
+        providers,
+        [
+            format!("{MONO}::svc-b/routes.go::Routes.run"),
+            format!("{MONO}::svc-c/main.go::run")
+        ],
+        "{found:#?}"
+    );
+    for (level, _, reason) in &run {
+        assert_eq!(level, "ambiguous");
+        let why = "2 providers fit; base URL from RUN_URL, no peer's base_url_env; ";
+        assert!(reason.starts_with(why), "{reason}");
+    }
+}

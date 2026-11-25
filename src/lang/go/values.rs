@@ -1083,6 +1083,23 @@ mod tests {
     }
 
     #[test]
+    fn each_top_level_declaration_keeps_its_own_bindings() {
+        // `a` hides the constant and `b` does not; each reads it twice, the second time from
+        // the names its declaration binds as the first read found them.
+        let src = "package x\nimport \"fmt\"\nconst f = \"/w/%s\"\n\
+                   func a(id string) { f := k(); g(fmt.Sprintf(f, id)); g(fmt.Sprintf(f, id)) }\n\
+                   func b(id string) { g(fmt.Sprintf(f, id)); g(fmt.Sprintf(f, id)) }\n";
+        let facts = crate::lang::go::Go.parse("x.go", src.as_bytes()).unwrap();
+        let args: Vec<String> = (facts.calls.iter())
+            .filter(|c| c.callee == "g")
+            .map(|c| serde_json::to_string(&c.args[0]).unwrap())
+            .collect();
+        assert_eq!(args.len(), 4);
+        assert_eq!(args[..2], [json(Value::Unknown), json(Value::Unknown)]);
+        assert!(args[2..].iter().all(|a| a.contains("/w/")), "{args:?}");
+    }
+
+    #[test]
     fn only_the_format_folds() {
         let body = "func h() { g(fmt.Sprintf(\"/w/%s\", f)) }";
         assert_eq!(sprintf_arg(true, body), sprintf_arg(false, body));

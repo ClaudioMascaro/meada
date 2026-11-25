@@ -1207,12 +1207,22 @@ fn path_of<'s>(site: &'s str, identity: &str) -> Option<&'s str> {
 mod tests {
     use super::{
         CallAt, Http, Mounts, PREFIX_DEPTH, fragments, normalize_path, prefixes, route_fits,
-        tail_fits,
+        tail_fits, under,
     };
     use crate::contract::{ContractKind, Role, Search, View};
     use crate::entry::EntryKind;
     use crate::index::{Consumer, Gateway, Provider};
     use crate::lang::{Limit, Part, Value};
+
+    /// A route whose handler names no definition has the whole file for its site
+    /// (`<identity>::<path>`, `Site::File`): a declared directory holds it as it holds a symbol's.
+    #[test]
+    fn a_whole_file_site_lies_under_its_directory() {
+        assert!(under("acme::svc-b/main.go", "acme", "svc-b"));
+        assert!(under("acme::svc-b/routes.go::Routes.run", "acme", "svc-b"));
+        assert!(!under("acme::svc-bx/main.go", "acme", "svc-b"));
+        assert!(!under("other::svc-b/main.go", "acme", "svc-b"));
+    }
 
     /// A base Meada could not read (a hole, a read no kind decided, a limit of value flow), with
     /// a path appended, may hold a path of its own: the consumer is unresolved, and its lead
