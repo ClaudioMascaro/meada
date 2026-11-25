@@ -10,7 +10,7 @@ use serde::Serialize;
 
 use super::{Direction, Graph, calls_on_link, held, in_path};
 use crate::contract::{self, Level, Link};
-use crate::index::CallSite;
+use crate::index::{CallSite, Export};
 use crate::package::{self, Manifest};
 use crate::render::Files;
 use crate::repo::Change;
@@ -24,7 +24,7 @@ pub struct Affected {
     reads: Vec<File>,
     packages: Packages,
     iac: Vec<Reached>,
-    sides: Vec<File>,
+    sides: Vec<Side>,
 }
 
 /// A changed path and what changed of it.
@@ -138,6 +138,16 @@ pub(crate) struct Settled<'g> {
 #[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Reached {
     id: String,
+    level: Level,
+}
+
+/// A reached node with no file of its own (`Graph::ends`): a repository-level side, a side
+/// only a document lists, or a config use.
+#[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Side {
+    id: String,
+    /// `repository`, `document` or `config`.
+    place: &'static str,
     level: Level,
 }
 
@@ -560,9 +570,20 @@ pub(crate) fn answer<'g>(
         files.insert((0, path), (Key::ROOT, "", None));
     }
     let mut iac = BTreeMap::new();
+    let mut sides = Vec::new();
     for (id, node) in graph.fan(roots) {
         if node.ends {
             iac.insert(id, node.evidence);
+        }
+        if graph.ends(id) {
+            let place = match () {
+                _ if graph.is_repo(id) => "repository",
+                _ if graph.documented.contains_key(id) => "document",
+                _ => "config",
+            };
+            let level = node.evidence.map_or(Level::Exact, |e| e.level);
+            let id = id.to_string();
+            sides.push(Side { id, place, level });
         }
         let Some(place) = graph.file_of(id) else {
             continue;
@@ -573,8 +594,14 @@ pub(crate) fn answer<'g>(
             *best = entry;
         }
     }
-    let files = (files.into_iter())
-        .map(|((n, path), (_, _, evidence))| {
+    // The packages the change touches, and what depends on them through the manifests.
+    let seeds = (changed.iter().map(|c| c.path.as_str()))
+        .chain(open.iter().map(|o| o.path.as_str()))
+        .filter_map(|path| owners.package(0, path))
+        .collect();
+    let closure = closure(&graph.exports[0], seeds);
+    let files: Vec<File> = (files.into_iter())
+        .map(|((n, path), (key, _, evidence))| {
             let root = Evidence {
                 level: Level::Exact,
                 by: None,
@@ -584,19 +611,20 @@ pub(crate) fn answer<'g>(
                 narrowed: false,
             };
             let e = evidence.unwrap_or(root);
+            let package = owners.package(n, path);
             File {
                 repo: graph.workspace.repos[n].identity.clone(),
                 path: path.to_string(),
-                package: owners.package(n, path),
+                manifest: n == 0 && package.as_ref().is_some_and(|p| closure.contains(p)),
+                package,
                 test: crate::http::is_test_file(path),
-                tier: Tier::of(&e),
+                tier: key.tier,
                 level: e.level,
                 by: e.by.map(str::to_string),
                 p: e.p,
                 candidates: (e.candidates > 0).then_some(e.candidates),
                 reason: e.reason.map(str::to_string),
                 narrowed: e.narrowed,
-                manifest: false,
             }
         })
         .collect();
@@ -608,12 +636,54 @@ pub(crate) fn answer<'g>(
             })
         })
         .collect();
+    // The packages are those of the repository where Meada runs.
+    let (mut certain, mut weaker) = (BTreeSet::new(), BTreeSet::new());
+    for f in files.iter().filter(|f| f.repo == *repo) {
+        let tier = if f.tier == Tier::Certain {
+            &mut certain
+        } else {
+            &mut weaker
+        };
+        tier.extend(f.package.clone());
+    }
+    let packages = Packages {
+        inferred: weaker.difference(&certain).cloned().collect(),
+        manifest_only: closure.difference(&certain).cloned().collect(),
+        certain: certain.into_iter().collect(),
+    };
+    sides.sort();
     Affected {
         changed,
         open,
         files,
+        packages,
         iac,
+        sides,
         ..Affected::default()
+    }
+}
+
+/// `seeds` and the packages of `export`'s repository that depend on them through its
+/// manifests, by directory: a `Dependency` makes the package of its manifest depend on the
+/// workspace package it names.
+fn closure(export: &Export, mut packages: BTreeSet<String>) -> BTreeSet<String> {
+    let named: HashMap<&str, &str> = (export.packages.iter())
+        .filter(|p| p.repository == export.repository)
+        .map(|p| (p.name.as_str(), p.directory.as_str()))
+        .collect();
+    loop {
+        let before = packages.len();
+        for d in &export.dependencies {
+            if named
+                .get(d.name.as_str())
+                .is_some_and(|&dir| packages.contains(dir))
+            {
+                packages.insert(directory(&d.manifest).to_string());
+            }
+        }
+        if packages.len() == before {
+            return packages;
+        }
     }
 }
 

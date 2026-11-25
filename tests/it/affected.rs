@@ -10,7 +10,7 @@ use std::process::Command;
 
 use common::fixture_repo;
 use meada::engine::{Changes, Engine};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 fn affected_repo(case: &str) -> PathBuf {
     fixture_repo(
@@ -433,4 +433,86 @@ fn an_affected_answer_is_the_same_over_two_runs() {
         serde_json::to_string(&answer).unwrap()
     };
     assert_eq!(run(), run());
+}
+
+/// The directories a `packages` group lists.
+fn packages(answer: &Value, group: &str) -> Vec<String> {
+    (answer["packages"][group].as_array().into_iter().flatten())
+        .map(|p| p.as_str().unwrap().to_string())
+        .collect()
+}
+
+#[test]
+fn manifest_only_lists_a_declared_dependent_with_no_import() {
+    let repo = affected_repo("affected_manifest_only");
+    let answer = of_files(&repo, &["packages/a/src/f.ts"]);
+    let certain = packages(&answer, "certain");
+    assert!(certain.contains(&"packages/b".to_string()), "{certain:?}");
+    assert!(!certain.contains(&"packages/d".to_string()), "{certain:?}");
+    let manifest_only = packages(&answer, "manifest_only");
+    assert!(
+        manifest_only.contains(&"packages/d".to_string()),
+        "{manifest_only:?}"
+    );
+    // A file's `manifest` says its package is in the closure.
+    assert_eq!(
+        file(&answer, "packages/b/src/g.ts").unwrap()["manifest"],
+        true
+    );
+}
+
+#[test]
+fn a_test_file_reached_through_its_top_level_describe_is_a_test() {
+    let repo = affected_repo("affected_test_file");
+    let answer = of_files(&repo, &["packages/a/src/f.ts"]);
+    let test = file(&answer, "packages/c/src/g.test.ts").expect("g.test.ts");
+    assert_eq!(test["test"], true);
+    assert_eq!(file(&answer, "packages/b/src/g.ts").unwrap()["test"], false);
+}
+
+#[test]
+fn a_name_match_only_package_is_inferred() {
+    let repo = affected_repo("affected_inferred_package");
+    let answer = of_files(&repo, &["packages/a/src/named.ts"]);
+    assert_eq!(packages(&answer, "inferred"), ["packages/e"]);
+    assert_eq!(packages(&answer, "certain"), ["packages/a"]);
+    let loose = file(&answer, "packages/e/src/loose.ts").expect("loose.ts");
+    assert_eq!(
+        (&loose["tier"], &loose["level"]),
+        (&json!("inferred"), &json!("inferred"))
+    );
+}
+
+/// The chain's catalog reads `resource::postgres::orders` with no `via`: the whole repository.
+#[test]
+fn a_repository_level_side_is_listed_in_sides() {
+    let (_, gateway, _) = common::chain("affected_repository_side");
+    let answer = of_files(&gateway, &["src/orders.ts"]);
+    let side =
+        json!({"id": "example.com/chain/catalog", "place": "repository", "level": "declared"});
+    assert!(
+        answer["sides"].as_array().unwrap().contains(&side),
+        "{answer:#}"
+    );
+    let catalog = (answer["files"].as_array().unwrap().iter())
+        .filter(|f| f["repo"] == "example.com/chain/catalog")
+        .count();
+    assert_eq!(catalog, 0, "a repository-level side has no file");
+}
+
+/// A config use is reached only through provisioning, which this walk does not follow: no
+/// fixture form reaches one, so only the document side is listed here.
+#[test]
+fn a_document_side_is_listed_in_sides() {
+    let (_, gateway, _) = common::documented_chain("affected_document_side");
+    let answer = of_files(&gateway, &["openapi.yaml"]);
+    let sides = answer["sides"].as_array().unwrap();
+    let shipments = sides
+        .iter()
+        .find(|s| s["id"].as_str().unwrap().ends_with("GET /api/shipments/{}"));
+    let shipments = shipments.unwrap_or_else(|| panic!("{answer:#}"));
+    assert_eq!(
+        (&shipments["place"], &shipments["level"]),
+        (&json!("document"), &json!("exact"))
+    );
 }
