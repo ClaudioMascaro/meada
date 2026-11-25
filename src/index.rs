@@ -1884,6 +1884,19 @@ pub(crate) fn facts_loading(db: &Connection, names: &[&str]) -> Result<BTreeMap<
     Ok(out)
 }
 
+/// The stored facts of each file of `paths` the index holds and this version can read, by path.
+pub(crate) fn facts_of(db: &Connection, paths: &[&str]) -> Result<BTreeMap<String, Facts>> {
+    let mut out = BTreeMap::new();
+    let mut rows = db.prepare("SELECT facts FROM files WHERE path = ?1")?;
+    for path in paths {
+        let facts: Option<String> = rows.query_row(params![path], |r| r.get(0)).optional()?;
+        if let Some(facts) = facts.and_then(|f| serde_json::from_str::<Facts>(&f).ok()) {
+            out.insert(path.to_string(), facts);
+        }
+    }
+    Ok(out)
+}
+
 /// The `manifests` rows (path and summary), by path.
 fn manifest_rows(db: &Connection) -> Result<Vec<(String, String)>> {
     let rows = db

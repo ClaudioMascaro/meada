@@ -537,6 +537,8 @@ fn conflicts(a: &Value, b: &Value) -> bool {
     let at = |x: &Value, key: &str, certain: bool| -> BTreeSet<(String, String)> {
         (x[key].as_array().into_iter().flatten())
             .filter(|e| !certain || e["tier"] == "certain")
+            // A lockfile read meets a lockfile change by name (`moved`), not by path.
+            .filter(|e| e.get("name").is_none())
             .map(|e| {
                 (
                     e["repo"].as_str().unwrap().into(),
@@ -549,9 +551,43 @@ fn conflicts(a: &Value, b: &Value) -> bool {
         let mut b_side = at(b, "changed", false);
         b_side.extend(at(b, "open", false));
         b_side.extend(at(b, "reads", true));
-        !at(a, "files", true).is_disjoint(&b_side)
+        !at(a, "files", true).is_disjoint(&b_side) || !moved(a).is_disjoint(&lockfile_reads(b))
     };
     one_way(a, b) || one_way(b, a)
+}
+
+/// The lockfile reads of an answer: `(repo, lockfile, name)`.
+fn lockfile_reads(x: &Value) -> BTreeSet<(String, String, String)> {
+    (x["reads"].as_array().into_iter().flatten())
+        .filter_map(|e| {
+            let name = e.get("name")?.as_str()?.to_string();
+            let (repo, path) = (e["repo"].as_str()?.into(), e["path"].as_str()?.into());
+            Some((repo, path, name))
+        })
+        .collect()
+}
+
+/// What an answer's lockfiles move, `(repo, lockfile, name)`: the names of the entries that moved
+/// and the dependencies that lead there.
+fn moved(x: &Value) -> BTreeSet<(String, String, String)> {
+    let mut out = BTreeSet::new();
+    for l in x["lockfiles"].as_array().into_iter().flatten() {
+        let (repo, path) = (l["repo"].as_str().unwrap(), l["path"].as_str().unwrap());
+        let entries = (l["entries"].as_array().into_iter().flatten()).map(|e| {
+            let d = e["descriptor"].as_str().unwrap();
+            let at = d[1..].find('@').map_or(d.len(), |i| i + 1);
+            d[..at].to_string()
+        });
+        let via = (l["packages"].as_array().into_iter().flatten())
+            .flat_map(|p| p["via"].as_array().unwrap())
+            .map(|n| n.as_str().unwrap().to_string());
+        out.extend(
+            entries
+                .chain(via)
+                .map(|n| (repo.to_string(), path.to_string(), n)),
+        );
+    }
+    out
 }
 
 /// Whether the certain `files` of `a` and `b` meet: the plain intersection.
@@ -1287,4 +1323,82 @@ fn lockfile_roots_seed_the_manifest_tier() {
         "{}",
         answer["packages"]
     );
+}
+
+/// The answers of two changes on one base of the lockfile fixture.
+fn lockfile_pair(case: &str, a: impl FnOnce(&Path), b: impl FnOnce(&Path)) -> (Value, Value) {
+    let repo = lockfile_repo(case);
+    (side(&repo, "a", a), side(&repo, "b", b))
+}
+
+fn bump_left_pad(repo: &Path) {
+    replace(
+        repo,
+        "web/yarn.lock",
+        &entry("left-pad", "1.3.0", "leftpad130"),
+        &entry("left-pad", "1.3.1", "leftpad131"),
+    );
+}
+
+#[test]
+fn a_first_import_of_x_conflicts_with_a_bump_of_x() {
+    let (a, b) = lockfile_pair(
+        "lockfile_pair_first_import",
+        |repo| {
+            replace(
+                repo,
+                "web/packages/a/src/plain.ts",
+                "export function plain",
+                "import { pad } from 'left-pad';\n\nexport function plain",
+            )
+        },
+        bump_left_pad,
+    );
+    assert!(
+        lockfile_reads(&a).contains(&(WEB.into(), "web/yarn.lock".into(), "left-pad".into())),
+        "{}",
+        a["reads"]
+    );
+    let read = (a["reads"].as_array().unwrap().iter())
+        .find(|r| r.get("name").is_some())
+        .unwrap();
+    assert_eq!(
+        (read["tier"].as_str(), read["level"].as_str()),
+        (Some("certain"), Some("exact"))
+    );
+    assert!(!files_meet(&a, &b));
+    assert!(conflicts(&a, &b));
+}
+
+#[test]
+fn an_import_of_another_name_does_not_conflict() {
+    let (a, b) = lockfile_pair(
+        "lockfile_pair_other_name",
+        |repo| {
+            replace(
+                repo,
+                "web/packages/a/src/plain.ts",
+                "export function plain",
+                "import 'react';\n\nexport function plain",
+            )
+        },
+        bump_left_pad,
+    );
+    assert!(lockfile_reads(&a).contains(&(WEB.into(), "web/yarn.lock".into(), "react".into())));
+    assert!(!conflicts(&a, &b));
+}
+
+#[test]
+fn an_unchanged_line_reads_no_lockfile_entry() {
+    let repo = lockfile_repo("lockfile_unchanged_import");
+    let answer = edited(&repo, "web/packages/a/src/uses.ts", "x * 2", "x * 3");
+    assert!(lockfile_reads(&answer).is_empty(), "{}", answer["reads"]);
+    // A workspace package is read through the code graph, never through the lockfile.
+    let answer = edited(
+        &repo,
+        "web/packages/a/src/plain.ts",
+        "export function plain",
+        "import { useKit } from '@scope/b';\n\nexport function plain",
+    );
+    assert!(lockfile_reads(&answer).is_empty(), "{}", answer["reads"]);
 }

@@ -72,6 +72,9 @@ pub(crate) struct Attributed {
     all_packages: BTreeSet<String>,
     /// The member manifests of the change whose only edits a lockfile read covers.
     covered: BTreeSet<String>,
+    /// What the changed lines load from outside the workspace: the lockfile that resolves each
+    /// and the package's name.
+    reads: BTreeSet<(String, String)>,
 }
 
 impl Attributed {
@@ -161,6 +164,9 @@ struct File {
 struct Read {
     repo: String,
     path: String,
+    /// On a lockfile read: the package the changed line loads, whose entry it reads.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
     tier: Tier,
     level: Level,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -540,6 +546,66 @@ fn resolutions(path: &std::path::Path) -> BTreeMap<String, String> {
         .collect()
 }
 
+/// What the changed lines of `changes` load from a package the workspace does not provide, each
+/// with the `yarn.lock` nearest above the file that loads it: a load is on a changed line when
+/// its specifier, quoted, is written there (a whole file loads everything it loads). A file with
+/// no lockfile above it reads none.
+fn lockfile_reads(
+    graph: &Graph<'_>,
+    changes: &[(String, Change)],
+    facts_at: impl FnOnce(&[&str]) -> crate::Result<BTreeMap<String, Facts>>,
+) -> crate::Result<BTreeSet<(String, String)>> {
+    let repo = &graph.workspace.repos[0];
+    let provided: HashSet<&str> = (graph.exports.iter())
+        .flat_map(|e| &e.packages)
+        .map(|p| p.name.as_str())
+        .collect();
+    let paths: Vec<&str> = (changes.iter())
+        .filter(|(_, c)| !matches!(c, Change::Deleted))
+        .map(|(p, _)| p.as_str())
+        .collect();
+    let facts = facts_at(&paths)?;
+    let mut out = BTreeSet::new();
+    for (path, change) in changes {
+        let Some(facts) = facts.get(path) else {
+            continue;
+        };
+        let text = std::fs::read_to_string(repo.root.join(path)).unwrap_or_default();
+        let lines: Vec<&str> = text.lines().collect();
+        let written = |spec: &str| match change {
+            Change::Lines(ranges) => ranges.iter().any(|&(a, b)| {
+                let at = lines
+                    .get(a.saturating_sub(1)..b.min(lines.len()))
+                    .unwrap_or_default();
+                at.iter().any(|l| {
+                    ['\'', '"', '`']
+                        .iter()
+                        .any(|q| l.contains(&format!("{q}{spec}{q}")))
+                })
+            }),
+            _ => true,
+        };
+        for spec in lang::loaded(facts) {
+            let Some((name, _)) = npm::split(spec) else {
+                continue;
+            };
+            if provided.contains(name) || !written(spec) {
+                continue;
+            }
+            let lockfile = std::iter::successors(Some(path.as_str()), |p| {
+                (!p.is_empty()).then(|| p.rsplit_once('/').map_or("", |(dir, _)| dir))
+            })
+            .skip(1)
+            .map(|dir| repo::relative(dir, "yarn.lock").unwrap_or_default())
+            .find(|lock| repo.root.join(lock).is_file());
+            if let Some(lockfile) = lockfile {
+                out.insert((lockfile, name.to_string()));
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// The packages of `names` a file of `facts` loads.
 fn loaded_names<'n>(facts: &Facts, names: &BTreeSet<&'n str>) -> BTreeSet<&'n str> {
     (lang::loaded(facts).into_iter())
@@ -604,11 +670,15 @@ pub(crate) fn attribute<'g>(
     changes: &[(String, Change)],
     base: Option<&str>,
     mut facts: impl FnMut(&[&str]) -> crate::Result<BTreeMap<String, Facts>>,
+    facts_at: impl FnOnce(&[&str]) -> crate::Result<BTreeMap<String, Facts>>,
 ) -> crate::Result<Attributed> {
     let repo = &graph.workspace.repos[0];
     let export = &graph.exports[0];
     let mut owners = Owners::new(graph);
-    let mut out = Attributed::default();
+    let mut out = Attributed {
+        reads: lockfile_reads(graph, changes, facts_at)?,
+        ..Attributed::default()
+    };
     // The package directory of each file of the repository, read once.
     let mut dirs: Option<Vec<(&str, &str)>> = None;
     for (path, change) in changes {
@@ -1008,7 +1078,8 @@ pub(crate) fn answer<'g>(
         certain: certain.into_iter().collect(),
     };
     sides.sort();
-    let mut read: BTreeMap<(usize, &str), (Key, Evidence)> = BTreeMap::new();
+    // A lockfile read is a place of its own, by the name it reads.
+    let mut read: BTreeMap<(usize, &str, Option<&str>), (Key, Evidence)> = BTreeMap::new();
     for (id, evidence) in reads(graph, changes, roots) {
         // A side only a document lists is read at the document's path.
         let document = || {
@@ -1020,19 +1091,31 @@ pub(crate) fn answer<'g>(
             })?;
             Some((n, path))
         };
-        let Some(place) = graph.file_of(id).or_else(document) else {
+        let Some((n, path)) = graph.file_of(id).or_else(document) else {
             continue;
         };
         let key = Key::of(&evidence);
-        let best = read.entry(place).or_insert((key, evidence));
+        let best = read.entry((n, path, None)).or_insert((key, evidence));
         if key < best.0 {
             *best = (key, evidence);
         }
     }
+    let exact = Evidence {
+        level: Level::Exact,
+        by: None,
+        p: None,
+        candidates: 0,
+        reason: None,
+        narrowed: false,
+    };
+    for (lockfile, name) in &attributed.reads {
+        read.insert((0, lockfile, Some(name)), (Key::ROOT, exact));
+    }
     let reads = (read.into_iter())
-        .map(|((n, path), (key, e))| Read {
+        .map(|((n, path, name), (key, e))| Read {
             repo: graph.workspace.repos[n].identity.clone(),
             path: path.to_string(),
+            name: name.map(str::to_string),
             tier: key.tier,
             level: e.level,
             candidates: (e.candidates > 0).then_some(e.candidates),

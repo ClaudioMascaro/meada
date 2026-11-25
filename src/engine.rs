@@ -714,8 +714,9 @@ impl Engine {
         let attributed: Vec<Attributed> = {
             let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
             let facts = |names: &[&str]| crate::index::facts_loading(&self.dbs[0], names);
+            let facts_at = |paths: &[&str]| crate::index::facts_of(&self.dbs[0], paths);
             (blocks.iter())
-                .map(|changes| trace::affected::attribute(&graph, changes, base, facts))
+                .map(|changes| trace::affected::attribute(&graph, changes, base, facts, facts_at))
                 .collect::<Result<_>>()?
         };
         // The files a lockfile roots are read as whole files are.
