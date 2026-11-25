@@ -1538,3 +1538,46 @@ fn a_new_range_of_a_locked_name_roots_only_its_member() {
     );
     assert_eq!(locked_paths(&answer), ["web/packages/c/src/index.ts"]);
 }
+
+#[test]
+fn a_patch_rehash_roots_hoisted_importers_through_the_wrapped_range() {
+    let repo = lockfile_repo("lockfile_patch_wrapped");
+    let patched = "patch:resolve@npm%3A^1.22.0#optional!builtin<compat/resolve>";
+    replace(
+        &repo,
+        "web/packages/a/package.json",
+        "\"lodash\": \"^4.17.0\"",
+        "\"lodash\": \"^4.17.0\", \"resolve\": \"^1.22.0\"",
+    );
+    // The member's edge goes to the `npm:` range the patch wraps, none to the `patch:` key.
+    replace(
+        &repo,
+        "web/yarn.lock",
+        "    lodash: \"npm:^4.17.0\"\n  languageName: unknown",
+        "    lodash: \"npm:^4.17.0\"\n    resolve: \"npm:^1.22.0\"\n  languageName: unknown",
+    );
+    let lock = repo.join("web/yarn.lock");
+    let mut text = fs::read_to_string(&lock).unwrap();
+    text.push_str(&format!(
+        "\n\"resolve@npm:^1.22.0\":\n{}  languageName: node\n  linkType: hard\n\n\
+         \"resolve@{patched}\":\n  version: 1.22.8\n  resolution: \
+         \"resolve@patch:resolve@npm%3A1.22.8#optional!builtin<compat/resolve>::version=1.22.8&hash=c3c19d\"\n  \
+         checksum: 10c0/resolvepatch1\n  languageName: node\n  linkType: hard\n",
+        entry("resolve", "1.22.8", "resolve1228")
+    ));
+    fs::write(&lock, text).unwrap();
+    fs::write(
+        repo.join("web/packages/d/src/res.ts"),
+        "import resolve from 'resolve';\n\nexport function found(x: string) {\n  return resolve.sync(x);\n}\n",
+    )
+    .unwrap();
+    commit_all(&repo, "patched resolve");
+    replace(&repo, "web/yarn.lock", "hash=c3c19d", "hash=c3c19e");
+    let answer = edited(&repo, "web/yarn.lock", "resolvepatch1", "resolvepatch2");
+    // `d` loads `resolve` without declaring it: the patch it gets changed.
+    assert!(
+        locked_paths(&answer).contains(&"web/packages/d/src/res.ts".to_string()),
+        "{:?}",
+        locked_paths(&answer)
+    );
+}

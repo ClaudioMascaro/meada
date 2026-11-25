@@ -731,7 +731,7 @@ pub(crate) fn attribute<'g>(
         // nothing for the others.
         let outside: Vec<lock::Moved> = (moved.iter())
             .filter(|m| !after.is_workspace(&m.descriptor))
-            .filter(|m| lock::changed(&before, &after, &m.descriptor))
+            .filter(|m| m.patched || lock::changed(&before, &after, &m.descriptor))
             .cloned()
             .collect();
         let hoisted: BTreeSet<String> = (lock::reached(&before, &after, &outside)

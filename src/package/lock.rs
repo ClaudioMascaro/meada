@@ -107,6 +107,10 @@ pub(crate) struct Moved {
     /// Whether an edge reached it by name only, so a dependent may not use it.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub by_name: bool,
+    /// Whether it moved only because a `patch:` descriptor wrapping it moved: what it resolves to
+    /// is the same entry, but what a dependent gets through the patch changed.
+    #[serde(skip)]
+    pub patched: bool,
 }
 
 /// What one workspace's dependency resolves to.
@@ -355,6 +359,7 @@ pub(crate) fn diff(base: &Lock, head: &Lock) -> Vec<Moved> {
                 before: b.map(|(_, e)| e.version.clone()),
                 after: h.map(|(_, e)| e.version.clone()),
                 by_name: by_name(b) || by_name(h),
+                patched: false,
             },
         );
     }
@@ -365,6 +370,7 @@ pub(crate) fn diff(base: &Lock, head: &Lock) -> Vec<Moved> {
             before: b.map(|(_, e)| e.version.clone()),
             after: h.map(|(_, e)| e.version.clone()),
             by_name: by_name(b) || by_name(h),
+            patched: true,
         });
     }
     moved.into_values().collect()
@@ -646,6 +652,7 @@ mod tests {
                 before: Some("4.17.20".into()),
                 after: Some("4.17.21".into()),
                 by_name: false,
+                patched: false,
             }]
         );
         assert_eq!(
@@ -916,6 +923,9 @@ mod tests {
                 "resolve@patch:resolve@npm%3A^1.20.0#~builtin<compat/resolve>"
             ]
         );
+        // Only the wrapped range is marked: it moved because the patch did.
+        let patched: Vec<bool> = moved.iter().map(|m| m.patched).collect();
+        assert_eq!(patched, [true, false]);
         assert_eq!(
             reached(&base, &head, &moved),
             names(&[("packages/a", &["resolve"])])

@@ -394,8 +394,6 @@ fn run(dir: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
-/// The bytes of `path` at the revision `rev` in the checkout at `root`, or `None` when the
-/// revision has no such path. A revision that does not resolve is an error.
 /// The bytes of the regular file at `abs`, read up to one past `max` so a caller can tell it is
 /// too large; `None` for a link, a directory, a device or a missing path. A file a repository
 /// holds is untrusted: a link to `/dev/zero` or to a terminal is never opened.
@@ -412,6 +410,8 @@ pub(crate) fn regular(abs: &Path, max: usize) -> Option<Vec<u8>> {
     Some(bytes)
 }
 
+/// The bytes of `path` at the revision `rev` in the checkout at `root`, or `None` when the
+/// revision has no such path. A revision that does not resolve is an error.
 pub fn show(root: &Path, rev: &str, path: &str) -> Result<Option<Vec<u8>>> {
     if rev.starts_with('-') {
         return Err(Msg::TraceChangesValue(rev).text().into());
@@ -544,6 +544,21 @@ mod tests {
         commit(&dir, "base");
         assert!(super::show(&dir, "no-such-rev", "a.ts").is_err());
         assert!(super::show(&dir, "--output=x", "a.ts").is_err());
+    }
+
+    #[test]
+    fn show_refuses_a_rev_git_would_read_as_an_option() {
+        let dir = scratch("show-dash-rev");
+        write(&dir, "a.ts", b"a\n");
+        commit(&dir, "base");
+        // A branch named like the path: `ls-tree --format=x^{tree} -- a.ts` then lists it and
+        // exits 0, so only the refusal tells this rev from a path absent at the base.
+        git(&dir, &["branch", "a.ts"]);
+        let err = super::show(&dir, "--format=x", "a.ts").unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            crate::msg::Msg::TraceChangesValue("--format=x").text()
+        );
     }
 
     #[test]

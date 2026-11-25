@@ -4133,8 +4133,6 @@ mod tests {
         (db.query_row("SELECT count(*) FROM communities", [], |r| r.get(0))).unwrap()
     }
 
-    /// Server mode (ADR 0011): a read that meets a commit in progress waits for it, and past
-    /// the busy timeout fails naming the repository and the lock.
     /// Many reached names cost one pass over the files, not one scan per name.
     #[test]
     fn facts_loading_scans_once_for_many_names() {
@@ -4167,6 +4165,8 @@ mod tests {
         assert!(took < Duration::from_secs(10), "{took:?}");
     }
 
+    /// Server mode (ADR 0011): a read that meets a commit in progress waits for it, and past
+    /// the busy timeout fails naming the repository and the lock.
     #[test]
     fn a_read_only_open_waits_for_a_commit_in_progress_up_to_the_busy_timeout() {
         let (dir, index) = index_dir("busy");
