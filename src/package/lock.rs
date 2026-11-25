@@ -10,7 +10,7 @@
 //! still matches no key goes to every entry of that name, the safe side, and those entries are
 //! marked as reached by name.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use serde::Serialize;
 use serde_json::Value;
@@ -335,15 +335,13 @@ pub(crate) fn diff(base: &Lock, head: &Lock) -> Vec<Moved> {
     let mut moved = BTreeMap::new();
     let mut wrapped = Vec::new();
     // Each locator's entries compared once, however many keys it has.
-    let mut same: HashMap<&str, bool> = HashMap::new();
+    let mut compared: HashMap<&str, bool> = HashMap::new();
     for d in every {
         let (b, h) = (base.resolve(d), head.resolve(d));
         let unchanged = match (b, h) {
-            (Some((bl, be)), Some((hl, he))) if bl == hl => *same.entry(hl).or_insert_with(|| {
-                be.version == he.version
-                    && be.checksum == he.checksum
-                    && be.dependencies == he.dependencies
-            }),
+            (Some((bl, be)), Some((hl, he))) if bl == hl => {
+                *compared.entry(hl).or_insert_with(|| same(be, he))
+            }
             _ => false,
         };
         if unchanged {
@@ -373,63 +371,107 @@ pub(crate) fn diff(base: &Lock, head: &Lock) -> Vec<Moved> {
 }
 
 /// The workspaces of `head` that depend on what moved, each with the names of its own
-/// dependencies that lead there. The walk goes up the dependency edges of `head` and stops at a
-/// workspace: one reached through another workspace is the code graph's to follow. A workspace
-/// whose own entry moved is reached through the dependencies it added, removed or changed since
-/// `base`. `peerDependencies` are no edges: the entry that provides a peer lists it.
+/// dependencies that lead there. The walk starts at each moved descriptor's dependents (a key
+/// added to an unchanged entry reaches only what uses that key), goes up the dependency edges of
+/// `head` through every key of each entry it reaches, and stops at a workspace: one reached
+/// through another workspace is the code graph's to follow. A workspace whose own entry changed
+/// is reached through the dependencies it added, removed or changed since `base`.
+/// `peerDependencies` are no edges: the entry that provides a peer lists it. Each descriptor's
+/// dependents and each name's by-name dependents are taken once.
 pub(crate) fn reached(
     base: &Lock,
     head: &Lock,
     moved: &[Moved],
 ) -> BTreeMap<String, BTreeSet<String>> {
     let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    let mut queue: Vec<&str> = Vec::new();
-    let mut members = BTreeSet::new();
+    let (mut descriptors, mut names): (Vec<&str>, Vec<&str>) = (Vec::new(), Vec::new());
     for m in moved {
         let Some((locator, entry)) = head.resolve(&m.descriptor) else {
             continue;
         };
-        let Some(dir) = head.dirs.get(locator) else {
-            queue.push(locator);
-            continue;
-        };
-        if !members.insert(locator) {
-            continue;
+        let own = base.entries.get(locator);
+        match head.dirs.get(locator) {
+            Some(dir) => {
+                let none = BTreeMap::new();
+                let before = own.map_or(&none, |e| &e.dependencies);
+                let after = &entry.dependencies;
+                let changed =
+                    (after.keys().chain(before.keys())).filter(|n| before.get(*n) != after.get(*n));
+                out.entry(dir.clone()).or_default().extend(changed.cloned());
+            }
+            None => {
+                descriptors.push(&m.descriptor);
+                // A by-name edge gets whichever entry of the name: one that changed reaches it.
+                if !own.is_some_and(|b| same(b, entry)) {
+                    names.push(name_of(locator));
+                }
+            }
         }
-        let none = BTreeMap::new();
-        let before = (base.resolve(&m.descriptor)).map_or(&none, |(_, e)| &e.dependencies);
-        let after = &entry.dependencies;
-        let names = (after.keys().chain(before.keys())).filter(|n| before.get(*n) != after.get(*n));
-        out.entry(dir.clone()).or_default().extend(names.cloned());
     }
-    let (mut seen, mut names) = (BTreeSet::new(), BTreeSet::new());
-    while let Some(locator) = queue.pop() {
-        if !seen.insert(locator) {
-            continue;
-        }
-        let entry = &head.entries[locator];
-        let keyed = (entry.keys.iter()).flat_map(|k| head.dependents.get(k).into_iter().flatten());
-        // A by-name edge reaches every entry of its name: its dependents are taken once.
-        let name = name_of(locator);
-        let by_name = (names
-            .insert(name)
-            .then(|| head.by_name_dependents.get(name)))
-        .flatten()
-        .into_iter()
-        .flatten();
-        for (dependent, dependency) in keyed.chain(by_name) {
+    let (mut taken, mut named, mut queued) = (HashSet::new(), HashSet::new(), HashSet::new());
+    loop {
+        let dependents: Vec<&(String, String)> = if let Some(d) = descriptors.pop() {
+            if !taken.insert(d) {
+                continue;
+            }
+            head.dependents.get(d).into_iter().flatten().collect()
+        } else if let Some(name) = names.pop() {
+            if !named.insert(name) {
+                continue;
+            }
+            head.by_name_dependents
+                .get(name)
+                .into_iter()
+                .flatten()
+                .collect()
+        } else {
+            break;
+        };
+        for (dependent, dependency) in dependents {
             match head.dirs.get(dependent) {
                 Some(dir) => {
                     out.entry(dir.clone())
                         .or_default()
                         .insert(dependency.clone());
                 }
-                None => queue.push(dependent.as_str()),
+                None if queued.insert(dependent.as_str()) => {
+                    descriptors.extend(head.entries[dependent].keys.iter().map(String::as_str));
+                    names.push(name_of(dependent));
+                }
+                None => {}
             }
         }
     }
     out.retain(|_, names| !names.is_empty());
     out
+}
+
+/// The `resolutions` of a `package.json`'s bytes, pattern to range; none when it does not parse.
+pub(crate) fn overrides(manifest: &[u8]) -> BTreeMap<String, String> {
+    let json = serde_json::from_slice::<serde_json::Value>(manifest).ok();
+    let found = json
+        .as_ref()
+        .and_then(|j| j.get("resolutions")?.as_object());
+    (found.into_iter().flatten())
+        .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_string())))
+        .collect()
+}
+
+/// Whether two entries of one locator read the same.
+fn same(a: &Entry, b: &Entry) -> bool {
+    a.version == b.version && a.checksum == b.checksum && a.dependencies == b.dependencies
+}
+
+/// Whether what `descriptor` resolves to changed from `base` to `head`: another locator, or one
+/// whose entry reads otherwise. A key added to an entry that did not change is no change.
+pub(crate) fn changed(base: &Lock, head: &Lock, descriptor: &str) -> bool {
+    let Some((locator, entry)) = head.resolve(descriptor) else {
+        return true;
+    };
+    match base.resolve(descriptor) {
+        Some((before, _)) if before != locator => true,
+        _ => !base.entries.get(locator).is_some_and(|b| same(b, entry)),
+    }
 }
 
 /// What each dependency of each workspace resolves to, sorted by directory and name. A
@@ -439,11 +481,18 @@ pub(crate) fn direct(lock: &Lock) -> Vec<Resolved> {
     for (dir, locator) in &lock.workspaces {
         for (name, target) in lock.edges.get(locator).into_iter().flatten() {
             let found: Vec<&str> = match target {
-                Target::Keys(keys) => keys
-                    .iter()
-                    .filter_map(|d| lock.descriptors.get(d))
-                    .map(String::as_str)
-                    .collect(),
+                // Two locators (a parent-scoped override beside the written range): which one
+                // this member gets is not certain, so no row.
+                Target::Keys(keys) => {
+                    let found: BTreeSet<&str> = (keys.iter())
+                        .filter_map(|d| lock.descriptors.get(d))
+                        .map(String::as_str)
+                        .collect();
+                    match found.len() {
+                        1 => found.into_iter().collect(),
+                        _ => Vec::new(),
+                    }
+                }
                 Target::ByName => match lock.named.get(name).map(Vec::as_slice) {
                     Some([one]) => vec![one.as_str()],
                     _ => Vec::new(),
@@ -679,6 +728,92 @@ mod tests {
         assert_eq!(
             head.edges["@scope/a@workspace:packages/a"]["lodash"],
             Target::Keys(vec!["lodash@npm:^4.17.0".into()])
+        );
+    }
+
+    #[test]
+    fn a_new_key_on_a_workspace_reaches_only_its_new_dependent() {
+        let rows = |key: &'static str, deps: &'static [(&'static str, &'static str)]| -> Vec<Row> {
+            vec![
+                ROOT,
+                (
+                    key,
+                    "@scope/a@workspace:packages/a",
+                    "0.0.0-use.local",
+                    &[("lodash", "npm:^4.17.0")],
+                ),
+                (
+                    "@scope/b@workspace:packages/b",
+                    "@scope/b@workspace:packages/b",
+                    "0.0.0-use.local",
+                    deps,
+                ),
+                ("lodash@npm:^4.17.0", "lodash@npm:4.17.21", "4.17.21", &[]),
+            ]
+        };
+        let base = lock(&rows("@scope/a@workspace:packages/a", &[]));
+        let head = lock(&rows(
+            "@scope/a@workspace:^, @scope/a@workspace:packages/a",
+            &[("@scope/a", "workspace:^")],
+        ));
+        assert_eq!(walk(&base, &head), names(&[("packages/b", &["@scope/a"])]));
+    }
+
+    #[test]
+    fn a_new_range_of_an_existing_entry_reaches_only_its_new_dependent() {
+        let rows = |key: &'static str, deps: &'static [(&'static str, &'static str)]| -> Vec<Row> {
+            vec![
+                ROOT,
+                (
+                    "@scope/a@workspace:packages/a",
+                    "@scope/a@workspace:packages/a",
+                    "0.0.0-use.local",
+                    &[("lodash", "npm:^4.17.0")],
+                ),
+                (
+                    "@scope/c@workspace:packages/c",
+                    "@scope/c@workspace:packages/c",
+                    "0.0.0-use.local",
+                    deps,
+                ),
+                (key, "lodash@npm:4.17.21", "4.17.21", &[]),
+            ]
+        };
+        let base = lock(&rows("lodash@npm:^4.17.0", &[]));
+        let head = lock(&rows(
+            "lodash@npm:^4.0.0, lodash@npm:^4.17.0",
+            &[("lodash", "npm:^4.0.0")],
+        ));
+        assert_eq!(walk(&base, &head), names(&[("packages/c", &["lodash"])]));
+        // The entry itself did not change: what a hoisted import gets stays the same.
+        let moved = diff(&base, &head);
+        let outside: Vec<&Moved> = (moved.iter())
+            .filter(|m| !head.is_workspace(&m.descriptor))
+            .collect();
+        assert_eq!(outside.len(), 1, "{moved:?}");
+        assert!(!changed(&base, &head, &outside[0].descriptor), "{moved:?}");
+    }
+
+    #[test]
+    fn direct_gives_no_row_for_two_resolutions() {
+        let rows: Vec<Row> = vec![
+            ROOT,
+            (
+                "@scope/b@workspace:packages/b",
+                "@scope/b@workspace:packages/b",
+                "0.0.0-use.local",
+                &[("left-pad", "npm:^1")],
+            ),
+            ("left-pad@npm:^1", "left-pad@npm:1.3.2", "1.3.2", &[]),
+            ("left-pad@npm:1.3.0", "left-pad@npm:1.3.0", "1.3.0", &[]),
+        ];
+        // A parent-scoped override names `left-pad` too: both keys match the member's edge.
+        let overrides = BTreeMap::from([("@scope/kit/left-pad".to_string(), "1.3.0".to_string())]);
+        let lock = read(text(&rows).as_bytes(), &overrides).unwrap();
+        assert!(
+            direct(&lock).iter().all(|r| r.name != "left-pad"),
+            "{:?}",
+            direct(&lock)
         );
     }
 

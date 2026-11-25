@@ -396,6 +396,22 @@ fn run(dir: &Path, args: &[&str]) -> Result<String> {
 
 /// The bytes of `path` at the revision `rev` in the checkout at `root`, or `None` when the
 /// revision has no such path. A revision that does not resolve is an error.
+/// The bytes of the regular file at `abs`, read up to one past `max` so a caller can tell it is
+/// too large; `None` for a link, a directory, a device or a missing path. A file a repository
+/// holds is untrusted: a link to `/dev/zero` or to a terminal is never opened.
+pub(crate) fn regular(abs: &Path, max: usize) -> Option<Vec<u8>> {
+    use std::io::Read;
+    if !std::fs::symlink_metadata(abs).ok()?.is_file() {
+        return None;
+    }
+    let mut bytes = Vec::new();
+    (std::fs::File::open(abs).ok()?)
+        .take(max as u64 + 1)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    Some(bytes)
+}
+
 pub fn show(root: &Path, rev: &str, path: &str) -> Result<Option<Vec<u8>>> {
     if rev.starts_with('-') {
         return Err(Msg::TraceChangesValue(rev).text().into());
@@ -528,6 +544,22 @@ mod tests {
         commit(&dir, "base");
         assert!(super::show(&dir, "no-such-rev", "a.ts").is_err());
         assert!(super::show(&dir, "--output=x", "a.ts").is_err());
+    }
+
+    #[test]
+    fn a_regular_file_is_read_up_to_one_past_its_cap() {
+        let dir = scratch("regular-file");
+        write(&dir, "a.json", b"0123456789");
+        write(&dir, "real.json", b"{}");
+        std::os::unix::fs::symlink(dir.join("real.json"), dir.join("link.json")).unwrap();
+        assert_eq!(super::regular(&dir.join("a.json"), 4).unwrap(), b"01234");
+        assert_eq!(
+            super::regular(&dir.join("a.json"), 64).unwrap(),
+            b"0123456789"
+        );
+        assert!(super::regular(&dir.join("link.json"), 64).is_none());
+        assert!(super::regular(&dir.join("missing.json"), 64).is_none());
+        assert!(super::regular(&dir, 64).is_none());
     }
 
     #[test]

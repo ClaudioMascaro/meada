@@ -2334,6 +2334,45 @@ const LOCK_HEAP: usize = 768 << 20;
 /// The time `lockfile_probe` may take: two full parses of 16 MiB in a debug build.
 const LOCK_BUDGET: Duration = Duration::from_secs(120);
 
+/// Entries that all list one descriptor in their key and all depend on it: the walk takes that
+/// descriptor's dependents once, not once per entry that lists it.
+#[test]
+fn a_lockfile_of_shared_keys_stays_bounded() {
+    use super::lock;
+    let n = 30_000;
+    let text = |bumped: bool| {
+        let mut text = "__metadata:\n  version: 8\n\n\"root@workspace:.\":\n  version: \
+                        0.0.0-use.local\n  resolution: \"root@workspace:.\"\n  dependencies:\n    \
+                        e0: \"npm:1\"\n\n"
+            .to_string();
+        for i in 0..n {
+            let sum = if bumped && (i == 0 || i == n - 1) {
+                "z"
+            } else {
+                ""
+            };
+            text += &format!(
+                "\"e{i}@npm:1, x@npm:1\":\n  version: 1.0.{i}\n  resolution: \"e{i}@npm:1.0.{i}\"\n  \
+                 dependencies:\n    x: \"npm:1\"\n  checksum: 10c0/{i}{sum}\n\n"
+            );
+        }
+        assert!(text.len() <= lock::MAX_LOCK_BYTES, "{} bytes", text.len());
+        text.into_bytes()
+    };
+    let start = Instant::now();
+    let held = heap::watch(LOCK_HEAP);
+    let none = BTreeMap::new();
+    let base = lock::read(&text(false), &none).unwrap();
+    let head = lock::read(&text(true), &none).unwrap();
+    let reached = lock::reached(&base, &head, &lock::diff(&base, &head));
+    let peak = heap::unwatch().saturating_sub(held);
+    let took = start.elapsed();
+    eprintln!("shared keys: {took:?}, {} MiB", peak >> 20);
+    assert_eq!(reached.keys().collect::<Vec<_>>(), ["."]);
+    assert!(took < LOCK_BUDGET, "{took:?}");
+    assert!(peak < LOCK_HEAP, "{} MiB", peak >> 20);
+}
+
 /// A lockfile built to explode, at its own cap (16 MiB, past `MAX_BYTES`), stays within its own
 /// time and heap bounds and returns a bounded size.
 #[test]

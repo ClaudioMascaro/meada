@@ -533,17 +533,14 @@ fn directory(path: &str) -> &str {
     path.rsplit_once('/').map_or(".", |(dir, _)| dir)
 }
 
-/// The `resolutions` of the `package.json` at `path`, pattern to range; none when it cannot be
-/// read.
+/// The bytes of a manifest of the repository: a regular file of at most `lang::MAX_BYTES`.
+fn manifest_bytes(abs: &std::path::Path) -> Option<Vec<u8>> {
+    repo::regular(abs, lang::MAX_BYTES).filter(|b| b.len() <= lang::MAX_BYTES)
+}
+
+/// The `resolutions` of the manifest at `path`.
 fn resolutions(path: &std::path::Path) -> BTreeMap<String, String> {
-    let json = (std::fs::read(path).ok())
-        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
-    let found = json
-        .as_ref()
-        .and_then(|j| j.get("resolutions")?.as_object());
-    (found.into_iter().flatten())
-        .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_string())))
-        .collect()
+    manifest_bytes(path).map_or_else(BTreeMap::new, |b| lock::overrides(&b))
 }
 
 /// What the changed lines of `changes` load from a package the workspace does not provide, each
@@ -628,7 +625,7 @@ fn covered(root: &std::path::Path, base: Option<&str>, path: &str, via: &BTreeSe
         bytes.and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
     };
     let before = json(base.and_then(|rev| repo::show(root, rev, path).ok().flatten()));
-    let after = json(std::fs::read(root.join(path)).ok());
+    let after = json(manifest_bytes(&root.join(path)));
     let (Some(serde_json::Value::Object(before)), Some(serde_json::Value::Object(after))) =
         (before, after)
     else {
@@ -685,6 +682,12 @@ pub(crate) fn attribute<'g>(
         if path.rsplit('/').next() != Some("yarn.lock") {
             continue;
         }
+        // A file that became a link (or stopped being one) is deleted and added: read it once.
+        if matches!(change, Change::Deleted)
+            && (changes.iter()).any(|(p, c)| p == path && !matches!(c, Change::Deleted))
+        {
+            continue;
+        }
         let folder = path.rsplit_once('/').map_or("", |(dir, _)| dir);
         let manifest = repo::relative(folder, "package.json").unwrap_or_default();
         let at_root = (export.manifests.iter())
@@ -692,16 +695,13 @@ pub(crate) fn attribute<'g>(
             .is_some_and(|m| owners.is_workspace(0, &m.path));
         let overrides = resolutions(&repo.root.join(&manifest));
         let head = || {
-            use std::io::Read;
-            let mut bytes = Vec::new();
-            // One byte past the cap is enough to tell it is too large.
-            (std::fs::File::open(repo.root.join(path)))
-                .and_then(|f| {
-                    f.take(lock::MAX_LOCK_BYTES as u64 + 1)
-                        .read_to_end(&mut bytes)
-                })
-                .map_err(|_| Unread::Deleted)?;
-            lock::read(&bytes, &overrides)
+            let abs = repo.root.join(path);
+            // One byte past the cap is enough to tell it is too large; a link is not followed.
+            match repo::regular(&abs, lock::MAX_LOCK_BYTES) {
+                Some(bytes) => lock::read(&bytes, &overrides),
+                None if abs.symlink_metadata().is_ok() => Err(Unread::Unparsable),
+                None => Err(Unread::Deleted),
+            }
         };
         let read = match (change, base) {
             (Change::Deleted, _) => Err(Unread::Deleted),
@@ -726,10 +726,12 @@ pub(crate) fn attribute<'g>(
         };
         let moved = lock::diff(&before, &after);
         let reached = lock::reached(&before, &after, &moved);
-        // A hoisted import gets something else only when an entry outside the workspaces moved;
-        // a member that starts or stops depending on a name changes nothing for the others.
+        // A hoisted import gets something else only when an entry outside the workspaces changed;
+        // a member that starts or stops depending on a name, or adds a key to an entry, changes
+        // nothing for the others.
         let outside: Vec<lock::Moved> = (moved.iter())
             .filter(|m| !after.is_workspace(&m.descriptor))
+            .filter(|m| lock::changed(&before, &after, &m.descriptor))
             .cloned()
             .collect();
         let hoisted: BTreeSet<String> = (lock::reached(&before, &after, &outside)

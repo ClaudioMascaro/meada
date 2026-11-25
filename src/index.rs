@@ -1861,24 +1861,24 @@ fn stored_files(db: &Connection) -> Result<HashMap<String, Stored>> {
     Ok(rows)
 }
 
-/// The stored facts of each file whose facts mention one of `names` as the start of a string
-/// (`"<name>`), by path: a superset of the files that load one of them, which the caller narrows
-/// with `lang::loaded`. A file whose facts this version cannot read is left out.
+/// The stored facts of each file whose facts may load a package of `names`, by path: one pass
+/// over the files, each kept when one of its JSON strings names such a package (the caller
+/// narrows with `lang::loaded`). A file this version cannot read is left out.
 pub(crate) fn facts_loading(db: &Connection, names: &[&str]) -> Result<BTreeMap<String, Facts>> {
+    let names: HashSet<&str> = names.iter().copied().collect();
     let mut out = BTreeMap::new();
-    let mut rows = db.prepare("SELECT path, facts FROM files WHERE instr(facts, ?1) > 0")?;
-    for name in names {
-        let found = rows.query_map(params![format!("\"{name}")], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
-        })?;
-        for row in found {
-            let (path, facts) = row?;
-            if out.contains_key(&path) {
-                continue;
-            }
-            if let Ok(facts) = serde_json::from_str::<Facts>(&facts) {
-                out.insert(path, facts);
-            }
+    let mut rows = db.prepare("SELECT path, facts FROM files")?;
+    let found = rows.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+    for row in found {
+        let (path, facts) = row?;
+        // Every piece between quotes, both sides of each: an escaped quote shifts no match off.
+        let names_one = (facts.split('"'))
+            .any(|s| crate::package::npm::split(s).is_some_and(|(n, _)| names.contains(n)));
+        if !names_one {
+            continue;
+        }
+        if let Ok(facts) = serde_json::from_str::<Facts>(&facts) {
+            out.insert(path, facts);
         }
     }
     Ok(out)
@@ -2497,18 +2497,9 @@ fn resolve_lockfile(tx: &Transaction, root: &Path, path: &str, src: &[u8]) -> Re
     tx.execute("DELETE FROM resolved WHERE lockfile = ?1", params![path])?;
     let folder = path.rsplit_once('/').map_or("", |(dir, _)| dir);
     let manifest = repo::relative(folder, "package.json").unwrap_or_default();
-    let overrides: BTreeMap<String, String> = read_up_to(&root.join(&manifest), lang::MAX_BYTES)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
-        .and_then(|json| {
-            let resolutions = json.get("resolutions")?.as_object()?;
-            Some(
-                (resolutions.iter())
-                    .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_string())))
-                    .collect(),
-            )
-        })
-        .unwrap_or_default();
+    let overrides = (repo::regular(&root.join(&manifest), lang::MAX_BYTES))
+        .filter(|b| b.len() <= lang::MAX_BYTES)
+        .map_or_else(BTreeMap::new, |b| lock::overrides(&b));
     let lock = match lock::read(src, &overrides) {
         Ok(lock) => lock,
         Err(unread) => return Ok(unread.name().to_string()),
@@ -4144,6 +4135,38 @@ mod tests {
 
     /// Server mode (ADR 0011): a read that meets a commit in progress waits for it, and past
     /// the busy timeout fails naming the repository and the lock.
+    /// Many reached names cost one pass over the files, not one scan per name.
+    #[test]
+    fn facts_loading_scans_once_for_many_names() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(super::SCHEMA).unwrap();
+        for i in 0..300 {
+            let facts = crate::lang::Facts {
+                loads: (0..60)
+                    .map(|k| format!("padding-{i}-{k}/sub"))
+                    .chain([format!("pkg{i}")])
+                    .collect(),
+                ..Default::default()
+            };
+            let facts = serde_json::to_string(&facts).unwrap();
+            db.execute(
+                "INSERT INTO files (path, hash, size, facts, resolved, setting) VALUES (?1, '', 0, ?2, '', '')",
+                rusqlite::params![format!("src/f{i}.ts"), facts],
+            )
+            .unwrap();
+        }
+        let names: Vec<String> = (0..100_000)
+            .map(|i| format!("n{i}"))
+            .chain(["pkg7".into()])
+            .collect();
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        let start = Instant::now();
+        let found = super::facts_loading(&db, &names).unwrap();
+        let took = start.elapsed();
+        assert_eq!(found.keys().collect::<Vec<_>>(), ["src/f7.ts"]);
+        assert!(took < Duration::from_secs(10), "{took:?}");
+    }
+
     #[test]
     fn a_read_only_open_waits_for_a_commit_in_progress_up_to_the_busy_timeout() {
         let (dir, index) = index_dir("busy");

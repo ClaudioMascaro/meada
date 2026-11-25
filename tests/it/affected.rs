@@ -1490,3 +1490,51 @@ fn an_oversized_lockfile_is_too_large() {
     let answer = affected(&repo, range);
     assert_eq!(unread(&answer), ("too-large".to_string(), all_packages()));
 }
+
+#[test]
+fn a_symlinked_lockfile_is_not_read() {
+    let repo = lockfile_repo("lockfile_symlink");
+    let lock = repo.join("web/yarn.lock");
+    let text = fs::read_to_string(&lock).unwrap().replace(
+        &entry("lodash", LODASH.0, LODASH.1),
+        &entry("lodash", LODASH_NEXT.0, LODASH_NEXT.1),
+    );
+    fs::write(repo.join("web/lock.txt"), text).unwrap();
+    fs::remove_file(&lock).unwrap();
+    std::os::unix::fs::symlink("lock.txt", &lock).unwrap();
+    commit_all(&repo, "a linked lockfile");
+    let range = Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    let answer = affected(&repo, range);
+    assert_eq!(unread(&answer), ("unparsable".to_string(), all_packages()));
+}
+
+#[test]
+fn a_new_range_of_a_locked_name_roots_only_its_member() {
+    let repo = lockfile_repo("lockfile_new_range");
+    replace(
+        &repo,
+        "web/packages/c/package.json",
+        "{\"typescript\": \"^5.4.0\"}",
+        "{\"lodash\": \"^4.0.0\", \"typescript\": \"^5.4.0\"}",
+    );
+    replace(
+        &repo,
+        "web/yarn.lock",
+        "\"lodash@npm:^4.17.0\":",
+        "\"lodash@npm:^4.0.0, lodash@npm:^4.17.0\":",
+    );
+    let answer = edited(
+        &repo,
+        "web/yarn.lock",
+        "  dependencies:\n    typescript: \"npm:^5.4.0\"\n",
+        "  dependencies:\n    lodash: \"npm:^4.0.0\"\n    typescript: \"npm:^5.4.0\"\n",
+    );
+    assert_eq!(
+        answer["lockfiles"][0]["packages"],
+        json!([{"package": "web/packages/c", "via": ["lodash"], "whole": true}])
+    );
+    assert_eq!(locked_paths(&answer), ["web/packages/c/src/index.ts"]);
+}
