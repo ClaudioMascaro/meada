@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use meada::decide;
-use meada::engine::{self, Direction, Engine, Start};
+use meada::engine::{self, Changes, Direction, Engine, Start};
 use meada::msg::{self, Msg};
 
 #[derive(Parser)]
@@ -61,11 +61,13 @@ enum Command {
         #[arg(long, requires = "decider", allow_negative_numbers = true)]
         min_p: Option<f64>,
     },
-    #[command(group(clap::ArgGroup::new("start").required(true).args(["from", "changes"])))]
+    #[command(group(clap::ArgGroup::new("start").required(true).args(["from", "changes", "files"])))]
     Trace {
         from: Option<String>,
         #[arg(long)]
         changes: Option<String>,
+        #[arg(long, num_args = 1..)]
+        files: Vec<String>,
         #[arg(long)]
         up: bool,
         #[arg(long)]
@@ -703,6 +705,7 @@ fn main() -> ExitCode {
             c.about(Msg::Trace.text())
                 .mut_arg("from", |a| a.help(Msg::TraceFrom.text()))
                 .mut_arg("changes", |a| a.help(Msg::TraceChanges.text()))
+                .mut_arg("files", |a| a.help(Msg::TraceFiles.text()))
                 .mut_arg("up", |a| a.help(Msg::TraceUp.text()))
                 .mut_arg("budget", |a| a.help(Msg::TraceBudget.text()))
         });
@@ -1206,20 +1209,26 @@ fn main() -> ExitCode {
         Command::Trace {
             from,
             changes,
+            files,
             up,
             budget,
         } => (|| {
-            let start = match (from.as_deref(), changes.as_deref()) {
-                (Some(from), _) => Start::From(from),
-                (None, Some("uncommitted")) => Start::Uncommitted,
-                (None, other) => {
-                    return Err(Msg::TraceChangesValue(other.unwrap_or_default())
-                        .text()
-                        .into());
-                }
-            };
             let direction = if up { Direction::Up } else { Direction::Down };
-            Engine::open(here)?.trace(start, direction, budget).map(out)
+            let start = match (from.as_deref(), changes.as_deref()) {
+                (Some(from), _) => Ok(Start::From(from)),
+                (None, Some("uncommitted")) => Ok(Start::Uncommitted),
+                (None, Some(range)) => match range.split_once("..") {
+                    Some((base, head)) => Err(Changes::Range { base, head }),
+                    None => return Err(Msg::TraceChangesValue(range).text().into()),
+                },
+                (None, None) => Err(Changes::Files(&files)),
+            };
+            let engine = Engine::open(here)?;
+            match start {
+                Ok(start) => engine.trace(start, direction, budget),
+                Err(changes) => engine.trace_changes(changes, direction, budget),
+            }
+            .map(out)
         })(),
         command => Engine::open(here).and_then(|engine| match command {
             Command::Export { .. } => engine.export().map(out),

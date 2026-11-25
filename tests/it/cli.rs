@@ -1484,3 +1484,33 @@ fn trace_changes_uncommitted_prints_the_engine_answer() {
     assert!(answer.contains("add"), "{answer}");
     assert_eq!(printed, answer);
 }
+
+/// `meada trace --changes <base>..<head>` and `--files` print `Engine::trace_changes`' answer.
+#[test]
+fn trace_takes_a_range_and_files() {
+    use meada::engine::{Changes, Direction, Engine};
+    let repo = fixture_repo("cli_trace_range", "ts-basic", None);
+    let math = repo.join("src/math.ts");
+    let text = fs::read_to_string(&math).unwrap();
+    fs::write(&math, text.replace("return a + b;", "return b + a;")).unwrap();
+    common::git(&repo, &["commit", "-q", "-a", "-m", "edit"]);
+    let range = Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    let files = ["src/math.ts".to_string()];
+    let cases: [(&[&str], Changes); 2] = [
+        (&["trace", "--changes", "HEAD~1..HEAD", "--up"], range),
+        (
+            &["trace", "--files", "src/math.ts", "--up"],
+            Changes::Files(&files),
+        ),
+    ];
+    for (args, changes) in cases {
+        let printed = stdout_of(meada_args(&repo, args));
+        let engine = Engine::open(&repo).unwrap();
+        let answer = engine.trace_changes(changes, Direction::Up, None).unwrap();
+        assert!(answer.contains("sum"), "{args:?}: {answer}");
+        assert_eq!(printed, answer, "{args:?}");
+    }
+}

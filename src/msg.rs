@@ -1498,6 +1498,17 @@ pub enum Msg<'a> {
     TraceBudget,
     /// `meada trace --changes` given what it does not take.
     TraceChangesValue(&'a str),
+    TraceFiles,
+    /// A `meada trace --changes <base>..<head>` whose head is not the checked-out commit.
+    RangeNotCheckedOut {
+        head: &'a str,
+    },
+    /// A range traced over a working tree that differs from `HEAD`.
+    TreeNotClean,
+    /// A `meada trace --files` path that is absolute or leaves the repository.
+    PathOutside {
+        path: &'a str,
+    },
     DecideFailures(usize),
     DeciderInvalid(&'a str),
     DeciderProtocol,
@@ -5562,14 +5573,55 @@ impl Msg<'_> {
             ),
             Msg::TraceChanges => pick(
                 "Start from the symbols a change touches: uncommitted (the working tree against \
-                 HEAD)."
+                 HEAD), or <base>..<head> with <head> checked out and a clean tree."
                     .into(),
                 "Começa pelos símbolos que uma mudança toca: uncommitted (a árvore de trabalho \
-                 contra o HEAD)."
+                 contra o HEAD), ou <base>..<head> com <head> em uso e a árvore limpa."
                     .into(),
                 "Empieza por los símbolos que toca un cambio: uncommitted (el árbol de trabajo \
-                 frente a HEAD)."
+                 frente a HEAD), o <base>..<head> con <head> actual y el árbol limpio."
                     .into(),
+            ),
+            Msg::TraceFiles => pick(
+                "Start from whole files: each path, relative to the repository root, changed as \
+                 a whole (a path not on disk is deleted)."
+                    .into(),
+                "Começa por arquivos inteiros: cada caminho, relativo à raiz do repositório, \
+                 mudou por inteiro (um caminho ausente do disco foi apagado)."
+                    .into(),
+                "Empieza por archivos enteros: cada ruta, relativa a la raíz del repositorio, \
+                 cambió entera (una ruta que no está en disco se borró)."
+                    .into(),
+            ),
+            Msg::RangeNotCheckedOut { head } => pick(
+                format!(
+                    "the range ends at `{head}`, which is not the checked-out commit: check it \
+                     out first, since the index answers about the working tree"
+                ),
+                format!(
+                    "o intervalo termina em `{head}`, que não é o commit em uso: faça checkout \
+                     dele antes, pois o índice responde sobre a árvore de trabalho"
+                ),
+                format!(
+                    "el rango termina en `{head}`, que no es el commit actual: haz checkout de él \
+                     antes, pues el índice responde sobre el árbol de trabajo"
+                ),
+            ),
+            Msg::TreeNotClean => pick(
+                "the working tree differs from HEAD: commit or stash the changes before tracing \
+                 a range"
+                    .into(),
+                "a árvore de trabalho difere do HEAD: faça commit ou stash das mudanças antes de \
+                 seguir um intervalo"
+                    .into(),
+                "el árbol de trabajo difiere de HEAD: haz commit o stash de los cambios antes de \
+                 seguir un rango"
+                    .into(),
+            ),
+            Msg::PathOutside { path } => pick(
+                format!("`{path}` is not a path inside the repository"),
+                format!("`{path}` não é um caminho dentro do repositório"),
+                format!("`{path}` no es una ruta dentro del repositorio"),
             ),
             Msg::TraceUp => pick(
                 "Walk up, to what calls or reaches the start, instead of down.".into(),
@@ -5582,9 +5634,9 @@ impl Msg<'_> {
                 format!("Presupuesto de tokens de la respuesta (por defecto {}).", meada_core::render::DEFAULT_BUDGET),
             ),
             Msg::TraceChangesValue(value) => pick(
-                format!("`--changes` takes `uncommitted`, not `{value}`"),
-                format!("`--changes` aceita `uncommitted`, não `{value}`"),
-                format!("`--changes` acepta `uncommitted`, no `{value}`"),
+                format!("`--changes` takes `uncommitted` or `<base>..<head>`, not `{value}`"),
+                format!("`--changes` aceita `uncommitted` ou `<base>..<head>`, não `{value}`"),
+                format!("`--changes` acepta `uncommitted` o `<base>..<head>`, no `{value}`"),
             ),
             Msg::DecideFailures(n) => pick(
                 format!("{n} item(s) failed, see above; the other decisions were handled"),

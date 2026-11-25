@@ -34,6 +34,9 @@ pub enum Start<'a> {
     /// The symbols of the repository where Meada runs whose spans overlap the working-tree
     /// diff against `HEAD`, untracked files included.
     Uncommitted,
+    /// The symbols of the repository where Meada runs that given changes touch (a range, a
+    /// file list).
+    Changes,
 }
 
 /// A call site, with the position of its repository in the workspace.
@@ -204,10 +207,13 @@ impl<'a> Graph<'a> {
             limit: WALK_DEPTH,
         };
         match start {
-            Start::Uncommitted => {
+            Start::Uncommitted | Start::Changes => {
                 let roots = self.changed(changes.unwrap_or_default(), &mut walk.files[0]);
-                if roots.is_empty() {
+                if roots.is_empty() && matches!(start, Start::Uncommitted) {
                     return "no symbol overlaps the uncommitted changes\n".into();
+                }
+                if roots.is_empty() {
+                    return "no symbol overlaps the changes\n".into();
                 }
                 for id in roots {
                     walk.root(id);
@@ -497,6 +503,7 @@ impl<'a> Graph<'a> {
             };
             let hit = match change {
                 Change::Untracked => true,
+                Change::Deleted => false,
                 Change::Lines(ranges) => {
                     let first = files.line(&s.span.path, s.span.start);
                     let last = files.line(&s.span.path, (s.span.end - 1).max(s.span.start));
@@ -638,7 +645,7 @@ pub(crate) fn starts(
     direction: Direction,
 ) -> Result<Vec<String>> {
     let from = match start {
-        Start::Uncommitted => {
+        Start::Uncommitted | Start::Changes => {
             let changed = changes.unwrap_or_default().iter();
             let paths: Vec<&str> = changed.map(|(p, _)| p.as_str()).collect();
             let found = crate::index::symbols_in(partial.db(0), &paths)?;

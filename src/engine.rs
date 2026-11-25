@@ -14,6 +14,7 @@ use crate::partial::{self, Partial};
 use crate::render::{
     DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mark, rank, section, unresolved,
 };
+pub use crate::repo::Changes;
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Manifest, Missing, Repository, Workspace};
 use crate::{
@@ -636,19 +637,42 @@ impl Engine {
         direction: Direction,
         budget: Option<usize>,
     ) -> Result<String> {
+        let changes = match start {
+            Start::Uncommitted => Some(repo::uncommitted(&self.root)?),
+            Start::From(_) | Start::Changes => None,
+        };
+        self.traced(start, changes, direction, budget)
+    }
+
+    /// The chain from the symbols `changes` touch (`Start::Changes`), as `trace` answers it;
+    /// a range whose head is not checked out, or over a tree that differs from it, is refused.
+    pub fn trace_changes(
+        &self,
+        changes: Changes,
+        direction: Direction,
+        budget: Option<usize>,
+    ) -> Result<String> {
+        let changes = changes.read(&self.root)?;
+        self.traced(Start::Changes, Some(changes), direction, budget)
+    }
+
+    /// `trace`'s body: `changes` holds what a change start touches.
+    fn traced(
+        &self,
+        start: Start,
+        changes: Option<Vec<(String, repo::Change)>>,
+        direction: Direction,
+        budget: Option<usize>,
+    ) -> Result<String> {
         self.refresh()?;
         let mut partial = self.partial()?;
         let links = self.links(&partial.exports);
         // A CI contract starts at the pipeline that provides it, as the pipeline's name does.
         let node = match start {
             Start::From(from) => trace::provider_node(&partial.exports, from),
-            Start::Uncommitted => None,
+            Start::Uncommitted | Start::Changes => None,
         };
         let start = node.as_deref().map_or(start, Start::From);
-        let changes = match start {
-            Start::Uncommitted => Some(repo::uncommitted(&self.root)?),
-            Start::From(_) => None,
-        };
         let starts = trace::starts(&mut partial, start, changes.as_deref(), direction)?;
         let none = starts.is_empty();
         trace::read(&mut partial, &links, starts, direction, true)?;

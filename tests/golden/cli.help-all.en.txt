@@ -72,13 +72,14 @@ Options:
 $ meada trace --help
 Follow a chain through calls and cross-repository links, down or up, until it ends, as the MCP trace tool answers.
 
-Usage: meada trace [OPTIONS] <FROM|--changes <CHANGES>>
+Usage: meada trace [OPTIONS] <FROM|--changes <CHANGES>|--files <FILES>...>
 
 Arguments:
   [FROM]  Where the chain starts: a symbol, a route or a call site, by identity or by name, or process::<entry point>.
 
 Options:
-      --changes <CHANGES>  Start from the symbols a change touches: uncommitted (the working tree against HEAD).
+      --changes <CHANGES>  Start from the symbols a change touches: uncommitted (the working tree against HEAD), or <base>..<head> with <head> checked out and a clean tree.
+      --files <FILES>...   Start from whole files: each path, relative to the repository root, changed as a whole (a path not on disk is deleted).
       --up                 Walk up, to what calls or reaches the start, instead of down.
       --budget <BUDGET>    Token budget of the answer (default 2000).
   -h, --help               Print help
