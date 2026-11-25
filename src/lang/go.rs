@@ -607,6 +607,12 @@ impl Walk<'_> {
         }
     }
 
+    /// Starts a top-level spec: its uses (scope "") are held by the spec's own definition, so
+    /// a name another spec of the file already used gives this one its row too.
+    fn new_top_spec(&mut self) {
+        self.referenced.retain(|(scope, _)| !scope.is_empty());
+    }
+
     /// Records every type use under `node` (`type_use`), written in `scope`: a parameter list,
     /// a result, a type declaration's type. An explicit stack, so a type nested however deep
     /// costs its size.
@@ -1507,6 +1513,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     walk.type_params = (type_params(spec).into_iter())
                         .map(|n| text(n, src).to_string())
                         .collect();
+                    walk.new_top_spec();
                     walk.type_uses("", spec.child_by_field_name("type_parameters"));
                     walk.type_uses("", ty);
                     for field in (ty.filter(|t| t.kind() == "struct_type").into_iter())
@@ -1552,6 +1559,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 for spec in specs {
                     let ty = spec.child_by_field_name("type");
                     let value = spec.child_by_field_name("value");
+                    walk.new_top_spec();
                     walk.type_uses("", ty);
                     walk.assigned("", &names(spec), ty, value, None);
                     // Each name holds the value written at its place, when the names and the

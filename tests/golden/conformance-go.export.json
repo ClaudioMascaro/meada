@@ -8375,6 +8375,30 @@
       "holder": "example.com/acme/conformance::methods/types.go::Holder"
     },
     {
+      "id": "example.com/acme/conformance::methods/types.go::(type)Counter#1",
+      "caller": "example.com/acme/conformance::methods/types.go",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1237,
+        "end": 1244
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::(type)Counter#2",
+      "caller": "example.com/acme/conformance::methods/types.go",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1259,
+        "end": 1266
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/types.go::(type)Log#0",
       "caller": "example.com/acme/conformance::methods/types.go",
       "target": "example.com/acme/conformance::methods/types.go::Log",
@@ -8386,6 +8410,18 @@
       },
       "kind": "type",
       "holder": "example.com/acme/conformance::methods/types.go::Holder"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::(type)Log#1",
+      "caller": "example.com/acme/conformance::methods/types.go",
+      "target": "example.com/acme/conformance::methods/types.go::Log",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1278,
+        "end": 1281
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::(type)Sink#0",

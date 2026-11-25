@@ -533,6 +533,13 @@ fn a_struct_field_type_is_held_by_its_struct() {
         "svc/types.go::Outer".to_string(),
     );
     assert!(rows.contains(&row), "{rows:#?}");
+    let second = (
+        row.0.clone(),
+        row.1.clone(),
+        row.2.clone(),
+        "svc/types.go::Second".into(),
+    );
+    assert!(rows.contains(&second), "{rows:#?}");
 }
 
 #[test]

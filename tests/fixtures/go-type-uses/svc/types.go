@@ -13,3 +13,8 @@ type Inner struct {
 type Outer struct {
 	In Inner
 }
+
+// A second struct naming the same type holds its own use.
+type Second struct {
+	In *Inner
+}
