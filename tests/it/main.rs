@@ -3,6 +3,7 @@
 
 mod common;
 
+mod affected;
 mod alerts;
 mod asyncapi;
 mod aws;

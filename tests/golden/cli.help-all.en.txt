@@ -82,5 +82,6 @@ Options:
       --files <FILES>...   Start from whole files: each path, relative to the repository root, changed as a whole (a path not on disk is deleted).
       --up                 Walk up, to what calls or reaches the start, instead of down.
       --budget <BUDGET>    Token budget of the answer (default 2000).
+      --affected           With --changes or --files: print, as JSON, everything the change may affect, file by file, each with the weakest link of its strongest chain, and what stays open.
   -h, --help               Print help
 

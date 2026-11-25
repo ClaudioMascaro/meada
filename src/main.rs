@@ -72,6 +72,8 @@ enum Command {
         up: bool,
         #[arg(long)]
         budget: Option<usize>,
+        #[arg(long, conflicts_with = "from")]
+        affected: bool,
     },
     #[cfg(feature = "snapshot")]
     Snapshot {
@@ -708,6 +710,7 @@ fn main() -> ExitCode {
                 .mut_arg("files", |a| a.help(Msg::TraceFiles.text()))
                 .mut_arg("up", |a| a.help(Msg::TraceUp.text()))
                 .mut_arg("budget", |a| a.help(Msg::TraceBudget.text()))
+                .mut_arg("affected", |a| a.help(Msg::TraceAffected.text()))
         });
     #[cfg(feature = "snapshot")]
     let matches = matches.mut_subcommand("snapshot", |c| {
@@ -1212,10 +1215,13 @@ fn main() -> ExitCode {
             files,
             up,
             budget,
+            affected,
         } => (|| {
             let direction = if up { Direction::Up } else { Direction::Down };
             let start = match (from.as_deref(), changes.as_deref()) {
                 (Some(from), _) => Ok(Start::From(from)),
+                // The affected set reads deletions and whole-file changes too.
+                (None, Some("uncommitted")) if affected => Err(Changes::Uncommitted),
                 (None, Some("uncommitted")) => Ok(Start::Uncommitted),
                 (None, Some(range)) => match range.split_once("..") {
                     Some((base, head)) => Err(Changes::Range { base, head }),
@@ -1225,10 +1231,15 @@ fn main() -> ExitCode {
             };
             let engine = Engine::open(here)?;
             match start {
-                Ok(start) => engine.trace(start, direction, budget),
-                Err(changes) => engine.trace_changes(changes, direction, budget),
+                Err(changes) if affected => {
+                    let answer = engine.affected(changes)?;
+                    let json = serde_json::to_string_pretty(&answer).map_err(|e| e.to_string())?;
+                    out(format_args!("{json}\n"));
+                    Ok(())
+                }
+                Ok(start) => engine.trace(start, direction, budget).map(out),
+                Err(changes) => engine.trace_changes(changes, direction, budget).map(out),
             }
-            .map(out)
         })(),
         command => Engine::open(here).and_then(|engine| match command {
             Command::Export { .. } => engine.export().map(out),

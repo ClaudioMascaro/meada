@@ -17,6 +17,8 @@ use crate::partial::Partial;
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
 
+pub(crate) mod affected;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
     /// From callers to callees, from consumers to the providers they reach, and from writers
@@ -649,8 +651,19 @@ pub(crate) fn starts(
             let changed = changes.unwrap_or_default().iter();
             let paths: Vec<&str> = changed.map(|(p, _)| p.as_str()).collect();
             let found = crate::index::symbols_in(partial.db(0), &paths)?;
-            let ids = found.iter().map(|s| s.id.clone()).collect();
+            let mut ids: Vec<String> = found.iter().map(|s| s.id.clone()).collect();
             partial.add_symbols(0, found);
+            if matches!(start, Start::Changes) {
+                // A file is the caller of its top-level calls, which an `import` line rebinds:
+                // the file ids of what still exists, with the calls they make.
+                let identity = &partial.exports[0].repository;
+                let files: Vec<String> = (changes.unwrap_or_default().iter())
+                    .filter(|(_, c)| !matches!(c, Change::Deleted))
+                    .map(|(p, _)| format!("{identity}::{p}"))
+                    .collect();
+                partial.callees(Some(0), &files)?;
+                ids.extend(files);
+            }
             return Ok(ids);
         }
         Start::From(from) => from,

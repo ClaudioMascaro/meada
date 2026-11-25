@@ -15,6 +15,7 @@ use crate::render::{
     DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mark, rank, section, unresolved,
 };
 pub use crate::repo::Changes;
+pub use crate::trace::affected::Affected;
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Manifest, Missing, Repository, Workspace};
 use crate::{
@@ -654,6 +655,19 @@ impl Engine {
     ) -> Result<String> {
         let changes = changes.read(&self.root)?;
         self.traced(Start::Changes, Some(changes), direction, budget)
+    }
+
+    /// Everything `changes` may affect (`meada trace --affected`): the walk up over the edges
+    /// that mean "depends on", with what it could not place listed apart.
+    pub fn affected(&self, changes: Changes) -> Result<Affected> {
+        let changes = changes.read(&self.root)?;
+        self.refresh()?;
+        let mut partial = self.partial()?;
+        let links = self.links(&partial.exports);
+        trace::starts(&mut partial, Start::Changes, Some(&changes), Direction::Up)?;
+        let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
+        let (_roots, open) = trace::affected::roots(&graph, &changes);
+        Ok(trace::affected::answer(&graph, &changes, open))
     }
 
     /// `trace`'s body: `changes` holds what a change start touches.

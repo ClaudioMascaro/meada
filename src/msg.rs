@@ -1499,6 +1499,7 @@ pub enum Msg<'a> {
     /// `meada trace --changes` given what it does not take.
     TraceChangesValue(&'a str),
     TraceFiles,
+    TraceAffected,
     /// A `meada trace --changes <base>..<head>` whose head is not the checked-out commit.
     RangeNotCheckedOut {
         head: &'a str,
@@ -5591,6 +5592,20 @@ impl Msg<'_> {
                     .into(),
                 "Empieza por archivos enteros: cada ruta, relativa a la raíz del repositorio, \
                  cambió entera (una ruta que no está en disco se borró)."
+                    .into(),
+            ),
+            Msg::TraceAffected => pick(
+                "With --changes or --files: print, as JSON, everything the change may affect, \
+                 file by file, each with the weakest link of its strongest chain, and what stays \
+                 open."
+                    .into(),
+                "Com --changes ou --files: imprime, em JSON, tudo o que a mudança pode afetar, \
+                 arquivo por arquivo, cada um com o elo mais fraco da sua cadeia mais forte, e o \
+                 que fica em aberto."
+                    .into(),
+                "Con --changes o --files: imprime, en JSON, todo lo que el cambio puede afectar, \
+                 archivo por archivo, cada uno con el eslabón más débil de su cadena más fuerte, y \
+                 lo que queda abierto."
                     .into(),
             ),
             Msg::RangeNotCheckedOut { head } => pick(
