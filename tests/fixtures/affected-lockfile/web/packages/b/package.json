@@ -1,0 +1,1 @@
+{"name": "@scope/b", "version": "1.0.0", "main": "src/kit.ts", "dependencies": {"@scope/a": "workspace:^", "@scope/kit": "^2.0.0"}}

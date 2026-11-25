@@ -1,0 +1,1 @@
+{"name": "solo", "version": "1.0.0", "main": "src/uses.ts", "dependencies": {"lodash": "^4.17.0"}}

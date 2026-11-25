@@ -1021,8 +1021,6 @@ pub enum Export {
 }
 
 /// Every specifier the file loads: its imports, the sources it re-exports from, and `loads`.
-// Read by `trace --affected`, wired in a commit that follows.
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn loaded(facts: &Facts) -> BTreeSet<&str> {
     let exported = facts.exports.iter().filter_map(|e| match e {
         Export::From { source, .. } | Export::All { source } => Some(source.as_str()),

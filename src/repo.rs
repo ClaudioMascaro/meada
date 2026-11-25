@@ -148,6 +148,16 @@ pub enum Changes<'a> {
 }
 
 impl Changes<'_> {
+    /// The revision the change starts from: a range's base, `HEAD` for the uncommitted changes,
+    /// none for whole files.
+    pub fn base(&self) -> Option<&str> {
+        match *self {
+            Changes::Uncommitted => Some("HEAD"),
+            Changes::Range { base, .. } => Some(base),
+            Changes::Files(_) => None,
+        }
+    }
+
     /// The changed paths of the repository at `root`, each with what changed.
     pub fn read(&self, root: &Path) -> Result<Vec<(String, Change)>> {
         match *self {
@@ -384,6 +394,39 @@ fn run(dir: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
+/// The bytes of `path` at the revision `rev` in the checkout at `root`, or `None` when the
+/// revision has no such path. A revision that does not resolve is an error.
+pub fn show(root: &Path, rev: &str, path: &str) -> Result<Option<Vec<u8>>> {
+    if rev.starts_with('-') {
+        return Err(Msg::TraceChangesValue(rev).text().into());
+    }
+    let tree = format!("{rev}^{{tree}}");
+    let listed = run(root, &["ls-tree", "-z", &tree, "--", path])?;
+    // `<mode> blob <oid>\t<path>`; a directory or a submodule there is no file.
+    let Some((meta, _)) = listed.split('\0').next().and_then(|e| e.split_once('\t')) else {
+        return Ok(None);
+    };
+    let fields: Vec<&str> = meta.split(' ').collect();
+    match fields[..] {
+        [_, "blob", oid] => Ok(Some(run_bytes(root, &["cat-file", "blob", oid])?)),
+        _ => Ok(None),
+    }
+}
+
+/// `git` in `dir`, its standard output as bytes, or its error output as the error.
+fn run_bytes(dir: &Path, args: &[&str]) -> Result<Vec<u8>> {
+    let out = command(dir).args(args).output()?;
+    if !out.status.success() {
+        return Err(format!(
+            "git {}: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr).trim()
+        )
+        .into());
+    }
+    Ok(out.stdout)
+}
+
 /// `run`'s output trimmed, or `None` when it fails.
 fn git(dir: &Path, args: &[&str]) -> Option<String> {
     run(dir, args).ok().map(|out| out.trim().to_string())
@@ -442,6 +485,58 @@ mod tests {
     fn sorted(mut changes: Vec<(String, Change)>) -> Vec<(String, Change)> {
         changes.sort_by(|a, b| a.0.cmp(&b.0));
         changes
+    }
+
+    #[test]
+    fn show_gives_the_bytes_at_a_rev() {
+        let dir = scratch("show-bytes");
+        std::fs::create_dir_all(dir.join("web")).unwrap();
+        write(&dir, "web/yarn.lock", b"old\n");
+        commit(&dir, "base");
+        write(&dir, "web/yarn.lock", b"new\n");
+        commit(&dir, "head");
+        assert_eq!(
+            super::show(&dir, "HEAD~1", "web/yarn.lock")
+                .unwrap()
+                .unwrap(),
+            b"old\n"
+        );
+        assert_eq!(
+            super::show(&dir, "HEAD", "web/yarn.lock").unwrap().unwrap(),
+            b"new\n"
+        );
+        assert_eq!(range("HEAD~1", "HEAD").base(), Some("HEAD~1"));
+        assert_eq!(Changes::Uncommitted.base(), Some("HEAD"));
+        assert_eq!(Changes::Files(&[]).base(), None);
+    }
+
+    #[test]
+    fn show_of_a_path_absent_at_the_rev_is_none() {
+        let dir = scratch("show-absent");
+        std::fs::create_dir_all(dir.join("web")).unwrap();
+        write(&dir, "web/a.ts", b"a\n");
+        commit(&dir, "base");
+        assert_eq!(super::show(&dir, "HEAD", "web/yarn.lock").unwrap(), None);
+        // A directory is no file.
+        assert_eq!(super::show(&dir, "HEAD", "web").unwrap(), None);
+    }
+
+    #[test]
+    fn show_with_a_bad_rev_is_an_error() {
+        let dir = scratch("show-bad-rev");
+        write(&dir, "a.ts", b"a\n");
+        commit(&dir, "base");
+        assert!(super::show(&dir, "no-such-rev", "a.ts").is_err());
+        assert!(super::show(&dir, "--output=x", "a.ts").is_err());
+    }
+
+    #[test]
+    fn show_keeps_bytes_that_are_not_utf8() {
+        let dir = scratch("show-bytes-raw");
+        let raw = [0xff, 0xfe, b'\n', 0x80];
+        write(&dir, "raw.bin", &raw);
+        commit(&dir, "base");
+        assert_eq!(super::show(&dir, "HEAD", "raw.bin").unwrap().unwrap(), raw);
     }
 
     #[test]

@@ -11,9 +11,11 @@ use serde::Serialize;
 use super::{Direction, Graph, calls_on_link, held, in_path};
 use crate::contract::{self, Level, Link};
 use crate::index::{CallSite, Export};
-use crate::package::{self, Manifest};
+use crate::lang::{self, Facts};
+use crate::package::lock::{self, Unread};
+use crate::package::{self, Manifest, npm};
 use crate::render::Files;
-use crate::repo::Change;
+use crate::repo::{self, Change};
 
 /// The answer of `meada trace --affected`, every list sorted.
 #[derive(Serialize, Debug, Default)]
@@ -25,6 +27,80 @@ pub struct Affected {
     packages: Packages,
     iac: Vec<Reached>,
     sides: Vec<Side>,
+    lockfiles: Vec<Lockfile>,
+}
+
+/// A changed lockfile: what moved in it and the packages that roots, or why it was not read.
+#[derive(Serialize, Debug)]
+pub(crate) struct Lockfile {
+    repo: String,
+    path: String,
+    #[serde(flatten)]
+    state: LockState,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(untagged)]
+enum LockState {
+    Read {
+        entries: Vec<lock::Moved>,
+        packages: Vec<LockPackage>,
+        /// The member manifests of the change whose only edits this lockfile covers.
+        manifests: Vec<String>,
+    },
+    Unread {
+        unread: Unread,
+    },
+}
+
+/// A package a lockfile change reaches: the direct dependencies that lead to what moved, and
+/// whether no file loads them, so every file of the package is rooted.
+#[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct LockPackage {
+    package: String,
+    via: Vec<String>,
+    whole: bool,
+}
+
+/// What the lockfiles of a change root: each lockfile, and each file one roots with that
+/// lockfile's path.
+#[derive(Default, Debug)]
+pub(crate) struct Attributed {
+    lockfiles: Vec<Lockfile>,
+    pub(crate) files: BTreeMap<String, String>,
+}
+
+impl Attributed {
+    /// The files a lockfile roots, each as a whole file, as `trace::starts` reads a change.
+    pub(crate) fn as_changes(&self) -> Vec<(String, Change)> {
+        (self.files.keys())
+            .map(|p| (p.clone(), Change::Untracked))
+            .collect()
+    }
+
+    /// The lockfile at `path`, when the change holds one this answer reads as a lockfile.
+    fn lockfile(&self, path: &str) -> Option<&Lockfile> {
+        self.lockfiles.iter().find(|l| l.path == path)
+    }
+}
+
+/// The paths a workspace root owns that affect every package under it (`all-packages`), as
+/// they sit in its folder: its manifest, the package manager's configuration and directory, the
+/// root `tsconfig.json` and the framework's version file. A lockfile there is read instead.
+// ponytail: every package, unnarrowed (a `tsconfig.json` by its `include`, `.yarn/patches` by
+// the lockfile's `patch:` entries); see `docs/agents/ceilings.md`.
+fn root_global(folder: &str, path: &str) -> bool {
+    let rel = match folder {
+        "." => path,
+        _ => match path.strip_prefix(folder).and_then(|r| r.strip_prefix('/')) {
+            Some(rel) => rel,
+            None => return false,
+        },
+    };
+    matches!(
+        rel,
+        "package.json" | ".yarnrc.yml" | "tsconfig.json" | "backstage.json"
+    ) || rel.starts_with(".yarn/")
 }
 
 /// A changed path and what changed of it.
@@ -41,7 +117,8 @@ struct Changed {
 pub(crate) struct Open {
     repo: String,
     path: String,
-    /// `deleted`, `iac`, `manifest`, `root` or `no-symbols`, the first that applies.
+    /// `all-packages`, `deleted`, `iac`, `manifest`, `root` or `no-symbols`, the first that
+    /// applies.
     reason: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     package: Option<String>,
@@ -70,6 +147,9 @@ struct File {
     narrowed: bool,
     /// Whether the file's package is in the manifest's reverse closure of a changed package.
     manifest: bool,
+    /// The lockfile whose change roots the file, when one does.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lockfile: Option<String>,
 }
 
 /// A file a changed line reads, with the evidence of its strongest edge.
@@ -443,15 +523,154 @@ fn directory(path: &str) -> &str {
     path.rsplit_once('/').map_or(".", |(dir, _)| dir)
 }
 
+/// The `resolutions` of the `package.json` at `path`, pattern to range; none when it cannot be
+/// read.
+fn resolutions(path: &std::path::Path) -> BTreeMap<String, String> {
+    let json = (std::fs::read(path).ok())
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
+    let found = json
+        .as_ref()
+        .and_then(|j| j.get("resolutions")?.as_object());
+    (found.into_iter().flatten())
+        .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_string())))
+        .collect()
+}
+
+/// Whether a file of `facts` loads a package named in `names`.
+fn loads_any(facts: &Facts, names: &BTreeSet<String>) -> bool {
+    (lang::loaded(facts).into_iter())
+        .any(|s| npm::split(s).is_some_and(|(name, _)| names.contains(name)))
+}
+
+/// What the `yarn.lock` files of `changes` root in the repository where Meada runs. A lockfile
+/// beside a workspace root manifest, or a Berry one of any project, is read at `base` (from git)
+/// and on disk, and what moved between them is walked up to the workspace's packages: in each,
+/// the files that load a direct dependency leading there are rooted, or every file of a package
+/// none of whose files does. One that cannot be read (no `base`, deleted, too large, not Berry,
+/// unparsable) roots nothing and is listed with why; a non-Berry lockfile of a package that is
+/// its own root is left to the rules for any other path. `facts` gives the stored facts of the
+/// files that mention a name.
+pub(crate) fn attribute<'g>(
+    graph: &'g Graph<'g>,
+    changes: &[(String, Change)],
+    base: Option<&str>,
+    mut facts: impl FnMut(&[&str]) -> crate::Result<BTreeMap<String, Facts>>,
+) -> crate::Result<Attributed> {
+    let repo = &graph.workspace.repos[0];
+    let export = &graph.exports[0];
+    let mut owners = Owners::new(graph);
+    let mut out = Attributed::default();
+    // The package directory of each file of the repository, read once.
+    let mut dirs: Option<Vec<(&str, &str)>> = None;
+    for (path, change) in changes {
+        if path.rsplit('/').next() != Some("yarn.lock") {
+            continue;
+        }
+        let folder = path.rsplit_once('/').map_or("", |(dir, _)| dir);
+        let manifest = repo::relative(folder, "package.json").unwrap_or_default();
+        let at_root = (export.manifests.iter())
+            .find(|m| m.path == manifest)
+            .is_some_and(|m| owners.is_workspace(0, &m.path));
+        let overrides = resolutions(&repo.root.join(&manifest));
+        let head = || {
+            use std::io::Read;
+            let mut bytes = Vec::new();
+            // One byte past the cap is enough to tell it is too large.
+            (std::fs::File::open(repo.root.join(path)))
+                .and_then(|f| {
+                    f.take(lock::MAX_LOCK_BYTES as u64 + 1)
+                        .read_to_end(&mut bytes)
+                })
+                .map_err(|_| Unread::Deleted)?;
+            lock::read(&bytes, &overrides)
+        };
+        let read = match (change, base) {
+            (Change::Deleted, _) => Err(Unread::Deleted),
+            (_, None) => Err(Unread::NoBase),
+            (_, Some(rev)) => match repo::show(&repo.root, rev, path) {
+                Ok(Some(bytes)) => lock::read(&bytes, &overrides).and_then(|b| Ok((b, head()?))),
+                _ => Err(Unread::NoBase),
+            },
+        };
+        let (before, after) = match read {
+            Ok(read) => read,
+            Err(unread) => {
+                if at_root {
+                    out.lockfiles.push(Lockfile {
+                        repo: repo.identity.clone(),
+                        path: path.clone(),
+                        state: LockState::Unread { unread },
+                    });
+                }
+                continue;
+            }
+        };
+        let moved = lock::diff(&before, &after);
+        let reached = lock::reached(&before, &after, &moved);
+        let names: BTreeSet<&str> = reached.values().flatten().map(String::as_str).collect();
+        let loaded = facts(&names.into_iter().collect::<Vec<_>>())?;
+        let dirs = dirs.get_or_insert_with(|| {
+            (export.files.iter())
+                .filter_map(|f| {
+                    let manifest = package::owner_of(&export.manifests, &f.path)?;
+                    Some((f.path.as_str(), directory(&manifest.path)))
+                })
+                .collect()
+        });
+        let mut packages = Vec::new();
+        for (dir, via) in &reached {
+            // A workspace outside the repository holds none of its files.
+            let Some(package) = repo::relative(folder, dir).filter(|p| !p.starts_with("..")) else {
+                continue;
+            };
+            let package = if package.is_empty() { "." } else { &package };
+            let owned: Vec<&str> = (dirs.iter())
+                .filter(|(_, d)| *d == package)
+                .map(|(p, _)| *p)
+                .collect();
+            let loading: Vec<&str> = (owned.iter().copied())
+                .filter(|p| loaded.get(*p).is_some_and(|f| loads_any(f, via)))
+                .collect();
+            let whole = loading.is_empty();
+            for file in if whole { owned } else { loading } {
+                out.files
+                    .entry(file.to_string())
+                    .or_insert_with(|| path.clone());
+            }
+            packages.push(LockPackage {
+                package: package.to_string(),
+                via: via.iter().cloned().collect(),
+                whole,
+            });
+        }
+        out.lockfiles.push(Lockfile {
+            repo: repo.identity.clone(),
+            path: path.clone(),
+            state: LockState::Read {
+                entries: moved,
+                packages,
+                manifests: Vec::new(),
+            },
+        });
+    }
+    out.lockfiles
+        .sort_by(|a, b| (&a.repo, &a.path).cmp(&(&b.repo, &b.path)));
+    Ok(out)
+}
+
 /// The ids a change roots in the repository where Meada runs, sorted, and the paths it leaves
 /// open. A symbol roots when its span overlaps a changed line; the file's own id and every
 /// symbol of the file root when the whole file changed or a changed line sits in no symbol (an
 /// `import` line rebinds calls in unchanged functions). Config sites and IaC nodes root by
 /// their lines, and a changed document roots every side it alone lists. An IaC or CI path is
-/// also `open` (`iac`): the walk does not follow IaC references nor pipeline calls.
+/// also `open` (`iac`): the walk does not follow IaC references nor pipeline calls. The files
+/// `attributed` roots for a lockfile root as a whole file does, with no `open` entry; a lockfile
+/// it could not read, and a path a workspace root owns that `root_global` names, are open as
+/// `all-packages`.
 pub(crate) fn roots<'g>(
     graph: &'g Graph<'g>,
     changes: &[(String, Change)],
+    attributed: &Attributed,
 ) -> (Vec<String>, Vec<Open>) {
     let export = &graph.exports[0];
     let repo = &graph.workspace.repos[0];
@@ -465,7 +684,13 @@ pub(crate) fn roots<'g>(
     }
     let mut roots = BTreeSet::new();
     let mut open = Vec::new();
-    for (path, change) in changes {
+    let changed: HashSet<&str> = changes.iter().map(|(p, _)| p.as_str()).collect();
+    let whole = Change::Untracked;
+    let extra = (attributed.files.keys())
+        .filter(|p| !changed.contains(p.as_str()))
+        .map(|p| (p, &whole, true));
+    let all = (changes.iter().map(|(p, c)| (p, c, false))).chain(extra);
+    for (path, change, rooted_by_lockfile) in all {
         let file = format!("{}::{path}", repo.identity);
         // Whether a 1-based line range overlaps the change.
         let touched = |first: usize, last: usize| match change {
@@ -528,8 +753,19 @@ pub(crate) fn roots<'g>(
                 rooted = true;
             }
         }
+        if rooted_by_lockfile {
+            continue;
+        }
         let owner = owners.owner(0, path);
+        let global = match attributed.lockfile(path) {
+            Some(l) => matches!(l.state, LockState::Unread { .. }),
+            None => owner.is_some_and(|(m, root)| root && root_global(directory(&m.path), path)),
+        };
         let reason = match () {
+            // First: a deleted root file or one with symbols affects every package all the same.
+            _ if global => Some("all-packages"),
+            // A lockfile read roots what moved in it.
+            _ if attributed.lockfile(path).is_some() => None,
             _ if matches!(change, Change::Deleted) => Some("deleted"),
             _ if iac => Some("iac"),
             // A manifest or a path the workspace root owns stays open even when it roots
@@ -544,7 +780,7 @@ pub(crate) fn roots<'g>(
                 repo: repo.identity.clone(),
                 path: path.clone(),
                 reason,
-                package: owners.package(0, path),
+                package: (!global).then(|| owners.package(0, path)).flatten(),
             });
         }
     }
@@ -559,6 +795,7 @@ pub(crate) fn answer<'g>(
     changes: &[(String, Change)],
     roots: &[String],
     open: Vec<Open>,
+    attributed: Attributed,
 ) -> Affected {
     let repo = &graph.workspace.repos[0].identity;
     let mut owners = Owners::new(graph);
@@ -579,7 +816,7 @@ pub(crate) fn answer<'g>(
     let mut files: BTreeMap<(usize, &str), (Key, &str, Option<Evidence>)> = BTreeMap::new();
     let touched =
         (changed.iter().map(|c| c.path.as_str())).chain(open.iter().map(|o| o.path.as_str()));
-    for path in touched {
+    for path in touched.chain(attributed.files.keys().map(String::as_str)) {
         files.insert((0, path), (Key::ROOT, "", None));
     }
     let mut iac = BTreeMap::new();
@@ -638,6 +875,9 @@ pub(crate) fn answer<'g>(
                 candidates: (e.candidates > 0).then_some(e.candidates),
                 reason: e.reason.map(str::to_string),
                 narrowed: e.narrowed,
+                lockfile: (n == 0)
+                    .then(|| attributed.files.get(path).cloned())
+                    .flatten(),
             }
         })
         .collect();
@@ -703,6 +943,7 @@ pub(crate) fn answer<'g>(
         packages,
         iac,
         sides,
+        lockfiles: attributed.lockfiles,
     }
 }
 
@@ -1136,7 +1377,7 @@ mod tests {
         let files: Vec<String> = files.iter().map(|f| f.to_string()).collect();
         let engine = Engine::open(repo).unwrap();
         let changes = [Changes::Files(&files).read(repo).unwrap()];
-        let (certain, walked, all) = (engine.walked(&changes, |graph, _, roots, _| {
+        let (certain, walked, all) = (engine.walked(&changes, None, |graph, _, roots, _, _| {
             let fan = graph.fan(roots);
             let certain: BTreeSet<String> = (fan.iter())
                 .filter(|(_, s)| s.key.tier == Tier::Certain)

@@ -102,10 +102,11 @@ fn open_lists_what_no_symbol_holds() {
     let expected = [
         (".github/workflows/ci.yml", "iac", None),
         ("gone.ts", "deleted", None),
-        ("package.json", "root", None),
+        // The workspace root's manifest and lockfile affect every package (front 4).
+        ("package.json", "all-packages", None),
         ("packages/a/README.md", "no-symbols", Some("packages/a")),
         ("packages/d/package.json", "manifest", Some("packages/d")),
-        ("yarn.lock", "root", None),
+        ("yarn.lock", "all-packages", None),
     ]
     .map(|(p, r, k)| (p.to_string(), r.to_string(), k.map(str::to_string)));
     assert_eq!(open, expected);
@@ -176,7 +177,8 @@ fn a_workspaces_object_marks_the_root() {
     )
     .unwrap();
     let answer = of_files(&repo, &["yarn.lock"]);
-    assert_eq!(answer["open"][0]["reason"], "root");
+    // A lockfile beside a workspace root affects every package (front 4).
+    assert_eq!(answer["open"][0]["reason"], "all-packages");
     assert!(answer["open"][0].get("package").is_none());
 }
 
@@ -208,7 +210,14 @@ fn the_cli_prints_the_affected_json() {
     assert_eq!(
         keys,
         [
-            "changed", "files", "iac", "open", "packages", "reads", "sides"
+            "changed",
+            "files",
+            "iac",
+            "lockfiles",
+            "open",
+            "packages",
+            "reads",
+            "sides"
         ]
     );
     let up = run(&[
@@ -792,4 +801,362 @@ fn manifest_only_follows_dependents_past_one_step() {
             "{package}: {manifest_only:?}"
         );
     }
+}
+
+// Lockfiles (front 4): a Yarn Berry `yarn.lock` change roots the files that load what moved.
+
+const WEB: &str = "example.com/scope/web";
+
+fn lockfile_repo(case: &str) -> PathBuf {
+    fixture_repo(
+        case,
+        "affected-lockfile",
+        Some("https://example.com/scope/web.git"),
+    )
+}
+
+/// The lines of one `yarn.lock` entry as the fixture writes them: version, resolution, checksum.
+fn entry(name: &str, version: &str, checksum: &str) -> String {
+    format!(
+        "  version: {version}\n  resolution: \"{name}@npm:{version}\"\n  checksum: 10c0/{checksum}\n"
+    )
+}
+
+/// The answer of a commit that bumps `name` in `web/yarn.lock` from one entry to another.
+fn bumped(repo: &Path, name: &str, from: (&str, &str), to: (&str, &str)) -> Value {
+    edited(
+        repo,
+        "web/yarn.lock",
+        &entry(name, from.0, from.1),
+        &entry(name, to.0, to.1),
+    )
+}
+
+const LODASH: (&str, &str) = ("4.17.20", "lodash41720");
+const LODASH_NEXT: (&str, &str) = ("4.17.21", "lodash41721");
+
+/// The paths of `files` a lockfile rooted, each with its lockfile.
+fn locked(answer: &Value) -> Vec<(String, String)> {
+    (answer["files"].as_array().into_iter().flatten())
+        .filter_map(|f| {
+            let lockfile = f.get("lockfile")?.as_str()?.to_string();
+            Some((f["path"].as_str().unwrap().to_string(), lockfile))
+        })
+        .collect()
+}
+
+fn locked_paths(answer: &Value) -> Vec<String> {
+    locked(answer).into_iter().map(|(p, _)| p).collect()
+}
+
+/// The `open` entries as `(path, reason, package)`.
+fn opened(answer: &Value) -> Vec<(String, String, Option<String>)> {
+    (answer["open"].as_array().into_iter().flatten())
+        .map(|e| {
+            let package = e.get("package").map(|p| p.as_str().unwrap().to_string());
+            let reason = e["reason"].as_str().unwrap().to_string();
+            (e["path"].as_str().unwrap().to_string(), reason, package)
+        })
+        .collect()
+}
+
+#[test]
+fn a_direct_bump_roots_only_the_importing_files() {
+    let repo = lockfile_repo("lockfile_direct");
+    let answer = bumped(&repo, "lodash", LODASH, LODASH_NEXT);
+    assert_eq!(
+        locked_paths(&answer),
+        ["web/packages/a/src/fp.ts", "web/packages/a/src/uses.ts"]
+    );
+    for path in ["web/packages/a/src/fp.ts", "web/packages/a/src/uses.ts"] {
+        let f = in_repo(&answer, WEB, path).unwrap();
+        assert_eq!(
+            (f["tier"].as_str(), f["level"].as_str()),
+            (Some("certain"), Some("exact"))
+        );
+        assert_eq!(f["lockfile"], "web/yarn.lock");
+        // The link that reached a file keeps its own field.
+        assert!(f.get("reason").is_none(), "{f}");
+    }
+    assert!(in_repo(&answer, WEB, "web/packages/a/src/plain.ts").is_none());
+    let lockfile = &answer["lockfiles"][0];
+    assert_eq!(lockfile["path"], "web/yarn.lock");
+    assert_eq!(
+        lockfile["packages"],
+        json!([{"package": "web/packages/a", "via": ["lodash"], "whole": false}])
+    );
+    assert_eq!(
+        lockfile["entries"],
+        json!([{"descriptor": "lodash@npm:^4.17.0", "before": "4.17.20", "after": "4.17.21"}])
+    );
+    // Attributed, the lockfile is touched and roots, so it is not open.
+    assert!(opened(&answer).is_empty(), "{:?}", opened(&answer));
+    assert!(in_repo(&answer, WEB, "web/yarn.lock").is_some());
+    // The dependent `b` is reached through the code graph, not through the lockfile.
+    assert!(
+        !locked_paths(&answer)
+            .iter()
+            .any(|p| p.starts_with("web/packages/b/"))
+    );
+}
+
+#[test]
+fn a_subpath_import_loads_its_package() {
+    let repo = lockfile_repo("lockfile_subpath");
+    let answer = bumped(&repo, "lodash", LODASH, LODASH_NEXT);
+    assert!(locked_paths(&answer).contains(&"web/packages/a/src/fp.ts".to_string()));
+}
+
+#[test]
+fn a_transitive_bump_roots_the_importers_of_the_direct_dependency() {
+    let repo = lockfile_repo("lockfile_transitive");
+    let answer = bumped(
+        &repo,
+        "left-pad",
+        ("1.3.0", "leftpad130"),
+        ("1.3.1", "leftpad131"),
+    );
+    assert_eq!(locked_paths(&answer), ["web/packages/b/src/kit.ts"]);
+    assert_eq!(
+        answer["lockfiles"][0]["packages"],
+        json!([{"package": "web/packages/b", "via": ["@scope/kit"], "whole": false}])
+    );
+}
+
+#[test]
+fn a_dependency_no_file_loads_roots_the_whole_package() {
+    let repo = lockfile_repo("lockfile_whole");
+    let answer = bumped(&repo, "typescript", ("5.4.5", "ts545"), ("5.4.6", "ts546"));
+    assert_eq!(locked_paths(&answer), ["web/packages/c/src/index.ts"]);
+    assert_eq!(
+        answer["lockfiles"][0]["packages"],
+        json!([{"package": "web/packages/c", "via": ["typescript"], "whole": true}])
+    );
+}
+
+#[test]
+fn a_bare_import_is_rooted_beside_a_named_one() {
+    let repo = lockfile_repo("lockfile_bare");
+    let manifest = repo.join("web/packages/b/package.json");
+    let text = fs::read_to_string(&manifest).unwrap();
+    fs::write(
+        &manifest,
+        text.replace("\"@scope/kit\"", "\"left-pad\": \"^1.3.0\", \"@scope/kit\""),
+    )
+    .unwrap();
+    replace(
+        &repo,
+        "web/yarn.lock",
+        "    \"@scope/kit\": \"npm:^2.0.0\"\n  languageName: unknown",
+        "    \"@scope/kit\": \"npm:^2.0.0\"\n    left-pad: \"npm:^1.3.0\"\n  languageName: unknown",
+    );
+    fs::write(
+        repo.join("web/packages/b/src/kit2.ts"),
+        "import pad from 'left-pad';\n\nexport function padded() {\n  return pad('a', 2);\n}\n",
+    )
+    .unwrap();
+    commit_all(&repo, "declare left-pad");
+    let answer = bumped(
+        &repo,
+        "left-pad",
+        ("1.3.0", "leftpad130"),
+        ("1.3.1", "leftpad131"),
+    );
+    assert_eq!(
+        locked_paths(&answer),
+        [
+            "web/packages/b/src/kit.ts",
+            "web/packages/b/src/kit2.ts",
+            "web/packages/b/src/side.ts"
+        ]
+    );
+}
+
+#[test]
+fn a_nested_lockfile_roots_by_repository_path() {
+    let repo = lockfile_repo("lockfile_nested");
+    let answer = bumped(&repo, "lodash", LODASH, LODASH_NEXT);
+    for key in ["changed", "files"] {
+        for path in paths(&answer, key) {
+            assert!(path.starts_with("web/"), "{key}: {path}");
+        }
+    }
+    let packages = answer["lockfiles"][0]["packages"].as_array().unwrap();
+    assert!(
+        packages
+            .iter()
+            .all(|p| p["package"].as_str().unwrap().starts_with("web/"))
+    );
+}
+
+#[test]
+fn an_aliased_dependency_roots_files_importing_the_alias() {
+    let repo = lockfile_repo("lockfile_alias");
+    let manifest = repo.join("web/packages/a/package.json");
+    let text = fs::read_to_string(&manifest).unwrap();
+    fs::write(
+        &manifest,
+        text.replace(
+            "\"lodash\": \"^4.17.0\"",
+            "\"lodash\": \"^4.17.0\", \"util\": \"npm:lodash@^4\"",
+        ),
+    )
+    .unwrap();
+    replace(
+        &repo,
+        "web/yarn.lock",
+        "    lodash: \"npm:^4.17.0\"\n  languageName: unknown",
+        "    lodash: \"npm:^4.17.0\"\n    util: \"npm:lodash@^4\"\n  languageName: unknown",
+    );
+    replace(
+        &repo,
+        "web/yarn.lock",
+        "\"lodash@npm:^4.17.0\":",
+        "\"lodash@npm:^4.17.0, util@npm:lodash@^4\":",
+    );
+    fs::write(
+        repo.join("web/packages/a/src/alias.ts"),
+        "import u from 'util';\n\nexport function aliased() {\n  return u.identity(1);\n}\n",
+    )
+    .unwrap();
+    commit_all(&repo, "alias lodash");
+    let answer = bumped(&repo, "lodash", LODASH, LODASH_NEXT);
+    assert!(locked_paths(&answer).contains(&"web/packages/a/src/alias.ts".to_string()));
+    assert_eq!(
+        answer["lockfiles"][0]["packages"][0]["via"],
+        json!(["lodash", "util"])
+    );
+}
+
+/// The one `lockfiles` entry's `unread`, and the `open` entry of `web/yarn.lock`.
+fn unread(answer: &Value) -> (String, Option<(String, String, Option<String>)>) {
+    let lockfiles = answer["lockfiles"].as_array().unwrap();
+    assert_eq!(lockfiles.len(), 1, "{lockfiles:?}");
+    assert!(lockfiles[0].get("packages").is_none());
+    let open = opened(answer)
+        .into_iter()
+        .find(|(p, _, _)| p == "web/yarn.lock");
+    (lockfiles[0]["unread"].as_str().unwrap().to_string(), open)
+}
+
+fn all_packages() -> Option<(String, String, Option<String>)> {
+    Some(("web/yarn.lock".into(), "all-packages".into(), None))
+}
+
+#[test]
+fn a_lockfile_added_in_the_change_is_all_packages() {
+    let repo = lockfile_repo("lockfile_added");
+    let lock = repo.join("web/yarn.lock");
+    let text = fs::read(&lock).unwrap();
+    fs::remove_file(&lock).unwrap();
+    commit_all(&repo, "no lockfile");
+    fs::write(&lock, text).unwrap();
+    commit_all(&repo, "lockfile");
+    let range = Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    let answer = affected(&repo, range);
+    assert_eq!(unread(&answer), ("no-base".to_string(), all_packages()));
+    assert!(locked(&answer).is_empty());
+}
+
+#[test]
+fn files_give_no_base() {
+    let repo = lockfile_repo("lockfile_files");
+    let answer = of_files(&repo, &["web/yarn.lock"]);
+    assert_eq!(unread(&answer), ("no-base".to_string(), all_packages()));
+}
+
+#[test]
+fn a_deleted_lockfile_is_all_packages() {
+    let repo = lockfile_repo("lockfile_deleted");
+    fs::remove_file(repo.join("web/yarn.lock")).unwrap();
+    commit_all(&repo, "drop the lockfile");
+    let range = Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    let answer = affected(&repo, range);
+    assert_eq!(unread(&answer), ("deleted".to_string(), all_packages()));
+}
+
+#[test]
+fn a_yarn_1_lockfile_is_all_packages() {
+    let repo = lockfile_repo("lockfile_yarn_1");
+    fs::write(
+        repo.join("web/yarn.lock"),
+        "# yarn lockfile v1\n\n\nlodash@^4.17.0:\n  version \"4.17.21\"\n",
+    )
+    .unwrap();
+    commit_all(&repo, "yarn 1");
+    let range = Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    let answer = affected(&repo, range);
+    assert_eq!(unread(&answer), ("format".to_string(), all_packages()));
+}
+
+#[test]
+fn root_files_are_all_packages_and_a_readme_stays_root() {
+    let repo = lockfile_repo("lockfile_root_files");
+    replace(&repo, "web/.yarnrc.yml", "node-modules", "pnp");
+    replace(&repo, "web/backstage.json", "1.30.0", "1.31.0");
+    replace(&repo, "web/README.md", "The web", "Our web");
+    commit_all(&repo, "root files");
+    let range = Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    let answer = affected(&repo, range);
+    let expected = [
+        ("web/.yarnrc.yml", "all-packages"),
+        ("web/README.md", "root"),
+        ("web/backstage.json", "all-packages"),
+    ]
+    .map(|(p, r)| (p.to_string(), r.to_string(), None));
+    assert_eq!(opened(&answer), expected);
+    assert_eq!(answer["lockfiles"], json!([]));
+}
+
+#[test]
+fn a_deleted_root_file_is_all_packages() {
+    let repo = lockfile_repo("lockfile_root_deleted");
+    fs::remove_file(repo.join("web/backstage.json")).unwrap();
+    commit_all(&repo, "drop the version file");
+    let range = Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    let answer = affected(&repo, range);
+    assert_eq!(
+        opened(&answer),
+        [(
+            "web/backstage.json".to_string(),
+            "all-packages".to_string(),
+            None
+        )]
+    );
+}
+
+#[test]
+fn a_single_package_lockfile_roots_its_importers() {
+    let repo = fixture_repo(
+        "lockfile_single",
+        "affected-lockfile-single",
+        Some("https://example.com/scope/solo.git"),
+    );
+    let answer = edited(
+        &repo,
+        "yarn.lock",
+        &entry("lodash", LODASH.0, LODASH.1),
+        &entry("lodash", LODASH_NEXT.0, LODASH_NEXT.1),
+    );
+    assert_eq!(locked_paths(&answer), ["src/uses.ts"]);
+    assert_eq!(
+        answer["lockfiles"][0]["packages"],
+        json!([{"package": ".", "via": ["lodash"], "whole": false}])
+    );
+    assert!(opened(&answer).is_empty(), "{:?}", opened(&answer));
 }

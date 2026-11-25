@@ -10,9 +10,6 @@
 //! still matches no key goes to every entry of that name, the safe side, and those entries are
 //! marked as reached by name.
 
-// Read by the index and `trace --affected`, wired in the commits that follow.
-#![cfg_attr(not(test), expect(dead_code))]
-
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use serde::Serialize;

@@ -1861,6 +1861,29 @@ fn stored_files(db: &Connection) -> Result<HashMap<String, Stored>> {
     Ok(rows)
 }
 
+/// The stored facts of each file whose facts mention one of `names` as the start of a string
+/// (`"<name>`), by path: a superset of the files that load one of them, which the caller narrows
+/// with `lang::loaded`. A file whose facts this version cannot read is left out.
+pub(crate) fn facts_loading(db: &Connection, names: &[&str]) -> Result<BTreeMap<String, Facts>> {
+    let mut out = BTreeMap::new();
+    let mut rows = db.prepare("SELECT path, facts FROM files WHERE instr(facts, ?1) > 0")?;
+    for name in names {
+        let found = rows.query_map(params![format!("\"{name}")], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+        })?;
+        for row in found {
+            let (path, facts) = row?;
+            if out.contains_key(&path) {
+                continue;
+            }
+            if let Ok(facts) = serde_json::from_str::<Facts>(&facts) {
+                out.insert(path, facts);
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// The `manifests` rows (path and summary), by path.
 fn manifest_rows(db: &Connection) -> Result<Vec<(String, String)>> {
     let rows = db
