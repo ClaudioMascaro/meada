@@ -292,8 +292,12 @@ fn a_declarative_client_method_is_affected_by_its_route() {
 fn the_reader_of_what_a_writer_writes_is_affected() {
     let (_, gateway, _) = common::chain("affected_writer");
     let answer = of_files(&gateway, &["src/orders.ts"]);
-    let reader = in_repo(&answer, "example.com/chain/worker", "src/jobs.ts");
-    assert_eq!(reader.expect("the reader")["level"], "declared");
+    let reader = in_repo(&answer, "example.com/chain/worker", "src/jobs.ts").expect("the reader");
+    // A declared link is certain.
+    assert_eq!(
+        (&reader["level"], &reader["tier"]),
+        (&json!("declared"), &json!("certain"))
+    );
 }
 
 #[test]
@@ -773,4 +777,19 @@ fn a_call_to_a_documented_route_reads_its_document() {
     let document =
         |r: &&Value| r["repo"] == "example.com/chain/gateway" && r["path"] == "openapi.yaml";
     assert!(reads.iter().any(|r| document(&r)), "{answer:#}");
+}
+
+/// `packages/app` names `@scope/d` in its manifest and imports nothing; `@scope/d` does the
+/// same with `@scope/a`.
+#[test]
+fn manifest_only_follows_dependents_past_one_step() {
+    let repo = affected_repo("affected_manifest_two_steps");
+    let answer = of_files(&repo, &["packages/a/src/f.ts"]);
+    let manifest_only = packages(&answer, "manifest_only");
+    for package in ["packages/app", "packages/d"] {
+        assert!(
+            manifest_only.contains(&package.to_string()),
+            "{package}: {manifest_only:?}"
+        );
+    }
 }

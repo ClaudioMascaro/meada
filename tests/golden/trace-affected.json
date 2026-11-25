@@ -83,6 +83,7 @@
     ],
     "inferred": [],
     "manifest_only": [
+      "packages/app",
       "packages/d",
       "packages/e"
     ]

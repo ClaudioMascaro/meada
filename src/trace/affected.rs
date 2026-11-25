@@ -1027,6 +1027,11 @@ mod tests {
         assert_eq!(Tier::of(&decided(Some("human"))), Tier::Certain);
         assert_eq!(Tier::of(&decided(Some("a-model"))), Tier::Model);
         assert_eq!(Tier::of(&decided(None)), Tier::Model);
+        let declared = Evidence {
+            level: Level::Declared,
+            ..decided(None)
+        };
+        assert_eq!(Tier::of(&declared), Tier::Certain);
     }
 
     #[test]

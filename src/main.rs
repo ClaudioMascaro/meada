@@ -660,8 +660,6 @@ fn drained(serve: impl FnOnce() -> meada::Result<()>) -> meada::Result<()> {
     serve()
 }
 
-/// Prints `text` on stdout, as `print!` does, but a reader that closed its end early
-/// (`meada export | head`) is no error: the rest is dropped and the command ends as it would.
 /// The blocks of a `meada trace --batch` file: a line `@@<label>` opens one, each other
 /// non-empty line is a path of the open block; paths before the first label form a block
 /// labelled "".
@@ -680,6 +678,8 @@ fn blocks(text: &str) -> Vec<(String, Vec<String>)> {
     blocks
 }
 
+/// Prints `text` on stdout, as `print!` does, but a reader that closed its end early
+/// (`meada export | head`) is no error: the rest is dropped and the command ends as it would.
 fn out(text: impl std::fmt::Display) {
     use std::io::Write;
     let mut stdout = std::io::stdout().lock();
