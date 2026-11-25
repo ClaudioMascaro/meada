@@ -182,3 +182,49 @@ fn a_declaration_reaches_only_its_own_repository() {
         shown(&of(&undeclared, peer_run))
     );
 }
+
+#[test]
+fn a_relative_url_in_a_package_that_serves_it_links_there() {
+    let found = links(&mono("base_url_relative"));
+    let test = shown(&of(&found, "svc-b/router_test.go::TestRun"));
+    assert_eq!(test.len(), 1, "{found:#?}");
+    assert_eq!(test[0].0, "inferred");
+    assert_eq!(test[0].1, format!("{MONO}::svc-b/main.go::run"));
+    assert!(!test[0].2.contains("providers fit"), "{test:?}");
+}
+
+#[test]
+fn a_relative_url_its_package_does_not_serve_keeps_every_fit() {
+    let found = links(&mono("base_url_relative_web"));
+    let web = shown(&of(&found, "web/src/client.ts::relativeRun"));
+    let providers: Vec<&str> = web.iter().map(|(_, p, _)| p.as_str()).collect();
+    assert_eq!(
+        providers,
+        [
+            format!("{MONO}::svc-b/main.go::run"),
+            format!("{MONO}::svc-c/main.go::run")
+        ],
+        "{found:#?}"
+    );
+    assert!(web.iter().all(|(level, ..)| level == "ambiguous"));
+}
+
+#[test]
+fn a_relative_url_drops_other_repositories_too() {
+    let found = links(&with_peer("base_url_relative_peer"));
+    // The peer serves `POST /run` too.
+    assert!(
+        found.iter().any(|l| l["provider"]
+            .as_str()
+            .unwrap()
+            .starts_with("example.com/acme/peer::")),
+        "{found:#?}"
+    );
+    let test = shown(&of(&found, "svc-b/router_test.go::TestRun"));
+    let providers: Vec<&str> = test.iter().map(|(_, p, _)| p.as_str()).collect();
+    assert_eq!(
+        providers,
+        [format!("{MONO}::svc-b/main.go::run")],
+        "{found:#?}"
+    );
+}

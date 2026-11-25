@@ -911,7 +911,7 @@ impl ContractKind for Http {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
-        _exports: &[IndexExport],
+        exports: &[IndexExport],
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
@@ -944,6 +944,25 @@ impl ContractKind for Http {
                 Some((m, p, Some(reason.to_string())))
             })
             .collect();
+        // A relative URL reaches its own origin: when a route of the consumer's own package
+        // fits, the others (other packages, other repositories) drop.
+        if via.is_none() {
+            let manifests = (exports.iter())
+                .find(|e| e.repository == from.identity)
+                .map_or(&[][..], |e| &e.manifests[..]);
+            let package = |site: &str, identity: &str| {
+                let owner = crate::package::owner_of(manifests, path_of(site, identity)?)?;
+                Some(owner.path.as_str())
+            };
+            if let Some(own) = package(&consumer.site, &from.identity) {
+                let mine = |(m, p, _): &(&Repository, &Provider, Option<String>)| {
+                    m.identity == from.identity && package(&p.site, &m.identity) == Some(own)
+                };
+                if serving.iter().any(mine) {
+                    serving.retain(mine);
+                }
+            }
+        }
         let direct: Vec<&str> = (serving.iter())
             .filter(|(.., gateway)| gateway.is_none())
             .map(|&(m, ..)| m.identity.as_str())
@@ -1173,11 +1192,15 @@ impl ContractKind for Http {
 /// Whether the site `site` of the repository `identity` (`<identity>::<path>::...`) lies under
 /// the directory `dir` of that repository: `svc` holds `svc/a.go`, never `svc-ui/a.go`.
 fn under(site: &str, identity: &str, dir: &str) -> bool {
-    let path = site
-        .strip_prefix(identity)
-        .and_then(|r| r.strip_prefix("::"));
-    path.and_then(|p| p.strip_prefix(dir))
+    (path_of(site, identity).and_then(|p| p.strip_prefix(dir)))
         .is_some_and(|rest| rest.starts_with('/'))
+}
+
+/// The repository path of the site `site` of the repository `identity`
+/// (`<identity>::<path>::...`).
+fn path_of<'s>(site: &'s str, identity: &str) -> Option<&'s str> {
+    let rest = site.strip_prefix(identity)?.strip_prefix("::")?;
+    Some(rest.split_once("::").map_or(rest, |(path, _)| path))
 }
 
 #[cfg(test)]
