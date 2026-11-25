@@ -642,6 +642,11 @@ path (the prefix followed by its code path without the stripped part); a link ma
 inferred and its reason names the rewrite. Within one repository a code path match wins.
 _Avoid_: base path, path rewrite
 
+**Base URL declaration**:
+A `meada.toml` entry (`[[base_url]]`) that says a base URL variable reaches the routes served
+under one directory of the same repository; a link through it is `declared`.
+_Avoid_: alias, mapping, route table
+
 **Provider document**:
 An OpenAPI or AsyncAPI file of a repository with a `[serve]` table, found by its name or listed
 in `[serve] documents`. Its routes and channel sides are provider contracts of the repository,

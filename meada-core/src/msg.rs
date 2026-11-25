@@ -96,6 +96,9 @@ pub enum Msg<'a> {
     NotLowercase,
     /// A `[serve]` rewrite without its leading `/`; the value is not quoted.
     NoLeadingSlash,
+    /// A `[[base_url]]` `dir` that is not written as a directory of the repository (`a/b`);
+    /// the value is not quoted.
+    NotRepoDir,
     Empty,
     OwnerNotString,
     OwnerTooLong,
@@ -208,6 +211,17 @@ impl Msg<'_> {
                 "must start with `/`".into(),
                 "deve começar com `/`".into(),
                 "debe empezar con `/`".into(),
+            ),
+            Msg::NotRepoDir => pick(
+                "must be a directory of the repository written as `a/b` \
+                 (no `.`, `..`, `\\` or leading `/`)"
+                    .into(),
+                "deve ser um diretório do repositório escrito como `a/b` \
+                 (sem `.`, `..`, `\\` nem `/` no início)"
+                    .into(),
+                "debe ser un directorio del repositorio escrito como `a/b` \
+                 (sin `.`, `..`, `\\` ni `/` al inicio)"
+                    .into(),
             ),
             Msg::Empty => pick("is empty".into(), "está vazio".into(), "está vacío".into()),
             Msg::OwnerNotString => pick(

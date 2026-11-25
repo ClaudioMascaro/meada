@@ -10,7 +10,7 @@ use std::path::Path;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
-pub use meada_core::manifest::{Resource, Serve, declared, gateway_path, line_of};
+pub use meada_core::manifest::{BaseUrl, Resource, Serve, declared, gateway_path, line_of};
 
 use crate::Result;
 
@@ -29,6 +29,10 @@ pub struct Config {
     pub test_routes: bool,
     #[serde(default)]
     pub(crate) iac: crate::iac::mapping::Config,
+    /// Base URL declarations (`[[base_url]]`): which directory of this repository a base URL
+    /// variable reaches. No variable is in two of them (`read_config_up_to`).
+    #[serde(default, rename = "base_url")]
+    pub base_urls: Vec<BaseUrl>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -49,6 +53,12 @@ impl Config {
         let reads = move |p: &&Peer| p.base_url_env.iter().any(|v| v == var);
         self.peers.iter().filter(reads).map(|p| p.repo.as_str())
     }
+
+    /// The directory a Base URL declaration says the variable `var` reaches.
+    pub fn declared_dir(&self, var: &str) -> Option<&str> {
+        let declares = |b: &&BaseUrl| b.env.iter().any(|v| v == var);
+        self.base_urls.iter().find(declares).map(|b| b.dir.as_str())
+    }
 }
 
 /// `<root>/meada.toml`, or an empty configuration when the file does not exist.
@@ -58,13 +68,61 @@ pub fn load(root: &Path) -> Result<Config> {
 
 /// `<root>/meada.toml`, or `None` when the file does not exist.
 pub fn load_own(root: &Path) -> Result<Option<Config>> {
-    read_own(root, "meada.toml")
+    read_config_up_to(root, None)
 }
 
-/// `<root>/<name>` parsed as `T`, or `None` when the file does not exist. A parse error names
-/// the file, the line and the key; `meada.decisions.toml` is read the same way.
-fn read_own<T: DeserializeOwned>(root: &Path, name: &str) -> Result<Option<T>> {
-    read_own_up_to(root, name, None)
+/// `<root>/meada.toml` as `read_own_up_to` reads it, `None` when it does not exist, refused
+/// when a variable is in two Base URL declarations (`check_base_urls`). Every read of a
+/// `Config` goes through it.
+pub(crate) fn read_config_up_to(root: &Path, max: Option<u64>) -> Result<Option<Config>> {
+    let file = root.join("meada.toml");
+    let Some(src) = text(&file, max)? else {
+        return Ok(None);
+    };
+    let config: Config = parse(&file, &src, "meada.toml")?;
+    if !config.base_urls.is_empty() {
+        check_base_urls(&src, &file)?;
+    }
+    Ok(Some(config))
+}
+
+/// An error naming `file`, the line and the variable when a variable is written a second time
+/// in the `base_url` entries of `src` (in two entries, or twice in one), at that second place.
+fn check_base_urls(src: &str, file: &Path) -> Result<()> {
+    use toml::de::{DeTable, DeValue};
+    let Ok(table) = DeTable::parse(src) else {
+        return Ok(());
+    };
+    let mut seen = std::collections::HashSet::new();
+    let entries = (table.get_ref().iter()).filter(|(k, _)| k.get_ref() == "base_url");
+    for (_, value) in entries {
+        let DeValue::Array(entries) = value.get_ref() else {
+            continue;
+        };
+        for entry in entries.iter() {
+            let DeValue::Table(entry) = entry.get_ref() else {
+                continue;
+            };
+            let env = entry.iter().filter(|(k, _)| k.get_ref() == "env");
+            for (_, names) in env {
+                let DeValue::Array(names) = names.get_ref() else {
+                    continue;
+                };
+                for name in names.iter() {
+                    let DeValue::String(var) = name.get_ref() else {
+                        continue;
+                    };
+                    if !seen.insert(var.to_string()) {
+                        let twice = meada_core::msg::Msg::ListedTwice.text();
+                        let line = line_of(src, name.span().start);
+                        let at = format!("{}:{line}", file.display());
+                        return Err(format!("{at}: `base_url.env`: `{var}` {twice}").into());
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// The most a mirror's `meada.toml` or `meada.decisions.toml` holds, in a server-mode mirror
@@ -73,8 +131,9 @@ fn read_own<T: DeserializeOwned>(root: &Path, name: &str) -> Result<Option<T>> {
 // ponytail: a flat 1 MiB, as `lang::MAX_BYTES`; real ones are a few kilobytes.
 pub(crate) const GENERATION_CONFIG_MAX: u64 = 1 << 20;
 
-/// `read_own`, reading at most `max` bytes through no symbolic link (`read_unlinked`) when it
-/// is set: a mirror's file, in a server-mode mirror or a pulled generation.
+/// `<root>/<name>` parsed as `T`, or `None` when the file does not exist; a parse error names
+/// the file, the line and the key. With `max`, it reads at most `max` bytes through no symbolic
+/// link (`read_unlinked`): a mirror's file, in a server-mode mirror or a pulled generation.
 pub(crate) fn read_own_up_to<T: DeserializeOwned>(
     root: &Path,
     name: &str,
@@ -268,6 +327,95 @@ mod tests {
         assert!(super::same_file(&meta(&link), &meta(&link)));
         assert!(!super::same_file(&meta(&link), &meta(&target)));
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// `src` written as `meada.toml` in a directory of its own, read as `read_config_up_to`
+    /// reads it (`max` for a mirror's), the error as text.
+    fn config_of(case: &str, src: &str, max: Option<u64>) -> Result<super::Config, String> {
+        let dir =
+            std::env::temp_dir().join(format!("meada-base-url-{case}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("meada.toml"), src).unwrap();
+        let read = super::read_config_up_to(&dir, max);
+        std::fs::remove_dir_all(&dir).unwrap();
+        read.map(|c| c.unwrap()).map_err(|e| e.to_string())
+    }
+
+    #[test]
+    fn a_base_url_declaration_maps_each_variable_to_its_directory() {
+        let src = "[[base_url]]\nenv = [\"A_URL\", \"B_URL\"]\ndir = \"svc-b\"\n";
+        let config = config_of("maps", src, None).unwrap();
+        assert_eq!(config.declared_dir("A_URL"), Some("svc-b"));
+        assert_eq!(config.declared_dir("B_URL"), Some("svc-b"));
+        assert_eq!(config.declared_dir("C_URL"), None);
+    }
+
+    #[test]
+    fn a_trailing_slash_is_dropped() {
+        let src = "[[base_url]]\nenv = [\"A_URL\"]\ndir = \"svc-b/\"\n";
+        let config = config_of("slash", src, None).unwrap();
+        assert_eq!(config.declared_dir("A_URL"), Some("svc-b"));
+    }
+
+    #[test]
+    fn a_bad_directory_is_refused() {
+        for (n, dir) in ["", ".", "./svc", "/svc", "svc/../x", "svc\\\\b"]
+            .iter()
+            .enumerate()
+        {
+            let src = format!("[serve]\n\n[[base_url]]\nenv = [\"A_URL\"]\ndir = \"{dir}\"\n");
+            let e = config_of(&format!("bad{n}"), &src, None).err().unwrap();
+            assert!(e.contains("meada.toml:5: `base_url.dir`"), "{dir:?}: {e}");
+        }
+    }
+
+    #[test]
+    fn a_variable_declared_twice_is_refused() {
+        let src = "[[base_url]]\nenv = [\"A_URL\"]\ndir = \"a\"\n\n\
+                   [[base_url]]\ndir = \"b\"\nenv = [\"B_URL\", \"A_URL\"]\n";
+        let e = config_of("twice", src, None).err().unwrap();
+        assert!(e.contains("meada.toml:7: `base_url.env`"), "{e}");
+        assert!(e.contains("A_URL"), "{e}");
+        // The inline form names the line the variable is written on.
+        let src = "base_url = [\n  { env = [\"A_URL\"], dir = \"a\" },\n  \
+                   { env = [\"A_URL\"], dir = \"b\" },\n]\n";
+        let e = config_of("inline", src, None).err().unwrap();
+        assert!(e.contains("meada.toml:3: `base_url.env`"), "{e}");
+        // One entry naming a variable twice is the same mistake.
+        let src = "[[base_url]]\nenv = [\"A_URL\",\n  \"A_URL\"]\ndir = \"a\"\n";
+        let e = config_of("same", src, None).err().unwrap();
+        assert!(e.contains("meada.toml:3: `base_url.env`"), "{e}");
+    }
+
+    #[test]
+    fn a_missing_directory_is_no_error() {
+        let src = "[[base_url]]\nenv = [\"A_URL\"]\ndir = \"gone\"\n";
+        let config = config_of("gone", src, None).unwrap();
+        assert_eq!(config.declared_dir("A_URL"), Some("gone"));
+    }
+
+    #[test]
+    fn a_mirror_config_refuses_a_duplicate_too() {
+        let src = "[[base_url]]\nenv = [\"A_URL\"]\ndir = \"a\"\n\n\
+                   [[base_url]]\nenv = [\"A_URL\"]\ndir = \"b\"\n";
+        let e = config_of("mirror", src, Some(super::GENERATION_CONFIG_MAX))
+            .err()
+            .unwrap();
+        assert!(e.contains("meada.toml:6: `base_url.env`"), "{e}");
+    }
+
+    #[test]
+    fn an_empty_env_is_refused() {
+        let src = "[[base_url]]\nenv = []\ndir = \"a\"\n";
+        let e = config_of("empty", src, None).err().unwrap();
+        assert!(e.contains("meada.toml:2: `base_url.env`"), "{e}");
+    }
+
+    #[test]
+    fn no_base_url_leaves_serve_undeclared() {
+        let src = "[[base_url]]\nenv = [\"A_URL\"]\ndir = \"a\"\n";
+        assert!(!config_of("serve", src, None).unwrap().serve.declared);
     }
 
     fn serve(prefix: Option<&str>, strip: Option<&str>) -> Serve {

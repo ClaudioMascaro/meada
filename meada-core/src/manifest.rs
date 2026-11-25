@@ -36,6 +36,44 @@ pub struct Serve {
     pub declared: bool,
 }
 
+/// A `[[base_url]]` entry of `meada.toml` (a Base URL declaration): a consumer whose base URL
+/// comes from one of `env` calls the routes served under `dir`, a directory of the same
+/// repository.
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct BaseUrl {
+    #[serde(deserialize_with = "variables")]
+    pub env: Vec<String>,
+    /// Repository-relative, `/` separated, without a trailing `/`.
+    #[serde(deserialize_with = "repo_dir")]
+    pub dir: String,
+}
+
+/// One or more variable names.
+fn variables<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
+    let names = Vec::<String>::deserialize(d)?;
+    match names.is_empty() || names.iter().any(String::is_empty) {
+        true => Err(D::Error::custom(Msg::Empty.text())),
+        false => Ok(names),
+    }
+}
+
+/// A directory of the repository written as `a/b`: one trailing `/` is dropped; empty, `.`,
+/// `..` or empty segments, a leading `/` and `\` are refused (`.` alone would be the whole
+/// repository, which `[serve]` covers).
+fn repo_dir<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let written = String::deserialize(d)?;
+    let dir = written.strip_suffix('/').unwrap_or(&written);
+    if dir.is_empty() {
+        return Err(D::Error::custom(Msg::Empty.text()));
+    }
+    let loose = |s: &str| matches!(s, "" | "." | "..");
+    match dir.starts_with('/') || dir.contains('\\') || dir.split('/').any(loose) {
+        true => Err(D::Error::custom(Msg::NotRepoDir.text())),
+        false => Ok(dir.into()),
+    }
+}
+
 /// A `[serve]` table that is present: `declared` is set.
 pub fn declared<'de, D: Deserializer<'de>>(d: D) -> Result<Serve, D::Error> {
     let serve = Serve::deserialize(d)?;

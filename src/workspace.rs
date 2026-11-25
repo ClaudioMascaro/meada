@@ -330,6 +330,7 @@ fn config_of(entry: EntryFile) -> Config {
         resources: entry.resources,
         test_routes: false,
         iac: Default::default(),
+        base_urls: Vec::new(),
     }
 }
 
@@ -912,7 +913,7 @@ impl Manifest {
                 serde_json::from_value(written.into()).map_err(|e| bad(e.to_string()))?;
             let blocks = file.blocks();
             let max = Some(config::GENERATION_CONFIG_MAX);
-            let own = config::read_own_up_to(&root, "meada.toml", max);
+            let own = config::read_config_up_to(&root, max);
             let (config, ignored) = match own.map_err(|e| bad(e.to_string()))? {
                 Some(own) => (own, blocks),
                 None => (config_of(file), Vec::new()),
@@ -1090,7 +1091,7 @@ fn mirror(
     // The mirror is a clone of a repository its operator does not control: its two files are
     // read as a pulled generation's are, bounded and through no symbolic link.
     let max = Some(config::GENERATION_CONFIG_MAX);
-    let own = config::read_own_up_to(&root, "meada.toml", max).map_err(|e| e.to_string())?;
+    let own = config::read_config_up_to(&root, max).map_err(|e| e.to_string())?;
     let has_own = own.is_some();
     let repository = Repository {
         config: own.unwrap_or(listed),
