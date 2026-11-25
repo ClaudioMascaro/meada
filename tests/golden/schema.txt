@@ -1782,6 +1782,26 @@ sample.go
       "name": "New.label"
     }
   ],
+  "references": [
+    {
+      "scope": "New",
+      "name": "Store",
+      "kind": "type",
+      "range": {
+        "start": 268,
+        "end": 273
+      }
+    },
+    {
+      "scope": "Store.Get",
+      "name": "Store",
+      "kind": "type",
+      "range": {
+        "start": 357,
+        "end": 362
+      }
+    }
+  ],
   "env_fields": [
     {
       "class": "Settings",

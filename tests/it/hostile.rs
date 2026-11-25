@@ -1275,6 +1275,15 @@ fn go() -> Vec<Case> {
                 )
             )),
         ),
+        // Type uses nested past every depth limit of the pack: slices and function types.
+        m(
+            "nested types",
+            format!(
+                "package h\n\nimport \"example.com/h/svc\"\n\nvar s {}svc.T\n\nvar f {}\n",
+                "[]".repeat(DEEP),
+                nest("func(", "svc.T", ")", DEEP)
+            ),
+        ),
         m(
             "chi route functions",
             chi(format!(

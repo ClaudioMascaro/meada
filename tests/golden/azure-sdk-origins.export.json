@@ -1646,6 +1646,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-origins::worker.go::Factory.makeClient::(type)Factory#0",
+      "caller": "local/azure-sdk-origins::worker.go::Factory.makeClient",
+      "target": "local/azure-sdk-origins::worker.go::Factory",
+      "level": "exact",
+      "span": {
+        "path": "worker.go",
+        "start": 1646,
+        "end": 1653
+      },
+      "kind": "type"
+    },
+    {
       "id": "local/azure-sdk-origins::worker.go::Factory.makeClient::bus.NewClient#0",
       "caller": "local/azure-sdk-origins::worker.go::Factory.makeClient",
       "target": null,
@@ -3655,6 +3667,7 @@
     {
       "name": ".#4",
       "members": [
+        "local/azure-sdk-origins::worker.go::Factory",
         "local/azure-sdk-origins::worker.go::Factory.makeClient",
         "local/azure-sdk-origins::worker.go::guessName"
       ]

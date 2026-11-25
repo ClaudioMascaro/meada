@@ -1942,6 +1942,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-controls::control.go::Factory.makeClient::(type)Factory#0",
+      "caller": "local/gcp-sdk-controls::control.go::Factory.makeClient",
+      "target": "local/gcp-sdk-controls::control.go::Factory",
+      "level": "exact",
+      "span": {
+        "path": "control.go",
+        "start": 1231,
+        "end": 1238
+      },
+      "kind": "type"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.go::Factory.makeClient::context.TODO#0",
       "caller": "local/gcp-sdk-controls::control.go::Factory.makeClient",
       "target": null,
@@ -4768,6 +4780,7 @@
     {
       "name": ".#5",
       "members": [
+        "local/gcp-sdk-controls::control.go::Factory",
         "local/gcp-sdk-controls::control.go::Factory.makeClient",
         "local/gcp-sdk-controls::control.go::guessed"
       ]

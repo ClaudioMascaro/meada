@@ -126,6 +126,13 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether a reference (`Facts::references`) to a name of an outside package gives no row
+    /// (Go: every `*http.Request` or `context.Context` would otherwise be a row with no target
+    /// and a package link's site), rather than a row with no target the package kind reads.
+    fn drops_external_uses(&self) -> bool {
+        false
+    }
+
     /// Whether a definition named by a dotted path (`app.use` of `app.use = function () {}`, `o.m`
     /// of a method of `const o = {}`) is what that path written in a call reaches, though its
     /// head is a local or a constant (JavaScript's).
@@ -2116,6 +2123,7 @@ mod tests {
     /// decision to take in review: list it here with its class, or move it.
     const TABLES: &[(&str, &str)] = &[
         ("csharp.rs:TRIMS", "runtime"),
+        ("go.rs:PREDECLARED", "syntax"),
         ("go/build.rs:ARCHITECTURES", "runtime"),
         ("go/build.rs:SYSTEMS", "runtime"),
         ("go/values.rs:METHODS", "exception"),

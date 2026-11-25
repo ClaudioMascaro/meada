@@ -127,6 +127,30 @@
   ],
   "calls": [
     {
+      "id": "example.com/gopkg/lib::api/client.go::Client.Create::(type)Client#0",
+      "caller": "example.com/gopkg/lib::api/client.go::Client.Create",
+      "target": "example.com/gopkg/lib::api/client.go::Client",
+      "level": "exact",
+      "span": {
+        "path": "api/client.go",
+        "start": 235,
+        "end": 241
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/gopkg/lib::api/client.go::NewClient::(type)Client#0",
+      "caller": "example.com/gopkg/lib::api/client.go::NewClient",
+      "target": "example.com/gopkg/lib::api/client.go::Client",
+      "level": "exact",
+      "span": {
+        "path": "api/client.go",
+        "start": 137,
+        "end": 143
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/gopkg/lib::cmd/app/main.go::main::text.Greet#0",
       "caller": "example.com/gopkg/lib::cmd/app/main.go::main",
       "target": "example.com/gopkg/lib::text/text.go::Greet",
@@ -197,6 +221,14 @@
     }
   ],
   "communities": [
+    {
+      "name": "api",
+      "members": [
+        "example.com/gopkg/lib::api/client.go::Client",
+        "example.com/gopkg/lib::api/client.go::Client.Create",
+        "example.com/gopkg/lib::api/client.go::NewClient"
+      ]
+    },
     {
       "name": "text",
       "members": [

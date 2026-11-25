@@ -402,6 +402,8 @@ pub struct Resolver<'a> {
     arities: HashMap<Target<'a>, Arity<'a>>,
     statics: HashSet<Target<'a>>,
     members_in_scope: bool,
+    /// The pack's `LanguagePack::drops_external_uses`.
+    drops_external_uses: bool,
     /// The pack's `LanguagePack::assigned_members`.
     assigned_members: bool,
     guesses_constructs: bool,
@@ -1104,6 +1106,7 @@ impl<'a> Resolver<'a> {
             arities,
             statics,
             members_in_scope: language.members_in_scope(),
+            drops_external_uses: language.drops_external_uses(),
             assigned_members: language.assigned_members(),
             guesses_constructs: language.guesses_constructs(),
             unordered_globs: language.unordered_globs(),
@@ -1381,8 +1384,19 @@ impl<'a> Resolver<'a> {
     /// What the reference at `index` of `path` (`Facts::references`) names, exactly: `None` no
     /// row; `Some(None)` a row with no target, for a name a package specifier binds (the package
     /// kind attaches it); `Some(Some((file, name)))` an `exact` edge to that definition or
-    /// declaration symbol. Never a name match: a use is never `inferred` or `ambiguous`.
+    /// declaration symbol. Never a name match: a use is never `inferred` or `ambiguous`. Where
+    /// the pack drops uses of outside names (`LanguagePack::drops_external_uses`), a row with no
+    /// target is no row: the final answer is checked, after `named` walked the name's prefixes.
     pub fn reference(&self, path: &'a str, index: usize) -> Option<Option<(&'a str, &'a str)>> {
+        let found = self.named(path, index)?;
+        match found {
+            None if self.drops_external_uses => None,
+            found => Some(found),
+        }
+    }
+
+    /// `reference`, rows with no target kept.
+    fn named(&self, path: &'a str, index: usize) -> Option<Option<(&'a str, &'a str)>> {
         let r = self.files[path].references.get(index)?;
         let (scope, name) = (r.scope.as_str(), r.name.as_str());
         let bare = |s: &str| !s.starts_with('.') && !s.starts_with('/');
