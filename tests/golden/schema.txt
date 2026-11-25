@@ -1,4 +1,4 @@
-extraction revision 5
+extraction revision 6
 
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -3332,6 +3332,9 @@ sample.tsx
         "Name": "Theme"
       }
     }
+  ],
+  "loads": [
+    "@scope/widgets"
   ],
   "exports": [
     {

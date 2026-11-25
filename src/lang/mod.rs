@@ -455,6 +455,12 @@ pub struct Facts {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub statics: Vec<String>,
     pub imports: Vec<Import>,
+    /// The specifiers the file loads without a binding (TS/JS), sorted and unique: `import 'x'`,
+    /// a dynamic `import('x')` of one plain string, and `require('x')` of one plain string while
+    /// `require` is the runtime's. Nothing resolves through them; a lockfile change roots the
+    /// files that load what moved (`trace --affected`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub loads: Vec<String>,
     /// Everything an explicit import can name: `exports` lists every binding the file makes
     /// available, and `star` narrows what a star import takes from them.
     pub exports: Vec<Export>,
@@ -1012,6 +1018,20 @@ pub enum Export {
     },
     /// Every name `source` exports that its `star` lets through.
     All { source: String },
+}
+
+/// Every specifier the file loads: its imports, the sources it re-exports from, and `loads`.
+// Read by `trace --affected`, wired in a commit that follows.
+#[cfg_attr(not(test), expect(dead_code))]
+pub(crate) fn loaded(facts: &Facts) -> BTreeSet<&str> {
+    let exported = facts.exports.iter().filter_map(|e| match e {
+        Export::From { source, .. } | Export::All { source } => Some(source.as_str()),
+        Export::Local { .. } => None,
+    });
+    (facts.imports.iter().map(|i| i.source.as_str()))
+        .chain(exported)
+        .chain(facts.loads.iter().map(String::as_str))
+        .collect()
 }
 
 /// Which of a file's exports a star import (`export * from`, `from m import *`) takes.
