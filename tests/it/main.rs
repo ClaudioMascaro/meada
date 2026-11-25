@@ -11,6 +11,7 @@ mod aws_sdk;
 mod aws_workloads;
 mod azure;
 mod azure_sdk;
+mod base_url;
 mod benchmark;
 mod cargo;
 mod channel_queries;

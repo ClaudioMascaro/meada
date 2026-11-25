@@ -590,7 +590,10 @@ pub(super) fn prepare(exports: &mut [Export], repositories: &[Repository]) {
             let (via, proxy) = via
                 .split_once(PROXY_VIA)
                 .map_or((via, None), |(v, p)| (v, Some(p)));
-            if let Some(variable) = via.strip_prefix("env:") {
+            // A Base URL declaration wins over a host infrastructure gives the variable:
+            // `Http.link` below takes it.
+            let undeclared = |v: &&str| repo.config.declared_dir(v).is_none();
+            if let Some(variable) = via.strip_prefix("env:").filter(undeclared) {
                 let scoped =
                     environments.scoped_values(&export.repository, &consumer.site, variable);
                 if !scoped.is_empty() {

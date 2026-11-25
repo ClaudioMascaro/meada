@@ -1,0 +1,7 @@
+services:
+  web:
+    build: ./web
+    environment:
+      B_URL: http://svc-c:8080
+  svc-c:
+    build: ./svc-c

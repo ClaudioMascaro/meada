@@ -1,0 +1,3 @@
+[[base_url]]
+env = ["B_URL"]
+dir = "svc-b"

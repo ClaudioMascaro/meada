@@ -923,10 +923,19 @@ impl ContractKind for Http {
         };
         let through = endpoint.map(|e| format!(" through the proxy endpoint {e}"));
         let through = through.as_deref().unwrap_or_default();
+        let var = via.and_then(|v| v.strip_prefix("env:"));
+        // A Base URL declaration settles the module: the routes served under its directory of
+        // this repository, chosen before a code path match elsewhere can drop a gateway match.
+        let dir = var.and_then(|var| from.config.declared_dir(var));
         // A route serves a consumer by its code path, or by its gateway path with the reason
         // for the rewrite. Within one repository a code path match wins over gateway path
         // matches; across repositories both are candidates.
         let mut serving: Vec<_> = (providers.iter())
+            .filter(|(m, p)| {
+                dir.is_none_or(|dir| {
+                    m.identity == from.identity && under(&p.site, &m.identity, dir)
+                })
+            })
             .filter_map(|&(m, p)| {
                 if fits(&p.contract, contract) {
                     return Some((m, p, None));
@@ -942,7 +951,6 @@ impl ContractKind for Http {
         serving
             .retain(|(m, _, gateway)| gateway.is_none() || !direct.contains(&m.identity.as_str()));
         let serving = serving.into_iter();
-        let var = via.and_then(|v| v.strip_prefix("env:"));
         let peers: Vec<&str> = var
             .map(|var| from.config.peers_reading(var).collect())
             .unwrap_or_default();
@@ -956,6 +964,14 @@ impl ContractKind for Http {
                 fits,
                 Level::Exact,
                 format!("host {host}{through} is served by"),
+            )
+        } else if let (Some(var), Some(dir)) = (var, dir) {
+            (
+                serving.collect(),
+                Level::Declared,
+                format!(
+                    "base URL from {var}{through}, declared for {dir}/ in meada.toml; served by"
+                ),
             )
         } else if let (Some(var), false) = (var, peers.is_empty()) {
             let fits = serving
@@ -1152,6 +1168,16 @@ impl ContractKind for Http {
     fn entry(&self, role: Role, contract: &str) -> Option<EntryKind> {
         (role == Role::Provider && route(contract).is_some()).then_some(EntryKind::Route)
     }
+}
+
+/// Whether the site `site` of the repository `identity` (`<identity>::<path>::...`) lies under
+/// the directory `dir` of that repository: `svc` holds `svc/a.go`, never `svc-ui/a.go`.
+fn under(site: &str, identity: &str, dir: &str) -> bool {
+    let path = site
+        .strip_prefix(identity)
+        .and_then(|r| r.strip_prefix("::"));
+    path.and_then(|p| p.strip_prefix(dir))
+        .is_some_and(|rest| rest.starts_with('/'))
 }
 
 #[cfg(test)]
