@@ -1402,3 +1402,91 @@ fn an_unchanged_line_reads_no_lockfile_entry() {
     );
     assert!(lockfile_reads(&answer).is_empty(), "{}", answer["reads"]);
 }
+
+#[test]
+fn a_dependency_newly_added_to_a_member_reaches_it() {
+    let repo = lockfile_repo("lockfile_added_dependency");
+    replace(
+        &repo,
+        "web/packages/c/package.json",
+        "{\"typescript\": \"^5.4.0\"}",
+        "{\"lodash\": \"^4.17.0\", \"typescript\": \"^5.4.0\"}",
+    );
+    let answer = edited(
+        &repo,
+        "web/yarn.lock",
+        "  dependencies:\n    typescript: \"npm:^5.4.0\"\n",
+        "  dependencies:\n    lodash: \"npm:^4.17.0\"\n    typescript: \"npm:^5.4.0\"\n",
+    );
+    let lockfile = &answer["lockfiles"][0];
+    assert_eq!(
+        lockfile["packages"],
+        json!([{"package": "web/packages/c", "via": ["lodash"], "whole": true}])
+    );
+    assert_eq!(
+        lockfile["manifests"],
+        json!(["web/packages/c/package.json"])
+    );
+    assert_eq!(locked_paths(&answer), ["web/packages/c/src/index.ts"]);
+    assert!(opened(&answer).is_empty(), "{:?}", opened(&answer));
+}
+
+#[test]
+fn a_patch_rehash_roots_the_importers() {
+    let repo = lockfile_repo("lockfile_patch");
+    let patched = "patch:resolve@npm%3A^1.22.0#optional!builtin<compat/resolve>";
+    replace(
+        &repo,
+        "web/packages/a/package.json",
+        "\"lodash\": \"^4.17.0\"",
+        "\"lodash\": \"^4.17.0\", \"resolve\": \"^1.22.0\"",
+    );
+    replace(
+        &repo,
+        "web/yarn.lock",
+        "    lodash: \"npm:^4.17.0\"\n  languageName: unknown",
+        &format!(
+            "    lodash: \"npm:^4.17.0\"\n    resolve: \"{patched}\"\n  languageName: unknown"
+        ),
+    );
+    let lock = repo.join("web/yarn.lock");
+    let mut text = fs::read_to_string(&lock).unwrap();
+    text.push_str(&format!(
+        "\n\"resolve@npm:^1.22.0\":\n{}  languageName: node\n  linkType: hard\n\n\
+         \"resolve@{patched}\":\n  version: 1.22.8\n  resolution: \
+         \"resolve@patch:resolve@npm%3A1.22.8#optional!builtin<compat/resolve>::version=1.22.8&hash=c3c19d\"\n  \
+         checksum: 10c0/resolvepatch1\n  languageName: node\n  linkType: hard\n",
+        entry("resolve", "1.22.8", "resolve1228")
+    ));
+    fs::write(&lock, text).unwrap();
+    fs::write(
+        repo.join("web/packages/a/src/res.ts"),
+        "import resolve from 'resolve';\n\nexport function found(x: string) {\n  return resolve.sync(x);\n}\n",
+    )
+    .unwrap();
+    commit_all(&repo, "patched resolve");
+    replace(&repo, "web/yarn.lock", "hash=c3c19d", "hash=c3c19e");
+    let answer = edited(&repo, "web/yarn.lock", "resolvepatch1", "resolvepatch2");
+    assert_eq!(locked_paths(&answer), ["web/packages/a/src/res.ts"]);
+    assert_eq!(
+        answer["lockfiles"][0]["packages"],
+        json!([{"package": "web/packages/a", "via": ["resolve"], "whole": false}])
+    );
+}
+
+#[test]
+fn an_oversized_lockfile_is_too_large() {
+    let repo = lockfile_repo("lockfile_too_large");
+    let mut text = String::from("__metadata:\n  version: 8\n");
+    while text.len() <= 16 << 20 {
+        text.push_str("# padding padding padding padding padding padding padding padding\n");
+    }
+    fs::write(repo.join("web/yarn.lock"), text).unwrap();
+    commit_all(&repo, "oversized");
+    let range = Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    let answer = affected(&repo, range);
+    assert_eq!(unread(&answer), ("too-large".to_string(), all_packages()));
+}

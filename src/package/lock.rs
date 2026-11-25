@@ -309,6 +309,11 @@ impl Lock {
         Some((locator, entry))
     }
 
+    /// Whether `descriptor` resolves to a workspace.
+    pub(crate) fn is_workspace(&self, descriptor: &str) -> bool {
+        (self.resolve(descriptor)).is_some_and(|(locator, _)| self.dirs.contains_key(locator))
+    }
+
     /// Whether `locator` is an entry some dependency reached by name only.
     fn by_name(&self, locator: &str) -> bool {
         self.by_name.contains(name_of(locator))

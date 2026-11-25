@@ -726,6 +726,16 @@ pub(crate) fn attribute<'g>(
         };
         let moved = lock::diff(&before, &after);
         let reached = lock::reached(&before, &after, &moved);
+        // A hoisted import gets something else only when an entry outside the workspaces moved;
+        // a member that starts or stops depending on a name changes nothing for the others.
+        let outside: Vec<lock::Moved> = (moved.iter())
+            .filter(|m| !after.is_workspace(&m.descriptor))
+            .cloned()
+            .collect();
+        let hoisted: BTreeSet<String> = (lock::reached(&before, &after, &outside)
+            .into_values()
+            .flatten())
+        .collect();
         let names: BTreeSet<&str> = reached.values().flatten().map(String::as_str).collect();
         let loaded = facts(&names.iter().copied().collect::<Vec<_>>())?;
         // What each file of this workspace loads among the reached names.
@@ -776,9 +786,8 @@ pub(crate) fn attribute<'g>(
                 continue;
             };
             let entries = &manifest.summary.dependencies;
-            if loading
-                .iter()
-                .any(|n| !entries.iter().any(|e| e.name == *n))
+            if (loading.iter())
+                .any(|n| hoisted.contains(*n) && !entries.iter().any(|e| e.name == *n))
             {
                 out.files
                     .entry(file.to_string())
