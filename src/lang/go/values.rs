@@ -34,6 +34,11 @@ pub(super) struct Std {
     /// os.Getenv("X")`), with whether the value is an environment read. Filled in source order,
     /// so a name is known where it is used after it is bound.
     held: RefCell<HashMap<(String, String), bool>>,
+    /// The file's top-level `const X = "<literal>"`, the formats a `fmt.Sprintf` may name.
+    formats: HashMap<String, String>,
+    /// The names each top-level declaration binds inside it (`bound_inside`), by its start,
+    /// filled the first time a format constant is read there.
+    bound: RefCell<HashMap<usize, BTreeSet<String>>>,
 }
 
 impl Std {
@@ -64,7 +69,23 @@ impl Std {
             aws: free(aws),
             env_by_path: tagged(root, src),
             held: RefCell::default(),
+            formats: formats(root, src),
+            bound: RefCell::default(),
         }
+    }
+
+    /// The literal of the file constant the identifier `node` names, unless a declaration of the
+    /// same name in the top-level declaration around it hides it.
+    fn format(&self, node: Node, src: &[u8]) -> Option<&str> {
+        let name = text(node, src);
+        let literal = self.formats.get(name)?;
+        let mut top = node;
+        while let Some(parent) = top.parent().filter(|p| p.kind() != "source_file") {
+            top = parent;
+        }
+        let mut bound = self.bound.borrow_mut();
+        let inside = (bound.entry(top.start_byte())).or_insert_with(|| bound_inside(top, src));
+        (!inside.contains(name)).then_some(literal.as_str())
     }
 
     /// Notes that `name`, bound in `scope`, holds `value`.
@@ -193,6 +214,61 @@ pub(super) fn env_fields(root: Node, src: &[u8]) -> Vec<EnvField> {
                 });
             }
         }
+    }
+    out
+}
+
+/// The file's top-level constants that hold one string literal (`const f = "/w/%s"`, also in
+/// a `const (...)` group), by name.
+fn formats(root: Node, src: &[u8]) -> HashMap<String, String> {
+    let mut out = HashMap::new();
+    let mut cursor = root.walk();
+    let decls = root.children(&mut cursor);
+    for spec in decls
+        .filter(|d| d.kind() == "const_declaration")
+        .flat_map(named)
+    {
+        let mut cursor = spec.walk();
+        let names: Vec<Node> = spec.children_by_field_name("name", &mut cursor).collect();
+        let values: Vec<Node> = (spec.child_by_field_name("value").into_iter())
+            .flat_map(named)
+            .collect();
+        if let ([name], [value]) = (&names[..], &values[..])
+            && let Value::Str(parts) = read(*value, (src, &Std::default()), "", 0, 0)
+            && let [Part::Text(literal)] = &parts[..]
+        {
+            out.insert(text(*name, src).to_string(), literal.clone());
+        }
+    }
+    out
+}
+
+/// Every name a declaration inside `node` binds: parameters and receivers, `:=`, `var`,
+/// `const`, a range or a type switch binding. Any of them may hide a file constant there.
+// ponytail: a name bound anywhere in the top-level declaration counts, whatever its block; it
+// errs toward leaving a format unread.
+fn bound_inside(node: Node, src: &[u8]) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    let mut stack = vec![node];
+    while let Some(n) = stack.pop() {
+        let field = match n.kind() {
+            "parameter_declaration"
+            | "variadic_parameter_declaration"
+            | "var_spec"
+            | "const_spec" => Some("name"),
+            "short_var_declaration" | "range_clause" => Some("left"),
+            "type_switch_statement" => Some("alias"),
+            _ => None,
+        };
+        if let Some(field) = field {
+            let mut cursor = n.walk();
+            for bound in n.children_by_field_name(field, &mut cursor) {
+                let names = std::iter::once(bound).chain(named(bound));
+                let names = names.filter(|b| b.kind() == "identifier");
+                out.extend(names.map(|b| text(b, src).to_string()));
+            }
+        }
+        stack.extend(named(n));
     }
     out
 }
@@ -333,7 +409,7 @@ fn read(node: Node, files: (&[u8], &Std), scope: &str, depth: usize, level: usiz
             };
             let sprintf = std.fmt.as_ref().map(|fmt| format!("{fmt}.Sprintf"));
             if sprintf.is_some_and(|name| callee(function, src) == name) {
-                return sprintf_value(node, src, again);
+                return sprintf_value(node, files, again);
             }
             if let Some(env) = env_value(node, function, files, scope, again) {
                 return env;
@@ -813,12 +889,18 @@ enum Arg {
 /// pairing of a verb and an argument, and a verb with flags, width or precision (`%5s`, `%.1s`,
 /// `%#v`), is a hole. A format with another verb, a number of arguments other than its verbs,
 /// or `args...` is `Unknown`.
-fn sprintf_value(node: Node, src: &[u8], read: impl Fn(Node) -> Value) -> Value {
+fn sprintf_value(node: Node, files: (&[u8], &Std), read: impl Fn(Node) -> Value) -> Value {
+    let (src, std) = files;
     let args: Vec<Node> = arguments(node).collect();
     if args.iter().any(|a| a.kind() == "variadic_argument") {
         return Value::Unknown;
     }
-    let Some(Value::Str(format)) = args.first().map(|a| read(*a)) else {
+    // Only the format reads a file constant: any other argument is as written.
+    let format = |a: &Node| match (a.kind() == "identifier").then(|| std.format(*a, src)) {
+        Some(Some(literal)) => Value::Str(vec![Part::Text(literal.to_string())]),
+        _ => read(*a),
+    };
+    let Some(Value::Str(format)) = args.first().map(format) else {
         return Value::Unknown;
     };
     let [Part::Text(format)] = &format[..] else {
@@ -949,6 +1031,66 @@ mod tests {
             value = call.args.first();
         }
         depth
+    }
+
+    /// The value `g` is given in `body`, a file importing `fmt` and `net/url` that declares
+    /// `const f = "/w/%s/cancel"` when `constant`, as JSON.
+    fn sprintf_arg(constant: bool, body: &str) -> String {
+        let decl = if constant {
+            "const f = \"/w/%s/cancel\"\n"
+        } else {
+            ""
+        };
+        let src = format!("package x\nimport (\"fmt\"\n\"net/url\")\n{decl}{body}\n");
+        serde_json::to_string(&first_arg(&src)).unwrap()
+    }
+
+    fn json(value: Value) -> String {
+        serde_json::to_string(&value).unwrap()
+    }
+
+    #[test]
+    fn a_sprintf_format_held_in_a_file_constant_keeps_the_path() {
+        let held = sprintf_arg(
+            true,
+            "func h(id string) { g(fmt.Sprintf(f, url.PathEscape(id))) }",
+        );
+        let written = sprintf_arg(
+            false,
+            "func h(id string) { g(fmt.Sprintf(\"/w/%s/cancel\", url.PathEscape(id))) }",
+        );
+        assert!(held.contains("/w/") && held.contains("/cancel"), "{held}");
+        // The same parts as the literal format gives, the call's place in the source apart.
+        let unplaced = |json: &str| {
+            let mut value: serde_json::Value = serde_json::from_str(json).unwrap();
+            value["Str"][1]["Invoke"]["range"] = serde_json::Value::Null;
+            value
+        };
+        assert_eq!(unplaced(&held), unplaced(&written));
+    }
+
+    #[test]
+    fn a_local_shadows_the_format_constant() {
+        for body in [
+            "func h(id string) { f := k(); g(fmt.Sprintf(f, id)) }",
+            "func h(f, id string) { g(fmt.Sprintf(f, id)) }",
+            "func h(id string) { var f = k(); g(fmt.Sprintf(f, id)) }",
+            "func h(id string) { const f = \"/other/%s\"; g(fmt.Sprintf(f, id)) }",
+            "func h(id string) { func() { f := k(); _ = f }(); g(fmt.Sprintf(f, id)) }",
+        ] {
+            assert_eq!(sprintf_arg(true, body), json(Value::Unknown), "{body}");
+        }
+    }
+
+    #[test]
+    fn only_the_format_folds() {
+        let body = "func h() { g(fmt.Sprintf(\"/w/%s\", f)) }";
+        assert_eq!(sprintf_arg(true, body), sprintf_arg(false, body));
+        // An identifier elsewhere stays a reference to its name.
+        assert_eq!(
+            sprintf_arg(true, "func h() { g(f) }"),
+            json(Value::Ref("f".into()))
+        );
     }
 
     #[test]
