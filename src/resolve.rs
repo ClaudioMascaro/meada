@@ -5176,10 +5176,10 @@ pub struct Code<'a> {
     folded: RefCell<HashMap<&'a str, usize>>,
     /// `folded` and `field_reads` for the work `Code::apart` runs.
     folded_apart: RefCell<HashMap<&'a str, usize>>,
-    field_reads_apart: RefCell<HashMap<Field<'a>, Value>>,
+    field_reads_apart: RefCell<HashMap<(Field<'a>, bool), Value>>,
     /// `folded` and `field_reads` for what a cut cycle adds to a walk (`Code::cut_apart`).
     folded_cuts: RefCell<HashMap<&'a str, usize>>,
-    field_reads_cuts: RefCell<HashMap<Field<'a>, Value>>,
+    field_reads_cuts: RefCell<HashMap<(Field<'a>, bool), Value>>,
     /// Whether a budget refused a charge since this was last cleared.
     refused: Cell<bool>,
     fold_returned_strings: Cell<bool>,
@@ -5190,9 +5190,10 @@ pub struct Code<'a> {
     /// The marker constants of the literals that set each field (`field_values`), by field name
     /// (`*` for a literal by position), built the first time a field is read.
     literals: OnceCell<HashMap<&'a str, BTreeSet<(&'a str, &'a str)>>>,
-    /// The environment read each struct field holds (`Code::field_read`), `Unknown` while it is
-    /// folded, so a field many reads reach is folded once and a field met again folds to nothing.
-    field_reads: RefCell<HashMap<Field<'a>, Value>>,
+    /// The environment read each struct field holds (`Code::field_read`), for a read in a Go
+    /// test file or not, `Unknown` while it is folded, so a field many reads reach is folded once
+    /// and a field met again folds to nothing.
+    field_reads: RefCell<HashMap<(Field<'a>, bool), Value>>,
     /// The last segment of every callee of the repository (`save` of `repo.save`, `C` of
     /// `(opaque).C`), built the first time a parameter is injected (`Code::may_be_called`).
     callees: OnceCell<HashSet<&'a str>>,
@@ -5424,7 +5425,7 @@ impl<'a> Code<'a> {
     fn aside<T>(
         &self,
         folded: &RefCell<HashMap<&'a str, usize>>,
-        field_reads: &RefCell<HashMap<Field<'a>, Value>>,
+        field_reads: &RefCell<HashMap<(Field<'a>, bool), Value>>,
         work: impl FnOnce() -> T,
     ) -> T {
         let swap = || {
@@ -6221,25 +6222,28 @@ impl<'a> Code<'a> {
     /// when a literal may set it to a value the source does not tell (`Code::field_values`),
     /// when no literal sets it, when two give different values or one gives anything but one
     /// environment read (`Env` or `EnvOr`), when a function whose parameter it takes has no
-    /// exact caller, past `FIELD_DEPTH`, and while it is folded (a field met again). The caller
-    /// checks that no file writes it through a selector (`Code::field_written`).
-    fn field_read(&self, field: Field<'a>, depth: usize, nested: usize) -> Value {
+    /// exact caller, past `FIELD_DEPTH`, and while it is folded (a field met again). `test_read`:
+    /// the read is in a Go `_test.go` file, whose callers then count (`Code::literal_reads`).
+    /// The caller checks that no file writes it through a selector (`Code::field_written`).
+    fn field_read(&self, field: Field<'a>, depth: usize, nested: usize, test_read: bool) -> Value {
         let (at, ty, _) = field;
         let struct_field = (self.resolver.defs.get(at).and_then(|d| d.get(ty)))
             .is_some_and(|d| d.kind == Kind::Class);
         if depth >= FIELD_DEPTH || !struct_field {
             return Value::Unknown;
         }
-        if let Some(known) = self.field_reads.borrow().get(&field) {
+        let key = (field, test_read);
+        if let Some(known) = self.field_reads.borrow().get(&key) {
             return known.clone();
         }
-        (self.field_reads.borrow_mut()).insert(field, Value::Unknown);
+        (self.field_reads.borrow_mut()).insert(key, Value::Unknown);
         let mut reads = Vec::new();
         let all = self.field_values(field).is_some_and(|values| {
             !values.is_empty()
                 && (values.into_iter()).all(|(path, scope, value)| {
                     let frames = &mut Vec::new();
-                    self.literal_reads(path, scope, value, frames, (depth, nested), &mut reads)
+                    let at = (depth, nested, test_read);
+                    self.literal_reads(path, scope, value, frames, at, &mut reads)
                 })
         });
         let read = match (all, &reads[..]) {
@@ -6248,7 +6252,7 @@ impl<'a> Code<'a> {
             }
             _ => Value::Unknown,
         };
-        (self.field_reads.borrow_mut()).insert(field, read.clone());
+        (self.field_reads.borrow_mut()).insert(key, read.clone());
         read
     }
 
@@ -6258,7 +6262,8 @@ impl<'a> Code<'a> {
     /// the walk that reads the field. `false` as soon as one is no single environment read, or a
     /// function to climb has no exact caller or a call reaches it by a name match (which may pass
     /// anything), is met again, is `WRAPPER_DEPTH` calls up or its caller's file has spent its
-    /// `EVAL_BUDGET`.
+    /// `EVAL_BUDGET`. A caller in a Go `_test.go` file is skipped unless `test_read`: `go build`
+    /// leaves such files out of the program, so they pass nothing to a read outside them.
     // ponytail: a constructor read as a value (`mk := New; mk(x)`) is not seen, so its exact
     // callers alone give the field; reading every value of the repository for its name would
     // see it.
@@ -6268,7 +6273,7 @@ impl<'a> Code<'a> {
         scope: &'a str,
         value: &'a Value,
         frames: &mut Vec<Frame<'a>>,
-        (depth, nested): (usize, usize),
+        (depth, nested, test_read): (usize, usize, bool),
         reads: &mut Vec<Part>,
     ) -> bool {
         let mut wants = None;
@@ -6295,6 +6300,7 @@ impl<'a> Code<'a> {
             return false;
         }
         let callers: Vec<Caller> = (self.resolver.callers.get(&function).into_iter().flatten())
+            .filter(|c| test_read || !c.path.ends_with("_test.go"))
             .copied()
             .collect();
         !callers.is_empty()
@@ -6308,7 +6314,8 @@ impl<'a> Code<'a> {
                     path: caller.path,
                     index: caller.index,
                 });
-                let read = self.literal_reads(path, scope, value, frames, (depth, nested), reads);
+                let at = (depth, nested, test_read);
+                let read = self.literal_reads(path, scope, value, frames, at, reads);
                 frames.pop();
                 read
             })
@@ -8168,7 +8175,10 @@ impl<'a> Code<'a> {
                 let marks = |on: &Marked| matches!(on, Marked::Field { class: c, name, .. } if c == class && name == field);
                 let injected = fold.inject.and_then(|i| self.injected(at, marks, i));
                 let field = (at, class, field);
-                injected.unwrap_or_else(|| self.field_read(field, fold.field_depth, fold.nested))
+                let test_read = path.ends_with("_test.go");
+                injected.unwrap_or_else(|| {
+                    self.field_read(field, fold.field_depth, fold.nested, test_read)
+                })
             }
             Binding::External(..) | Binding::Unknown if fold.chain => {
                 // An opaque member of a value is not a package path. On-demand type imports

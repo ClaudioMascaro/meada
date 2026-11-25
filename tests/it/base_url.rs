@@ -306,3 +306,66 @@ fn a_request_struct_change_reaches_both_consumers() {
         assert!(certain, "{path}: {entry}");
     }
 }
+
+/// A `_test.go` file of the client's package: a helper builds the client on a test server's
+/// literal URL, and `probe` reads the client's base itself.
+const CLIENT_TEST: &str = r#"package client
+
+import "net/http"
+
+func newTestClient() *Client { return New("http://127.0.0.1:8080") }
+
+func probe(c *Client) { _, _ = http.Post(c.base+"/run", "application/json", nil) }
+"#;
+
+/// `site` has no link: its base URL is unknown, so its call has no contract.
+fn assert_no_base(found: &[Value], site: &str) {
+    assert_eq!(shown(&of(found, site)), [], "{site}");
+}
+
+#[test]
+fn a_test_helper_does_not_feed_the_client_base() {
+    let repo = mono("base_url_test_helper");
+    std::fs::write(repo.join("svc-a/client/client_test.go"), CLIENT_TEST).unwrap();
+    let found = links(&repo);
+    let reason =
+        format!("base URL from B_BASE_URL, declared for svc-b/ in meada.toml; served by {MONO}");
+    for (site, provider) in [
+        ("svc-a/client/client.go::Client.Run", "Routes.run"),
+        ("svc-a/client/client.go::Client.Cancel", "Routes.cancel"),
+    ] {
+        let row = (
+            "declared".to_string(),
+            format!("{MONO}::svc-b/routes.go::{provider}"),
+            reason.clone(),
+        );
+        assert_eq!(shown(&of(&found, site)), [row], "{found:#?}");
+    }
+}
+
+#[test]
+fn a_field_only_test_files_construct_stays_unknown() {
+    let repo = mono("base_url_test_only");
+    std::fs::remove_file(repo.join("svc-a/main.go")).unwrap();
+    let helper = r#"package client
+
+import "example.com/mono/svc-a/config"
+
+func newClient() *Client {
+	cfg, _ := config.Load()
+	return New(cfg.B.BaseURL)
+}
+"#;
+    std::fs::write(repo.join("svc-a/client/client_test.go"), helper).unwrap();
+    let found = links(&repo);
+    assert_no_base(&found, "svc-a/client/client.go::Client.Run");
+    assert_no_base(&found, "svc-a/client/client.go::Client.Cancel");
+}
+
+#[test]
+fn a_read_inside_a_test_file_keeps_every_caller() {
+    let repo = mono("base_url_test_read");
+    std::fs::write(repo.join("svc-a/client/client_test.go"), CLIENT_TEST).unwrap();
+    let found = links(&repo);
+    assert_no_base(&found, "svc-a/client/client_test.go::probe");
+}
