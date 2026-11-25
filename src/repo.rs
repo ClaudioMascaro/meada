@@ -174,7 +174,8 @@ impl Changes<'_> {
                         return Err(Msg::PathOutside { path }.text().into());
                     };
                     let full = root.join(&rel);
-                    if full.is_dir() {
+                    // A symlink is a file to git, whatever it points to.
+                    if std::fs::symlink_metadata(&full).is_ok_and(|m| m.is_dir()) {
                         return Err(Msg::PathIsDirectory { path }.text().into());
                     }
                     let change = match full.exists() {
@@ -576,6 +577,21 @@ mod tests {
             .err()
             .map(|e| e.to_string());
         assert!(refused.is_some_and(|e| e.contains("`sub` is a directory")));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Git tracks a symlink as a file, whatever it points to.
+    #[cfg(unix)]
+    #[test]
+    fn files_take_a_symlink_to_a_directory() {
+        let dir = scratch("files-symlink");
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        std::os::unix::fs::symlink("sub", dir.join("link")).unwrap();
+        let files = ["link".to_string()];
+        assert_eq!(
+            Changes::Files(&files).read(&dir).unwrap(),
+            [("link".to_string(), Change::Untracked)]
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
