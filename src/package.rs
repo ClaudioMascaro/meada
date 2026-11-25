@@ -47,8 +47,9 @@ mod cargo;
 mod go;
 #[cfg(test)]
 mod hostile;
+pub(crate) mod lock;
 mod maven;
-mod npm;
+pub(crate) mod npm;
 mod nuget;
 mod pep440;
 mod pypi;

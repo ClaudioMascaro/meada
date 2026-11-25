@@ -4,6 +4,11 @@
   `YAML_KEY_BUDGET` (1 MiB); a file past it (a long key over thousands of children) reads as
   empty, so its `${key}` placeholders name environment variables.
 
+- `package/lock.rs`: a Yarn Berry `yarn.lock` is read up to `MAX_LOCK_BYTES` (16 MiB, past
+  `lang::MAX_BYTES`, since a monorepo's lockfile is a few MiB); a larger one is `too-large`. Only
+  Berry files are read: a Yarn 1, npm, pnpm or bun lockfile is `format`. `peerDependencies` are
+  no edges. A dependency matching no key after normalizing goes to every entry of its name.
+
 - `package/go.rs`: a `replace` applies to every version of the module it names (its old version is
   read and dropped, as `lang/go/modfile.rs` does for imports); a `go.work` is not read; a `vendor/`
   directory and an `internal/` package are no different from any other directory of the provider;
