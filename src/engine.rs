@@ -665,9 +665,13 @@ impl Engine {
         let mut partial = self.partial()?;
         let links = self.links(&partial.exports);
         trace::starts(&mut partial, Start::Changes, Some(&changes), Direction::Up)?;
+        let (roots, open) = {
+            let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
+            trace::affected::roots(&graph, &changes)
+        };
+        trace::read_affected(&mut partial, &links, roots.clone())?;
         let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
-        let (_roots, open) = trace::affected::roots(&graph, &changes);
-        Ok(trace::affected::answer(&graph, &changes, open))
+        Ok(trace::affected::answer(&graph, &changes, &roots, open))
     }
 
     /// `trace`'s body: `changes` holds what a change start touches.

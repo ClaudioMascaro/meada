@@ -743,6 +743,30 @@ pub(crate) fn read(
     direction: Direction,
     candidates: bool,
 ) -> Result<HashSet<String>> {
+    reading(partial, links, starts, direction, candidates, false)
+}
+
+/// Reads into `partial` what the affected walk (`affected::fan`) may follow from `starts`:
+/// `read` up with candidates, plus, from each node, the consumers of the data links the calls
+/// it makes provide (a write goes on to its readers) and the definitions a call that reaches it
+/// decorates. Executions and IaC nodes are contract rows the partial already holds.
+pub(crate) fn read_affected(
+    partial: &mut Partial,
+    links: &[Link],
+    starts: Vec<String>,
+) -> Result<()> {
+    reading(partial, links, starts, Direction::Up, true, true).map(drop)
+}
+
+/// `read`, and with `affected` the steps `read_affected` adds.
+fn reading(
+    partial: &mut Partial,
+    links: &[Link],
+    starts: Vec<String>,
+    direction: Direction,
+    candidates: bool,
+    affected: bool,
+) -> Result<HashSet<String>> {
     let receiving: HashSet<String> = partial
         .exports
         .iter()
@@ -803,11 +827,22 @@ pub(crate) fn read(
                             .filter(|link| contract::flows_to_consumer(Some(&link.contract)))
                             .map(|link| link.provider.clone()),
                     );
+                    if affected {
+                        let written = by_provider.get(call.id.as_str()).into_iter().flatten();
+                        next.extend(
+                            written
+                                .filter(|link| contract::flows_to_consumer(Some(&link.contract)))
+                                .map(|link| link.consumer.clone()),
+                        );
+                    }
                 }
                 let mut calls = sites;
                 calls.extend(partial.callers(None, &new, candidates)?);
                 // Going up, a file's row reaches the symbol holding it (`held`).
                 for (_, c) in calls {
+                    if affected {
+                        next.extend(c.decorates);
+                    }
                     next.extend(c.holder);
                     next.push(c.caller);
                 }
