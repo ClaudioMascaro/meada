@@ -473,3 +473,27 @@ func probe(c *Client) { _, _ = http.Post(c.base+"/run", "application/json", nil)
     let found = links(&repo);
     assert_no_base(&found, "svc-a/client/probe_test.go::probe");
 }
+
+#[test]
+fn a_function_local_type_elsewhere_does_not_cancel_the_client_base() {
+    let repo = mono("base_url_local_type");
+    let local = "package main\n\nfunc local() {\n\ttype pair struct{ a, b string }\n\t_ = pair{\"x\", \"y\"}\n}\n";
+    std::fs::write(repo.join("svc-b/local.go"), local).unwrap();
+    assert_client_declared(&links(&repo));
+}
+
+#[test]
+fn a_literal_of_a_type_that_binds_to_nothing_keeps_the_base_unknown() {
+    // Unknown, qualified or not: it may be the client's struct.
+    for (case, ty) in [
+        ("base_url_unbound_qualified", "missing.Pair"),
+        ("base_url_unbound", "Missing"),
+    ] {
+        let repo = mono(case);
+        let unbound = format!("package main\n\nfunc unbound() {{ _ = {ty}{{\"x\", \"y\"}} }}\n");
+        std::fs::write(repo.join("svc-b/unbound.go"), unbound).unwrap();
+        let found = links(&repo);
+        assert_no_base(&found, "svc-a/client/client.go::Client.Run");
+        assert_no_base(&found, "svc-a/client/client.go::Client.Cancel");
+    }
+}

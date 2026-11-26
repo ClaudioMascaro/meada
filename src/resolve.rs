@@ -6153,7 +6153,8 @@ impl<'a> Code<'a> {
     /// The values the composite literals of the repository give the field `field` (`T{rc: x}`,
     /// `[]T{{rc: x}}`), each with the file and scope it is written in. `None` when a literal may
     /// set it to a value the source does not tell: one by position, one whose type is not read
-    /// or not known, or one of a type that declares no such field (an alias). The pack writes
+    /// or not known (one by position of a type declared inside a function sets none), or one of
+    /// a type that declares no such field (an alias). The pack writes
     /// each as a marker constant `{name}` (`{*}` by position) holding `New(type, [value])`, the
     /// type `?` when it is not read.
     // ponytail: a literal of an alias or a defined type (`type B = T`, `type B T`) written by
@@ -6204,6 +6205,15 @@ impl<'a> Code<'a> {
                             || (self.resolver.receivers.get(t.path))
                                 .is_some_and(|r| r.contains_key(&(t.name, name))) => {}
                     Binding::External(..) => {}
+                    // A type declared inside a function (an unqualified name a local binds) is
+                    // another type than any package-level struct: its literal by position sets
+                    // none of their fields.
+                    // ponytail: a function-local alias of the struct (`type L = T; L{a, b}`) or
+                    // a type parameter instantiated with it sets the struct's fields unseen;
+                    // read local type declarations when one matters.
+                    Binding::Hidden
+                        if by_position
+                            && written.chars().all(|c| c.is_alphanumeric() || c == '_') => {}
                     _ => return None,
                 }
             }
