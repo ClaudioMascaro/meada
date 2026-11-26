@@ -500,6 +500,7 @@ fn provider(site: Site, contract: String) -> Found {
         shape: None,
         lead: None,
         cap: None,
+        client: None,
     }
 }
 
@@ -527,6 +528,7 @@ fn consumer_at(site: Site, read: Read, shape: Option<Shape>) -> Found {
         lead: read.lead,
         shape,
         cap: None,
+        client: None,
     }
 }
 
@@ -1376,6 +1378,7 @@ mod tests {
             root: None,
             lead: None,
             cap: None,
+            client: None,
         };
         let direct = provider("http::GET::/shop/users");
         let gateway = Provider {

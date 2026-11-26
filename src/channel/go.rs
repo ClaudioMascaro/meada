@@ -15,6 +15,7 @@ use crate::channel::message::{
     Handler, Message, bind, channel_name as name, consume, consume_env, env_of, produce,
     produce_env, publish, topic, topics,
 };
+use crate::config::ChannelClient;
 use crate::lang::go::modfile::unversioned;
 use crate::lang::go::package_call;
 use crate::lang::{Call, Value, property};
@@ -162,7 +163,7 @@ const METHODS: &[&str] = &[
     "NewReader",
 ];
 
-pub(super) fn messages(code: &Code) -> Vec<Message> {
+pub(super) fn messages(code: &Code, clients: &[ChannelClient]) -> Vec<Message> {
     if !code.pack().extensions().contains(&"go") {
         return Vec::new();
     }
@@ -170,6 +171,10 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
     for (&path, facts) in code.files() {
         for (n, stored) in facts.calls.iter().enumerate() {
             let method = (stored.callee.rsplit_once('.')).map_or(stored.callee.as_str(), |m| m.1);
+            if let Some(client) = declared(code, path, n, method, clients) {
+                out.extend(client_sides(code, path, n, client));
+                continue;
+            }
             if !METHODS.contains(&method) {
                 continue;
             }
@@ -200,6 +205,71 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
         }
     }
     out
+}
+
+/// The Client declaration the call at `n` of `path` (named `method`) resolves to: an external
+/// function by its import path and name, or a definition of the repository the call reaches,
+/// by its file and qualified name. A name alone never matches.
+fn declared<'a, 'c>(
+    code: &Code<'a>,
+    path: &'a str,
+    n: usize,
+    method: &str,
+    clients: &'c [ChannelClient],
+) -> Option<&'c ChannelClient> {
+    let named = |c: &&ChannelClient| match (c.definition(), c.external()) {
+        (Some((_, name)), _) => name.rsplit('.').next() == Some(method),
+        (None, Some((_, name))) => name == method,
+        _ => false,
+    };
+    let mut named = clients.iter().filter(named).peekable();
+    named.peek()?;
+    let call = code.call(path, n)?;
+    let reached = code.reaches(path, n);
+    named.find(|c| match (c.definition(), c.external()) {
+        (Some((file, name)), _) => reached.is_some_and(|t| t.path == file && t.name == name),
+        (None, Some(_)) => {
+            let outside = (call.callee.contains('.'))
+                .then(|| package_call(code, path, &call.scope, &call.callee))
+                .flatten();
+            outside.is_some_and(|o| unversioned(&o) == unversioned(&c.call))
+        }
+        _ => false,
+    })
+}
+
+/// The sides a declared call makes, read as a built-in client of its role: the value at its
+/// topic position names each, lifted through exact callers when it is a parameter, its
+/// environment variable kept. A position the call or its literal lacks leaves it unresolved.
+fn client_sides<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    n: usize,
+    client: &ChannelClient,
+) -> Vec<Message> {
+    let at = &client.topic;
+    let read = |args: &[Value], _: &Keywords| {
+        let value = arg(args, at.arg);
+        let value = match &at.field {
+            None => value,
+            Some(key) => match field(value, key)? {
+                Some(value) => value,
+                None => return Some((vec![None], None)),
+            },
+        };
+        Some((vec![topic(value)?], env_of(value)))
+    };
+    let broker = client.broker.name();
+    let mut sides = match client.role {
+        meada_core::manifest::ClientRole::Producer => produce_env(code, path, n, broker, &read),
+        meada_core::manifest::ClientRole::Consumer => {
+            consume_env(code, path, n, broker, &read, None)
+        }
+    };
+    for side in &mut sides {
+        side.client = Some(client.call.clone());
+    }
+    sides
 }
 
 /// What the source says the value `name`, written in `scope` of `path`, is made by outside the
@@ -494,7 +564,7 @@ mod tests {
         let modules = Go.modules(&[], &BTreeMap::new()).unwrap();
         let resolver = Resolver::new(&files, modules, &Go);
         let code = Code::new(&resolver, &files, &Go);
-        let mut messages = messages(&code);
+        let mut messages = messages(&code, &[]);
         messages.extend(super::super::aws::test_messages(&code, None));
         crate::channel::message::lines(messages)
     }

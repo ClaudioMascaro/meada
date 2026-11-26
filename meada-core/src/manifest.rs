@@ -70,7 +70,7 @@ fn dotted_key<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
 
 /// A `[[channel_client]]` entry of `meada.toml` (a Client declaration): a call that resolves to
 /// `call` produces to or consumes from a channel of `broker`, named by the value at `topic`.
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ChannelClient {
     /// An external function by its import path and name (`example.com/acme/flow.NewProducer`),

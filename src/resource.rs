@@ -246,6 +246,7 @@ impl ContractKind for Resource {
                         root: None,
                         lead: None,
                         cap: None,
+                        client: None,
                     });
                 }
             }

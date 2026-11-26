@@ -304,6 +304,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                                 path: m.path.clone(),
                                 call: if here { n } else { m.call },
                                 role: Side::Producer,
+                                client: None,
                             });
                         }
                     }

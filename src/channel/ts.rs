@@ -137,6 +137,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                             path: site.into(),
                             call: at,
                             role: Side::Consumer(handler.clone()),
+                            client: None,
                         })
                     },
                 )
@@ -260,6 +261,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 path: site.into(),
                 call: at,
                 role: Side::Consumer(handler.clone()),
+                client: None,
             }));
         }
     }
@@ -285,6 +287,7 @@ fn producers(broker: &'static str, found: Found) -> Vec<Message> {
                     path: site.into(),
                     call: at,
                     role: Side::Producer,
+                    client: None,
                 })
             },
         )
@@ -478,6 +481,7 @@ fn sqs<'a>(
             path: expanded.site.0.into(),
             call: expanded.site.1,
             role: role.clone(),
+            client: None,
         })
     })
     .collect()

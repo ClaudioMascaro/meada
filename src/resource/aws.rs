@@ -399,6 +399,7 @@ impl Operation {
             shape: None,
             lead: None,
             cap: None,
+            client: None,
         }
     }
 }

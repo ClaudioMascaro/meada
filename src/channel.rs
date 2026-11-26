@@ -285,13 +285,25 @@ impl ContractKind for Channel {
         name.filter(|n| !n.is_empty()).map(|_| broker)
     }
 
+    /// A line per Client declaration whose `call` made no side of the repository.
+    fn status(&self, repository: &Repository, export: &Export, _links: &[Link]) -> Vec<String> {
+        let made: std::collections::BTreeSet<&str> = (export.providers.iter())
+            .filter_map(|p| p.client.as_deref())
+            .chain(export.consumers.iter().filter_map(|c| c.client.as_deref()))
+            .collect();
+        (repository.config.channel_clients.iter())
+            .filter(|c| !made.contains(c.call.as_str()))
+            .map(|c| crate::msg::Msg::ChannelClientUnmatched { call: &c.call }.text())
+            .collect()
+    }
+
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
         // Each reader answers for its own pack only; the order is the order found.
         let messages: Vec<Message> = [
             ts::messages(code),
             python::messages(code),
             rust::messages(code),
-            go::messages(code),
+            go::messages(code, indexed.channel_clients),
             java::messages(code, indexed),
             csharp::messages(code),
         ]
@@ -361,6 +373,7 @@ impl ContractKind for Channel {
                     shape: None,
                     lead: None,
                     cap: None,
+                    client: m.client.clone(),
                 }
             })
             .chain(ts::aws(code))
@@ -419,6 +432,7 @@ impl ContractKind for Channel {
                         root: None,
                         lead: None,
                         cap: None,
+                        client: None,
                     }),
                 }
             }
@@ -723,6 +737,7 @@ mod tests {
             root: None,
             lead: None,
             cap: None,
+            client: None,
         }
     }
 
@@ -952,6 +967,7 @@ export async function listen() {
             files: &["a.ts"],
             configs: &[],
             symlinks: &[],
+            channel_clients: &[],
         };
         let sites: Vec<_> = Channel
             .extract(&code, &indexed)

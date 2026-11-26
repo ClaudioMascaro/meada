@@ -420,6 +420,7 @@ pub(in crate::http) fn unfollowed(code: &Code, config: &Config) -> Vec<Found> {
             shape: None,
             lead: None,
             cap: None,
+            client: None,
         })
         .collect()
 }

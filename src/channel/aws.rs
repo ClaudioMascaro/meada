@@ -120,6 +120,7 @@ impl Operation {
             shape: None,
             lead: None,
             cap: None,
+            client: None,
         }
     }
 }
@@ -266,6 +267,7 @@ pub(super) fn test_messages(
                 path,
                 call,
                 role,
+                client: None,
             })
         })
         .collect()

@@ -61,6 +61,8 @@ pub struct Found {
     /// The level this side's links are capped at, from where its name came
     /// (`environment_cap`); `None` for no cap but its `via`'s.
     pub cap: Option<Level>,
+    /// The declared `call` of the Client declaration that made the side (`[[channel_client]]`).
+    pub client: Option<String>,
 }
 
 /// What an unresolved consumer's URL starts with that Meada could not read, and the known part
@@ -1331,6 +1333,7 @@ mod tests {
             shape: None,
             lead: None,
             cap: None,
+            client: None,
         };
         let names = super::Names::new(&[inline("a.ts")]).without(["b.ts".to_string()].into());
         assert_eq!(names.scope("a.ts", "app.@40").as_str(), "app.GET /a");

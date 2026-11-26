@@ -14,6 +14,7 @@ mod azure_sdk;
 mod base_url;
 mod benchmark;
 mod cargo;
+mod channel_clients;
 mod channel_queries;
 mod channels;
 mod channels_jobs;

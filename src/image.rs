@@ -865,6 +865,7 @@ fn runner(
         root: Some(root.into()),
         lead: None,
         cap: None,
+        client: None,
     }
 }
 

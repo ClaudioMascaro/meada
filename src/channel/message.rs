@@ -18,6 +18,8 @@ pub struct Message {
     pub path: String,
     pub call: usize,
     pub role: Side,
+    /// The declared `call` of the Client declaration that made the side (`[[channel_client]]`).
+    pub client: Option<String>,
 }
 
 #[derive(Clone)]
@@ -157,6 +159,7 @@ pub fn produce_env_with<'a>(
                     path: site.into(),
                     call: at,
                     role: Side::Producer,
+                    client: None,
                 })
             },
         )
@@ -228,6 +231,7 @@ pub fn consume_env_with<'a>(
                     path: site.into(),
                     call: at,
                     role: Side::Consumer(handler.clone()),
+                    client: None,
                 })
             },
         )
@@ -285,6 +289,7 @@ pub fn publish_with<'a>(
                     path: site.into(),
                     call: at,
                     role,
+                    client: None,
                 }
             },
         )
@@ -322,6 +327,7 @@ pub fn bind_with<'a>(
                     path: site.into(),
                     call: at,
                     role: Side::Binding { exchange, pattern },
+                    client: None,
                 })
             },
         )

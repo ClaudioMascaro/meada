@@ -170,7 +170,7 @@ CREATE INDEX candidates_call ON candidates (call);
 CREATE INDEX candidates_target ON candidates (target);
 CREATE TABLE contracts (
     role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
-    method TEXT, fragments TEXT, shape TEXT, identity TEXT, lead TEXT, cap TEXT
+    method TEXT, fragments TEXT, shape TEXT, identity TEXT, lead TEXT, cap TEXT, client TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
 CREATE TABLE documents (
@@ -740,6 +740,8 @@ pub struct Indexed<'a> {
     pub configs: &'a [(&'a str, &'a [u8])],
     /// The config inputs a pack named that are symbolic links, which the index does not read.
     pub symlinks: &'a [&'a str],
+    /// The repository's Client declarations (`[[channel_client]]`).
+    pub channel_clients: &'a [crate::config::ChannelClient],
 }
 
 /// Brings the index up to date with the files a language pack handles under `root`: tracked
@@ -1263,7 +1265,8 @@ fn refresh_attempt(
     // so it extracts again. Folding them in also forces that on an index of this version written
     // before the `shape` rows and constant `exports` targets existed (issue #175), which the
     // schema golden does not cover.
-    let digest = configs_digest(digest, &manifest_rows, &mapping_stamp);
+    let clients = format!("{:?}", config.channel_clients);
+    let digest = configs_digest(digest, &manifest_rows, &clients, &mapping_stamp);
     if changed.is_empty() && deleted.is_empty() && known_configs.as_deref() == Some(&digest) {
         tx.commit()?;
         return Ok(());
@@ -1492,6 +1495,7 @@ fn refresh_attempt(
         files: &files,
         configs: &pack_configs,
         symlinks: &symlinks,
+        channel_clients: &config.channel_clients,
     };
 
     // Contracts, from every file of the groups not kept. Values are not kept in the index, so
@@ -1768,6 +1772,7 @@ fn refresh_attempt(
             identity,
             lead,
             f.cap.map(crate::contract::Level::name),
+            &f.client,
         );
         let shape = rows.entry(key).or_default();
         match (shape.as_mut(), &f.shape) {
@@ -1776,12 +1781,14 @@ fn refresh_attempt(
             (_, None) => {}
         }
     }
-    for ((role, site, contract, via, path, method, fragments, identity, lead, cap), shape) in rows {
+    for (key, shape) in rows {
+        let (role, site, contract, via, path, method, fragments, identity, lead, cap, client) = key;
         let shape = shape.as_ref().map(serde_json::to_string).transpose()?;
         tx.execute(
-            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
-                role, contract, site, via, path, method, fragments, shape, identity, lead, cap
+                role, contract, site, via, path, method, fragments, shape, identity, lead, cap,
+                client
             ],
         )?;
     }
@@ -2061,11 +2068,14 @@ fn through_link(root: &Path, path: &str) -> bool {
 fn configs_digest(
     mut digest: blake3::Hasher,
     manifest_rows: &[(String, String)],
+    clients: &str,
     mappings: &str,
 ) -> String {
     for (path, summary) in manifest_rows {
         digest.update(format!("{path}\0{summary}\0").as_bytes());
     }
+    // The Client declarations make channel sides at extraction (`Indexed::channel_clients`).
+    digest.update(clients.as_bytes());
     digest.update(env!("CARGO_PKG_VERSION").as_bytes());
     format!("{}:{mappings}", digest.finalize().to_hex())
 }
@@ -2315,7 +2325,8 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
         return Ok(false);
     }
     let mappings = config.iac.stamp()?;
-    Ok(configs_digest(digest, &manifest_rows(db)?, &mappings) == configs)
+    let clients = format!("{:?}", config.channel_clients);
+    Ok(configs_digest(digest, &manifest_rows(db)?, &clients, &mappings) == configs)
 }
 
 /// What communities read of a file's rows (`write_communities`): its symbols, and the caller (its
@@ -3473,6 +3484,8 @@ pub(crate) struct Provider {
     /// The level the side's links are capped at (`contract::environment_cap`,
     /// `contracts.cap`); never exported.
     pub(crate) cap: Option<crate::contract::Level>,
+    /// The declared `call` that made the side (`contracts.client`); never exported.
+    pub(crate) client: Option<String>,
 }
 
 /// A path a gateway serves a route at, and why: `gateway prefix /shop`.
@@ -3509,6 +3522,8 @@ pub(crate) struct Consumer {
     /// The level the side's links are capped at (`contract::environment_cap`,
     /// `contracts.cap`); never exported.
     pub(crate) cap: Option<crate::contract::Level>,
+    /// The declared `call` that made the side (`contracts.client`); never exported.
+    pub(crate) client: Option<String>,
 }
 
 impl Consumer {
@@ -3600,7 +3615,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         .collect();
     let providers = db
         .prepare(
-            "SELECT contract, site, shape, via, method, identity, cap FROM contracts \
+            "SELECT contract, site, shape, via, method, identity, cap, client FROM contracts \
              WHERE role = 'provider' ORDER BY contract, site",
         )?
         .query_map([], |r| {
@@ -3612,13 +3627,14 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
                 method: r.get(4)?,
                 identity: stored_identity(r.get(5)?),
                 cap: stored_level(r.get(6)?),
+                client: r.get(7)?,
                 ..Provider::default()
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
     let consumers = db
         .prepare(
-            "SELECT contract, site, via, method, fragments, shape, identity, lead, cap \
+            "SELECT contract, site, via, method, fragments, shape, identity, lead, cap, client \
              FROM contracts WHERE role = 'consumer' ORDER BY site, contract, via",
         )?
         .query_map([], |r| {
@@ -3640,6 +3656,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
                     .get::<_, Option<String>>(7)?
                     .and_then(|l| serde_json::from_str(&l).ok()),
                 cap: stored_level(r.get(8)?),
+                client: r.get(9)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;

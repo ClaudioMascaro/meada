@@ -338,6 +338,7 @@ pub(crate) fn extract(code: &Code, channels: bool) -> Vec<Found> {
                 shape: None,
                 lead: None,
                 cap: None,
+                client: None,
             });
         }
     }

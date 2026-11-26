@@ -518,6 +518,7 @@ mod tests {
                 hops: Vec::new(),
                 root: None,
                 cap: None,
+                client: None,
             }],
             ..Export::default()
         };

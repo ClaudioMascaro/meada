@@ -334,6 +334,7 @@ pub(crate) fn extract<'a>(
                                 shape: None,
                                 lead: None,
                                 cap: None,
+                                client: None,
                             });
                         }
                     }

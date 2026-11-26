@@ -211,6 +211,7 @@ impl ContractKind for Alert {
                         root: None,
                         lead: None,
                         cap: None,
+                        client: None,
                     });
                 }
                 if identities.insert(node.identity(&repo.identity)) {

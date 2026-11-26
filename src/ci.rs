@@ -559,6 +559,7 @@ impl ContractKind for Ci {
                     root: None,
                     lead: None,
                     cap: None,
+                    client: None,
                 });
             }
             crate::index::sort_consumers(&mut export.consumers);
