@@ -642,10 +642,19 @@ fn chart_envs(repo: &Repository, export: &mut Export, path: &str, envs: Vec<conf
             repository: repo.identity.clone(),
             path: owner.clone(),
             level: Level::Declared,
-            reason: format!("helm_env {} ({path})", env.key),
+            reason: format!("{CHART_RUNS}{} ({path})", env.key),
         });
         export.iac.push(node);
     }
+}
+
+/// How a chart environment's execution row's reason starts (`chart_envs`).
+const CHART_RUNS: &str = "helm_env ";
+
+/// Whether the execution row `x` is a chart environment's (`chart_envs`): its path is the owning
+/// package's directory, which runs no package nested under it.
+pub(crate) fn chart_execution(x: &meada_core::export::Execution) -> bool {
+    x.reason.starts_with(CHART_RUNS)
 }
 
 /// Whether `node` is a chart environment's workload node (`chart_envs`).

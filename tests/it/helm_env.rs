@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use meada::engine::Engine;
 use serde_json::Value;
 
-use crate::common::fixture_repo;
+use crate::common::{fixture_repo, of_files};
 
 const CHART: &str = "svc/chart/api";
 
@@ -157,6 +157,39 @@ fn the_base_values_file_lies_under_each_environment() {
             let other = values(&[("OTHER", env)]);
             write(repo, &format!("{CHART}/values-{env}.yaml"), &other);
         }
+    });
+    assert_eq!(level_from(&export, "Created"), "declared");
+}
+
+/// A base `values.yaml` holding only a comment is Helm's empty map: the environments stand.
+#[test]
+fn a_comment_only_base_values_file_is_an_empty_map() {
+    let export = export("helm_env_empty_base", |repo| {
+        write(
+            repo,
+            &format!("{CHART}/values.yaml"),
+            "# set per environment\n",
+        );
+    });
+    assert_eq!(level_from(&export, "Created"), "declared");
+}
+
+/// An environment file holding nothing is the base alone, as Helm lays it.
+#[test]
+fn an_empty_environment_values_file_is_the_base() {
+    let export = export("helm_env_empty_env", |repo| {
+        let base = values(&[("ORDERS_TOPIC", "orders.created")]);
+        write(repo, &format!("{CHART}/values.yaml"), &base);
+        write(
+            repo,
+            &format!("{CHART}/values-stg.yaml"),
+            &values(&[("OTHER", "x")]),
+        );
+        write(
+            repo,
+            &format!("{CHART}/values-prd.yaml"),
+            "# nothing here yet\n",
+        );
     });
     assert_eq!(level_from(&export, "Created"), "declared");
 }
@@ -318,6 +351,24 @@ fn a_nested_package_gets_no_environment_from_the_chart() {
         consumed(&export, "svc/nested/reader.go"),
         ["channel::kafka"]
     );
+}
+
+/// A change to a file of a package nested under the chart's package reaches none of the chart's
+/// environments; a change to the owning package's own file reaches them (`trace --affected`).
+#[test]
+fn only_the_owning_package_reaches_the_chart_environments() {
+    let repo = fixture("helm_env_affected_scope");
+    let chart = |answer: &Value| -> Vec<String> {
+        (answer["files"].as_array().unwrap().iter())
+            .filter_map(|f| f["path"].as_str())
+            .filter(|p| p.starts_with(CHART))
+            .map(String::from)
+            .collect()
+    };
+    let nested = of_files(&repo, &["svc/nested/reader.go"]);
+    assert_eq!(chart(&nested), Vec::<String>::new(), "{nested}");
+    let owned = of_files(&repo, &["svc/consumer.go"]);
+    assert!(!chart(&owned).is_empty(), "{owned}");
 }
 
 /// Every link whose kind is not a channel, as text.

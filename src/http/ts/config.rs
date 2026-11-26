@@ -63,6 +63,8 @@ struct Read {
     literals: BTreeMap<String, BTreeSet<String>>,
     /// The includes no root followed, each once, sorted.
     unfollowed: Vec<Unfollowed>,
+    /// Whether a root was dropped (past `MAX_BYTES`, or not parsing): `literals` may lack values.
+    dropped: bool,
     /// Whether any file has a `proxy.endpoints` that is not null, an empty object included, or an
     /// include not followed where it may hold one (`TABLE_PATHS`): Backstage reads that table
     /// whenever it exists, so an empty or unread one leaves no key to say so.
@@ -150,6 +152,12 @@ impl<'i> Config<'i> {
         self.read().literals.get(key).unwrap_or(&NONE)
     }
 
+    /// Whether `literals` holds every value the files may give: no root dropped, no include left
+    /// unfollowed (either may give any key another value).
+    pub(crate) fn whole(&self) -> bool {
+        !self.read().dropped && self.read().unfollowed.is_empty()
+    }
+
     /// The keys of every `app-config*.yaml`, parsed the first time they are asked for.
     fn keys(&self) -> &Properties {
         &self.read().keys
@@ -171,6 +179,7 @@ impl<'i> Config<'i> {
             let mut literals: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
             let mut unfollowed = BTreeSet::new();
             let mut endpoints_table = false;
+            let mut dropped = false;
             let mut reading = includes::Reading::default();
             for (path, src) in roots(self.files) {
                 // An include not followed at the root, `proxy` or `proxy.endpoints` may hold the
@@ -180,6 +189,7 @@ impl<'i> Config<'i> {
                 unfollowed.extend(grafted.unfollowed);
                 endpoints_table |= grafted.watched_unread;
                 let Some(mut tree) = grafted.tree else {
+                    dropped = true;
                     continue;
                 };
                 expand(&mut tree);
@@ -202,6 +212,7 @@ impl<'i> Config<'i> {
                 contested,
                 literals,
                 unfollowed: unfollowed.into_iter().collect(),
+                dropped,
                 endpoints_table,
             }
         })

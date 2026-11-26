@@ -416,7 +416,7 @@ fn topics(config: &AppConfig, args: &[Value], keys: &[&str]) -> Option<Named> {
     Some((
         names,
         environment,
-        (values.len() > 1).then_some(Level::Inferred),
+        (values.len() > 1 || !config.whole()).then_some(Level::Inferred),
     ))
 }
 
@@ -628,6 +628,39 @@ mod tests {
                 .all(|l| l == "kafka unresolved producer"),
             "{unconfigured:?}"
         );
+    }
+
+    /// An include no root followed, or a root dropped, may give the key another value: its one value
+    /// is `inferred`.
+    #[test]
+    fn an_app_config_include_not_followed_caps_the_topic() {
+        let src = "import { Kafka } from 'kafkajs';\nconst kafka = new Kafka({ brokers: [] });\n\
+                   const producer = kafka.producer();\nexport async function f(config) { \
+                   await producer.send({ topic: config.getString('t.one') }); }\n";
+        let base: &[u8] = b"t:\n  one: orders.created\n";
+        let production: &[u8] = b"t:\n  $include: ./missing.yaml\n";
+        let found = |configs: &[(&str, &[u8])]| -> Vec<(Option<String>, Option<Level>)> {
+            (configured_messages(src, configs).into_iter())
+                .map(|m| (m.name, m.cap))
+                .collect()
+        };
+        let created = Some("orders.created".to_string());
+        assert_eq!(
+            found(&[("app-config.yaml", base)]),
+            [(created.clone(), None)]
+        );
+        let configs = [
+            ("app-config.yaml", base),
+            ("app-config.production.yaml", production),
+        ];
+        assert_eq!(found(&configs), [(created.clone(), Some(Level::Inferred))]);
+        // A root that does not parse is dropped, and may hold another value too.
+        let broken: &[u8] = b"t: [\n";
+        let configs = [
+            ("app-config.yaml", base),
+            ("app-config.production.yaml", broken),
+        ];
+        assert_eq!(found(&configs), [(created, Some(Level::Inferred))]);
     }
 
     /// A private field is a client when every value its class writes it comes from one factory,

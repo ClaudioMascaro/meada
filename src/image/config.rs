@@ -143,6 +143,17 @@ pub(super) fn read(
     }) else {
         return out;
     };
+    // An empty or comment-only file holds no document: Helm reads it as an empty map.
+    let empty = Value::Object(Default::default());
+    let lines = &key_lines;
+    chart_envs(
+        path,
+        docs.first().unwrap_or(&empty),
+        root,
+        facts.helm_env,
+        lines,
+        &mut out,
+    );
     let Some(doc) = docs.first() else {
         return out;
     };
@@ -150,7 +161,6 @@ pub(super) fn read(
     if path.starts_with(".github/workflows/") {
         workflow(path, doc, &mut out);
     }
-    chart_envs(path, doc, root, facts.helm_env, &key_lines, &mut out);
     if crate::config_values::helm_values(name)
         && let Some(written) = doc.get("image")
         && let Some(repository) = written.get("repository").and_then(Value::as_str)
@@ -311,14 +321,19 @@ fn chart_envs(
         None => None,
         Some(base) => {
             let read = crate::contract::read(root, &base)
-                .and_then(|src| events::read(Syntax::of(&base), &src, |_| {}).ok())
-                .and_then(|docs| docs.into_iter().next());
-            let Some(read) = read else {
+                .and_then(|src| events::read(Syntax::of(&base), &src, |_| {}).ok());
+            let Some(docs) = read else {
                 return;
             };
-            Some(read)
+            // An empty or comment-only base is Helm's empty map.
+            Some(
+                docs.into_iter()
+                    .next()
+                    .unwrap_or(Value::Object(Default::default())),
+            )
         }
     };
+    let (mut envs, mut bytes) = (Vec::new(), out.bytes);
     for key in keys {
         let Some(entries) = laid(base.as_ref(), doc, key) else {
             continue;
@@ -327,18 +342,19 @@ fn chart_envs(
             .map(|(name, value)| name.len() + value.len() + 8)
             .sum::<usize>()
             + key.len();
-        if out.bytes.saturating_add(cost) > IMAGE_STORED_MAX {
+        bytes = bytes.saturating_add(cost);
+        // All or nothing: an environment missing one key would agree vacuously with the others.
+        if bytes > IMAGE_STORED_MAX {
             return;
         }
-        out.bytes += cost;
-        out.envs.push(ChartEnv {
+        envs.push(ChartEnv {
             key: key.clone(),
             line: lines.get(key).copied().unwrap_or(1),
             entries,
         });
     }
-    if !out.envs.is_empty() {
-        out.chart = chart;
+    if !envs.is_empty() {
+        (out.bytes, out.envs, out.chart) = (bytes, envs, chart);
     }
 }
 
@@ -555,6 +571,29 @@ fn maven(path: &str, src: &[u8], out: &mut Summary) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A chart environment is stored whole or not at all: one missing a key past the ceiling
+    /// would agree vacuously with the environments that set it.
+    #[test]
+    fn a_chart_environment_past_the_storage_ceiling_is_dropped_whole() {
+        let root = Path::new("tests/fixtures/helm-env");
+        let doc = serde_json::json!({
+            "a": { "envs": { "T": "orders.created" } },
+            "b": { "envs": { "U": "x".repeat(64) } },
+        });
+        let keys = ["a.envs".to_string(), "b.envs".to_string()];
+        let stored = |bytes: usize| {
+            let mut out = Summary {
+                bytes,
+                ..Default::default()
+            };
+            let path = "svc/chart/api/values-stg.yaml";
+            chart_envs(path, &doc, root, &keys, &Default::default(), &mut out);
+            (out.envs.len(), out.chart.len())
+        };
+        assert_eq!(stored(0), (2, 2));
+        assert_eq!(stored(IMAGE_STORED_MAX - 40), (0, 0));
+    }
 
     #[test]
     fn repeated_long_builder_locations_stop_at_the_image_storage_ceiling() {

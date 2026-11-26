@@ -357,9 +357,9 @@ impl<'a> Graph<'a> {
             walk.push(depth, row);
             if execution.level != Level::Ambiguous {
                 for entry in self.exports[n].entry_points.iter().filter(|e| {
-                    self.symbols
-                        .get(e.site.as_str())
-                        .is_some_and(|(_, s)| in_path(&s.span.path, &execution.path))
+                    self.symbols.get(e.site.as_str()).is_some_and(|(_, s)| {
+                        runs(execution, &self.exports[n].manifests, &s.span.path)
+                    })
                 }) {
                     let (n, text) = walk.node(&entry.site);
                     walk.enter(
@@ -573,6 +573,21 @@ fn config_starts<'a>(exports: &'a [Export], from: &str) -> Vec<&'a str> {
         .collect()
 }
 
+/// Whether the execution row `x` runs `file` of its repository, whose manifests are
+/// `manifests`: a file under its path, and for a chart environment's row only a file the package
+/// at that path owns itself, as the environment lookup scopes it (a nested package's excluded).
+pub(crate) fn runs(
+    x: &meada_core::export::Execution,
+    manifests: &[crate::package::Manifest],
+    file: &str,
+) -> bool {
+    if !crate::image::chart_execution(x) {
+        return in_path(file, &x.path);
+    }
+    let owner = crate::package::owner_of(manifests, file);
+    owner.map(|m| m.path.rsplit_once('/').map_or(".", |(dir, _)| dir)) == Some(x.path.as_str())
+}
+
 fn in_path(file: &str, directory: &str) -> bool {
     directory == "."
         || file == directory
@@ -602,11 +617,12 @@ pub(crate) fn read_executions(partial: &mut Partial, links: &[Link]) -> Result<(
             .map(|e| e.site.clone())
             .collect::<Vec<_>>();
         partial.symbols(Some(n), &sites)?;
+        let manifests = &partial.exports[n].manifests;
         starts.extend(
             partial.exports[n]
                 .symbols
                 .iter()
-                .filter(|s| in_path(&s.span.path, &execution.path))
+                .filter(|s| runs(&execution, manifests, &s.span.path))
                 .map(|s| s.id.clone()),
         );
     }
@@ -1173,7 +1189,8 @@ impl<'a> Walk<'_, 'a> {
             return;
         };
         for execution in graph.executions.iter().filter(|x| {
-            x.repository == graph.exports[n].repository && in_path(&symbol.span.path, &x.path)
+            x.repository == graph.exports[n].repository
+                && runs(x, &graph.exports[n].manifests, &symbol.span.path)
         }) {
             for (m, export) in graph.exports.iter().enumerate() {
                 for node in &export.iac {
