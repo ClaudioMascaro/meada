@@ -173,3 +173,62 @@ fn an_export_without_a_lockfile_has_no_resolved_key() {
     );
     assert!(export(&repo).get("resolved").is_none());
 }
+
+#[test]
+fn a_sibling_folder_sharing_a_prefix_is_not_a_member() {
+    let repo = berry("lockfile_prefix_sibling");
+    let folder = repo.join("apps/a");
+    let sibling = repo.join("apps/ab/x/package.json");
+    fs::create_dir_all(folder.join("b/x")).unwrap();
+    fs::create_dir_all(sibling.parent().unwrap()).unwrap();
+    let manifest = r#"{"name":"@acme/a","dependencies":{"some-lib":"1.0.0"}}"#;
+    fs::write(folder.join("b/x/package.json"), manifest).unwrap();
+    fs::write(&sibling, manifest.replace("@acme/a", "@acme/b")).unwrap();
+    fs::write(
+        folder.join("package.json"),
+        r#"{"name":"@acme/root","workspaces":["b/*"]}"#,
+    )
+    .unwrap();
+    let lock = r#"__metadata:
+  version: 8
+
+"@acme/a@workspace:b/x":
+  version: 0.0.0-use.local
+  resolution: "@acme/a@workspace:b/x"
+  dependencies:
+    some-lib: "npm:1.0.0"
+
+"some-lib@npm:1.0.0":
+  version: 1.0.0
+  resolution: "some-lib@npm:1.0.0"
+"#;
+    fs::write(folder.join("yarn.lock"), lock).unwrap();
+    common::commit_all(&repo, "create nested workspace and sibling");
+
+    fs::write(
+        &sibling,
+        fs::read_to_string(&sibling)
+            .unwrap()
+            .replace("1.0.0", "2.0.0"),
+    )
+    .unwrap();
+    let answer = common::edited(&repo, "apps/a/yarn.lock", "1.0.0", "2.0.0");
+    let lock = &answer["lockfiles"][0];
+    assert_eq!(lock["path"], "apps/a/yarn.lock");
+    assert!(
+        lock["packages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|p| p["package"] == "apps/a/b/x")
+    );
+    assert!(
+        answer["open"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["path"] == "apps/ab/x/package.json" && e["reason"] == "manifest"),
+        "{}",
+        answer["open"]
+    );
+}

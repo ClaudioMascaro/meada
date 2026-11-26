@@ -9,7 +9,7 @@ use std::collections::{BTreeSet, HashMap};
 use tree_sitter::Node;
 
 use super::{DEFINITION_DEPTH, callee, type_name};
-use crate::lang::{EnvField, Import, Invocation, Part, Value, named, text};
+use crate::lang::{EnvField, Import, Invocation, Part, Value, children, named, text};
 use crate::qualify;
 
 /// How many nested expressions a value is read through (`f(g(h(..)))`); a deeper one is
@@ -275,6 +275,7 @@ fn bound_inside(node: Node, src: &[u8]) -> BTreeSet<String> {
             | "var_spec"
             | "const_spec" => Some("name"),
             "short_var_declaration" | "range_clause" => Some("left"),
+            "receive_statement" if children(n).any(|child| child.kind() == ":=") => Some("left"),
             "type_switch_statement" => Some("alias"),
             _ => None,
         };
@@ -1085,6 +1086,13 @@ mod tests {
             value
         };
         assert_eq!(unplaced(&held), unplaced(&written));
+    }
+
+    #[test]
+    fn a_select_receive_shadowing_a_format_constant_reads_nothing() {
+        let src = "package x\nimport \"fmt\"\nconst f = \"/orders/%s\"\n\
+            func h(ch <-chan string, id string) { select { case f := <-ch: g(fmt.Sprintf(f, id)) } }";
+        assert!(matches!(first_arg(src), Value::Unknown));
     }
 
     #[test]

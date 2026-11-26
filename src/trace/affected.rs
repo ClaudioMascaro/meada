@@ -807,11 +807,13 @@ pub(crate) fn attribute<'g>(
                 continue;
             };
             let dir = dir.trim_end_matches('/');
-            let at = match folder {
-                "" => dir,
-                _ => dir
-                    .strip_prefix(folder)
-                    .map_or("..", |d| d.trim_start_matches('/')),
+            let at = if folder.is_empty() {
+                dir
+            } else if let Some(member) = dir.strip_prefix(folder).and_then(|d| d.strip_prefix('/'))
+            {
+                member
+            } else {
+                continue;
             };
             let via = reached.get(at).filter(|_| !at.is_empty() && at != "..");
             if let Some(via) = via

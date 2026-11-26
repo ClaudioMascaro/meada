@@ -134,6 +134,23 @@ fn editing_channel_client_reextracts_on_a_warm_index() {
 }
 
 #[test]
+fn an_external_client_refuses_a_same_named_function_of_another_import_path() {
+    let result = export("clients_external_path", |repo| {
+        let manifest = toml("1", "0.TopicName").replace("acme/flow", "acme/kafka");
+        std::fs::write(repo.join("meada.toml"), manifest).unwrap();
+        let main = repo.join("main.go");
+        let src = std::fs::read_to_string(&main).unwrap();
+        std::fs::write(
+            main,
+            src.replace("example.com/acme/flow", "example.com/other/kafka")
+                .replace("flow.", "kafka."),
+        )
+        .unwrap();
+    });
+    assert!(sides(&result, "providers", "::main.go::main").is_empty());
+}
+
+#[test]
 fn a_call_by_name_alone_is_not_a_declared_client() {
     let export = export("clients_by_name", |_| {});
     assert!(sides(&export, "consumers", "::other/client.go::").is_empty());
