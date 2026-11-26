@@ -77,6 +77,7 @@ fn import_found(site: Site, specifier: String, chain: String) -> Found {
         fragments: Vec::new(),
         shape: None,
         lead: None,
+        cap: None,
     }
 }
 
@@ -1432,6 +1433,7 @@ fn import(exports: &mut [Export], providers: &Providers) {
                         hops,
                         root: None,
                         lead: None,
+                        cap: None,
                     });
                 }
             }
@@ -1676,6 +1678,7 @@ fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
                     fragments: Vec::new(),
                     shape: Some(shape),
                     lead: None,
+                    cap: None,
                 });
             }
         }
@@ -1724,6 +1727,7 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                     hops,
                     root: None,
                     lead: None,
+                    cap: None,
                 };
                 let installed = installed.entry(step_of(&script.site).0).or_default();
                 // The rows the CI step holds already: a package once, a script once.
@@ -1862,6 +1866,7 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                         hops: Vec::new(),
                         root: None,
                         lead: None,
+                        cap: None,
                     });
                     let mut dependency = Dependency::default();
                     dependency.manifest = manifest.path.clone();
@@ -2564,6 +2569,7 @@ mod tests {
                 hops: Vec::new(),
                 root: None,
                 lead: None,
+                cap: None,
             }],
             calls: vec![call_site],
             ..Export::default()
@@ -3155,6 +3161,7 @@ mod tests {
             hops: Vec::new(),
             root: None,
             lead: None,
+            cap: None,
         };
         let repo = Repository {
             root: "/nonexistent".into(),

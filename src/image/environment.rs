@@ -22,6 +22,19 @@ struct Scope<'a> {
     root: &'a str,
     entry: &'a Entry,
     certain: bool,
+    /// A chart environment's scope (`image::chart_env`): only a kind that reads chart
+    /// environments sees it, for sites the scope's package owns.
+    helm: Option<Helm<'a>>,
+}
+
+/// What a chart environment's scope knows of its chart: its directory, its values file, its
+/// key and the chart's environment files, so a variable's agreement across the chart can be told.
+#[derive(Clone)]
+struct Helm<'a> {
+    chart: &'a str,
+    file: &'a str,
+    key: &'a str,
+    environments: Arc<[String]>,
 }
 
 type Paths<'a> = BTreeMap<&'a str, Vec<Scope<'a>>>;
@@ -30,6 +43,8 @@ type Variables<'a> = BTreeMap<&'a str, Paths<'a>>;
 /// Workload-scoped values, shared with kinds that resolve an HTTP base or a resource name.
 pub(crate) struct Environments<'a> {
     scopes: BTreeMap<String, Variables<'a>>,
+    /// Each repository's manifests, for the package a chart environment's site belongs to.
+    manifests: BTreeMap<&'a str, &'a [crate::package::Manifest]>,
 }
 
 /// A base URL carries its workload scope without putting identities in human reason text.
@@ -48,6 +63,7 @@ impl<'a> Environments<'a> {
         {
             return Self {
                 scopes: BTreeMap::new(),
+                manifests: BTreeMap::new(),
             };
         }
         let links = super::execution_links(exports, repositories);
@@ -74,12 +90,30 @@ impl<'a> Environments<'a> {
         }
         let mut out = Self {
             scopes: BTreeMap::new(),
+            manifests: (exports.iter())
+                .map(|e| (e.repository.as_str(), e.manifests.as_slice()))
+                .collect(),
         };
         for export in exports {
+            let charts: BTreeMap<String, Arc<[String]>> = if export.iac.iter().any(super::chart_env)
+            {
+                (super::summaries(export).into_iter())
+                    .filter(|(_, s)| !s.envs.is_empty())
+                    .map(|(path, s)| (path, s.chart.into()))
+                    .collect()
+            } else {
+                BTreeMap::new()
+            };
             for node in &export.iac {
                 if node.environment.is_empty() {
                     continue;
                 }
+                let helm = super::chart_env(node).then(|| Helm {
+                    chart: &node.root,
+                    file: &node.path,
+                    key: &node.address,
+                    environments: charts.get(&node.path).cloned().unwrap_or_else(|| [].into()),
+                });
                 let workload: Arc<str> = node.identity(&export.repository).into();
                 let direct = executions.get(&(workload.as_ref(), node.root.as_str()));
                 // Resolve one container image once, independently of how many variables it sets.
@@ -123,6 +157,7 @@ impl<'a> Environments<'a> {
                                 root: &node.root,
                                 entry,
                                 certain,
+                                helm: helm.clone(),
                             });
                     }
                 }
@@ -138,7 +173,7 @@ impl<'a> Environments<'a> {
         site: &str,
         variable: &str,
     ) -> Vec<ScopedValue<'_>> {
-        let mut entries = self.entries(repository, site, variable);
+        let mut entries = self.entries(repository, site, variable, false);
         // An unresolved envFrom can hold any matching name, except an explicit override in
         // that same container. Reuse the indexed paths rather than scan source or processes.
         if let Some(variables) = self.scopes.get(repository) {
@@ -148,7 +183,7 @@ impl<'a> Environments<'a> {
                     name.strip_suffix('*')
                         .is_some_and(|prefix| variable.starts_with(prefix))
                 })
-                .flat_map(|name| self.entries(repository, site, name))
+                .flat_map(|name| self.entries(repository, site, name, false))
                 .filter(|scope| {
                     !entries.iter().any(|exact| {
                         exact.workload == scope.workload
@@ -174,23 +209,56 @@ impl<'a> Environments<'a> {
             .collect()
     }
 
-    /// Values and their explanations for one variable at one code site. No process is read.
-    pub(crate) fn values(
+    /// Values and their explanations for one variable at one code site, each with the cap a
+    /// chart environment's value carries (Goal 2): `declared` when every environment of every
+    /// chart in scope that sets the variable gives the one literal, else `inferred`; `None` for
+    /// any other workload's. `helm` is whether the reader's kind reads chart environments. No
+    /// process is read.
+    fn values(
         &self,
         repository: &str,
         site: &str,
         variable: &str,
-    ) -> Vec<(&str, String)> {
-        self.entries(repository, site, variable)
-            .into_iter()
+        helm: bool,
+    ) -> Vec<(&str, String, Option<Level>)> {
+        let scopes = (self.entries(repository, site, variable, helm).into_iter())
             .filter(|s| s.certain && s.entry.contract.is_none())
-            .filter_map(|s| Some((s.entry.value.as_deref()?, s.reason(variable))))
+            .collect::<Vec<_>>();
+        let charts = scopes.iter().filter_map(|s| s.helm.as_ref());
+        let set: std::collections::HashSet<(&str, &str)> =
+            charts.clone().map(|h| (h.chart, h.file)).collect();
+        let every: BTreeMap<&str, &[String]> =
+            charts.map(|h| (h.chart, &*h.environments)).collect();
+        let mut values = scopes.iter().filter(|s| s.helm.is_some());
+        let first = values.next().and_then(|s| s.entry.value.as_deref());
+        // A chart that never sets the variable has no scope here, so it says nothing.
+        let agreed = first.is_some()
+            && values.all(|s| s.entry.value.as_deref() == first)
+            && (every.iter()).all(|(chart, environments)| {
+                (environments.iter()).all(|env| set.contains(&(*chart, env.as_str())))
+            });
+        let cap = if agreed {
+            Level::Declared
+        } else {
+            Level::Inferred
+        };
+        (scopes.into_iter())
+            .filter_map(|s| {
+                let value = s.entry.value.as_deref()?;
+                Some((value, s.reason(variable), s.helm.as_ref().map(|_| cap)))
+            })
             .collect()
     }
 
     /// Typed known resource references share exactly the same code/container/root scope.
-    fn targets(&self, repository: &str, site: &str, variable: &str) -> Vec<(&str, String)> {
-        self.entries(repository, site, variable)
+    fn targets(
+        &self,
+        repository: &str,
+        site: &str,
+        variable: &str,
+        helm: bool,
+    ) -> Vec<(&str, String)> {
+        self.entries(repository, site, variable, helm)
             .into_iter()
             .filter(|s| s.certain)
             .filter_map(|s| Some((s.entry.contract.as_deref()?, s.reason(variable))))
@@ -202,8 +270,9 @@ impl<'a> Environments<'a> {
         repository: &str,
         site: &str,
         variable: &str,
+        helm: bool,
     ) -> Vec<EnvironmentValue> {
-        self.entries(repository, site, variable)
+        self.entries(repository, site, variable, helm)
             .into_iter()
             .filter(|scope| scope.certain)
             .map(|scope| EnvironmentValue {
@@ -219,7 +288,10 @@ impl<'a> Environments<'a> {
             .collect()
     }
 
-    fn entries(&self, repository: &str, site: &str, variable: &str) -> Vec<&Scope<'a>> {
+    /// The scopes that hold `variable` for `site`: a workload's whose code path holds the
+    /// site's file, and, when `helm` (the reader's kind reads chart environments), a chart
+    /// environment's whose package is the one that owns the file, so a nested package is out.
+    fn entries(&self, repository: &str, site: &str, variable: &str, helm: bool) -> Vec<&Scope<'a>> {
         let Some(path) = site
             .strip_prefix(repository)
             .and_then(|s| s.strip_prefix("::"))
@@ -234,21 +306,30 @@ impl<'a> Environments<'a> {
         else {
             return Vec::new();
         };
+        let owner = helm
+            .then(|| self.manifests.get(repository))
+            .flatten()
+            .and_then(|manifests| crate::package::owner_of(manifests, path))
+            .map(|m| m.path.rsplit_once('/').map_or(".", |(dir, _)| dir));
         // Only the file and its ancestors can contain this site; unrelated build paths are skipped.
         let ancestors =
             std::iter::successors(Some(path), |p| p.rsplit_once('/').map(|(parent, _)| parent));
         std::iter::once(".")
             .chain(ancestors)
-            .filter_map(|path| paths.get(path))
-            .flatten()
+            .filter_map(|path| Some((path, paths.get(path)?)))
+            .flat_map(|(path, scopes)| scopes.iter().map(move |s| (path, s)))
+            .filter(|(path, s)| s.helm.is_none() || owner == Some(*path))
+            .map(|(_, s)| s)
             .collect()
     }
 }
 
 impl Scope<'_> {
     fn reason(&self, variable: &str) -> String {
+        let key = self.helm.as_ref();
+        let key = key.map_or(String::new(), |h| format!(", helm_env {}", h.key));
         format!(
-            "workload:{} (root {}), env:{variable}",
+            "workload:{} (root {}), env:{variable}{key}",
             self.workload, self.root
         )
     }
@@ -277,30 +358,41 @@ pub(super) fn resolve(exports: &mut [Export], repositories: &[Repository]) {
                     return None;
                 }
                 let kind = crate::contract::kind_of(contract)?;
+                // Only channel resolution reads chart environments (front 6, Goal 2).
+                let helm = kind.prefix() == "channel";
                 if let Some(identity) = identity
                     && let Some(values) =
                         kind.environment_identity(contract, identity, &|variable| {
-                            environments.receiver_values(&export.repository, site, variable)
+                            environments.receiver_values(&export.repository, site, variable, helm)
                         })
                 {
-                    return (!values.is_empty()).then_some(values);
+                    let values = values.into_iter().map(|(name, via)| (name, via, None));
+                    return Some(values.collect::<Vec<_>>()).filter(|v| !v.is_empty());
                 }
-                let mut values =
-                    std::collections::BTreeMap::<String, std::collections::BTreeSet<String>>::new();
-                for (value, reason) in environments.values(&export.repository, site, variable) {
+                type Sources = (std::collections::BTreeSet<String>, Option<Level>);
+                let mut values = std::collections::BTreeMap::<String, Sources>::new();
+                let repository = &export.repository;
+                for (value, reason, cap) in environments.values(repository, site, variable, helm) {
                     if let Some(name) = kind.environment_name(contract, value, operation) {
-                        values.entry(name).or_default().insert(reason);
+                        let (reasons, side) = values.entry(name).or_default();
+                        reasons.insert(reason);
+                        // A side is `declared` when one of its sources is.
+                        *side = [*side, cap].into_iter().flatten().min();
                     }
                 }
-                for (target, reason) in environments.targets(&export.repository, site, variable) {
+                for (target, reason) in environments.targets(repository, site, variable, helm) {
                     if kind.environment_target(contract, target, operation) {
-                        values.entry(target.into()).or_default().insert(reason);
+                        values.entry(target.into()).or_default().0.insert(reason);
                     }
                 }
                 let values = values
                     .into_iter()
-                    .map(|(name, reasons)| {
-                        (name, reasons.into_iter().collect::<Vec<_>>().join("; "))
+                    .map(|(name, (reasons, cap))| {
+                        (
+                            name,
+                            reasons.into_iter().collect::<Vec<_>>().join("; "),
+                            cap,
+                        )
                     })
                     .collect::<Vec<_>>();
                 (!values.is_empty()).then_some(values)
@@ -344,10 +436,11 @@ pub(super) fn resolve(exports: &mut [Export], repositories: &[Repository]) {
                 None => vec![p],
                 Some(values) => values
                     .into_iter()
-                    .map(|(contract, via)| {
+                    .map(|(contract, via, cap)| {
                         let mut p = p.clone();
                         p.contract = contract;
                         p.via = Some(via);
+                        p.cap = cap;
                         p
                     })
                     .collect(),
@@ -360,10 +453,11 @@ pub(super) fn resolve(exports: &mut [Export], repositories: &[Repository]) {
                 None => vec![c],
                 Some(values) => values
                     .into_iter()
-                    .map(|(contract, via)| {
+                    .map(|(contract, via, cap)| {
                         let mut c = c.clone();
                         c.contract = Some(contract);
                         c.via = Some(via);
+                        c.cap = cap;
                         c
                     })
                     .collect(),

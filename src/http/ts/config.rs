@@ -419,6 +419,7 @@ pub(in crate::http) fn unfollowed(code: &Code, config: &Config) -> Vec<Found> {
             fragments: vec![u.include.clone()],
             shape: None,
             lead: None,
+            cap: None,
         })
         .collect()
 }

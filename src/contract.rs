@@ -58,6 +58,9 @@ pub struct Found {
     /// For an unresolved consumer whose URL starts with a part Meada could not read, why, and
     /// the known part after it (#801).
     pub lead: Option<Lead>,
+    /// The level this side's links are capped at, from where its name came
+    /// (`environment_cap`); `None` for no cap but its `via`'s.
+    pub cap: Option<Level>,
 }
 
 /// What an unresolved consumer's URL starts with that Meada could not read, and the known part
@@ -226,6 +229,8 @@ pub use meada_core::search::Hit;
 #[derive(Default)]
 pub struct ConfigFacts<'a> {
     pub(crate) nodes: &'a [&'a crate::iac::Node],
+    /// The keys of the repository's Chart environment declarations (`[[helm_env]]`).
+    pub(crate) helm_env: &'a [String],
 }
 
 /// A contract kind: the whole interface of one, so that the engine, the open items, the
@@ -845,12 +850,14 @@ pub(crate) fn config_summary(
     src: &[u8],
     root: &std::path::Path,
     nodes: &[&crate::iac::Node],
+    helm_env: &[String],
 ) -> serde_json::Value {
     let mut summaries = serde_json::Map::new();
+    let facts = ConfigFacts { nodes, helm_env };
     for kind in KINDS.iter().filter(|k| k.config_file(path)) {
         summaries.insert(
             kind.prefix().into(),
-            kind.config_summary(path, src, root, &ConfigFacts { nodes }),
+            kind.config_summary(path, src, root, &facts),
         );
     }
     summaries.into()
@@ -885,9 +892,19 @@ pub(crate) fn environment_reason(via: Option<&str>) -> Option<&str> {
     via.filter(|v| v.starts_with("workload:"))
 }
 
-pub(crate) fn environment_link(link: &mut Link, via: Option<&str>) {
+/// The level a side's links are capped at, by where its name came from: `cap` when the side
+/// carries one (a Helm chart environment, `image::environment`; several app-config values),
+/// else `inferred` for a name a workload environment gave (`workload:` via), else none. Every
+/// place that caps a link or a use asks it, so no source of a name escapes its cap.
+pub(crate) fn environment_cap(cap: Option<Level>, via: Option<&str>) -> Option<Level> {
+    cap.or_else(|| environment_reason(via).map(|_| Level::Inferred))
+}
+
+pub(crate) fn environment_link(link: &mut Link, cap: Option<Level>, via: Option<&str>) {
+    if let Some(level) = environment_cap(cap, via) {
+        link.level = link.level.max(level);
+    }
     if let Some(reason) = environment_reason(via) {
-        link.level = link.level.max(Level::Inferred);
         let evidence = format!("; {reason}");
         if !link.reason.contains(&evidence) {
             link.reason += &evidence;
@@ -896,12 +913,14 @@ pub(crate) fn environment_link(link: &mut Link, via: Option<&str>) {
 }
 
 /// The kind's evidence level for a directed use; unknown kinds cannot establish exact uses.
-pub(crate) fn use_level(contract: &str, via: Option<&str>, operation: Option<&str>) -> Level {
-    if environment_reason(via).is_some() {
-        Level::Inferred
-    } else {
-        kind_of(contract).map_or(Level::Declared, |kind| kind.use_level(via, operation))
-    }
+pub(crate) fn use_level(
+    contract: &str,
+    cap: Option<Level>,
+    via: Option<&str>,
+    operation: Option<&str>,
+) -> Level {
+    let level = kind_of(contract).map_or(Level::Declared, |kind| kind.use_level(via, operation));
+    environment_cap(cap, via).map_or(level, |cap| level.max(cap))
 }
 
 /// Preserve each kind's export scope, including repository-level builders where supported.
@@ -1311,6 +1330,7 @@ mod tests {
             fragments: Vec::new(),
             shape: None,
             lead: None,
+            cap: None,
         };
         let names = super::Names::new(&[inline("a.ts")]).without(["b.ts".to_string()].into());
         assert_eq!(names.scope("a.ts", "app.@40").as_str(), "app.GET /a");

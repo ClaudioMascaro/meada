@@ -517,6 +517,7 @@ mod tests {
                 lead: None,
                 hops: Vec::new(),
                 root: None,
+                cap: None,
             }],
             ..Export::default()
         };

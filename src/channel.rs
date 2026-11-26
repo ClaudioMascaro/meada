@@ -360,6 +360,7 @@ impl ContractKind for Channel {
                     fragments: Vec::new(),
                     shape: None,
                     lead: None,
+                    cap: None,
                 }
             })
             .chain(ts::aws(code))
@@ -417,6 +418,7 @@ impl ContractKind for Channel {
                         hops: Vec::new(),
                         root: None,
                         lead: None,
+                        cap: None,
                     }),
                 }
             }
@@ -519,7 +521,7 @@ impl ContractKind for Channel {
                     None,
                     None,
                 );
-                crate::contract::environment_link(&mut link, consumer.via.as_deref());
+                crate::contract::environment_link(&mut link, consumer.cap, consumer.via.as_deref());
                 link
             })
             .collect()
@@ -607,19 +609,19 @@ fn reaching<'p>(
 ) -> BTreeMap<&'p str, (Level, String)> {
     let mut found = BTreeMap::new();
     for p in providers {
-        if let Some(mut matched) = fits(&p.contract, contract) {
-            if let Some(reason) = crate::contract::environment_reason(p.via.as_deref()) {
-                matched.0 = matched.0.max(Level::Inferred);
-                matched.1 += &format!("; {reason}");
+        let capped = |(level, mut reason): (Level, String)| {
+            let level = crate::contract::environment_cap(p.cap, p.via.as_deref())
+                .map_or(level, |cap| level.max(cap));
+            if let Some(evidence) = crate::contract::environment_reason(p.via.as_deref()) {
+                reason += &format!("; {evidence}");
             }
-            strongest(&mut found, &p.site, matched);
+            (level, reason)
+        };
+        if let Some(matched) = fits(&p.contract, contract) {
+            strongest(&mut found, &p.site, capped(matched));
         }
-        if let Some(mut matched) = subscribed(&p.contract, contract, routes) {
-            if let Some(reason) = crate::contract::environment_reason(p.via.as_deref()) {
-                matched.0 = matched.0.max(Level::Inferred);
-                matched.1 += &format!("; {reason}");
-            }
-            strongest(&mut found, &p.site, matched);
+        if let Some(matched) = subscribed(&p.contract, contract, routes) {
+            strongest(&mut found, &p.site, capped(matched));
         }
     }
     for b in routes.bindings.iter().filter(|b| b.contract == contract) {
@@ -720,6 +722,7 @@ mod tests {
             hops: Vec::new(),
             root: None,
             lead: None,
+            cap: None,
         }
     }
 

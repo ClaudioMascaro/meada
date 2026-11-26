@@ -499,6 +499,7 @@ fn provider(site: Site, contract: String) -> Found {
         fragments: Vec::new(),
         shape: None,
         lead: None,
+        cap: None,
     }
 }
 
@@ -525,6 +526,7 @@ fn consumer_at(site: Site, read: Read, shape: Option<Shape>) -> Found {
         fragments: read.fragments,
         lead: read.lead,
         shape,
+        cap: None,
     }
 }
 
@@ -1373,6 +1375,7 @@ mod tests {
             hops: Vec::new(),
             root: None,
             lead: None,
+            cap: None,
         };
         let direct = provider("http::GET::/shop/users");
         let gateway = Provider {

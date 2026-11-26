@@ -170,7 +170,7 @@ CREATE INDEX candidates_call ON candidates (call);
 CREATE INDEX candidates_target ON candidates (target);
 CREATE TABLE contracts (
     role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
-    method TEXT, fragments TEXT, shape TEXT, identity TEXT, lead TEXT
+    method TEXT, fragments TEXT, shape TEXT, identity TEXT, lead TEXT, cap TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
 CREATE TABLE documents (
@@ -941,7 +941,9 @@ fn refresh_attempt(
             None
         }
     };
-    let mappings = crate::config::load(root)?.iac;
+    let config = crate::config::load(root)?;
+    let helm_env: Vec<String> = config.helm_env.iter().map(|h| h.key.clone()).collect();
+    let mappings = config.iac;
     let serve = read_serve()?;
     let mapping_stamp = mappings.stamp()?;
     let mappings_changed = known_configs
@@ -1182,17 +1184,25 @@ fn refresh_attempt(
         "contract_configs",
         &contract_configs,
         now,
-        |path| Ok(inputs_moved(root, inputs.get(path), nodes_of(path))),
+        |path| {
+            Ok(inputs_moved(
+                root,
+                inputs.get(path),
+                nodes_of(path),
+                &helm_env,
+            ))
+        },
         |abs| read_up_to(abs, lang::MAX_BYTES),
         |path, src| {
             SUMMARIES.set(SUMMARIES.get() + 1);
             let nodes = nodes_of(path);
             let (summary, seen) =
-                contract::probed(|| contract::config_summary(path, src, root, nodes));
+                contract::probed(|| contract::config_summary(path, src, root, nodes, &helm_env));
             let read = Inputs {
                 nodes: nodes_digest(nodes),
                 probes: seen.probes,
                 reads: seen.reads,
+                helm_env: helm_env.clone(),
             };
             made.borrow_mut()
                 .push((path.to_string(), serde_json::to_string(&read)?));
@@ -1757,6 +1767,7 @@ fn refresh_attempt(
             fragments.transpose()?,
             identity,
             lead,
+            f.cap.map(crate::contract::Level::name),
         );
         let shape = rows.entry(key).or_default();
         match (shape.as_mut(), &f.shape) {
@@ -1765,12 +1776,12 @@ fn refresh_attempt(
             (_, None) => {}
         }
     }
-    for ((role, site, contract, via, path, method, fragments, identity, lead), shape) in rows {
+    for ((role, site, contract, via, path, method, fragments, identity, lead, cap), shape) in rows {
         let shape = shape.as_ref().map(serde_json::to_string).transpose()?;
         tx.execute(
-            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO contracts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
-                role, contract, site, via, path, method, fragments, shape, identity, lead
+                role, contract, site, via, path, method, fragments, shape, identity, lead, cap
             ],
         )?;
     }
@@ -2263,10 +2274,12 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
     }
     let contract_configs = contract_found(&all, &hidden);
     let inputs = stored_inputs(db)?;
+    let config = crate::config::load(root)?;
+    let helm_env: Vec<String> = config.helm_env.iter().map(|h| h.key.clone()).collect();
     for (path, _) in &contract_configs {
         let nodes = nodes_by_path.get(path.as_str()).map(Vec::as_slice);
         if inputs.contains_key(path)
-            && inputs_moved(root, inputs.get(path), nodes.unwrap_or_default())
+            && inputs_moved(root, inputs.get(path), nodes.unwrap_or_default(), &helm_env)
         {
             return Ok(false);
         }
@@ -2301,7 +2314,7 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
     if stored.keys().any(|p| !packs.contains_key(p.as_str())) {
         return Ok(false);
     }
-    let mappings = crate::config::load(root)?.iac.stamp()?;
+    let mappings = config.iac.stamp()?;
     Ok(configs_digest(digest, &manifest_rows(db)?, &mappings) == configs)
 }
 
@@ -2685,14 +2698,17 @@ fn contract_found(
 }
 
 /// What a contract configuration's summary read beside the file's bytes (`contract_configs.inputs`):
-/// the BLAKE3 of the IaC nodes evaluated for it, what was at each path it probed and the
-/// fingerprint of each file it read or directory it listed (`contract::fingerprint`, #744).
+/// the BLAKE3 of the IaC nodes evaluated for it, what was at each path it probed, the
+/// fingerprint of each file it read or directory it listed (`contract::fingerprint`, #744) and
+/// the keys of the Chart environment declarations it was given (`ConfigFacts::helm_env`).
 #[derive(Serialize, serde::Deserialize)]
 struct Inputs {
     nodes: String,
     probes: BTreeMap<String, contract::Probe>,
     #[serde(default)]
     reads: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    helm_env: Vec<String>,
 }
 
 /// The `inputs` of every `contract_configs` row, by path.
@@ -2713,11 +2729,17 @@ fn nodes_digest(nodes: &[&iac::Node]) -> String {
 /// Whether a contract configuration's summary may differ with its bytes unchanged: its IaC nodes,
 /// what is at a path it probed or what a file it read or a directory it listed holds moved since
 /// `inputs` was recorded, or none was.
-fn inputs_moved(root: &Path, inputs: Option<&String>, nodes: &[&iac::Node]) -> bool {
+fn inputs_moved(
+    root: &Path,
+    inputs: Option<&String>,
+    nodes: &[&iac::Node],
+    helm_env: &[String],
+) -> bool {
     let Some(Ok(read)) = inputs.map(|i| serde_json::from_str::<Inputs>(i)) else {
         return true;
     };
-    read.nodes != nodes_digest(nodes)
+    read.helm_env != helm_env
+        || read.nodes != nodes_digest(nodes)
         || (read.probes.iter()).any(|(rel, was)| contract::probe(root, rel) != *was)
         || (read.reads.iter()).any(|(key, was)| contract::fingerprint(root, key) != *was)
 }
@@ -3448,6 +3470,9 @@ pub(crate) struct Provider {
     pub(crate) hosts: Vec<String>,
     /// The `version` of a package's manifest, for `package::link`.
     pub(crate) version: Option<String>,
+    /// The level the side's links are capped at (`contract::environment_cap`,
+    /// `contracts.cap`); never exported.
+    pub(crate) cap: Option<crate::contract::Level>,
 }
 
 /// A path a gateway serves a route at, and why: `gateway prefix /shop`.
@@ -3481,6 +3506,9 @@ pub(crate) struct Consumer {
     /// (`package::import`); `Packages::link` turns them into links.
     pub(crate) hops: Vec<Hop>,
     pub(crate) root: Option<String>,
+    /// The level the side's links are capped at (`contract::environment_cap`,
+    /// `contracts.cap`); never exported.
+    pub(crate) cap: Option<crate::contract::Level>,
 }
 
 impl Consumer {
@@ -3497,6 +3525,11 @@ impl Consumer {
 fn stored_shape(json: Option<String>) -> Option<Shape> {
     // ponytail: written by `refresh` only, so a bad value is an index to rebuild.
     serde_json::from_str(&json?).ok()
+}
+
+/// A `contracts.cap` value, a level's name; one that does not parse reads as no cap.
+fn stored_level(name: Option<String>) -> Option<crate::contract::Level> {
+    serde_json::from_value(serde_json::Value::String(name?)).ok()
 }
 
 fn stored_identity(json: Option<String>) -> Option<crate::contract::ReceiverIdentity> {
@@ -3567,8 +3600,8 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         .collect();
     let providers = db
         .prepare(
-            "SELECT contract, site, shape, via, method, identity FROM contracts WHERE role = 'provider' \
-             ORDER BY contract, site",
+            "SELECT contract, site, shape, via, method, identity, cap FROM contracts \
+             WHERE role = 'provider' ORDER BY contract, site",
         )?
         .query_map([], |r| {
             Ok(Provider {
@@ -3578,14 +3611,15 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
                 via: r.get(3)?,
                 method: r.get(4)?,
                 identity: stored_identity(r.get(5)?),
+                cap: stored_level(r.get(6)?),
                 ..Provider::default()
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
     let consumers = db
         .prepare(
-            "SELECT contract, site, via, method, fragments, shape, identity, lead FROM contracts \
-             WHERE role = 'consumer' ORDER BY site, contract, via",
+            "SELECT contract, site, via, method, fragments, shape, identity, lead, cap \
+             FROM contracts WHERE role = 'consumer' ORDER BY site, contract, via",
         )?
         .query_map([], |r| {
             let fragments: Option<String> = r.get(4)?;
@@ -3605,6 +3639,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
                 lead: r
                     .get::<_, Option<String>>(7)?
                     .and_then(|l| serde_json::from_str(&l).ok()),
+                cap: stored_level(r.get(8)?),
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -5274,6 +5309,7 @@ mod tests {
             &src,
             &tests.join("fixtures/schema"),
             &nodes,
+            &[],
         ))
         .unwrap();
         actual += "\n";
@@ -5297,6 +5333,7 @@ mod tests {
             &src,
             &tests.join("fixtures/schema"),
             &[],
+            &[],
         ))
         .unwrap();
         actual += "\n";
@@ -5308,6 +5345,7 @@ mod tests {
             "sample.incident.tf",
             &src,
             &tests.join("fixtures/schema"),
+            &[],
             &[],
         ))
         .unwrap();

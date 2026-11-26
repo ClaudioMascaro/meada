@@ -51,6 +51,7 @@ mod generations;
 mod github_app;
 mod gopkg;
 mod grammar;
+mod helm_env;
 mod hostile;
 mod http_iac;
 mod iac;

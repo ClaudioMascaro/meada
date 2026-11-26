@@ -405,6 +405,7 @@ resource "aws_apigatewayv2_route" "wide" {{
                         std::path::Path::new("/missing-http-iac-source"),
                         &crate::contract::ConfigFacts {
                             nodes: &nodes.iter().collect::<Vec<_>>(),
+                            ..Default::default()
                         },
                     )
                     .to_string()
@@ -552,6 +553,28 @@ resource "aws_apigatewayv2_route" "wide" {{
                 .to_string()
                 .len()
         }),
+        (
+            "image: a chart environment of many entries under many keys",
+            || {
+                use crate::contract::ContractKind;
+                let entries = fill(1, |i| format!("    E{i}: v{i}\n"));
+                let mut keys: Vec<String> = (0..1000).map(|i| format!("lib-chart.k{i}")).collect();
+                keys.push("lib-chart.envs".into());
+                // The fixture's chart: its `values.yaml` lies under the file.
+                crate::image::Image
+                    .config_summary(
+                        "svc/chart/api/values-stg.yaml",
+                        &file(format!("lib-chart:\n  envs:\n{entries}")),
+                        std::path::Path::new("tests/fixtures/helm-env"),
+                        &crate::contract::ConfigFacts {
+                            helm_env: &keys,
+                            ..Default::default()
+                        },
+                    )
+                    .to_string()
+                    .len()
+            },
+        ),
         ("image: many Skaffold artifacts", || {
             use crate::contract::ContractKind;
             let items = fill(1, |i| format!("    - image: ghcr.io/acme/image-{i}\n"));

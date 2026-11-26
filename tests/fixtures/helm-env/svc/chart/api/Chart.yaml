@@ -1,0 +1,7 @@
+apiVersion: v2
+name: api
+version: 0.1.0
+dependencies:
+  - name: lib-chart
+    version: 1.0.0
+    repository: oci://example.com/charts
