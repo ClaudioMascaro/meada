@@ -188,6 +188,24 @@
       "hash": "40d353d93cb68230363dd547fb9509b95f5c3d54e0e8a824cd7d5f26ec800a7c"
     },
     {
+      "id": "example.com/chain/catalog::app/api/labels/route.ts::Labels",
+      "span": {
+        "path": "app/api/labels/route.ts",
+        "start": 133,
+        "end": 178
+      },
+      "hash": "9b6cc44ac848fd43304d37e89a564ce59b0a23373f9300e477a6aac7c499017f"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/labels/route.ts::Reply",
+      "span": {
+        "path": "app/api/labels/route.ts",
+        "start": 180,
+        "end": 232
+      },
+      "hash": "b7c79e4cc6baaa3b58584aa747917341677e5d8c229609aa3525c587c75f600f"
+    },
+    {
       "id": "example.com/chain/catalog::app/api/offers/route.ts::GET",
       "span": {
         "path": "app/api/offers/route.ts",
@@ -222,6 +240,24 @@
         "end": 480
       },
       "hash": "46e81a797f2b71e321f4e7fcebde6f365b58fb0f7a40520ca8e69638f7592e4f"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::Page",
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 329,
+        "end": 392
+      },
+      "hash": "6f125010bd34ffe75f51dfcc667063a2be6ef97a58bead4102d05dfbc129bf2c"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::Profile",
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 216,
+        "end": 320
+      },
+      "hash": "d19cefb92169fd201b4edc9e0f22d7374d7717606880e701d4812f1f217de65d"
     },
     {
       "id": "example.com/chain/catalog::app/api/quotes/route.ts::GET",
@@ -260,6 +296,15 @@
       "hash": "94b0d9a0c6524833d520310568efa59d2a00e97269a247c8c3d1126aac41243e"
     },
     {
+      "id": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::SKUS",
+      "span": {
+        "path": "app/api/stock/[sku]/route.ts",
+        "start": 6,
+        "end": 19
+      },
+      "hash": "83e2cb11c0c02fc41e75e4a071ba309d41b3ab3a89238fe7c17d37699a1106e5"
+    },
+    {
       "id": "example.com/chain/catalog::app/api/stock/route.ts::GET",
       "span": {
         "path": "app/api/stock/route.ts",
@@ -267,6 +312,15 @@
         "end": 390
       },
       "hash": "a05f042d87945b0003313d156022cf6d62e13609ce8a6a99bd65f634b3e1b856"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/route.ts::HISTORY",
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 102,
+        "end": 118
+      },
+      "hash": "8136dfd4c0f40c77b574334df7ef4a7dd3647d0f8ca2fcef7043bf54694bc02a"
     },
     {
       "id": "example.com/chain/catalog::app/api/stock/route.ts::POST",
@@ -386,6 +440,15 @@
       "hash": "016a3137dbcbeeda777e4eed87965bdbdd1e3178c712030b08d5cf1dc6c5202a"
     },
     {
+      "id": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Labels",
+      "span": {
+        "path": "packages/contracts/src/receipt.ts",
+        "start": 316,
+        "end": 361
+      },
+      "hash": "9b6cc44ac848fd43304d37e89a564ce59b0a23373f9300e477a6aac7c499017f"
+    },
+    {
       "id": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
       "span": {
         "path": "packages/contracts/src/receipt.ts",
@@ -499,6 +562,18 @@
       }
     },
     {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::GET::(member)Comments#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/schemas.ts::Comments",
+      "level": "exact",
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 296,
+        "end": 310
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/chain/catalog::app/api/comments/route.ts::GET::Comments.parse#0",
       "caller": "example.com/chain/catalog::app/api/comments/route.ts::GET",
       "target": null,
@@ -541,6 +616,18 @@
         "start": 317,
         "end": 323
       }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/route.ts::POST::(member)Comment#0",
+      "caller": "example.com/chain/catalog::app/api/comments/route.ts::POST",
+      "target": "example.com/chain/catalog::lib/schemas.ts::Comment",
+      "level": "exact",
+      "span": {
+        "path": "app/api/comments/route.ts",
+        "start": 583,
+        "end": 600
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/chain/catalog::app/api/comments/route.ts::POST::Comment.safeParse#0",
@@ -587,6 +674,66 @@
       }
     },
     {
+      "id": "example.com/chain/catalog::app/api/comments/summary/route.ts::(type)Summary#0",
+      "caller": "example.com/chain/catalog::app/api/comments/summary/route.ts",
+      "target": "example.com/chain/catalog::lib/schemas.ts::Summary",
+      "level": "exact",
+      "span": {
+        "path": "app/api/comments/summary/route.ts",
+        "start": 174,
+        "end": 181
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/summary/route.ts::(type)z.infer#0",
+      "caller": "example.com/chain/catalog::app/api/comments/summary/route.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/summary/route.ts",
+        "start": 159,
+        "end": 166
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET::(type)NextResponse#0",
+      "caller": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/summary/route.ts",
+        "start": 271,
+        "end": 283
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET::(type)Summary#0",
+      "caller": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/schemas.ts::Summary",
+      "level": "exact",
+      "span": {
+        "path": "app/api/comments/summary/route.ts",
+        "start": 299,
+        "end": 306
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET::(type)z.infer#0",
+      "caller": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/comments/summary/route.ts",
+        "start": 284,
+        "end": 291
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET::NextResponse.json#0",
       "caller": "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
       "target": null,
@@ -629,6 +776,43 @@
         "start": 33,
         "end": 51
       }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/labels/route.ts::(type)Labels#0",
+      "caller": "example.com/chain/catalog::app/api/labels/route.ts",
+      "target": "example.com/chain/catalog::app/api/labels/route.ts::Labels",
+      "level": "exact",
+      "span": {
+        "path": "app/api/labels/route.ts",
+        "start": 223,
+        "end": 229
+      },
+      "kind": "type",
+      "holder": "example.com/chain/catalog::app/api/labels/route.ts::Reply"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/labels/route.ts::GET::(type)NextResponse#0",
+      "caller": "example.com/chain/catalog::app/api/labels/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/labels/route.ts",
+        "start": 271,
+        "end": 283
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/labels/route.ts::GET::(type)Reply#0",
+      "caller": "example.com/chain/catalog::app/api/labels/route.ts::GET",
+      "target": "example.com/chain/catalog::app/api/labels/route.ts::Reply",
+      "level": "exact",
+      "span": {
+        "path": "app/api/labels/route.ts",
+        "start": 284,
+        "end": 289
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/chain/catalog::app/api/labels/route.ts::GET::NextResponse.json#0",
@@ -708,6 +892,31 @@
       }
     },
     {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::(value)Profile#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts",
+      "target": "example.com/chain/catalog::app/api/profiles/route.ts::Profile",
+      "level": "exact",
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 362,
+        "end": 369
+      },
+      "kind": "value",
+      "holder": "example.com/chain/catalog::app/api/profiles/route.ts::Page"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/profiles/route.ts::GET::(member)Page#0",
+      "caller": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+      "target": "example.com/chain/catalog::app/api/profiles/route.ts::Page",
+      "level": "exact",
+      "span": {
+        "path": "app/api/profiles/route.ts",
+        "start": 452,
+        "end": 462
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/chain/catalog::app/api/profiles/route.ts::GET::NextResponse.json#0",
       "caller": "example.com/chain/catalog::app/api/profiles/route.ts::GET",
       "target": null,
@@ -749,7 +958,8 @@
         "path": "app/api/profiles/route.ts",
         "start": 354,
         "end": 370
-      }
+      },
+      "holder": "example.com/chain/catalog::app/api/profiles/route.ts::Page"
     },
     {
       "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.number#0",
@@ -760,7 +970,8 @@
         "path": "app/api/profiles/route.ts",
         "start": 379,
         "end": 389
-      }
+      },
+      "holder": "example.com/chain/catalog::app/api/profiles/route.ts::Page"
     },
     {
       "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.object#0",
@@ -771,7 +982,8 @@
         "path": "app/api/profiles/route.ts",
         "start": 226,
         "end": 320
-      }
+      },
+      "holder": "example.com/chain/catalog::app/api/profiles/route.ts::Profile"
     },
     {
       "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.object#1",
@@ -782,7 +994,8 @@
         "path": "app/api/profiles/route.ts",
         "start": 286,
         "end": 316
-      }
+      },
+      "holder": "example.com/chain/catalog::app/api/profiles/route.ts::Profile"
     },
     {
       "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.object#2",
@@ -793,7 +1006,8 @@
         "path": "app/api/profiles/route.ts",
         "start": 336,
         "end": 392
-      }
+      },
+      "holder": "example.com/chain/catalog::app/api/profiles/route.ts::Page"
     },
     {
       "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.string#0",
@@ -804,7 +1018,8 @@
         "path": "app/api/profiles/route.ts",
         "start": 243,
         "end": 253
-      }
+      },
+      "holder": "example.com/chain/catalog::app/api/profiles/route.ts::Profile"
     },
     {
       "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.string#1",
@@ -815,7 +1030,8 @@
         "path": "app/api/profiles/route.ts",
         "start": 263,
         "end": 273
-      }
+      },
+      "holder": "example.com/chain/catalog::app/api/profiles/route.ts::Profile"
     },
     {
       "id": "example.com/chain/catalog::app/api/profiles/route.ts::z.string#2",
@@ -826,7 +1042,8 @@
         "path": "app/api/profiles/route.ts",
         "start": 303,
         "end": 313
-      }
+      },
+      "holder": "example.com/chain/catalog::app/api/profiles/route.ts::Profile"
     },
     {
       "id": "example.com/chain/catalog::app/api/quotes/route.ts::GET::NextResponse.json#0",
@@ -906,6 +1123,18 @@
       }
     },
     {
+      "id": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET::(member)SKUS#0",
+      "caller": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET",
+      "target": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::SKUS",
+      "level": "exact",
+      "span": {
+        "path": "app/api/stock/[sku]/route.ts",
+        "start": 117,
+        "end": 130
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET::Response.json#0",
       "caller": "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET",
       "target": null,
@@ -937,6 +1166,42 @@
         "start": 117,
         "end": 142
       }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/route.ts::GET::(member)HISTORY#0",
+      "caller": "example.com/chain/catalog::app/api/stock/route.ts::GET",
+      "target": "example.com/chain/catalog::app/api/stock/route.ts::HISTORY",
+      "level": "exact",
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 352,
+        "end": 363
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/route.ts::GET::(value)LIMIT#0",
+      "caller": "example.com/chain/catalog::app/api/stock/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/limits.ts::LIMIT",
+      "level": "exact",
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 316,
+        "end": 321
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/stock/route.ts::GET::(value)TAGS#0",
+      "caller": "example.com/chain/catalog::app/api/stock/route.ts::GET",
+      "target": "example.com/chain/catalog::lib/limits.ts::TAGS",
+      "level": "exact",
+      "span": {
+        "path": "app/api/stock/route.ts",
+        "start": 333,
+        "end": 337
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/catalog::app/api/stock/route.ts::GET::HISTORY.map#0",
@@ -981,6 +1246,30 @@
         "start": 517,
         "end": 531
       }
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/tags/route.ts::GET::(type)NextResponse#0",
+      "caller": "example.com/chain/catalog::app/api/tags/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/tags/route.ts",
+        "start": 209,
+        "end": 221
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/catalog::app/api/tags/route.ts::GET::(type)Tagged#0",
+      "caller": "example.com/chain/catalog::app/api/tags/route.ts::GET",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "app/api/tags/route.ts",
+        "start": 222,
+        "end": 228
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/chain/catalog::app/api/tags/route.ts::GET::NextResponse.json#0",
@@ -1068,7 +1357,8 @@
         "path": "lib/schemas.ts",
         "start": 177,
         "end": 194
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comment"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::(call_expression).nullish#0",
@@ -1079,7 +1369,8 @@
         "path": "lib/schemas.ts",
         "start": 246,
         "end": 286
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comment"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::(call_expression).optional#0",
@@ -1090,7 +1381,21 @@
         "path": "lib/schemas.ts",
         "start": 204,
         "end": 234
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comment"
+    },
+    {
+      "id": "example.com/chain/catalog::lib/schemas.ts::(value)Comment#0",
+      "caller": "example.com/chain/catalog::lib/schemas.ts",
+      "target": "example.com/chain/catalog::lib/schemas.ts::Comment",
+      "level": "exact",
+      "span": {
+        "path": "lib/schemas.ts",
+        "start": 355,
+        "end": 362
+      },
+      "kind": "value",
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comments"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::z.array#0",
@@ -1101,7 +1406,8 @@
         "path": "lib/schemas.ts",
         "start": 204,
         "end": 223
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comment"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::z.array#1",
@@ -1112,7 +1418,8 @@
         "path": "lib/schemas.ts",
         "start": 347,
         "end": 363
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comments"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::z.number#0",
@@ -1123,7 +1430,8 @@
         "path": "lib/schemas.ts",
         "start": 407,
         "end": 417
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Summary"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::z.number#1",
@@ -1134,7 +1442,8 @@
         "path": "lib/schemas.ts",
         "start": 428,
         "end": 438
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Summary"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::z.object#0",
@@ -1145,7 +1454,8 @@
         "path": "lib/schemas.ts",
         "start": 139,
         "end": 320
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comment"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::z.object#1",
@@ -1156,7 +1466,8 @@
         "path": "lib/schemas.ts",
         "start": 246,
         "end": 276
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comment"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::z.object#2",
@@ -1167,7 +1478,8 @@
         "path": "lib/schemas.ts",
         "start": 389,
         "end": 441
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Summary"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::z.record#0",
@@ -1178,7 +1490,8 @@
         "path": "lib/schemas.ts",
         "start": 296,
         "end": 316
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comment"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::z.string#0",
@@ -1189,7 +1502,8 @@
         "path": "lib/schemas.ts",
         "start": 156,
         "end": 166
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comment"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::z.string#1",
@@ -1200,7 +1514,8 @@
         "path": "lib/schemas.ts",
         "start": 177,
         "end": 187
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comment"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::z.string#2",
@@ -1211,7 +1526,8 @@
         "path": "lib/schemas.ts",
         "start": 212,
         "end": 222
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comment"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::z.string#3",
@@ -1222,7 +1538,8 @@
         "path": "lib/schemas.ts",
         "start": 263,
         "end": 273
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comment"
     },
     {
       "id": "example.com/chain/catalog::lib/schemas.ts::z.string#4",
@@ -1233,7 +1550,68 @@
         "path": "lib/schemas.ts",
         "start": 305,
         "end": 315
-      }
+      },
+      "holder": "example.com/chain/catalog::lib/schemas.ts::Comment"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/index.ts::(reexport)Quote#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/index.ts",
+      "target": "example.com/chain/catalog::packages/contracts/src/quote.ts::Quote",
+      "level": "exact",
+      "span": {
+        "path": "packages/contracts/src/index.ts",
+        "start": 127,
+        "end": 132
+      },
+      "kind": "reexport"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/index.ts::(reexport)Receipt#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/index.ts",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "level": "exact",
+      "span": {
+        "path": "packages/contracts/src/index.ts",
+        "start": 185,
+        "end": 192
+      },
+      "kind": "reexport"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/index.ts::(reexport)Status#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/index.ts",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Status",
+      "level": "exact",
+      "span": {
+        "path": "packages/contracts/src/index.ts",
+        "start": 194,
+        "end": 200
+      },
+      "kind": "reexport"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/index.ts::(reexport)Tagged#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/index.ts",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Tagged",
+      "level": "exact",
+      "span": {
+        "path": "packages/contracts/src/index.ts",
+        "start": 202,
+        "end": 208
+      },
+      "kind": "reexport"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/index.ts::(value)Ticket#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/index.ts",
+      "target": "example.com/chain/catalog::packages/contracts/src/index.ts::Ticket",
+      "level": "exact",
+      "span": {
+        "path": "packages/contracts/src/index.ts",
+        "start": 360,
+        "end": 366
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/catalog::packages/contracts/src/index.ts::z.object#0",
@@ -1244,7 +1622,8 @@
         "path": "packages/contracts/src/index.ts",
         "start": 297,
         "end": 343
-      }
+      },
+      "holder": "example.com/chain/catalog::packages/contracts/src/index.ts::Ticket"
     },
     {
       "id": "example.com/chain/catalog::packages/contracts/src/index.ts::z.string#0",
@@ -1255,7 +1634,8 @@
         "path": "packages/contracts/src/index.ts",
         "start": 312,
         "end": 322
-      }
+      },
+      "holder": "example.com/chain/catalog::packages/contracts/src/index.ts::Ticket"
     },
     {
       "id": "example.com/chain/catalog::packages/contracts/src/index.ts::z.string#1",
@@ -1266,7 +1646,8 @@
         "path": "packages/contracts/src/index.ts",
         "start": 330,
         "end": 340
-      }
+      },
+      "holder": "example.com/chain/catalog::packages/contracts/src/index.ts::Ticket"
     },
     {
       "id": "example.com/chain/catalog::packages/contracts/src/quote.ts::z.number#0",
@@ -1277,7 +1658,8 @@
         "path": "packages/contracts/src/quote.ts",
         "start": 131,
         "end": 141
-      }
+      },
+      "holder": "example.com/chain/catalog::packages/contracts/src/quote.ts::Quote"
     },
     {
       "id": "example.com/chain/catalog::packages/contracts/src/quote.ts::z.object#0",
@@ -1288,7 +1670,8 @@
         "path": "packages/contracts/src/quote.ts",
         "start": 96,
         "end": 144
-      }
+      },
+      "holder": "example.com/chain/catalog::packages/contracts/src/quote.ts::Quote"
     },
     {
       "id": "example.com/chain/catalog::packages/contracts/src/quote.ts::z.string#0",
@@ -1299,7 +1682,21 @@
         "path": "packages/contracts/src/quote.ts",
         "start": 112,
         "end": 122
-      }
+      },
+      "holder": "example.com/chain/catalog::packages/contracts/src/quote.ts::Quote"
+    },
+    {
+      "id": "example.com/chain/catalog::packages/contracts/src/receipt.ts::(type)Labels#0",
+      "caller": "example.com/chain/catalog::packages/contracts/src/receipt.ts",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Labels",
+      "level": "exact",
+      "span": {
+        "path": "packages/contracts/src/receipt.ts",
+        "start": 415,
+        "end": 421
+      },
+      "kind": "type",
+      "holder": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Tagged"
     },
     {
       "id": "example.com/chain/catalog::packages/contracts/src/shelf.ts::Object.freeze#0",
@@ -1310,7 +1707,8 @@
         "path": "packages/contracts/src/shelf.ts",
         "start": 216,
         "end": 242
-      }
+      },
+      "holder": "example.com/chain/catalog::packages/contracts/src/shelf.ts::LIMITS"
     }
   ],
   "providers": [
@@ -1693,6 +2091,11 @@
     },
     {
       "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/catalog::app/api/tags/route.ts::GET::(type)Tagged#0",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@chain/contracts",
       "site": "example.com/chain/catalog::package.json::dependencies::@chain/contracts",
       "via": null
     }
@@ -1713,6 +2116,16 @@
       "range": "workspace:*"
     }
   ],
+  "imports": [
+    {
+      "site": "example.com/chain/catalog::app/api/tags/route.ts::GET::(type)Tagged#0",
+      "specifier": "@chain/contracts",
+      "name": "Tagged",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Tagged"
+    }
+  ],
   "communities": [
     {
       "name": "app/api/cached",
@@ -1722,21 +2135,105 @@
       ]
     },
     {
-      "name": "lib",
+      "name": "app/api/comments",
       "members": [
         "example.com/chain/catalog::app/api/comments/route.ts::GET",
+        "example.com/chain/catalog::app/api/comments/route.ts::POST",
+        "example.com/chain/catalog::lib/schemas.ts::Comment",
+        "example.com/chain/catalog::lib/schemas.ts::Comments"
+      ]
+    },
+    {
+      "name": "app/api/comments/summary",
+      "members": [
+        "example.com/chain/catalog::app/api/comments/summary/route.ts::GET",
+        "example.com/chain/catalog::lib/schemas.ts::Summary"
+      ]
+    },
+    {
+      "name": "app/api/labels",
+      "members": [
+        "example.com/chain/catalog::app/api/labels/route.ts::GET",
+        "example.com/chain/catalog::app/api/labels/route.ts::Labels",
+        "example.com/chain/catalog::app/api/labels/route.ts::Reply"
+      ]
+    },
+    {
+      "name": "app/api/profiles",
+      "members": [
+        "example.com/chain/catalog::app/api/profiles/route.ts::GET",
+        "example.com/chain/catalog::app/api/profiles/route.ts::Page",
+        "example.com/chain/catalog::app/api/profiles/route.ts::Profile"
+      ]
+    },
+    {
+      "name": "app/api/stock",
+      "members": [
+        "example.com/chain/catalog::app/api/stock/route.ts::GET",
+        "example.com/chain/catalog::app/api/stock/route.ts::HISTORY",
+        "example.com/chain/catalog::lib/limits.ts::LIMIT",
+        "example.com/chain/catalog::lib/limits.ts::TAGS"
+      ]
+    },
+    {
+      "name": "app/api/stock/[sku]",
+      "members": [
+        "example.com/chain/catalog::app/api/stock/[sku]/route.ts::GET",
+        "example.com/chain/catalog::app/api/stock/[sku]/route.ts::SKUS"
+      ]
+    },
+    {
+      "name": "lib",
+      "members": [
         "example.com/chain/catalog::app/api/offers/route.ts::GET",
         "example.com/chain/catalog::app/api/products/[id]/route.ts::GET",
-        "example.com/chain/catalog::app/api/profiles/route.ts::GET",
         "example.com/chain/catalog::app/api/quotes/route.ts::GET",
         "example.com/chain/catalog::app/api/tickets/route.ts::GET",
         "example.com/chain/catalog::lib/products.ts::find",
         "example.com/chain/catalog::lib/products.ts::load",
         "example.com/chain/catalog::lib/products.ts::parent"
       ]
+    },
+    {
+      "name": "packages/contracts/src",
+      "members": [
+        "example.com/chain/catalog::packages/contracts/src/index.ts::Ticket"
+      ]
+    },
+    {
+      "name": "packages/contracts/src#2",
+      "members": [
+        "example.com/chain/catalog::packages/contracts/src/quote.ts::Quote"
+      ]
+    },
+    {
+      "name": "packages/contracts/src#3",
+      "members": [
+        "example.com/chain/catalog::packages/contracts/src/receipt.ts::Labels",
+        "example.com/chain/catalog::packages/contracts/src/receipt.ts::Tagged"
+      ]
+    },
+    {
+      "name": "packages/contracts/src#4",
+      "members": [
+        "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt"
+      ]
+    },
+    {
+      "name": "packages/contracts/src#5",
+      "members": [
+        "example.com/chain/catalog::packages/contracts/src/receipt.ts::Status"
+      ]
     }
   ],
   "links": [
+    {
+      "consumer": "example.com/chain/catalog::app/api/tags/route.ts::GET::(type)Tagged#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Tagged",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts workspace:* (local 1.0.0), range unchecked; import main"
+    },
     {
       "consumer": "example.com/chain/catalog::package.json::dependencies::@chain/contracts",
       "provider": "example.com/chain/catalog::packages/contracts/package.json",
@@ -1764,6 +2261,20 @@
       "contract": "http::GET::/api/products/{}",
       "level": "exact",
       "reason": "host catalog.example.com is served by example.com/chain/catalog"
+    },
+    {
+      "consumer": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves/{}::(value)SHELF#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/shelf.ts::SHELF",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
+      "consumer": "example.com/chain/gateway::src/shelves.ts::GET /api/shelves::(value)LIMITS#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/shelf.ts::LIMITS",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
     },
     {
       "consumer": "example.com/chain/web::package.json::dependencies::@chain/contracts",
@@ -2006,6 +2517,13 @@
       "reason": "2 providers fit; host unresolved; served by example.com/chain/catalog"
     },
     {
+      "consumer": "example.com/chain/web::src/shared.ts::annotated::(type)Receipt#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/chain/web::src/shared.ts::annotated::fetch#0",
       "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
       "contract": "http::GET::/api/receipts",
@@ -2018,6 +2536,13 @@
       }
     },
     {
+      "consumer": "example.com/chain/web::src/shared.ts::argument::(type)Receipt#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/chain/web::src/shared.ts::argument::getJson#0",
       "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
       "contract": "http::GET::/api/receipts",
@@ -2028,6 +2553,13 @@
           "paidAt": "inferred"
         }
       }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::inferred::(type)Quote#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/quote.ts::Quote",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
     },
     {
       "consumer": "example.com/chain/web::src/shared.ts::inferred::fetch#0",
@@ -2067,6 +2599,13 @@
       }
     },
     {
+      "consumer": "example.com/chain/web::src/shared.ts::receipt::(type)Receipt#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/chain/web::src/shared.ts::receipt::fetch#0",
       "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
       "contract": "http::GET::/api/receipts",
@@ -2077,6 +2616,13 @@
           "paidAt": "inferred"
         }
       }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::status::(type)Status#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Status",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
     },
     {
       "consumer": "example.com/chain/web::src/shared.ts::status::fetch#0",

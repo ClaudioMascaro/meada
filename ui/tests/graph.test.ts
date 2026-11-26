@@ -15,9 +15,10 @@ test('communities retain the chain golden members', () => {
   expect(graph.communities).toHaveLength(3);
   expect(graph.communities[0]).toEqual({
     name: 'src', members: [
+      'example.com/chain/web::src/api/client.ts::BASE',
       'example.com/chain/web::src/api/client.ts::request',
-      'example.com/chain/web::src/orders.ts::createOrder',
-      'example.com/chain/web::src/orders.ts::listOrders',
+      'example.com/chain/web::src/dashboard.ts::cancel',
+      'example.com/chain/web::src/orders.ts::cancelOrder',
     ],
   });
 });

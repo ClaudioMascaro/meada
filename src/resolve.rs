@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use crate::lang::{
     Annotated, Binds, Bound, Call, Class, Closure, Const, Def, Export, Facts, FirstResult, Import,
     Imported, Invocation, Kind, LanguagePack, Marked, Modules, Param, Part, Reaches, Star, Step,
-    Taker, Through, Ty, Value,
+    Taker, Through, Ty, Use, Value,
 };
 
 mod mutations;
@@ -1375,6 +1375,103 @@ impl<'a> Resolver<'a> {
             Some(known) if self.built_final => known.clone(),
             Some(exact @ Resolution::Exact(_)) => exact.clone(),
             _ => self.call(path, &self.files[path].calls[index]),
+        }
+    }
+
+    /// What the reference at `index` of `path` (`Facts::references`) names, exactly: `None` no
+    /// row; `Some(None)` a row with no target, for a name a package specifier binds (the package
+    /// kind attaches it); `Some(Some((file, name)))` an `exact` edge to that definition or
+    /// declaration symbol. Never a name match: a use is never `inferred` or `ambiguous`.
+    pub fn reference(&self, path: &'a str, index: usize) -> Option<Option<(&'a str, &'a str)>> {
+        let r = self.files[path].references.get(index)?;
+        let (scope, name) = (r.scope.as_str(), r.name.as_str());
+        let bare = |s: &str| !s.starts_with('.') && !s.starts_with('/');
+        let rows = || Seen {
+            rows: true,
+            ..self.seen(path, scope)
+        };
+        let work = &mut Work::default();
+        match (r.kind, r.from.as_deref()) {
+            // A package's specifier; a `paths` alias a file answers goes on like a relative one.
+            (Use::Dynamic | Use::Reexport, Some(from))
+                if bare(from) && self.module(path, from).is_none() =>
+            {
+                return Some(None);
+            }
+            (Use::Reexport, _) if name == "*" => return None,
+            (Use::Reexport, Some(from)) => {
+                let imported = (self.files[path].exports.iter()).find_map(|e| match e {
+                    Export::From {
+                        source,
+                        name: imported @ Imported::Name(n),
+                        ..
+                    } if source == from && n == name => Some((source.as_str(), imported)),
+                    _ => None,
+                })?;
+                let found = self.import(path, "", imported.0, imported.1, &mut rows());
+                return self.edge(found, true);
+            }
+            (Use::Dynamic, Some(from)) => {
+                let module = self.module(path, from)?;
+                return self.edge(self.export_as(module, name, &mut rows(), true), true);
+            }
+            _ => {}
+        }
+        // A dotted head alone is a callee's (`client.get()`): its definitions are the call's own
+        // to resolve, so only a declaration symbol is an edge.
+        let head_of_call = r.kind == Use::Member && !name.contains('.');
+        let reading = match r.kind {
+            Use::Type => Reading::Type,
+            _ => Reading::Read,
+        };
+        // A member chain is walked as far as it resolves: `config.url`, then `config`.
+        let mut prefix = name;
+        loop {
+            let mut found =
+                self.resolve_labelled(path, scope, prefix, &mut rows(), work, reading, None);
+            // A type or interface the file declares binds no type reading; read as a value, the
+            // locals, parameters and constants of the scopes around hide it as they should.
+            if !matches!(found, Binding::Def(_) | Binding::External(..)) && reading != Reading::Read
+            {
+                found = self.resolve_labelled(
+                    path,
+                    scope,
+                    prefix,
+                    &mut rows(),
+                    work,
+                    Reading::Read,
+                    None,
+                );
+            }
+            // A declaration no reading binds (an enum, `export default <expression>`) is the
+            // file's own: nothing around the use hid it, or the value reading would have said.
+            if matches!(found, Binding::Unknown)
+                && !prefix.contains('.')
+                && self.declared.get(path).is_some_and(|d| d.contains(prefix))
+            {
+                found = Binding::Const(path, prefix);
+            }
+            if let Some(edge) = self.edge(found, !head_of_call) {
+                return Some(edge);
+            }
+            prefix = prefix.rsplit_once('.')?.0;
+        }
+    }
+
+    /// The edge a reference's binding gives (`reference`): a definition when `defs`, a
+    /// declaration symbol, or a row with no target for a package's name.
+    fn edge(&self, found: Binding<'a>, defs: bool) -> Option<Option<(&'a str, &'a str)>> {
+        match found {
+            Binding::Def(t) if defs => Some(Some((t.path, t.name))),
+            Binding::Const(p, n) if self.declared.get(p).is_some_and(|d| d.contains(n)) => {
+                Some(Some((p, n)))
+            }
+            Binding::External(source, _)
+                if defs && !source.starts_with('.') && !source.starts_with('/') =>
+            {
+                Some(None)
+            }
+            _ => None,
         }
     }
 
@@ -4502,6 +4599,10 @@ impl<'a> Resolver<'a> {
             }
             let private: HashSet<&str> = facts.private.iter().map(String::as_str).collect();
             for export in &facts.exports {
+                if let Some(row) = self.sourced(path, export) {
+                    rows.insert((path, row.0, row.1));
+                    continue;
+                }
                 let found = match export {
                     Export::Local { exported, .. } | Export::From { exported, .. } => {
                         if private.contains(exported.as_str()) && !self.takers[path].takes(exported)
@@ -4515,7 +4616,7 @@ impl<'a> Resolver<'a> {
                         None => continue,
                     },
                 };
-                rows.extend(found.into_iter().map(|row| (path, row)));
+                rows.extend(found.into_iter().map(|row| (path, row, None)));
             }
             let mut names = BTreeSet::new();
             self.glob_names(path, &mut HashSet::new(), &mut names);
@@ -4523,16 +4624,38 @@ impl<'a> Resolver<'a> {
             let found = names
                 .into_iter()
                 .flat_map(|name| self.rows(path, name, false));
-            rows.extend(found.map(|row| (path, row)));
+            rows.extend(found.map(|row| (path, row, None)));
         }
         (rows.into_iter())
-            .map(|(path, (name, file, target))| Exported {
+            .map(|(path, (name, file, target), source)| Exported {
                 path: path.to_string(),
                 name: name.map(String::from),
                 file: file.map(String::from),
                 target: target.map(String::from),
+                source: source.map(String::from),
             })
             .collect()
+    }
+
+    /// The row of a TS/JS re-export from a bare specifier no file of the repository answers:
+    /// `(name, None, name there)` for `export { name } from '<pkg>'`, `("*", None, None)` for
+    /// `export * from '<pkg>'`, with the specifier (`Exported::source`).
+    fn sourced(&self, path: &'a str, export: &'a Export) -> Option<(Row<'a>, Option<&'a str>)> {
+        let (_, extension) = path.rsplit_once('.')?;
+        if !crate::lang::ts::EXTENSIONS.contains(&extension) {
+            return None;
+        }
+        let (row, source): (Row<'a>, &'a str) = match export {
+            Export::From {
+                exported,
+                source,
+                name: Imported::Name(name),
+            } => ((Some(exported), None, Some(name)), source),
+            Export::All { source } => ((Some("*"), None, None), source),
+            _ => return None,
+        };
+        let bare = !source.starts_with('.') && !source.starts_with('/');
+        (bare && self.module(path, source).is_none()).then_some((row, Some(source)))
     }
 
     /// The rows of `file` exporting `exported`: its name, the file and the definition it gives;
@@ -4776,8 +4899,12 @@ pub struct Exported {
     /// known, which ends the lookup of `name` in `path`.
     pub file: Option<String>,
     /// The qualified name of the definition, constant or type in `file`; `None` when `name` is
-    /// the whole file.
+    /// the whole file. For a re-export of another package (`source`), the name it has there.
     pub target: Option<String>,
+    /// The bare specifier a TS/JS file re-exports from (`export { X } from '<pkg>'`, the name
+    /// `*` for `export * from '<pkg>'`), whose module is outside the repository's files: an
+    /// import of the package follows it one package further (`package::Provided::reexport`).
+    pub source: Option<String>,
 }
 
 /// A public class's family past the class itself (`Resolver::ancestries`).
@@ -5578,6 +5705,11 @@ impl<'a> Code<'a> {
     /// Every file of the pack, with the facts the index keeps (no values).
     pub fn files(&self) -> &'a BTreeMap<&'a str, &'a Facts> {
         self.resolver.files
+    }
+
+    /// `Resolver::reference`: what the reference at `index` of `path` names.
+    pub fn reference(&self, path: &'a str, index: usize) -> Option<Option<(&'a str, &'a str)>> {
+        self.resolver.reference(path, index)
     }
 
     /// The arguments of the call at `index` of `path`, as written.

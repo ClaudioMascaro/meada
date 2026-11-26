@@ -19,6 +19,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/channels/worker::src/consumer.ts::consumer",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 114,
+        "end": 162
+      },
+      "hash": "fbf336efebfb320958fb69873f0d1a68f410cd6f307ced8b2efc4eebfa2a891e"
+    },
+    {
       "id": "example.com/channels/worker::src/consumer.ts::handleOrder",
       "span": {
         "path": "src/consumer.ts",
@@ -28,6 +37,15 @@
       "hash": "1fc095c9ce89fc42f090b41ff84663c7e2e0ac15834fc82f7799ae89360e9b55"
     },
     {
+      "id": "example.com/channels/worker::src/consumer.ts::kafka",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 40,
+        "end": 106
+      },
+      "hash": "a9eff492768ac3309758a394fb912a3dbeca1af6f8c35fba51c24cb15bf59c6a"
+    },
+    {
       "id": "example.com/channels/worker::src/consumer.ts::start",
       "span": {
         "path": "src/consumer.ts",
@@ -35,6 +53,24 @@
         "end": 328
       },
       "hash": "6f74089649cf259fefc29b8d6131847d7d61effd5e277b53975e8fb36b56d5dc"
+    },
+    {
+      "id": "example.com/channels/worker::src/pattern.ts::consumer",
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 118,
+        "end": 170
+      },
+      "hash": "acaba6d4d6a769196bba911ac0edb61b283fc623986b7ef2ad17855eb25cc639"
+    },
+    {
+      "id": "example.com/channels/worker::src/pattern.ts::kafka",
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 40,
+        "end": 110
+      },
+      "hash": "d65756648d9bdafdf5de2af7fde2b4248aadd33240b90f29456deb3aed40c04d"
     },
     {
       "id": "example.com/channels/worker::src/pattern.ts::seen",
@@ -62,6 +98,24 @@
         "end": 370
       },
       "hash": "bd8c18e149daad02ef323402b9fa2acdd435c43666b8daffbb8769c33ad4ff29"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::channel",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 94,
+        "end": 136
+      },
+      "hash": "c9a1004cbc12690211472d927c09e2fb1258fde43b620e06ae6a482735c6db36"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::connection",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 35,
+        "end": 86
+      },
+      "hash": "709952080c3ce3041946bc4481e3341cefc3579af6c1b8c09cefa679b308b7f5"
     },
     {
       "id": "example.com/channels/worker::src/queues.ts::lookalikes",
@@ -120,6 +174,19 @@
   ],
   "calls": [
     {
+      "id": "example.com/channels/worker::src/consumer.ts::(member)kafka#0",
+      "caller": "example.com/channels/worker::src/consumer.ts",
+      "target": "example.com/channels/worker::src/consumer.ts::kafka",
+      "level": "exact",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 125,
+        "end": 139
+      },
+      "kind": "member",
+      "holder": "example.com/channels/worker::src/consumer.ts::consumer"
+    },
+    {
       "id": "example.com/channels/worker::src/consumer.ts::Kafka#0",
       "caller": "example.com/channels/worker::src/consumer.ts",
       "target": null,
@@ -128,7 +195,8 @@
         "path": "src/consumer.ts",
         "start": 48,
         "end": 106
-      }
+      },
+      "holder": "example.com/channels/worker::src/consumer.ts::kafka"
     },
     {
       "id": "example.com/channels/worker::src/consumer.ts::kafka.consumer#0",
@@ -139,7 +207,32 @@
         "path": "src/consumer.ts",
         "start": 125,
         "end": 162
-      }
+      },
+      "holder": "example.com/channels/worker::src/consumer.ts::consumer"
+    },
+    {
+      "id": "example.com/channels/worker::src/consumer.ts::start::(member)consumer#0",
+      "caller": "example.com/channels/worker::src/consumer.ts::start",
+      "target": "example.com/channels/worker::src/consumer.ts::consumer",
+      "level": "exact",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 205,
+        "end": 223
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/channels/worker::src/consumer.ts::start::(value)handleOrder#0",
+      "caller": "example.com/channels/worker::src/consumer.ts::start",
+      "target": "example.com/channels/worker::src/consumer.ts::handleOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 311,
+        "end": 322
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/channels/worker::src/consumer.ts::start::consumer.run#0",
@@ -164,6 +257,19 @@
       }
     },
     {
+      "id": "example.com/channels/worker::src/pattern.ts::(member)kafka#0",
+      "caller": "example.com/channels/worker::src/pattern.ts",
+      "target": "example.com/channels/worker::src/pattern.ts::kafka",
+      "level": "exact",
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 129,
+        "end": 143
+      },
+      "kind": "member",
+      "holder": "example.com/channels/worker::src/pattern.ts::consumer"
+    },
+    {
       "id": "example.com/channels/worker::src/pattern.ts::Kafka#0",
       "caller": "example.com/channels/worker::src/pattern.ts",
       "target": null,
@@ -172,7 +278,8 @@
         "path": "src/pattern.ts",
         "start": 48,
         "end": 110
-      }
+      },
+      "holder": "example.com/channels/worker::src/pattern.ts::kafka"
     },
     {
       "id": "example.com/channels/worker::src/pattern.ts::kafka.consumer#0",
@@ -183,7 +290,32 @@
         "path": "src/pattern.ts",
         "start": 129,
         "end": 170
-      }
+      },
+      "holder": "example.com/channels/worker::src/pattern.ts::consumer"
+    },
+    {
+      "id": "example.com/channels/worker::src/pattern.ts::watchOrders::(member)consumer#0",
+      "caller": "example.com/channels/worker::src/pattern.ts::watchOrders",
+      "target": "example.com/channels/worker::src/pattern.ts::consumer",
+      "level": "exact",
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 286,
+        "end": 304
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/channels/worker::src/pattern.ts::watchOrders::(value)seen#0",
+      "caller": "example.com/channels/worker::src/pattern.ts::watchOrders",
+      "target": "example.com/channels/worker::src/pattern.ts::seen",
+      "level": "exact",
+      "span": {
+        "path": "src/pattern.ts",
+        "start": 366,
+        "end": 370
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/channels/worker::src/pattern.ts::watchOrders::consumer.run#0",
@@ -208,6 +340,19 @@
       }
     },
     {
+      "id": "example.com/channels/worker::src/queues.ts::(member)connection#0",
+      "caller": "example.com/channels/worker::src/queues.ts",
+      "target": "example.com/channels/worker::src/queues.ts::connection",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 110,
+        "end": 134
+      },
+      "kind": "member",
+      "holder": "example.com/channels/worker::src/queues.ts::channel"
+    },
+    {
       "id": "example.com/channels/worker::src/queues.ts::amqp.connect#0",
       "caller": "example.com/channels/worker::src/queues.ts",
       "target": null,
@@ -216,7 +361,20 @@
         "path": "src/queues.ts",
         "start": 54,
         "end": 86
-      }
+      },
+      "holder": "example.com/channels/worker::src/queues.ts::connection"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::bind::(member)channel#0",
+      "caller": "example.com/channels/worker::src/queues.ts::bind",
+      "target": "example.com/channels/worker::src/queues.ts::channel",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 251,
+        "end": 268
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/channels/worker::src/queues.ts::bind::channel.bindQueue#0",
@@ -249,7 +407,20 @@
         "path": "src/queues.ts",
         "start": 110,
         "end": 136
-      }
+      },
+      "holder": "example.com/channels/worker::src/queues.ts::channel"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::lookalikes::(member)channel#0",
+      "caller": "example.com/channels/worker::src/queues.ts::lookalikes",
+      "target": "example.com/channels/worker::src/queues.ts::channel",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 782,
+        "end": 797
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/channels/worker::src/queues.ts::lookalikes::channel.consume#0",
@@ -272,6 +443,66 @@
         "start": 817,
         "end": 850
       }
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::(member)channel#0",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": "example.com/channels/worker::src/queues.ts::channel",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 411,
+        "end": 426
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::(value)onAudit#0",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": "example.com/channels/worker::src/queues.ts::onAudit",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 520,
+        "end": 527
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::(value)onJob#0",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": "example.com/channels/worker::src/queues.ts::onJob",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 479,
+        "end": 484
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::(value)onOrder#0",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": "example.com/channels/worker::src/queues.ts::onOrder",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 437,
+        "end": 444
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/channels/worker::src/queues.ts::work::(value)onShipment#0",
+      "caller": "example.com/channels/worker::src/queues.ts::work",
+      "target": "example.com/channels/worker::src/queues.ts::onShipment",
+      "level": "exact",
+      "span": {
+        "path": "src/queues.ts",
+        "start": 567,
+        "end": 577
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/channels/worker::src/queues.ts::work::channel.consume#0",
@@ -373,6 +604,45 @@
       "exchange": "events",
       "pattern": "*.shipped",
       "site": "example.com/channels/worker::src/queues.ts::bind::channel.bindQueue#1"
+    }
+  ],
+  "communities": [
+    {
+      "name": "src",
+      "members": [
+        "example.com/channels/worker::src/consumer.ts::consumer",
+        "example.com/channels/worker::src/consumer.ts::handleOrder",
+        "example.com/channels/worker::src/consumer.ts::kafka",
+        "example.com/channels/worker::src/consumer.ts::start"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/channels/worker::src/pattern.ts::consumer",
+        "example.com/channels/worker::src/pattern.ts::kafka",
+        "example.com/channels/worker::src/pattern.ts::seen",
+        "example.com/channels/worker::src/pattern.ts::watchOrders"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/channels/worker::src/queues.ts::bind",
+        "example.com/channels/worker::src/queues.ts::channel",
+        "example.com/channels/worker::src/queues.ts::connection",
+        "example.com/channels/worker::src/queues.ts::lookalikes"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
+        "example.com/channels/worker::src/queues.ts::onAudit",
+        "example.com/channels/worker::src/queues.ts::onJob",
+        "example.com/channels/worker::src/queues.ts::onOrder",
+        "example.com/channels/worker::src/queues.ts::onShipment",
+        "example.com/channels/worker::src/queues.ts::work"
+      ]
     }
   ],
   "links": [

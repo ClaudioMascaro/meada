@@ -1,5 +1,5 @@
 example.com/channels/api src/amqp.ts:17-21 announce
-community: none
+community: src
 processes: 1 (1 export; 1 repository): announce (example.com/channels/api)
 async function announce(id: string) {
   channel.publish("events", "order.created", Buffer.from(id));
@@ -14,6 +14,8 @@ example.com/channels/api src/amqp.ts:20 (unresolved) Buffer.from
 example.com/channels/api src/amqp.ts:18 (unresolved) channel.publish
 example.com/channels/api src/amqp.ts:19 (unresolved) channel.publish
 example.com/channels/api src/amqp.ts:20 (unresolved) channel.publish
+uses:
+example.com/channels/api src/amqp.ts:5 channel (member)
 contracts:
 example.com/channels/api src/amqp.ts:18 publishes events order.created
 example.com/channels/api src/amqp.ts:18 produces channel::amqp::audit [exact: channel::amqp::audit binding events order.created]

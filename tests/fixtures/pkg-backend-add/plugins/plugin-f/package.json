@@ -1,0 +1,1 @@
+{"name": "@scope/plugin-f", "exports": {".": "./src/index.ts", "./alpha": "./src/alpha.ts"}}

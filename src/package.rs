@@ -36,7 +36,7 @@ use crate::entry;
 use crate::iac::actions::run::{self, Script, Word};
 use crate::index::{self, CallSite, Consumer, Export, Indexed, Provider};
 use crate::lang::ts::{EXTENSIONS, strip_jsonc, with_extensions};
-use crate::lang::{Call, MAX_BYTES};
+use crate::lang::{Call, MAX_BYTES, Use};
 use crate::literals::Literals;
 use crate::render::{Files, label, rank, section};
 use crate::resolve::{Ancestry, Code, Exported, Flexible};
@@ -62,15 +62,22 @@ use nuget::Nuget;
 use pypi::Pypi;
 use swiftpm::Swiftpm;
 
-/// The import that binds the head of a call's callee (`Code::imported`), as `(specifier, chain)`.
-fn head_imports<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
-    let imported = code.imported(path, &call.scope, &call.callee);
-    (imported.into_iter())
-        .map(|(specifier, chain)| (specifier.to_string(), chain))
-        .collect()
-}
-
 pub struct Packages;
+
+/// An `Import` at `site` of `chain` off the package `specifier`.
+fn import_found(site: Site, specifier: String, chain: String) -> Found {
+    Found {
+        identity: None,
+        role: Role::Import,
+        site,
+        contract: None,
+        via: Some(specifier),
+        method: Some(chain),
+        fragments: Vec::new(),
+        shape: None,
+        lead: None,
+    }
+}
 
 /// The start of every package contract identifier.
 const PREFIX: &str = "package::";
@@ -98,17 +105,26 @@ trait Ecosystem {
     /// Whether a bare `specifier` may name one of its packages.
     fn names_package(&self, specifier: &str) -> bool;
 
-    /// The imports the call at `index` of the file `path` goes through, as `(specifier, chain)`
-    /// (`head_imports`: the one import that binds its head). `index` lets an ecosystem read the
-    /// call's arguments (`Code::args`).
-    fn imports<'a>(
+    /// The imports a call of the file `path` goes through, as `(specifier, chain)` (`Code::imported`):
+    /// the one import that binds its head. What its arguments carry is `carried`.
+    fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
+        let imported = code.imported(path, &call.scope, &call.callee);
+        (imported.into_iter())
+            .map(|(specifier, chain)| (specifier.to_string(), chain))
+            .collect()
+    }
+
+    /// The imports an argument of the call at `index` of the file `path` carries into it, as
+    /// `(specifier, chain)`: a registrar handed a module (npm: a Backstage backend's
+    /// `add(import(...))`). `index` reads the arguments (`Code::args`); none by default.
+    fn carried<'a>(
         &self,
-        code: &Code<'a>,
-        path: &'a str,
+        _code: &Code<'a>,
+        _path: &'a str,
         _index: usize,
-        call: &'a Call,
+        _call: &'a Call,
     ) -> Vec<(String, String)> {
-        head_imports(code, path, call)
+        Vec::new()
     }
 
     /// The dependency entries an import of `specifier` by the file `from.1` of the repository
@@ -295,15 +311,33 @@ trait Ecosystem {
 }
 
 /// `Ecosystem::resolutions` by its default rule: each entry the import may name and, in each
-/// provider the entry reaches, where `resolve` leads.
+/// provider the entry reaches, where `resolve` leads; where it leads nowhere because the
+/// provider's file re-exports the name from another package (`Provided::reexport`), where the
+/// import of that package from that file leads, one package further and no more, so a cycle
+/// of re-exports stops.
 fn resolutions_by_ways<'e, E: Ecosystem + ?Sized>(
     ecosystem: &E,
     exports: &'e [Export],
     providers: &Providers,
     at: &dyn Fn(usize) -> &'e Provided<'e>,
+    from: (usize, &str),
+    import: (&str, &str),
+    known: &dyn Fn(&Provided<'e>, &str) -> bool,
+) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
+    resolutions_hopping(ecosystem, exports, providers, at, from, import, known, true)
+}
+
+/// `resolutions_by_ways`, following a re-export of another package only when `hop`.
+#[expect(clippy::too_many_arguments)]
+fn resolutions_hopping<'e, E: Ecosystem + ?Sized>(
+    ecosystem: &E,
+    exports: &'e [Export],
+    providers: &Providers,
+    provider: &dyn Fn(usize) -> &'e Provided<'e>,
     (n, from): (usize, &str),
     (specifier, chain): (&str, &str),
     known: &dyn Fn(&Provided<'e>, &str) -> bool,
+    hop: bool,
 ) -> Vec<(&'e Entry, Vec<Resolution<'e>>)> {
     let mut out = Vec::new();
     for (entry, subpath, reached) in reachable(ecosystem, exports, providers, (n, from), specifier)
@@ -311,14 +345,35 @@ fn resolutions_by_ways<'e, E: Ecosystem + ?Sized>(
         let mut resolved = Vec::new();
         for (m, i) in reached {
             let manifest = &exports[m].manifests[i];
-            let at = at(m);
-            let known = |id: &str| known(at, id);
+            let at = provider(m);
+            let known_here = |id: &str| known(at, id);
             let repository = &exports[m].repository;
             let import = ((entry, subpath.as_str()), (specifier, chain));
-            if let Some(r) = ecosystem.resolve(at, repository, manifest, import.0, import.1, &known)
-            {
+            let found =
+                ecosystem.resolve(at, repository, manifest, import.0, import.1, &known_here);
+            if let Some(r) = found {
                 resolved.push((m, manifest, at, r));
+                continue;
             }
+            let file = hop
+                .then(|| at.entry(manifest, &ecosystem.ways(manifest, &subpath)))
+                .flatten();
+            let Some((source, chain)) = file.as_ref().and_then(|(f, ..)| at.reexport(f, chain))
+            else {
+                continue;
+            };
+            let from = (m, file.as_ref().map_or("", |(f, ..)| f.as_str()));
+            let further = resolutions_hopping(
+                ecosystem,
+                exports,
+                providers,
+                provider,
+                from,
+                (&source, &chain),
+                known,
+                false,
+            );
+            resolved.extend(further.into_iter().flat_map(|(_, r)| r));
         }
         out.push((entry, resolved));
     }
@@ -1136,6 +1191,34 @@ impl<'e> Provided<'e> {
                 .find(|f| self.files.contains(f.as_str()))?;
             Some((found, None))
         })
+    }
+
+    /// The package `file` re-exports the head of `chain` from and the chain there
+    /// (`Exported::source`): its own `export { head } from '<pkg>'`, else its one
+    /// `export * from '<pkg>'` for any name but `default`. Two such stars give none, as two
+    /// local ones make a name ambiguous (`lookup`).
+    ///
+    /// ponytail: the file's own rows only, not those of a local `export *` it goes through;
+    /// follow them as `lookup` does when an entry re-exports a package two files deep.
+    fn reexport(&self, file: &str, chain: &str) -> Option<(String, String)> {
+        let (head, rest) = chain
+            .split_once('.')
+            .map_or((chain, None), |(h, r)| (h, Some(r)));
+        let rows = self.exported.get(file).map_or(&[][..], Vec::as_slice);
+        let renamed = |name: &str| rest.map_or(name.to_string(), |r| format!("{name}.{r}"));
+        if let Some(own) = rows.iter().find(|e| e.name.as_deref() == Some(head)) {
+            let source = own.source.clone()?;
+            return Some((source, renamed(own.target.as_deref().unwrap_or(head))));
+        }
+        let stars: Vec<&str> = (rows.iter())
+            .filter(|e| e.name.as_deref() == Some("*"))
+            .filter_map(|e| e.source.as_deref())
+            .collect();
+        match (head, stars.as_slice()) {
+            ("default", _) => None,
+            (_, [source]) => Some((source.to_string(), chain.to_string())),
+            _ => None,
+        }
     }
 
     /// What `file` exports as `name`: a file, and the qualified name of a definition in it or
@@ -2057,8 +2140,9 @@ impl ContractKind for Packages {
         false
     }
 
-    /// Every call through a binding imported from a bare specifier, as an `Import`: which of
-    /// them name a package of the workspace is known at query time only (`import`). After the
+    /// Every call through a binding imported from a bare specifier, and every import a call's
+    /// argument carries (`Ecosystem::carried`), as an `Import`: which of them name a package of
+    /// the workspace is known at query time only (`import`). After the
     /// imports it builds the public `surface` from `indexed` (the manifests, tsconfigs, exported
     /// rows and files) and, when the surface is not empty, appends the `exported_shapes` of the
     /// pack's `Code`.
@@ -2069,25 +2153,48 @@ impl ContractKind for Packages {
             .filter_map(|(&path, facts)| Some((path, facts, of_source(path)?)));
         for (path, facts, ecosystem) in files {
             for (index, call) in facts.calls.iter().enumerate() {
-                for (specifier, chain) in ecosystem.imports(code, path, index, call) {
+                let carried = ecosystem.carried(code, path, index, call);
+                for (specifier, chain) in ecosystem
+                    .imports(code, path, call)
+                    .into_iter()
+                    .chain(carried)
+                {
                     if chain.is_empty() || !ecosystem.names_package(&specifier) {
                         continue;
                     }
-                    found.push(Found {
-                        identity: None,
-                        role: Role::Import,
-                        site: Site::Call {
-                            path: path.to_string(),
-                            index,
-                        },
-                        contract: None,
-                        via: Some(specifier),
-                        method: Some(chain),
-                        fragments: Vec::new(),
-                        shape: None,
-                        lead: None,
-                    });
+                    let site = Site::Call {
+                        path: path.to_string(),
+                        index,
+                    };
+                    found.push(import_found(site, specifier, chain));
                 }
+            }
+            // A use of a name a bare specifier binds, or taken off a bare `import()` or
+            // re-exported from one: the rows `Code::reference` leaves with no target.
+            for (index, r) in facts.references.iter().enumerate() {
+                if code.reference(path, index) != Some(None) {
+                    continue;
+                }
+                let (specifier, mut chain) = match &r.from {
+                    Some(from) => (from.clone(), r.name.clone()),
+                    None => match code.imported(path, &r.scope, &r.name) {
+                        Some((specifier, chain)) => (specifier.to_string(), chain),
+                        None => continue,
+                    },
+                };
+                // A member read (`tokens.gap`, `Mode.A`) uses what the package exports, its
+                // head: the rest is a property of that value.
+                if r.kind == Use::Member {
+                    chain.truncate(chain.find('.').unwrap_or(chain.len()));
+                }
+                if chain.is_empty() || !ecosystem.names_package(&specifier) {
+                    continue;
+                }
+                let site = Site::Reference {
+                    path: path.to_string(),
+                    index,
+                };
+                found.push(import_found(site, specifier, chain));
             }
         }
         // The files an import of one of the repository's packages reaches: only they keep shapes.
@@ -2153,7 +2260,9 @@ impl ContractKind for Packages {
         import(exports, &providers);
         for export in exports.iter_mut() {
             let own = format!("{}::", export.repository);
+            // A use is no call: an import from one (`Site::Reference`) leaves a door open.
             let imported: HashSet<&str> = (export.imports.iter())
+                .filter(|i| !Use::names(&i.site))
                 .map(|i| i.target.as_str())
                 .filter(|t| t.starts_with(&own))
                 .collect();
@@ -3345,6 +3454,96 @@ mod tests {
         assert_eq!(kept_by(&[other, one(&["id"])]), None);
     }
 
+    /// Where `X`, imported from `b` by `src/a.ts` of a consumer, resolves when `b`'s
+    /// `index.ts` re-exports it from `d` and `d`'s `index.ts` holds what `d_rows` say.
+    fn second_hop(d_rows: Vec<Exported>) -> Vec<String> {
+        let sourced = |path: &str, name: &str, source: &str| Exported {
+            source: Some(source.into()),
+            ..row(path, Some(name), None, Some(name))
+        };
+        let consumer = repository("c", r#"{"dependencies": {"b": "^1.0.0"}}"#, &[], false);
+        let package = |name: &str, on: &str| {
+            let json = format!(
+                r#"{{"name": "{name}", "version": "1.0.0", "main": "index.ts", "dependencies": {{"{on}": "^1.0.0"}}}}"#
+            );
+            repository(name, &json, &[("index.ts", &[])], false)
+        };
+        let mut b = package("b", "d");
+        b.exported = vec![sourced("index.ts", "X", "d")];
+        let mut d = package("d", "b");
+        d.exported = d_rows;
+        let exports = [consumer, b, d];
+        let providers = Providers::new(&exports);
+        let provided: Vec<OnceCell<Provided>> = exports.iter().map(|_| OnceCell::new()).collect();
+        let found = resolutions(
+            &exports,
+            &providers,
+            &provided,
+            (0, "src/a.ts"),
+            "b",
+            "X",
+            |_, _| true,
+        );
+        let mut ids: Vec<String> = (found.into_iter())
+            .flat_map(|(_, r)| r)
+            .flat_map(|(_, _, _, r)| r.targets)
+            .collect();
+        ids.sort();
+        ids
+    }
+
+    #[test]
+    fn a_re_export_of_another_package_resolves_one_package_further() {
+        let own = row("index.ts", Some("X"), Some("index.ts"), Some("X"));
+        assert_eq!(second_hop(vec![own]), ["d::index.ts::X"]);
+        let star = Exported {
+            source: Some("e".into()),
+            ..row("index.ts", Some("*"), None, None)
+        };
+        // A third package is one hop too many.
+        assert!(second_hop(vec![star]).is_empty());
+    }
+
+    #[test]
+    fn a_re_export_cycle_stops() {
+        // `d` re-exports `X` back from `b`: no row, no endless walk.
+        let back = Exported {
+            source: Some("b".into()),
+            ..row("index.ts", Some("X"), None, Some("X"))
+        };
+        assert!(second_hop(vec![back]).is_empty());
+    }
+
+    #[test]
+    fn a_re_exported_name_is_looked_up_by_its_own_name_then_a_lone_star() {
+        let rows = [
+            Exported {
+                source: Some("a".into()),
+                ..row("i.ts", Some("Y"), None, Some("X"))
+            },
+            Exported {
+                source: Some("s".into()),
+                ..row("i.ts", Some("*"), None, None)
+            },
+            row("i.ts", Some("own"), Some("i.ts"), Some("own")),
+            Exported {
+                source: Some("t".into()),
+                ..row("two.ts", Some("*"), None, None)
+            },
+            Exported {
+                source: Some("u".into()),
+                ..row("two.ts", Some("*"), None, None)
+            },
+        ];
+        let p = provided(&rows);
+        let to = |s: &str, c: &str| Some((s.to_string(), c.to_string()));
+        assert_eq!(p.reexport("i.ts", "Y.deep"), to("a", "X.deep"));
+        assert_eq!(p.reexport("i.ts", "Z"), to("s", "Z"));
+        assert_eq!(p.reexport("i.ts", "own"), None);
+        assert_eq!(p.reexport("i.ts", "default"), None);
+        assert_eq!(p.reexport("two.ts", "Z"), None);
+    }
+
     /// A provider whose files export what `rows` say.
     fn provided<'e>(rows: &'e [Exported]) -> Provided<'e> {
         let mut exported: HashMap<&str, Vec<&Exported>> = HashMap::new();
@@ -3373,6 +3572,7 @@ mod tests {
             name: name.map(Into::into),
             file: file.map(Into::into),
             target: target.map(Into::into),
+            source: None,
         }
     }
 

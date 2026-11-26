@@ -75,6 +75,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/chain/web::src/api/body.ts::BASE",
+      "span": {
+        "path": "src/api/body.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "4b91029ca5da7b89c17c424818d3b6d88572f84614a2b51603b4836346ba9d17"
+    },
+    {
       "id": "example.com/chain/web::src/api/body.ts::get",
       "span": {
         "path": "src/api/body.ts",
@@ -82,6 +91,15 @@
         "end": 297
       },
       "hash": "d8eb6cb6032177c931ceda1e66a3cfb8b2db0dfdc79bf5f2ac4b49b0720cb762"
+    },
+    {
+      "id": "example.com/chain/web::src/api/client.ts::BASE",
+      "span": {
+        "path": "src/api/client.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "4b91029ca5da7b89c17c424818d3b6d88572f84614a2b51603b4836346ba9d17"
     },
     {
       "id": "example.com/chain/web::src/api/client.ts::request",
@@ -100,6 +118,24 @@
         "end": 103
       },
       "hash": "130c74282dad18369770f7d26fc22dbc1355788de1d5a765d7b9a4c6c8c84101"
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::BASE",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "2d68652f2602e2ea7b9258ecaacf13f6b9a468a59396ad3f4eb876d1704d1d64"
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::Envelope",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 786,
+        "end": 822
+      },
+      "hash": "546ba48c7740525a61bc9b6818e0e6f28e267c4c3a0f13c740e4ac55c68b3823"
     },
     {
       "id": "example.com/chain/web::src/api/typed.ts::enveloped",
@@ -145,6 +181,15 @@
         "end": 76
       },
       "hash": "739186290a142f7a531ea32af813358aedbef6f77396667ba1a856025efd09d7"
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::CATALOG",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 6,
+        "end": 39
+      },
+      "hash": "ca87cef0d546c7a3e41a1f1ac5cd4090ce3525dd72e073bb690e3df07f3cf834"
     },
     {
       "id": "example.com/chain/web::src/batches.ts::handed",
@@ -210,6 +255,15 @@
       "hash": "4a0ed54b5a941793ec88641996233628bbfb5c6bbe299ae087aaa79ef070d5b9"
     },
     {
+      "id": "example.com/chain/web::src/comments.ts::CATALOG",
+      "span": {
+        "path": "src/comments.ts",
+        "start": 6,
+        "end": 39
+      },
+      "hash": "ca87cef0d546c7a3e41a1f1ac5cd4090ce3525dd72e073bb690e3df07f3cf834"
+    },
+    {
       "id": "example.com/chain/web::src/comments.ts::comments",
       "span": {
         "path": "src/comments.ts",
@@ -253,6 +307,78 @@
         "end": 212
       },
       "hash": "c787308f2bdd2b995362f3de89985285809d0eb8afc7afb0405916b9dc5dba9d"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::CATALOG",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 182,
+        "end": 215
+      },
+      "hash": "ca87cef0d546c7a3e41a1f1ac5cd4090ce3525dd72e073bb690e3df07f3cf834"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Counts",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 832,
+        "end": 886
+      },
+      "hash": "89816946fb62659c7855df18f3eea436477df819de7c1d41c437097988a3a577"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Maybe",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1625,
+        "end": 1678
+      },
+      "hash": "2d81483b549d5629cd3108c06926c5533b02b11ff66403d690feb2d84f9e3bc7"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Page",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 527,
+        "end": 601
+      },
+      "hash": "bf38d115d0f257fd25ce13b111c3847c8929c52f6ac4b379363edf889b33b8ed"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Pages",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1343,
+        "end": 1401
+      },
+      "hash": "cf2aa424c36a1c490d023461c41d13939074e43b1e41cb786b7ea59b22c01f34"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Profile",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 393,
+        "end": 525
+      },
+      "hash": "912c5cf96c93cf282a9c1f27edd33d9c57fc60588cca92a9455aec9732a190b3"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Query",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2143,
+        "end": 2178
+      },
+      "hash": "aa8a98919dc908ec7d226c439707182781557475148ace83a4d80cee50bfe568"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::Ranked",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1055,
+        "end": 1125
+      },
+      "hash": "3cd426c284d374bbcc0a11e4172862bd09cf1a8de60fc024542fe3a6e7c3b242"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::cast",
@@ -345,6 +471,15 @@
       "hash": "a3a21d8ce061b3514545be5ac564441967c55d979cc58c797379e92c1d883383"
     },
     {
+      "id": "example.com/chain/web::src/drift.ts::BASE",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 41,
+        "end": 71
+      },
+      "hash": "4b91029ca5da7b89c17c424818d3b6d88572f84614a2b51603b4836346ba9d17"
+    },
+    {
       "id": "example.com/chain/web::src/drift.ts::both",
       "span": {
         "path": "src/drift.ts",
@@ -435,6 +570,15 @@
       "hash": "a0da114084b14d354003e297fb44a2dc838ee28d46d5e737c8d20c8c2f1212a0"
     },
     {
+      "id": "example.com/chain/web::src/labels.ts::CATALOG",
+      "span": {
+        "path": "src/labels.ts",
+        "start": 6,
+        "end": 39
+      },
+      "hash": "ca87cef0d546c7a3e41a1f1ac5cd4090ce3525dd72e073bb690e3df07f3cf834"
+    },
+    {
       "id": "example.com/chain/web::src/labels.ts::labels",
       "span": {
         "path": "src/labels.ts",
@@ -487,6 +631,24 @@
         "end": 238
       },
       "hash": "6e3d64ac3f76355e2d40bc2ad7802e07734c283a7fd5dc716feb989af0f9fada"
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::CATALOG",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 216,
+        "end": 249
+      },
+      "hash": "ca87cef0d546c7a3e41a1f1ac5cd4090ce3525dd72e073bb690e3df07f3cf834"
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::GATEWAY",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 175,
+        "end": 208
+      },
+      "hash": "3abc25197de37c580df390e88b5aaac852d916dec85d2957d2c135d6ca83d1e5"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::annotated",
@@ -588,6 +750,15 @@
       "hash": "50b91ece7ba83928c015e0f23e0dd7312e52dc14b1b268d73269f57b5fcacb24"
     },
     {
+      "id": "example.com/chain/web::src/shipments.ts::BASE",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "4b91029ca5da7b89c17c424818d3b6d88572f84614a2b51603b4836346ba9d17"
+    },
+    {
       "id": "example.com/chain/web::src/shipments.ts::edgeShipment",
       "span": {
         "path": "src/shipments.ts",
@@ -658,6 +829,24 @@
         "end": 290
       },
       "hash": "f79e2f91eb6e6bcad447da1405be4ebb61d9e3ff29970e2fdc6f004595127ada"
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::CATALOG",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 47,
+        "end": 80
+      },
+      "hash": "ca87cef0d546c7a3e41a1f1ac5cd4090ce3525dd72e073bb690e3df07f3cf834"
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::GATEWAY",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 6,
+        "end": 39
+      },
+      "hash": "3abc25197de37c580df390e88b5aaac852d916dec85d2957d2c135d6ca83d1e5"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::cached",
@@ -743,6 +932,18 @@
   ],
   "calls": [
     {
+      "id": "example.com/chain/web::src/api/body.ts::get::(value)BASE#0",
+      "caller": "example.com/chain/web::src/api/body.ts::get",
+      "target": "example.com/chain/web::src/api/body.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/api/body.ts",
+        "start": 201,
+        "end": 205
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/api/body.ts::get::Error#0",
       "caller": "example.com/chain/web::src/api/body.ts::get",
       "target": null,
@@ -776,6 +977,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/api/client.ts::request::(value)BASE#0",
+      "caller": "example.com/chain/web::src/api/client.ts::request",
+      "target": "example.com/chain/web::src/api/client.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/api/client.ts",
+        "start": 194,
+        "end": 198
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/api/client.ts::request::fetch#0",
       "caller": "example.com/chain/web::src/api/client.ts::request",
       "target": null,
@@ -785,6 +998,30 @@
         "start": 185,
         "end": 220
       }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::enveloped::(type)Envelope#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::enveloped",
+      "target": "example.com/chain/web::src/api/typed.ts::Envelope",
+      "level": "exact",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 974,
+        "end": 982
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::enveloped::(value)BASE#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::enveloped",
+      "target": "example.com/chain/web::src/api/typed.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 1018,
+        "end": 1022
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/api/typed.ts::enveloped::fetch#0",
@@ -809,6 +1046,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/api/typed.ts::fetchAs::(value)BASE#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::fetchAs",
+      "target": "example.com/chain/web::src/api/typed.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 746,
+        "end": 750
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/api/typed.ts::fetchAs::fetch#0",
       "caller": "example.com/chain/web::src/api/typed.ts::fetchAs",
       "target": null,
@@ -831,6 +1080,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/api/typed.ts::getJson::(value)BASE#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::getJson",
+      "target": "example.com/chain/web::src/api/typed.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 208,
+        "end": 212
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/api/typed.ts::getJson::fetch#0",
       "caller": "example.com/chain/web::src/api/typed.ts::getJson",
       "target": null,
@@ -851,6 +1112,18 @@
         "start": 240,
         "end": 250
       }
+    },
+    {
+      "id": "example.com/chain/web::src/api/typed.ts::search::(value)BASE#0",
+      "caller": "example.com/chain/web::src/api/typed.ts::search",
+      "target": "example.com/chain/web::src/api/typed.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/api/typed.ts",
+        "start": 505,
+        "end": 509
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/api/typed.ts::search::JSON.stringify#0",
@@ -884,6 +1157,18 @@
         "start": 557,
         "end": 567
       }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::handed::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/batches.ts::handed",
+      "target": "example.com/chain/web::src/batches.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 2212,
+        "end": 2219
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/batches.ts::handed::fetch#0",
@@ -963,6 +1248,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/batches.ts::ids::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/batches.ts::ids",
+      "target": "example.com/chain/web::src/batches.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 644,
+        "end": 651
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/batches.ts::ids::fetch#0",
       "caller": "example.com/chain/web::src/batches.ts::ids",
       "target": null,
@@ -1007,6 +1304,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/batches.ts::pageOf::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/batches.ts::pageOf",
+      "target": "example.com/chain/web::src/batches.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 258,
+        "end": 265
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/batches.ts::pageOf::fetch#0",
       "caller": "example.com/chain/web::src/batches.ts::pageOf",
       "target": null,
@@ -1038,6 +1347,18 @@
         "start": 1228,
         "end": 1274
       }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::quantities::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/batches.ts::quantities",
+      "target": "example.com/chain/web::src/batches.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1056,
+        "end": 1063
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/batches.ts::quantities::body.items.filter#0",
@@ -1106,6 +1427,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/batches.ts::rebound::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/batches.ts::rebound",
+      "target": "example.com/chain/web::src/batches.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1437,
+        "end": 1444
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/batches.ts::rebound::fetch#0",
       "caller": "example.com/chain/web::src/batches.ts::rebound",
       "target": null,
@@ -1137,6 +1470,18 @@
         "start": 1487,
         "end": 1497
       }
+    },
+    {
+      "id": "example.com/chain/web::src/batches.ts::shadowed::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/batches.ts::shadowed",
+      "target": "example.com/chain/web::src/batches.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/batches.ts",
+        "start": 1823,
+        "end": 1830
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/batches.ts::shadowed::fetch#0",
@@ -1205,6 +1550,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/comments.ts::comments::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/comments.ts::comments",
+      "target": "example.com/chain/web::src/comments.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/comments.ts",
+        "start": 255,
+        "end": 262
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/comments.ts::comments::fetch#0",
       "caller": "example.com/chain/web::src/comments.ts::comments",
       "target": null,
@@ -1227,6 +1584,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/comments.ts::submit::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/comments.ts::submit",
+      "target": "example.com/chain/web::src/comments.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/comments.ts",
+        "start": 459,
+        "end": 466
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/comments.ts::submit::fetch#0",
       "caller": "example.com/chain/web::src/comments.ts::submit",
       "target": null,
@@ -1247,6 +1616,18 @@
         "start": 526,
         "end": 536
       }
+    },
+    {
+      "id": "example.com/chain/web::src/comments.ts::summary::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/comments.ts::summary",
+      "target": "example.com/chain/web::src/comments.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/comments.ts",
+        "start": 690,
+        "end": 697
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/comments.ts::summary::fetch#0",
@@ -1315,6 +1696,69 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/declared.ts::(extends)Entity#0",
+      "caller": "example.com/chain/web::src/declared.ts",
+      "target": "example.com/chain/web::src/api/types.ts::Entity",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 419,
+        "end": 425
+      },
+      "kind": "extends",
+      "holder": "example.com/chain/web::src/declared.ts::Profile"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::(type)Counts#0",
+      "caller": "example.com/chain/web::src/declared.ts",
+      "target": "example.com/chain/web::src/declared.ts::Counts",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1069,
+        "end": 1075
+      },
+      "kind": "type",
+      "holder": "example.com/chain/web::src/declared.ts::Ranked"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::(type)Profile#0",
+      "caller": "example.com/chain/web::src/declared.ts",
+      "target": "example.com/chain/web::src/declared.ts::Profile",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 553,
+        "end": 560
+      },
+      "kind": "type",
+      "holder": "example.com/chain/web::src/declared.ts::Page"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::cast::(type)Page#0",
+      "caller": "example.com/chain/web::src/declared.ts::cast",
+      "target": "example.com/chain/web::src/declared.ts::Page",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 746,
+        "end": 750
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::cast::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/declared.ts::cast",
+      "target": "example.com/chain/web::src/declared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 690,
+        "end": 697
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/declared.ts::cast::fetch#0",
       "caller": "example.com/chain/web::src/declared.ts::cast",
       "target": null,
@@ -1337,6 +1781,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/declared.ts::counts::(type)Counts#0",
+      "caller": "example.com/chain/web::src/declared.ts::counts",
+      "target": "example.com/chain/web::src/declared.ts::Counts",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 938,
+        "end": 944
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/chain/web::src/declared.ts::counts::getJson#0",
       "caller": "example.com/chain/web::src/declared.ts::counts",
       "target": "example.com/chain/web::src/api/typed.ts::getJson",
@@ -1346,6 +1802,42 @@
         "start": 930,
         "end": 962
       }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::foreign::(type)Maybe#0",
+      "caller": "example.com/chain/web::src/declared.ts::foreign",
+      "target": "example.com/chain/web::src/declared.ts::Maybe",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1854,
+        "end": 1859
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::foreign::(type)Remote#0",
+      "caller": "example.com/chain/web::src/declared.ts::foreign",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1807,
+        "end": 1813
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::foreign::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/declared.ts::foreign",
+      "target": "example.com/chain/web::src/declared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1743,
+        "end": 1750
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::foreign::fetch#0",
@@ -1381,6 +1873,42 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/declared.ts::pages::(type)Pages#0",
+      "caller": "example.com/chain/web::src/declared.ts::pages",
+      "target": "example.com/chain/web::src/declared.ts::Pages",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1519,
+        "end": 1524
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::pages::(type)z.infer#0",
+      "caller": "example.com/chain/web::src/declared.ts::pages",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1504,
+        "end": 1511
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::pages::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/declared.ts::pages",
+      "target": "example.com/chain/web::src/declared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1465,
+        "end": 1472
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/declared.ts::pages::fetch#0",
       "caller": "example.com/chain/web::src/declared.ts::pages",
       "target": null,
@@ -1401,6 +1929,18 @@
         "start": 1534,
         "end": 1544
       }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::plain::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/declared.ts::plain",
+      "target": "example.com/chain/web::src/declared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2849,
+        "end": 2856
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::plain::fetch#0",
@@ -1425,6 +1965,30 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/declared.ts::ranked::(type)Ranked#0",
+      "caller": "example.com/chain/web::src/declared.ts::ranked",
+      "target": "example.com/chain/web::src/declared.ts::Ranked",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1228,
+        "end": 1234
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::ranked::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/declared.ts::ranked",
+      "target": "example.com/chain/web::src/declared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 1189,
+        "end": 1196
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/declared.ts::ranked::fetch#0",
       "caller": "example.com/chain/web::src/declared.ts::ranked",
       "target": null,
@@ -1447,6 +2011,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/declared.ts::searched::(type)Query#0",
+      "caller": "example.com/chain/web::src/declared.ts::searched",
+      "target": "example.com/chain/web::src/declared.ts::Query",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2238,
+        "end": 2243
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/chain/web::src/declared.ts::searched::search#0",
       "caller": "example.com/chain/web::src/declared.ts::searched",
       "target": "example.com/chain/web::src/api/typed.ts::search",
@@ -1456,6 +2032,30 @@
         "start": 2231,
         "end": 2276
       }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::typedJson::(type)Counts#0",
+      "caller": "example.com/chain/web::src/declared.ts::typedJson",
+      "target": "example.com/chain/web::src/declared.ts::Counts",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2051,
+        "end": 2057
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::typedJson::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/declared.ts::typedJson",
+      "target": "example.com/chain/web::src/declared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2008,
+        "end": 2015
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::typedJson::fetch#0",
@@ -1480,6 +2080,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/declared.ts::viaReturn::(type)Counts#0",
+      "caller": "example.com/chain/web::src/declared.ts::viaReturn",
+      "target": "example.com/chain/web::src/declared.ts::Counts",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2429,
+        "end": 2435
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/chain/web::src/declared.ts::viaReturn::fetchAs#0",
       "caller": "example.com/chain/web::src/declared.ts::viaReturn",
       "target": "example.com/chain/web::src/api/typed.ts::fetchAs",
@@ -1489,6 +2101,18 @@
         "start": 2421,
         "end": 2453
       }
+    },
+    {
+      "id": "example.com/chain/web::src/declared.ts::wrapped::(type)Counts#0",
+      "caller": "example.com/chain/web::src/declared.ts::wrapped",
+      "target": "example.com/chain/web::src/declared.ts::Counts",
+      "level": "exact",
+      "span": {
+        "path": "src/declared.ts",
+        "start": 2608,
+        "end": 2614
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::wrapped::enveloped#0",
@@ -1510,7 +2134,8 @@
         "path": "src/declared.ts",
         "start": 1369,
         "end": 1379
-      }
+      },
+      "holder": "example.com/chain/web::src/declared.ts::Pages"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::z.number#1",
@@ -1521,7 +2146,8 @@
         "path": "src/declared.ts",
         "start": 1388,
         "end": 1398
-      }
+      },
+      "holder": "example.com/chain/web::src/declared.ts::Pages"
     },
     {
       "id": "example.com/chain/web::src/declared.ts::z.object#0",
@@ -1532,7 +2158,8 @@
         "path": "src/declared.ts",
         "start": 1351,
         "end": 1401
-      }
+      },
+      "holder": "example.com/chain/web::src/declared.ts::Pages"
     },
     {
       "id": "example.com/chain/web::src/drift.ts::both::console.log#0",
@@ -1590,6 +2217,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/drift.ts::firstOrderId::(value)BASE#0",
+      "caller": "example.com/chain/web::src/drift.ts::firstOrderId",
+      "target": "example.com/chain/web::src/drift.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 433,
+        "end": 437
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/drift.ts::firstOrderId::fetch#0",
       "caller": "example.com/chain/web::src/drift.ts::firstOrderId",
       "target": null,
@@ -1621,6 +2260,18 @@
         "start": 1381,
         "end": 1399
       }
+    },
+    {
+      "id": "example.com/chain/web::src/drift.ts::load::(value)BASE#0",
+      "caller": "example.com/chain/web::src/drift.ts::load",
+      "target": "example.com/chain/web::src/drift.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 1703,
+        "end": 1707
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/drift.ts::load::console.log#0",
@@ -1678,6 +2329,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/drift.ts::orderTotal::(value)BASE#0",
+      "caller": "example.com/chain/web::src/drift.ts::orderTotal",
+      "target": "example.com/chain/web::src/drift.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 213,
+        "end": 217
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/drift.ts::orderTotal::fetch#0",
       "caller": "example.com/chain/web::src/drift.ts::orderTotal",
       "target": null,
@@ -1722,6 +2385,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/drift.ts::productName::(value)BASE#0",
+      "caller": "example.com/chain/web::src/drift.ts::productName",
+      "target": "example.com/chain/web::src/drift.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/drift.ts",
+        "start": 674,
+        "end": 678
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/drift.ts::productName::fetch#0",
       "caller": "example.com/chain/web::src/drift.ts::productName",
       "target": null,
@@ -1753,6 +2428,18 @@
         "start": 1129,
         "end": 1147
       }
+    },
+    {
+      "id": "example.com/chain/web::src/labels.ts::labels::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/labels.ts::labels",
+      "target": "example.com/chain/web::src/labels.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/labels.ts",
+        "start": 219,
+        "end": 226
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/labels.ts::labels::fetch#0",
@@ -1821,6 +2508,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/orders.ts::cancelOrder::(value)ORDERS_PATH#0",
+      "caller": "example.com/chain/web::src/orders.ts::cancelOrder",
+      "target": "example.com/chain/web::src/api/paths.ts::ORDERS_PATH",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 302,
+        "end": 313
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/orders.ts::cancelOrder::request#0",
       "caller": "example.com/chain/web::src/orders.ts::cancelOrder",
       "target": "example.com/chain/web::src/api/client.ts::request",
@@ -1830,6 +2529,18 @@
         "start": 291,
         "end": 332
       }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::createOrder::(value)ORDERS_PATH#0",
+      "caller": "example.com/chain/web::src/orders.ts::createOrder",
+      "target": "example.com/chain/web::src/api/paths.ts::ORDERS_PATH",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 399,
+        "end": 410
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/orders.ts::createOrder::request#0",
@@ -1843,6 +2554,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/orders.ts::listOrders::(value)ORDERS_PATH#0",
+      "caller": "example.com/chain/web::src/orders.ts::listOrders",
+      "target": "example.com/chain/web::src/api/paths.ts::ORDERS_PATH",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 223,
+        "end": 234
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/orders.ts::listOrders::request#0",
       "caller": "example.com/chain/web::src/orders.ts::listOrders",
       "target": "example.com/chain/web::src/api/client.ts::request",
@@ -1852,6 +2575,30 @@
         "start": 215,
         "end": 235
       }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::annotated::(type)Receipt#0",
+      "caller": "example.com/chain/web::src/shared.ts::annotated",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1513,
+        "end": 1520
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::annotated::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/shared.ts::annotated",
+      "target": "example.com/chain/web::src/shared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1477,
+        "end": 1484
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::annotated::fetch#0",
@@ -1876,6 +2623,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/shared.ts::argument::(type)Receipt#0",
+      "caller": "example.com/chain/web::src/shared.ts::argument",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1687,
+        "end": 1694
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/chain/web::src/shared.ts::argument::getJson#0",
       "caller": "example.com/chain/web::src/shared.ts::argument",
       "target": "example.com/chain/web::src/api/typed.ts::getJson",
@@ -1885,6 +2644,42 @@
         "start": 1679,
         "end": 1712
       }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::inferred::(type)Quote#0",
+      "caller": "example.com/chain/web::src/shared.ts::inferred",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1904,
+        "end": 1909
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::inferred::(type)z.infer#0",
+      "caller": "example.com/chain/web::src/shared.ts::inferred",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1889,
+        "end": 1896
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::inferred::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/shared.ts::inferred",
+      "target": "example.com/chain/web::src/shared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1853,
+        "end": 1860
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::inferred::fetch#0",
@@ -1909,6 +2704,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/shared.ts::offer::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/shared.ts::offer",
+      "target": "example.com/chain/web::src/shared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 2270,
+        "end": 2277
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/shared.ts::offer::fetch#0",
       "caller": "example.com/chain/web::src/shared.ts::offer",
       "target": null,
@@ -1929,6 +2736,18 @@
         "start": 2311,
         "end": 2321
       }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::quote::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/shared.ts::quote",
+      "target": "example.com/chain/web::src/shared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 386,
+        "end": 393
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::quote::fetch#0",
@@ -1953,6 +2772,30 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/shared.ts::receipt::(type)Receipt#0",
+      "caller": "example.com/chain/web::src/shared.ts::receipt",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 903,
+        "end": 910
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::receipt::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/shared.ts::receipt",
+      "target": "example.com/chain/web::src/shared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 847,
+        "end": 854
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/shared.ts::receipt::fetch#0",
       "caller": "example.com/chain/web::src/shared.ts::receipt",
       "target": null,
@@ -1973,6 +2816,18 @@
         "start": 888,
         "end": 898
       }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::shelf::(value)GATEWAY#0",
+      "caller": "example.com/chain/web::src/shared.ts::shelf",
+      "target": "example.com/chain/web::src/shared.ts::GATEWAY",
+      "level": "exact",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 616,
+        "end": 623
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::shelf::fetch#0",
@@ -1997,6 +2852,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/shared.ts::shelves::(value)GATEWAY#0",
+      "caller": "example.com/chain/web::src/shared.ts::shelves",
+      "target": "example.com/chain/web::src/shared.ts::GATEWAY",
+      "level": "exact",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1037,
+        "end": 1044
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/shared.ts::shelves::fetch#0",
       "caller": "example.com/chain/web::src/shared.ts::shelves",
       "target": null,
@@ -2017,6 +2884,30 @@
         "start": 1081,
         "end": 1091
       }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::status::(type)Status#0",
+      "caller": "example.com/chain/web::src/shared.ts::status",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1311,
+        "end": 1317
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::status::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/shared.ts::status",
+      "target": "example.com/chain/web::src/shared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 1252,
+        "end": 1259
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::status::fetch#0",
@@ -2041,6 +2932,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/shared.ts::tags::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/shared.ts::tags",
+      "target": "example.com/chain/web::src/shared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 2509,
+        "end": 2516
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/shared.ts::tags::fetch#0",
       "caller": "example.com/chain/web::src/shared.ts::tags",
       "target": null,
@@ -2061,6 +2964,18 @@
         "start": 2548,
         "end": 2558
       }
+    },
+    {
+      "id": "example.com/chain/web::src/shared.ts::ticket::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/shared.ts::ticket",
+      "target": "example.com/chain/web::src/shared.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/shared.ts",
+        "start": 2060,
+        "end": 2067
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/shared.ts::ticket::fetch#0",
@@ -2129,6 +3044,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/shipments.ts::shipment::(value)BASE#0",
+      "caller": "example.com/chain/web::src/shipments.ts::shipment",
+      "target": "example.com/chain/web::src/shipments.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 179,
+        "end": 183
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/shipments.ts::shipment::fetch#0",
       "caller": "example.com/chain/web::src/shipments.ts::shipment",
       "target": null,
@@ -2173,6 +3100,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/stock.ts::cached::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/stock.ts::cached",
+      "target": "example.com/chain/web::src/stock.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1624,
+        "end": 1631
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/stock.ts::cached::fetch#0",
       "caller": "example.com/chain/web::src/stock.ts::cached",
       "target": null,
@@ -2193,6 +3132,18 @@
         "start": 1668,
         "end": 1678
       }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::image::(value)GATEWAY#0",
+      "caller": "example.com/chain/web::src/stock.ts::image",
+      "target": "example.com/chain/web::src/stock.ts::GATEWAY",
+      "level": "exact",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1804,
+        "end": 1811
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::image::fetch#0",
@@ -2217,6 +3168,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/stock.ts::item::(value)GATEWAY#0",
+      "caller": "example.com/chain/web::src/stock.ts::item",
+      "target": "example.com/chain/web::src/stock.ts::GATEWAY",
+      "level": "exact",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 346,
+        "end": 353
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/stock.ts::item::fetch#0",
       "caller": "example.com/chain/web::src/stock.ts::item",
       "target": null,
@@ -2237,6 +3200,18 @@
         "start": 401,
         "end": 411
       }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::one::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/stock.ts::one",
+      "target": "example.com/chain/web::src/stock.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1388,
+        "end": 1395
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::one::fetch#0",
@@ -2261,6 +3236,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/stock.ts::price::(value)GATEWAY#0",
+      "caller": "example.com/chain/web::src/stock.ts::price",
+      "target": "example.com/chain/web::src/stock.ts::GATEWAY",
+      "level": "exact",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2089,
+        "end": 2096
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/stock.ts::price::fetch#0",
       "caller": "example.com/chain/web::src/stock.ts::price",
       "target": null,
@@ -2281,6 +3268,18 @@
         "start": 2149,
         "end": 2159
       }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::restock::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/stock.ts::restock",
+      "target": "example.com/chain/web::src/stock.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 1165,
+        "end": 1172
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::restock::fetch#0",
@@ -2305,6 +3304,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/stock.ts::reviews::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/stock.ts::reviews",
+      "target": "example.com/chain/web::src/stock.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 2261,
+        "end": 2268
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/stock.ts::reviews::fetch#0",
       "caller": "example.com/chain/web::src/stock.ts::reviews",
       "target": null,
@@ -2327,6 +3338,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/stock.ts::save::(value)GATEWAY#0",
+      "caller": "example.com/chain/web::src/stock.ts::save",
+      "target": "example.com/chain/web::src/stock.ts::GATEWAY",
+      "level": "exact",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 663,
+        "end": 670
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/stock.ts::save::fetch#0",
       "caller": "example.com/chain/web::src/stock.ts::save",
       "target": null,
@@ -2347,6 +3370,18 @@
         "start": 731,
         "end": 741
       }
+    },
+    {
+      "id": "example.com/chain/web::src/stock.ts::stock::(value)CATALOG#0",
+      "caller": "example.com/chain/web::src/stock.ts::stock",
+      "target": "example.com/chain/web::src/stock.ts::CATALOG",
+      "level": "exact",
+      "span": {
+        "path": "src/stock.ts",
+        "start": 962,
+        "end": 969
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/stock.ts::stock::fetch#0",
@@ -2887,6 +3922,11 @@
       "via": "env:GATEWAY_URL"
     },
     {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/web::src/shared.ts::annotated::(type)Receipt#0",
+      "via": null
+    },
+    {
       "contract": "http::GET::/api/receipts",
       "site": "example.com/chain/web::src/shared.ts::annotated::fetch#0",
       "via": "env:CATALOG_URL",
@@ -2907,6 +3947,11 @@
       }
     },
     {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/web::src/shared.ts::argument::(type)Receipt#0",
+      "via": null
+    },
+    {
       "contract": "http::GET::/api/receipts",
       "site": "example.com/chain/web::src/shared.ts::argument::getJson#0",
       "via": "env:CATALOG_URL",
@@ -2925,6 +3970,11 @@
           "total"
         ]
       }
+    },
+    {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/web::src/shared.ts::inferred::(type)Quote#0",
+      "via": null
     },
     {
       "contract": "http::GET::/api/receipts",
@@ -2974,6 +4024,11 @@
       }
     },
     {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/web::src/shared.ts::receipt::(type)Receipt#0",
+      "via": null
+    },
+    {
       "contract": "http::GET::/api/receipts",
       "site": "example.com/chain/web::src/shared.ts::receipt::fetch#0",
       "via": "env:CATALOG_URL",
@@ -3021,6 +4076,11 @@
           "max"
         ]
       }
+    },
+    {
+      "contract": "package::npm::@chain/contracts",
+      "site": "example.com/chain/web::src/shared.ts::status::(type)Status#0",
+      "via": null
     },
     {
       "contract": "http::GET::/api/receipts",
@@ -3251,10 +4311,53 @@
       "range": "^1.0.0"
     }
   ],
+  "imports": [
+    {
+      "site": "example.com/chain/web::src/shared.ts::annotated::(type)Receipt#0",
+      "specifier": "@chain/contracts",
+      "name": "Receipt",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt"
+    },
+    {
+      "site": "example.com/chain/web::src/shared.ts::argument::(type)Receipt#0",
+      "specifier": "@chain/contracts",
+      "name": "Receipt",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt"
+    },
+    {
+      "site": "example.com/chain/web::src/shared.ts::inferred::(type)Quote#0",
+      "specifier": "@chain/contracts",
+      "name": "Quote",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/quote.ts::Quote"
+    },
+    {
+      "site": "example.com/chain/web::src/shared.ts::receipt::(type)Receipt#0",
+      "specifier": "@chain/contracts",
+      "name": "Receipt",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt"
+    },
+    {
+      "site": "example.com/chain/web::src/shared.ts::status::(type)Status#0",
+      "specifier": "@chain/contracts",
+      "name": "Status",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Status"
+    }
+  ],
   "communities": [
     {
       "name": "src",
       "members": [
+        "example.com/chain/web::src/api/body.ts::BASE",
         "example.com/chain/web::src/api/body.ts::get",
         "example.com/chain/web::src/drift.ts::both",
         "example.com/chain/web::src/drift.ts::customerEmail",
@@ -3264,64 +4367,144 @@
       ]
     },
     {
+      "name": "src#10",
+      "members": [
+        "example.com/chain/web::src/shared.ts::GATEWAY",
+        "example.com/chain/web::src/shared.ts::shelf",
+        "example.com/chain/web::src/shared.ts::shelves"
+      ]
+    },
+    {
+      "name": "src#11",
+      "members": [
+        "example.com/chain/web::src/shipments.ts::BASE",
+        "example.com/chain/web::src/shipments.ts::shipment"
+      ]
+    },
+    {
+      "name": "src#12",
+      "members": [
+        "example.com/chain/web::src/stock.ts::CATALOG",
+        "example.com/chain/web::src/stock.ts::cached",
+        "example.com/chain/web::src/stock.ts::one",
+        "example.com/chain/web::src/stock.ts::restock",
+        "example.com/chain/web::src/stock.ts::reviews",
+        "example.com/chain/web::src/stock.ts::stock"
+      ]
+    },
+    {
+      "name": "src#13",
+      "members": [
+        "example.com/chain/web::src/stock.ts::GATEWAY",
+        "example.com/chain/web::src/stock.ts::image",
+        "example.com/chain/web::src/stock.ts::item",
+        "example.com/chain/web::src/stock.ts::price",
+        "example.com/chain/web::src/stock.ts::save"
+      ]
+    },
+    {
       "name": "src#2",
       "members": [
+        "example.com/chain/web::src/api/client.ts::BASE",
         "example.com/chain/web::src/api/client.ts::request",
+        "example.com/chain/web::src/api/paths.ts::ORDERS_PATH",
         "example.com/chain/web::src/dashboard.ts::cancel",
+        "example.com/chain/web::src/dashboard.ts::dashboard",
         "example.com/chain/web::src/orders.ts::cancelOrder",
         "example.com/chain/web::src/orders.ts::createOrder",
-        "example.com/chain/web::src/orders.ts::listOrders"
-      ]
-    },
-    {
-      "name": "src#3",
-      "members": [
-        "example.com/chain/web::src/api/typed.ts::enveloped",
-        "example.com/chain/web::src/declared.ts::wrapped"
-      ]
-    },
-    {
-      "name": "src#4",
-      "members": [
-        "example.com/chain/web::src/api/typed.ts::fetchAs",
-        "example.com/chain/web::src/declared.ts::viaReturn"
-      ]
-    },
-    {
-      "name": "src#5",
-      "members": [
-        "example.com/chain/web::src/api/typed.ts::getJson",
-        "example.com/chain/web::src/declared.ts::counts",
-        "example.com/chain/web::src/shared.ts::argument"
-      ]
-    },
-    {
-      "name": "src#6",
-      "members": [
-        "example.com/chain/web::src/api/typed.ts::search",
-        "example.com/chain/web::src/declared.ts::searched"
-      ]
-    },
-    {
-      "name": "src#7",
-      "members": [
-        "example.com/chain/web::src/batches.ts::shadowed",
-        "example.com/chain/web::src/batches.ts::shadowed.inner"
-      ]
-    },
-    {
-      "name": "src#8",
-      "members": [
-        "example.com/chain/web::src/dashboard.ts::dashboard",
+        "example.com/chain/web::src/orders.ts::listOrders",
         "example.com/chain/web::src/status.ts::health",
         "example.com/chain/web::src/status.ts::track"
       ]
     },
     {
+      "name": "src#3",
+      "members": [
+        "example.com/chain/web::src/api/typed.ts::BASE",
+        "example.com/chain/web::src/api/typed.ts::Envelope",
+        "example.com/chain/web::src/api/typed.ts::enveloped",
+        "example.com/chain/web::src/api/typed.ts::fetchAs",
+        "example.com/chain/web::src/api/typed.ts::getJson",
+        "example.com/chain/web::src/api/typed.ts::search",
+        "example.com/chain/web::src/declared.ts::Counts",
+        "example.com/chain/web::src/declared.ts::Query",
+        "example.com/chain/web::src/declared.ts::counts",
+        "example.com/chain/web::src/declared.ts::searched",
+        "example.com/chain/web::src/declared.ts::typedJson",
+        "example.com/chain/web::src/declared.ts::viaReturn",
+        "example.com/chain/web::src/declared.ts::wrapped",
+        "example.com/chain/web::src/shared.ts::argument"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
+        "example.com/chain/web::src/api/types.ts::Entity",
+        "example.com/chain/web::src/declared.ts::CATALOG",
+        "example.com/chain/web::src/declared.ts::Maybe",
+        "example.com/chain/web::src/declared.ts::Page",
+        "example.com/chain/web::src/declared.ts::Pages",
+        "example.com/chain/web::src/declared.ts::Profile",
+        "example.com/chain/web::src/declared.ts::Ranked",
+        "example.com/chain/web::src/declared.ts::cast",
+        "example.com/chain/web::src/declared.ts::foreign",
+        "example.com/chain/web::src/declared.ts::pages",
+        "example.com/chain/web::src/declared.ts::plain",
+        "example.com/chain/web::src/declared.ts::ranked"
+      ]
+    },
+    {
+      "name": "src#5",
+      "members": [
+        "example.com/chain/web::src/batches.ts::CATALOG",
+        "example.com/chain/web::src/batches.ts::handed",
+        "example.com/chain/web::src/batches.ts::ids",
+        "example.com/chain/web::src/batches.ts::pageOf",
+        "example.com/chain/web::src/batches.ts::quantities",
+        "example.com/chain/web::src/batches.ts::rebound",
+        "example.com/chain/web::src/batches.ts::shadowed",
+        "example.com/chain/web::src/batches.ts::shadowed.inner"
+      ]
+    },
+    {
+      "name": "src#6",
+      "members": [
+        "example.com/chain/web::src/comments.ts::CATALOG",
+        "example.com/chain/web::src/comments.ts::comments",
+        "example.com/chain/web::src/comments.ts::submit",
+        "example.com/chain/web::src/comments.ts::summary"
+      ]
+    },
+    {
+      "name": "src#7",
+      "members": [
+        "example.com/chain/web::src/drift.ts::BASE",
+        "example.com/chain/web::src/drift.ts::firstOrderId",
+        "example.com/chain/web::src/drift.ts::load",
+        "example.com/chain/web::src/drift.ts::orderTotal",
+        "example.com/chain/web::src/drift.ts::page",
+        "example.com/chain/web::src/drift.ts::productName"
+      ]
+    },
+    {
+      "name": "src#8",
+      "members": [
+        "example.com/chain/web::src/labels.ts::CATALOG",
+        "example.com/chain/web::src/labels.ts::labels"
+      ]
+    },
+    {
       "name": "src#9",
       "members": [
-        "example.com/chain/web::src/drift.ts::load",
-        "example.com/chain/web::src/drift.ts::page"
+        "example.com/chain/web::src/shared.ts::CATALOG",
+        "example.com/chain/web::src/shared.ts::annotated",
+        "example.com/chain/web::src/shared.ts::inferred",
+        "example.com/chain/web::src/shared.ts::offer",
+        "example.com/chain/web::src/shared.ts::quote",
+        "example.com/chain/web::src/shared.ts::receipt",
+        "example.com/chain/web::src/shared.ts::status",
+        "example.com/chain/web::src/shared.ts::tags",
+        "example.com/chain/web::src/shared.ts::ticket"
       ]
     }
   ],
@@ -3672,6 +4855,13 @@
       "reason": "base URL from GATEWAY_URL, a base_url_env of peer example.com/chain/gateway"
     },
     {
+      "consumer": "example.com/chain/web::src/shared.ts::annotated::(type)Receipt#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/chain/web::src/shared.ts::annotated::fetch#0",
       "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
       "contract": "http::GET::/api/receipts",
@@ -3684,6 +4874,13 @@
       }
     },
     {
+      "consumer": "example.com/chain/web::src/shared.ts::argument::(type)Receipt#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/chain/web::src/shared.ts::argument::getJson#0",
       "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
       "contract": "http::GET::/api/receipts",
@@ -3694,6 +4891,13 @@
           "paidAt": "inferred"
         }
       }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::inferred::(type)Quote#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/quote.ts::Quote",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
     },
     {
       "consumer": "example.com/chain/web::src/shared.ts::inferred::fetch#0",
@@ -3733,6 +4937,13 @@
       }
     },
     {
+      "consumer": "example.com/chain/web::src/shared.ts::receipt::(type)Receipt#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Receipt",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
+    },
+    {
       "consumer": "example.com/chain/web::src/shared.ts::receipt::fetch#0",
       "provider": "example.com/chain/catalog::app/api/receipts/route.ts::GET",
       "contract": "http::GET::/api/receipts",
@@ -3768,6 +4979,13 @@
           "max": ""
         }
       }
+    },
+    {
+      "consumer": "example.com/chain/web::src/shared.ts::status::(type)Status#0",
+      "provider": "example.com/chain/catalog::packages/contracts/src/receipt.ts::Status",
+      "contract": "package::npm::@chain/contracts",
+      "level": "exact",
+      "reason": "package::npm::@chain/contracts ^1.0.0 (local 1.0.0); import main"
     },
     {
       "consumer": "example.com/chain/web::src/shared.ts::status::fetch#0",

@@ -264,6 +264,7 @@ mod tests {
             name: Some("run".into()),
             file: Some("cmd.py".into()),
             target: Some("run".into()),
+            source: None,
         }];
         let mut facts = Facts::default();
         for name in ["main", "run", "__main__"] {
@@ -309,6 +310,7 @@ mod tests {
                 name: Some(name.to_string()),
                 file: Some("cmd.py".into()),
                 target: Some(name.to_string()),
+                source: None,
             });
         }
         let files = BTreeMap::from([("cmd.py", &facts)]);
@@ -374,6 +376,7 @@ mod tests {
             name: Some("T".into()),
             file: Some("t.go".into()),
             target: Some("T".into()),
+            source: None,
         }];
         let files = BTreeMap::from([("t.go", &facts)]);
         let local = Local {

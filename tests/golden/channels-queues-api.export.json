@@ -15,6 +15,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/queues/api::src/nats.ts::REGION",
+      "span": {
+        "path": "src/nats.ts",
+        "start": 91,
+        "end": 104
+      },
+      "hash": "952726e9bb965ba9d4ca44d9b2e4d825e8256e83f70c231e747dc053e295599c"
+    },
+    {
       "id": "example.com/queues/api::src/nats.ts::invoicePaid",
       "span": {
         "path": "src/nats.ts",
@@ -24,6 +33,15 @@
       "hash": "691819f839b40404e0842c0e3919a21b0c14618b1a6962198100f23ca30d475d"
     },
     {
+      "id": "example.com/queues/api::src/nats.ts::nc",
+      "span": {
+        "path": "src/nats.ts",
+        "start": 39,
+        "end": 83
+      },
+      "hash": "8abb090fe30ef3b699294ba696e40aa2520e9ef2ed9be21fe6703d54974b10a6"
+    },
+    {
       "id": "example.com/queues/api::src/nats.ts::orderCreated",
       "span": {
         "path": "src/nats.ts",
@@ -31,6 +49,24 @@
         "end": 215
       },
       "hash": "99b0e7f49e8f7437155420dd318cc461ec4d5e7b8c89672f4fc4e0889946cfe8"
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::BASE",
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 110,
+        "end": 137
+      },
+      "hash": "7b464647cdae0b87eb32329446cbcdedd14f7bb3180af13012667c4013aeb80a"
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::client",
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 76,
+        "end": 102
+      },
+      "hash": "c6d3bd19fd0e2dd99de4c4b5714d0e7c71d784ea74608879bb91925205ee1670"
     },
     {
       "id": "example.com/queues/api::src/sqs.ts::enqueue",
@@ -70,7 +106,20 @@
         "path": "src/nats.ts",
         "start": 50,
         "end": 83
-      }
+      },
+      "holder": "example.com/queues/api::src/nats.ts::nc"
+    },
+    {
+      "id": "example.com/queues/api::src/nats.ts::invoicePaid::(member)nc#0",
+      "caller": "example.com/queues/api::src/nats.ts::invoicePaid",
+      "target": "example.com/queues/api::src/nats.ts::nc",
+      "level": "exact",
+      "span": {
+        "path": "src/nats.ts",
+        "start": 251,
+        "end": 261
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/queues/api::src/nats.ts::invoicePaid::nc.publish#0",
@@ -82,6 +131,30 @@
         "start": 251,
         "end": 285
       }
+    },
+    {
+      "id": "example.com/queues/api::src/nats.ts::orderCreated::(member)nc#0",
+      "caller": "example.com/queues/api::src/nats.ts::orderCreated",
+      "target": "example.com/queues/api::src/nats.ts::nc",
+      "level": "exact",
+      "span": {
+        "path": "src/nats.ts",
+        "start": 142,
+        "end": 152
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/queues/api::src/nats.ts::orderCreated::(value)REGION#0",
+      "caller": "example.com/queues/api::src/nats.ts::orderCreated",
+      "target": "example.com/queues/api::src/nats.ts::REGION",
+      "level": "exact",
+      "span": {
+        "path": "src/nats.ts",
+        "start": 195,
+        "end": 201
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/queues/api::src/nats.ts::orderCreated::nc.publish#0",
@@ -114,7 +187,20 @@
         "path": "src/sqs.ts",
         "start": 85,
         "end": 102
-      }
+      },
+      "holder": "example.com/queues/api::src/sqs.ts::client"
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::enqueue::(member)client#0",
+      "caller": "example.com/queues/api::src/sqs.ts::enqueue",
+      "target": "example.com/queues/api::src/sqs.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 509,
+        "end": 520
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/queues/api::src/sqs.ts::enqueue::SendMessageCommand#0",
@@ -137,6 +223,30 @@
         "start": 509,
         "end": 587
       }
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::enqueueOrder::(member)client#0",
+      "caller": "example.com/queues/api::src/sqs.ts::enqueueOrder",
+      "target": "example.com/queues/api::src/sqs.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 282,
+        "end": 293
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/queues/api::src/sqs.ts::enqueueOrder::(value)BASE#0",
+      "caller": "example.com/queues/api::src/sqs.ts::enqueueOrder",
+      "target": "example.com/queues/api::src/sqs.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/sqs.ts",
+        "start": 337,
+        "end": 341
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/queues/api::src/sqs.ts::enqueueOrder::SendMessageCommand#0",
@@ -198,6 +308,23 @@
   "communities": [
     {
       "name": "src",
+      "members": [
+        "example.com/queues/api::src/nats.ts::REGION",
+        "example.com/queues/api::src/nats.ts::invoicePaid",
+        "example.com/queues/api::src/nats.ts::nc",
+        "example.com/queues/api::src/nats.ts::orderCreated"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/queues/api::src/sqs.ts::BASE",
+        "example.com/queues/api::src/sqs.ts::client",
+        "example.com/queues/api::src/sqs.ts::enqueueOrder"
+      ]
+    },
+    {
+      "name": "src#3",
       "members": [
         "example.com/queues/api::src/sqs.ts::enqueue",
         "example.com/queues/api::src/sqs.ts::enqueueRefund"

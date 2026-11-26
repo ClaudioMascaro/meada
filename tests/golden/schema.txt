@@ -1,4 +1,4 @@
-extraction revision 4
+extraction revision 5
 
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -12,7 +12,7 @@ CREATE INDEX symbols_hash ON symbols (hash);
 CREATE TABLE calls (
     id TEXT NOT NULL, caller TEXT NOT NULL, target TEXT, level TEXT,
     path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, narrowed INTEGER NOT NULL,
-    decorates TEXT
+    decorates TEXT, kind TEXT, holder TEXT
 );
 CREATE INDEX calls_path ON calls (path);
 CREATE INDEX calls_id ON calls (id);
@@ -34,7 +34,7 @@ CREATE TABLE manifests (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL
 );
-CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
+CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT, source TEXT);
 CREATE INDEX exports_path ON exports (path);
 CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
 CREATE TABLE flexible (path TEXT NOT NULL, name TEXT NOT NULL, least INTEGER NOT NULL, most INTEGER);
@@ -431,12 +431,227 @@ sample.ts
   ],
   "declarations": [
     {
+      "name": "BASE",
+      "range": {
+        "start": 299,
+        "end": 347
+      },
+      "hash": "43f834f398c3187300c0f39c7857a738495b8a46114fe50854a9cbe232016c88"
+    },
+    {
+      "name": "app",
+      "range": {
+        "start": 355,
+        "end": 370
+      },
+      "hash": "ab91d989774dae76bf44e54fdab42d07cca448bdbcf381d1046ad2b0927e8966"
+    },
+    {
+      "name": "Row",
+      "range": {
+        "start": 971,
+        "end": 1002
+      },
+      "hash": "6a4b8532fa5f9842c34968a9e7f1dae450f3e634a2e3bf69b8ce0026dd27f74e"
+    },
+    {
+      "name": "Rows",
+      "range": {
+        "start": 1004,
+        "end": 1022
+      },
+      "hash": "91365655a301c55e54a2ae07351bd8958acb408584e27600cf05d29e16926ee1"
+    },
+    {
       "name": "default",
       "range": {
         "start": 1039,
         "end": 1047
       },
       "hash": "30c7e9dc02edc853988d780adb63b147bcdf280a5a709dacba620814e1b02bac"
+    },
+    {
+      "name": "sdk",
+      "range": {
+        "start": 1119,
+        "end": 1142
+      },
+      "hash": "aef0b61f476213db5784452ba322e4c9375d09eff711ceb67f22703c40727f76"
+    }
+  ],
+  "references": [
+    {
+      "scope": "",
+      "name": "helper",
+      "kind": "reexport",
+      "range": {
+        "start": 226,
+        "end": 246
+      },
+      "from": "./helper"
+    },
+    {
+      "scope": "",
+      "name": "*",
+      "kind": "reexport",
+      "range": {
+        "start": 266,
+        "end": 291
+      },
+      "from": "./shapes"
+    },
+    {
+      "scope": "",
+      "name": "process.env.API_URL",
+      "kind": "member",
+      "range": {
+        "start": 306,
+        "end": 325
+      }
+    },
+    {
+      "scope": "Store.find",
+      "name": "BASE",
+      "kind": "value",
+      "range": {
+        "start": 471,
+        "end": 475
+      }
+    },
+    {
+      "scope": "Store.find",
+      "name": "id",
+      "kind": "value",
+      "range": {
+        "start": 485,
+        "end": 487
+      }
+    },
+    {
+      "scope": "Store.find",
+      "name": "limit",
+      "kind": "value",
+      "range": {
+        "start": 497,
+        "end": 502
+      }
+    },
+    {
+      "scope": "serve",
+      "name": "tries",
+      "kind": "value",
+      "range": {
+        "start": 684,
+        "end": 689
+      }
+    },
+    {
+      "scope": "serve",
+      "name": "item",
+      "kind": "value",
+      "range": {
+        "start": 699,
+        "end": 703
+      }
+    },
+    {
+      "scope": "serve",
+      "name": "host",
+      "kind": "value",
+      "range": {
+        "start": 705,
+        "end": 709
+      }
+    },
+    {
+      "scope": "serve",
+      "name": "rest",
+      "kind": "value",
+      "range": {
+        "start": 711,
+        "end": 715
+      }
+    },
+    {
+      "scope": "serve",
+      "name": "first",
+      "kind": "value",
+      "range": {
+        "start": 717,
+        "end": 722
+      }
+    },
+    {
+      "scope": "serve",
+      "name": "error",
+      "kind": "value",
+      "range": {
+        "start": 756,
+        "end": 761
+      }
+    },
+    {
+      "scope": "serve",
+      "name": "app",
+      "kind": "member",
+      "range": {
+        "start": 770,
+        "end": 777
+      }
+    },
+    {
+      "scope": "serve.@789",
+      "name": "res",
+      "kind": "member",
+      "range": {
+        "start": 804,
+        "end": 812
+      }
+    },
+    {
+      "scope": "serve",
+      "name": "port",
+      "kind": "value",
+      "range": {
+        "start": 845,
+        "end": 849
+      }
+    },
+    {
+      "scope": "serve.@851",
+      "name": "path",
+      "kind": "member",
+      "range": {
+        "start": 857,
+        "end": 866
+      }
+    },
+    {
+      "scope": "",
+      "name": "Row",
+      "kind": "type",
+      "range": {
+        "start": 1016,
+        "end": 1019
+      }
+    },
+    {
+      "scope": "publishAws",
+      "name": "sdk",
+      "kind": "member",
+      "range": {
+        "start": 1170,
+        "end": 1178
+      }
+    },
+    {
+      "scope": "publishAws",
+      "name": "process.env.TOPIC",
+      "kind": "member",
+      "range": {
+        "start": 1209,
+        "end": 1226
+      }
     }
   ],
   "locals": [
@@ -3046,6 +3261,204 @@ sample.swift
   "confined": [
     "local()"
   ]
+}
+
+sample.tsx
+{
+  "defs": [
+    {
+      "name": "Page",
+      "kind": "Function",
+      "range": {
+        "start": 98,
+        "end": 186
+      },
+      "params": [
+        {
+          "name": "t",
+          "binds": "Any"
+        }
+      ],
+      "hash": "52964fabc53e2e9883848227393d577d944b1135046384b4e16d2b494d45ce22"
+    },
+    {
+      "name": "Panel",
+      "kind": "Class",
+      "range": {
+        "start": 195,
+        "end": 222
+      },
+      "params": [],
+      "hash": "a2feefd823768a4791f10402389d9d823cf94d26fa280ce9ebab6fa6e1ae8479"
+    },
+    {
+      "name": "load",
+      "kind": "Function",
+      "range": {
+        "start": 231,
+        "end": 326
+      },
+      "params": [],
+      "asynchronous": true,
+      "hash": "69e96af43d5f146488af737c919b6540f675be9ec7d61e1398f4133c7ede1ff7"
+    }
+  ],
+  "imports": [
+    {
+      "local": "Button",
+      "source": "@scope/ui",
+      "name": {
+        "Name": "Button"
+      }
+    },
+    {
+      "local": "Base",
+      "source": "@scope/ui",
+      "name": {
+        "Name": "Base"
+      }
+    },
+    {
+      "local": "tokens",
+      "source": "@scope/ui",
+      "name": {
+        "Name": "tokens"
+      }
+    },
+    {
+      "local": "Theme",
+      "source": "@scope/ui",
+      "name": {
+        "Name": "Theme"
+      }
+    }
+  ],
+  "exports": [
+    {
+      "Local": {
+        "exported": "Page",
+        "local": "Page"
+      }
+    },
+    {
+      "Local": {
+        "exported": "Panel",
+        "local": "Panel"
+      }
+    },
+    {
+      "Local": {
+        "exported": "load",
+        "local": "load"
+      }
+    },
+    {
+      "From": {
+        "exported": "Card",
+        "source": "./card",
+        "name": {
+          "Name": "Card"
+        }
+      }
+    }
+  ],
+  "star": "ExceptDefault",
+  "calls": [
+    {
+      "scope": "load",
+      "callee": "(import)",
+      "range": {
+        "start": 282,
+        "end": 306
+      }
+    }
+  ],
+  "consts": [
+    {
+      "name": "Page.gap"
+    }
+  ],
+  "references": [
+    {
+      "scope": "Page",
+      "name": "Theme",
+      "kind": "type",
+      "range": {
+        "start": 115,
+        "end": 120
+      }
+    },
+    {
+      "scope": "Page",
+      "name": "tokens.gap",
+      "kind": "member",
+      "range": {
+        "start": 138,
+        "end": 148
+      }
+    },
+    {
+      "scope": "Page",
+      "name": "Button",
+      "kind": "jsx",
+      "range": {
+        "start": 160,
+        "end": 166
+      }
+    },
+    {
+      "scope": "Page",
+      "name": "gap",
+      "kind": "value",
+      "range": {
+        "start": 176,
+        "end": 179
+      }
+    },
+    {
+      "scope": "Panel",
+      "name": "Base",
+      "kind": "extends",
+      "range": {
+        "start": 215,
+        "end": 219
+      }
+    },
+    {
+      "scope": "load",
+      "name": "Widget",
+      "kind": "dynamic",
+      "range": {
+        "start": 265,
+        "end": 271
+      },
+      "from": "@scope/widgets"
+    },
+    {
+      "scope": "load",
+      "name": "Widget",
+      "kind": "value",
+      "range": {
+        "start": 317,
+        "end": 323
+      }
+    },
+    {
+      "scope": "",
+      "name": "Card",
+      "kind": "reexport",
+      "range": {
+        "start": 337,
+        "end": 341
+      },
+      "from": "./card"
+    }
+  ],
+  "locals": [
+    "load.Widget"
+  ],
+  "receivers": [],
+  "member_writes": []
 }
 
 sample.openapi.yaml

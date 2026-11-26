@@ -580,6 +580,7 @@ mod tests {
                 name: Some(name.to_string()),
                 file: Some(file.to_string()),
                 target: target.map(String::from),
+                source: None,
             };
         Export {
             repository: "r".to_string(),

@@ -1542,7 +1542,8 @@ impl Engine {
         let id = symbol_found.id.as_str();
         let callers = partial.callers(Some(n), &[id], true)?;
         partial.callers_of(&callers)?;
-        let callees = partial.callees(Some(n), &[id])?;
+        let mut callees = partial.callees(Some(n), &[id])?;
+        callees.extend(partial.uses_held(Some(n), &[id])?);
         let targets: Vec<&str> = (callees.iter())
             .flat_map(|(_, c)| c.target.iter().chain(&c.candidates))
             .map(String::as_str)
@@ -1793,15 +1794,16 @@ fn span_text(root: &Path, export: &Export, symbol: &Symbol) -> Option<(usize, Ve
 }
 
 /// `callers:`, `callees:` and, when the symbol has calls that decorate a definition, `annotations:`
-/// of the symbol `id`, inside the repository `identity`.
+/// of the symbol `id`, inside the repository `identity`; then, where there are some, `used by:`
+/// and `uses:`, the rows of uses that are no calls, each with its kind.
 fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Vec<String> {
     let symbols: HashMap<&str, &Symbol> =
         export.symbols.iter().map(|s| (s.id.as_str(), s)).collect();
-    let mut callers: Vec<_> = export
+    let (mut callers, mut used_by): (Vec<_>, Vec<_>) = export
         .calls
         .iter()
         .filter(|c| c.target.as_deref() == Some(id) || c.candidates.iter().any(|t| t == id))
-        .collect();
+        .partition(|c| c.kind.is_none());
     callers.sort_by_key(|c| (&c.span.path, c.span.start));
     let callers: Vec<String> = callers
         .iter()
@@ -1817,7 +1819,37 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
             )
         })
         .collect();
-    let mut calls: Vec<_> = export.calls.iter().filter(|c| c.caller == id).collect();
+    // A use its file makes names the symbol holding it, as `trace` up does.
+    used_by.sort_by_key(|c| (&c.span.path, c.span.start));
+    let used_by: Vec<String> = (used_by.iter())
+        .map(|c| {
+            let name = match c.holder.as_deref() {
+                Some(holder) => Some(label(holder)),
+                None => symbols
+                    .contains_key(c.caller.as_str())
+                    .then(|| label(&c.caller)),
+            };
+            let location = files.at(&c.span.path, c.span.start);
+            let kind = c.kind.as_deref().unwrap_or_default();
+            format!(
+                "{identity} {location} {} ({kind})",
+                name.unwrap_or("(top level)")
+            )
+        })
+        .collect();
+    // A use its file makes is the holding symbol's, as `used by:` reads it.
+    let (mut calls, uses): (Vec<_>, Vec<_>) = (export.calls.iter())
+        .filter(|c| c.caller == id || c.kind.is_some() && c.holder.as_deref() == Some(id))
+        .partition(|c| c.kind.is_none());
+    let mut uses: Vec<String> = (uses.iter())
+        .filter_map(|c| {
+            let t = symbols.get(c.target.as_deref()?)?;
+            let kind = c.kind.as_deref().unwrap_or_default();
+            Some(line(identity, files, t, label(&t.id)) + &format!(" ({kind})"))
+        })
+        .collect();
+    uses.sort();
+    uses.dedup();
     calls.sort_by_key(|c| (c.target.is_none(), &c.id));
     let lines_of = |calls: Vec<&CallSite>, files: &mut Files| -> Vec<String> {
         let mut lines: Vec<String> = calls
@@ -1865,6 +1897,13 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
     lines.extend(section("callees", callees));
     if !annotations.is_empty() {
         lines.extend(section("annotations", annotations));
+    }
+    // Uses that are no calls (TS/JS), only where there are some.
+    if !used_by.is_empty() {
+        lines.extend(section("used by", used_by));
+    }
+    if !uses.is_empty() {
+        lines.extend(section("uses", uses));
     }
     lines
 }

@@ -9143,7 +9143,8 @@
         "start": 95,
         "end": 134
       },
-      "decorates": "example.com/acme/conformance::shop/orders/views.py::order"
+      "decorates": "example.com/acme/conformance::shop/orders/views.py::order",
+      "holder": "example.com/acme/conformance::shop/orders/views.py::order"
     },
     {
       "id": "example.com/acme/conformance::shop/urls.py::include#0",
@@ -9309,7 +9310,8 @@
         "start": 99,
         "end": 141
       },
-      "decorates": "example.com/acme/conformance::web/accounts.py::update"
+      "decorates": "example.com/acme/conformance::web/accounts.py::update",
+      "holder": "example.com/acme/conformance::web/accounts.py::update"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::APIRouter#0",
@@ -9343,7 +9345,8 @@
         "start": 284,
         "end": 331
       },
-      "decorates": "example.com/acme/conformance::web/api.py::ping"
+      "decorates": "example.com/acme/conformance::web/api.py::ping",
+      "holder": "example.com/acme/conformance::web/api.py::ping"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::app.api_route#1",
@@ -9355,7 +9358,8 @@
         "start": 365,
         "end": 387
       },
-      "decorates": "example.com/acme/conformance::web/api.py::echo"
+      "decorates": "example.com/acme/conformance::web/api.py::echo",
+      "holder": "example.com/acme/conformance::web/api.py::echo"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::app.get#0",
@@ -9367,7 +9371,8 @@
         "start": 224,
         "end": 242
       },
-      "decorates": "example.com/acme/conformance::web/api.py::health"
+      "decorates": "example.com/acme/conformance::web/api.py::health",
+      "holder": "example.com/acme/conformance::web/api.py::health"
     },
     {
       "id": "example.com/acme/conformance::web/api.py::app.include_router#0",
@@ -9512,7 +9517,8 @@
         "start": 88,
         "end": 112
       },
-      "decorates": "example.com/acme/conformance::web/items.py::read_item"
+      "decorates": "example.com/acme/conformance::web/items.py::read_item",
+      "holder": "example.com/acme/conformance::web/items.py::read_item"
     },
     {
       "id": "example.com/acme/conformance::web/items.py::router.post#0",
@@ -9524,7 +9530,8 @@
         "start": 170,
         "end": 185
       },
-      "decorates": "example.com/acme/conformance::web/items.py::create_item"
+      "decorates": "example.com/acme/conformance::web/items.py::create_item",
+      "holder": "example.com/acme/conformance::web/items.py::create_item"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::Blueprint#0",
@@ -9558,7 +9565,8 @@
         "start": 479,
         "end": 499
       },
-      "decorates": "example.com/acme/conformance::web/pages.py::shortcut"
+      "decorates": "example.com/acme/conformance::web/pages.py::shortcut",
+      "holder": "example.com/acme/conformance::web/pages.py::shortcut"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::app.register_blueprint#0",
@@ -9592,7 +9600,8 @@
         "start": 254,
         "end": 268
       },
-      "decorates": "example.com/acme/conformance::web/pages.py::index"
+      "decorates": "example.com/acme/conformance::web/pages.py::index",
+      "holder": "example.com/acme/conformance::web/pages.py::index"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::app.route#1",
@@ -9604,7 +9613,8 @@
         "start": 303,
         "end": 365
       },
-      "decorates": "example.com/acme/conformance::web/pages.py::order"
+      "decorates": "example.com/acme/conformance::web/pages.py::order",
+      "holder": "example.com/acme/conformance::web/pages.py::order"
     },
     {
       "id": "example.com/acme/conformance::web/pages.py::fetch#0",
@@ -9638,7 +9648,8 @@
         "start": 415,
         "end": 444
       },
-      "decorates": "example.com/acme/conformance::web/pages.py::daily"
+      "decorates": "example.com/acme/conformance::web/pages.py::daily",
+      "holder": "example.com/acme/conformance::web/pages.py::daily"
     },
     {
       "id": "example.com/acme/conformance::web/partial.py::APIRouter#0",
@@ -9672,7 +9683,8 @@
         "start": 304,
         "end": 333
       },
-      "decorates": "example.com/acme/conformance::web/partial.py::read_part"
+      "decorates": "example.com/acme/conformance::web/partial.py::read_part",
+      "holder": "example.com/acme/conformance::web/partial.py::read_part"
     },
     {
       "id": "example.com/acme/conformance::web/partial.py::app.include_router#0",
@@ -9740,7 +9752,8 @@
         "start": 229,
         "end": 252
       },
-      "decorates": "example.com/acme/conformance::web/partial.py::read_user"
+      "decorates": "example.com/acme/conformance::web/partial.py::read_user",
+      "holder": "example.com/acme/conformance::web/partial.py::read_user"
     }
   ],
   "providers": [

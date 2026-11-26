@@ -11,6 +11,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/acme/portal::src/client.ts::BASE",
+      "span": {
+        "path": "src/client.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "a4c51ea4be9941ec2f27c3ed2094989dd103be26545d77ea8d89bfef18d1378a"
+    },
+    {
       "id": "example.com/acme/portal::src/client.ts::bare",
       "span": {
         "path": "src/client.ts",
@@ -85,6 +94,18 @@
   ],
   "calls": [
     {
+      "id": "example.com/acme/portal::src/client.ts::bare::(value)BASE#0",
+      "caller": "example.com/acme/portal::src/client.ts::bare",
+      "target": "example.com/acme/portal::src/client.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/client.ts",
+        "start": 768,
+        "end": 772
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/portal::src/client.ts::bare::send#0",
       "caller": "example.com/acme/portal::src/client.ts::bare",
       "target": null,
@@ -94,6 +115,18 @@
         "start": 760,
         "end": 780
       }
+    },
+    {
+      "id": "example.com/acme/portal::src/client.ts::getItem::(value)BASE#0",
+      "caller": "example.com/acme/portal::src/client.ts::getItem",
+      "target": "example.com/acme/portal::src/client.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/client.ts",
+        "start": 531,
+        "end": 535
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/portal::src/client.ts::getItem::fetchImpl#0",
@@ -118,6 +151,18 @@
       }
     },
     {
+      "id": "example.com/acme/portal::src/client.ts::listReports::(value)BASE#0",
+      "caller": "example.com/acme/portal::src/client.ts::listReports",
+      "target": "example.com/acme/portal::src/client.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/client.ts",
+        "start": 359,
+        "end": 363
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/portal::src/client.ts::listReports::request#0",
       "caller": "example.com/acme/portal::src/client.ts::listReports",
       "target": null,
@@ -127,6 +172,18 @@
         "start": 348,
         "end": 374
       }
+    },
+    {
+      "id": "example.com/acme/portal::src/client.ts::mirrors::(value)BASE#0",
+      "caller": "example.com/acme/portal::src/client.ts::mirrors",
+      "target": "example.com/acme/portal::src/client.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/client.ts",
+        "start": 986,
+        "end": 990
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/portal::src/client.ts::mirrors::fetch#0",
@@ -140,6 +197,18 @@
       }
     },
     {
+      "id": "example.com/acme/portal::src/client.ts::other::(value)BASE#0",
+      "caller": "example.com/acme/portal::src/client.ts::other",
+      "target": "example.com/acme/portal::src/client.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/client.ts",
+        "start": 698,
+        "end": 702
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/portal::src/client.ts::other::client#0",
       "caller": "example.com/acme/portal::src/client.ts::other",
       "target": null,
@@ -151,6 +220,18 @@
       }
     },
     {
+      "id": "example.com/acme/portal::src/client.ts::pushReport::(value)BASE#0",
+      "caller": "example.com/acme/portal::src/client.ts::pushReport",
+      "target": "example.com/acme/portal::src/client.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/client.ts",
+        "start": 240,
+        "end": 244
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/portal::src/client.ts::pushReport::fetchImpl#0",
       "caller": "example.com/acme/portal::src/client.ts::pushReport",
       "target": null,
@@ -160,6 +241,18 @@
         "start": 227,
         "end": 281
       }
+    },
+    {
+      "id": "example.com/acme/portal::src/client.ts::retry::(value)BASE#0",
+      "caller": "example.com/acme/portal::src/client.ts::retry",
+      "target": "example.com/acme/portal::src/client.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/client.ts",
+        "start": 1167,
+        "end": 1171
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/portal::src/client.ts::retry::Error#0",
@@ -210,6 +303,18 @@
   "communities": [
     {
       "name": "src",
+      "members": [
+        "example.com/acme/portal::src/client.ts::BASE",
+        "example.com/acme/portal::src/client.ts::bare",
+        "example.com/acme/portal::src/client.ts::listReports",
+        "example.com/acme/portal::src/client.ts::mirrors",
+        "example.com/acme/portal::src/client.ts::other",
+        "example.com/acme/portal::src/client.ts::pushReport",
+        "example.com/acme/portal::src/client.ts::retry"
+      ]
+    },
+    {
+      "name": "src#2",
       "members": [
         "example.com/acme/portal::src/client.ts::getItem",
         "example.com/acme/portal::src/client.ts::getOne"

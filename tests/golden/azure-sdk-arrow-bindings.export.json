@@ -40,6 +40,15 @@
       "hash": "0fbdbdcb750cc4239b7160a846e7c267bf60e2b6a09980a50e187f1f8c301ccc"
     },
     {
+      "id": "local/azure-sdk-arrow-bindings::worker.js::bus",
+      "span": {
+        "path": "worker.js",
+        "start": 61,
+        "end": 97
+      },
+      "hash": "6e71b245607954f6310b05d151a859e9c3d3f8737e2d953ea8eba0e073e95849"
+    },
+    {
       "id": "local/azure-sdk-arrow-bindings::worker.js::commented",
       "span": {
         "path": "worker.js",
@@ -103,6 +112,15 @@
       "hash": "12565238d87108a4461d455d82cdab5648b88e1661c492e1104d46317a68d86d"
     },
     {
+      "id": "local/azure-sdk-arrow-bindings::worker.ts::bus",
+      "span": {
+        "path": "worker.ts",
+        "start": 61,
+        "end": 97
+      },
+      "hash": "6e71b245607954f6310b05d151a859e9c3d3f8737e2d953ea8eba0e073e95849"
+    },
+    {
       "id": "local/azure-sdk-arrow-bindings::worker.ts::commented",
       "span": {
         "path": "worker.ts",
@@ -149,7 +167,8 @@
         "path": "worker.js",
         "start": 65,
         "end": 97
-      }
+      },
+      "holder": "local/azure-sdk-arrow-bindings::worker.js::bus"
     },
     {
       "id": "local/azure-sdk-arrow-bindings::worker.js::asynchronous::(call_expression).receiveMessages#0",
@@ -161,6 +180,18 @@
         "start": 575,
         "end": 643
       }
+    },
+    {
+      "id": "local/azure-sdk-arrow-bindings::worker.js::asynchronous::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.js::asynchronous",
+      "target": "local/azure-sdk-arrow-bindings::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 575,
+        "end": 593
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-arrow-bindings::worker.js::asynchronous::bus.createReceiver#0",
@@ -185,6 +216,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-arrow-bindings::worker.js::bare::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.js::bare",
+      "target": "local/azure-sdk-arrow-bindings::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 220,
+        "end": 238
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-arrow-bindings::worker.js::bare::bus.createReceiver#0",
       "caller": "local/azure-sdk-arrow-bindings::worker.js::bare",
       "target": null,
@@ -205,6 +248,18 @@
         "start": 770,
         "end": 831
       }
+    },
+    {
+      "id": "local/azure-sdk-arrow-bindings::worker.js::builtin::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.js::builtin",
+      "target": "local/azure-sdk-arrow-bindings::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 770,
+        "end": 788
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-arrow-bindings::worker.js::builtin::bus.createReceiver#0",
@@ -229,6 +284,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-arrow-bindings::worker.js::commented::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.js::commented",
+      "target": "local/azure-sdk-arrow-bindings::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 344,
+        "end": 362
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-arrow-bindings::worker.js::commented::bus.createReceiver#0",
       "caller": "local/azure-sdk-arrow-bindings::worker.js::commented",
       "target": null,
@@ -249,6 +316,18 @@
         "start": 458,
         "end": 526
       }
+    },
+    {
+      "id": "local/azure-sdk-arrow-bindings::worker.js::parenthesized::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.js::parenthesized",
+      "target": "local/azure-sdk-arrow-bindings::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 458,
+        "end": 476
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-arrow-bindings::worker.js::parenthesized::bus.createReceiver#0",
@@ -273,6 +352,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-arrow-bindings::worker.js::send::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.js::send",
+      "target": "local/azure-sdk-arrow-bindings::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 124,
+        "end": 140
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-arrow-bindings::worker.js::send::bus.createSender#0",
       "caller": "local/azure-sdk-arrow-bindings::worker.js::send",
       "target": null,
@@ -295,6 +386,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-arrow-bindings::worker.js::unaffected::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.js::unaffected",
+      "target": "local/azure-sdk-arrow-bindings::worker.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.js",
+        "start": 682,
+        "end": 700
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-arrow-bindings::worker.js::unaffected::bus.createReceiver#0",
       "caller": "local/azure-sdk-arrow-bindings::worker.js::unaffected",
       "target": null,
@@ -314,7 +417,8 @@
         "path": "worker.ts",
         "start": 65,
         "end": 97
-      }
+      },
+      "holder": "local/azure-sdk-arrow-bindings::worker.ts::bus"
     },
     {
       "id": "local/azure-sdk-arrow-bindings::worker.ts::asynchronous::(call_expression).receiveMessages#0",
@@ -326,6 +430,18 @@
         "start": 575,
         "end": 643
       }
+    },
+    {
+      "id": "local/azure-sdk-arrow-bindings::worker.ts::asynchronous::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.ts::asynchronous",
+      "target": "local/azure-sdk-arrow-bindings::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 575,
+        "end": 593
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-arrow-bindings::worker.ts::asynchronous::bus.createReceiver#0",
@@ -350,6 +466,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-arrow-bindings::worker.ts::bare::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.ts::bare",
+      "target": "local/azure-sdk-arrow-bindings::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 220,
+        "end": 238
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-arrow-bindings::worker.ts::bare::bus.createReceiver#0",
       "caller": "local/azure-sdk-arrow-bindings::worker.ts::bare",
       "target": null,
@@ -370,6 +498,18 @@
         "start": 770,
         "end": 831
       }
+    },
+    {
+      "id": "local/azure-sdk-arrow-bindings::worker.ts::builtin::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.ts::builtin",
+      "target": "local/azure-sdk-arrow-bindings::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 770,
+        "end": 788
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-arrow-bindings::worker.ts::builtin::bus.createReceiver#0",
@@ -394,6 +534,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-arrow-bindings::worker.ts::commented::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.ts::commented",
+      "target": "local/azure-sdk-arrow-bindings::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 344,
+        "end": 362
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-arrow-bindings::worker.ts::commented::bus.createReceiver#0",
       "caller": "local/azure-sdk-arrow-bindings::worker.ts::commented",
       "target": null,
@@ -414,6 +566,18 @@
         "start": 458,
         "end": 526
       }
+    },
+    {
+      "id": "local/azure-sdk-arrow-bindings::worker.ts::parenthesized::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.ts::parenthesized",
+      "target": "local/azure-sdk-arrow-bindings::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 458,
+        "end": 476
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-arrow-bindings::worker.ts::parenthesized::bus.createReceiver#0",
@@ -438,6 +602,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-arrow-bindings::worker.ts::send::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.ts::send",
+      "target": "local/azure-sdk-arrow-bindings::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 124,
+        "end": 140
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-arrow-bindings::worker.ts::send::bus.createSender#0",
       "caller": "local/azure-sdk-arrow-bindings::worker.ts::send",
       "target": null,
@@ -458,6 +634,18 @@
         "start": 682,
         "end": 740
       }
+    },
+    {
+      "id": "local/azure-sdk-arrow-bindings::worker.ts::unaffected::(member)bus#0",
+      "caller": "local/azure-sdk-arrow-bindings::worker.ts::unaffected",
+      "target": "local/azure-sdk-arrow-bindings::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 682,
+        "end": 700
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-arrow-bindings::worker.ts::unaffected::bus.createReceiver#0",
@@ -541,6 +729,34 @@
       "contract": "channel::servicebus::shadowed-route-ts",
       "site": "local/azure-sdk-arrow-bindings::worker.ts::unaffected",
       "via": null
+    }
+  ],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "local/azure-sdk-arrow-bindings::worker.js::asynchronous",
+        "local/azure-sdk-arrow-bindings::worker.js::bare",
+        "local/azure-sdk-arrow-bindings::worker.js::builtin",
+        "local/azure-sdk-arrow-bindings::worker.js::bus",
+        "local/azure-sdk-arrow-bindings::worker.js::commented",
+        "local/azure-sdk-arrow-bindings::worker.js::parenthesized",
+        "local/azure-sdk-arrow-bindings::worker.js::send",
+        "local/azure-sdk-arrow-bindings::worker.js::unaffected"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "local/azure-sdk-arrow-bindings::worker.ts::asynchronous",
+        "local/azure-sdk-arrow-bindings::worker.ts::bare",
+        "local/azure-sdk-arrow-bindings::worker.ts::builtin",
+        "local/azure-sdk-arrow-bindings::worker.ts::bus",
+        "local/azure-sdk-arrow-bindings::worker.ts::commented",
+        "local/azure-sdk-arrow-bindings::worker.ts::parenthesized",
+        "local/azure-sdk-arrow-bindings::worker.ts::send",
+        "local/azure-sdk-arrow-bindings::worker.ts::unaffected"
+      ]
     }
   ],
   "links": [

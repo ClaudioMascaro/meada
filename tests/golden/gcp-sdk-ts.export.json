@@ -13,6 +13,15 @@
   ],
   "symbols": [
     {
+      "id": "local/gcp-sdk-ts::send.js::bus",
+      "span": {
+        "path": "send.js",
+        "start": 205,
+        "end": 220
+      },
+      "hash": "e7f048ee69e0744fce679e829fb55e456d32adc5bf548d10359f7a433d66134e"
+    },
+    {
       "id": "local/gcp-sdk-ts::send.js::handle",
       "span": {
         "path": "send.js",
@@ -29,6 +38,15 @@
         "end": 1158
       },
       "hash": "bf74b12c73a5cb73de2163bc04b55b944db83e7e9b04cd061d5ca40ffa6162f3"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.js::object",
+      "span": {
+        "path": "send.js",
+        "start": 396,
+        "end": 453
+      },
+      "hash": "a4b93b25c953773e1c2676760cc5405bedecd41b41434afacd770d3b48bc4f4d"
     },
     {
       "id": "local/gcp-sdk-ts::send.js::read",
@@ -58,6 +76,15 @@
       "hash": "9f1ef742884991dbd5796d995876bbef0a86674bde595a5faa5fd13e23f80d3f"
     },
     {
+      "id": "local/gcp-sdk-ts::send.js::secrets",
+      "span": {
+        "path": "send.js",
+        "start": 461,
+        "end": 484
+      },
+      "hash": "6fdf9b599f4e1103835b57a3e2f70ecea90357c086df51402afa24ca8ec32b2c"
+    },
+    {
       "id": "local/gcp-sdk-ts::send.js::send",
       "span": {
         "path": "send.js",
@@ -65,6 +92,33 @@
         "end": 544
       },
       "hash": "3d823496c816d9344071035246986eaeac991bc07b357bd9ef40d42e55eb5de7"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.js::storage",
+      "span": {
+        "path": "send.js",
+        "start": 367,
+        "end": 388
+      },
+      "hash": "3c3bfa59020875626932821797fc198fe797f7b3b38d83c88a34b611f66e80ae"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.js::subscription",
+      "span": {
+        "path": "send.js",
+        "start": 287,
+        "end": 359
+      },
+      "hash": "7b2e0303756488c1ff8ad0cc6433fc72dc36984af577ed86303b44cf970785d0"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.js::topic",
+      "span": {
+        "path": "send.js",
+        "start": 228,
+        "end": 279
+      },
+      "hash": "68e5d1614f73dfda5f082030008faadabf9a6ef2c5fb772ee7829aec906db72b"
     },
     {
       "id": "local/gcp-sdk-ts::send.js::unknown",
@@ -85,6 +139,15 @@
       "hash": "11a07516645a7f4c9169dbb21103c9672818d7ff16a96c34d87b3489e0efd0b5"
     },
     {
+      "id": "local/gcp-sdk-ts::send.ts::bus",
+      "span": {
+        "path": "send.ts",
+        "start": 205,
+        "end": 220
+      },
+      "hash": "e7f048ee69e0744fce679e829fb55e456d32adc5bf548d10359f7a433d66134e"
+    },
+    {
       "id": "local/gcp-sdk-ts::send.ts::handle",
       "span": {
         "path": "send.ts",
@@ -101,6 +164,15 @@
         "end": 1158
       },
       "hash": "bf74b12c73a5cb73de2163bc04b55b944db83e7e9b04cd061d5ca40ffa6162f3"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::object",
+      "span": {
+        "path": "send.ts",
+        "start": 396,
+        "end": 453
+      },
+      "hash": "107cd968443c821374166c92d2bae09015cf2ad1689fbee280ebcc208158a207"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::read",
@@ -130,6 +202,15 @@
       "hash": "19f902eaacd7f7f84ec91ecdb756a51a504d64d8e6748c8d95af03a61b428edd"
     },
     {
+      "id": "local/gcp-sdk-ts::send.ts::secrets",
+      "span": {
+        "path": "send.ts",
+        "start": 461,
+        "end": 484
+      },
+      "hash": "6fdf9b599f4e1103835b57a3e2f70ecea90357c086df51402afa24ca8ec32b2c"
+    },
+    {
       "id": "local/gcp-sdk-ts::send.ts::send",
       "span": {
         "path": "send.ts",
@@ -137,6 +218,33 @@
         "end": 544
       },
       "hash": "3d823496c816d9344071035246986eaeac991bc07b357bd9ef40d42e55eb5de7"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::storage",
+      "span": {
+        "path": "send.ts",
+        "start": 367,
+        "end": 388
+      },
+      "hash": "3c3bfa59020875626932821797fc198fe797f7b3b38d83c88a34b611f66e80ae"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::subscription",
+      "span": {
+        "path": "send.ts",
+        "start": 287,
+        "end": 359
+      },
+      "hash": "bc3c639606eeeeff48c08d30df880ec0d3cbc2b9710a131d55f7810265b70d3a"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::topic",
+      "span": {
+        "path": "send.ts",
+        "start": 228,
+        "end": 279
+      },
+      "hash": "5ef26f2b3438693df3b9fb8f15849639031e6def92746f07f851f529ec4a8b29"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::unknown",
@@ -167,7 +275,34 @@
         "path": "send.js",
         "start": 405,
         "end": 453
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.js::object"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.js::(member)bus#0",
+      "caller": "local/gcp-sdk-ts::send.js",
+      "target": "local/gcp-sdk-ts::send.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "send.js",
+        "start": 236,
+        "end": 245
+      },
+      "kind": "member",
+      "holder": "local/gcp-sdk-ts::send.js::topic"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.js::(member)storage#0",
+      "caller": "local/gcp-sdk-ts::send.js",
+      "target": "local/gcp-sdk-ts::send.js::storage",
+      "level": "exact",
+      "span": {
+        "path": "send.js",
+        "start": 405,
+        "end": 419
+      },
+      "kind": "member",
+      "holder": "local/gcp-sdk-ts::send.js::object"
     },
     {
       "id": "local/gcp-sdk-ts::send.js::Bus#0",
@@ -178,7 +313,8 @@
         "path": "send.js",
         "start": 211,
         "end": 220
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.js::bus"
     },
     {
       "id": "local/gcp-sdk-ts::send.js::Secrets#0",
@@ -189,7 +325,8 @@
         "path": "send.js",
         "start": 471,
         "end": 484
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.js::secrets"
     },
     {
       "id": "local/gcp-sdk-ts::send.js::Store#0",
@@ -200,7 +337,8 @@
         "path": "send.js",
         "start": 377,
         "end": 388
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.js::storage"
     },
     {
       "id": "local/gcp-sdk-ts::send.js::bus.subscription#0",
@@ -211,7 +349,8 @@
         "path": "send.js",
         "start": 302,
         "end": 359
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.js::subscription"
     },
     {
       "id": "local/gcp-sdk-ts::send.js::bus.topic#0",
@@ -222,7 +361,8 @@
         "path": "send.js",
         "start": 236,
         "end": 279
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.js::topic"
     },
     {
       "id": "local/gcp-sdk-ts::send.js::hidden::(call_expression).file#0",
@@ -324,6 +464,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-ts::send.js::read::(member)object#0",
+      "caller": "local/gcp-sdk-ts::send.js::read",
+      "target": "local/gcp-sdk-ts::send.js::object",
+      "level": "exact",
+      "span": {
+        "path": "send.js",
+        "start": 683,
+        "end": 698
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-ts::send.js::read::object.download#0",
       "caller": "local/gcp-sdk-ts::send.js::read",
       "target": null,
@@ -333,6 +485,30 @@
         "start": 683,
         "end": 700
       }
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.js::receive::(member)subscription#0",
+      "caller": "local/gcp-sdk-ts::send.js::receive",
+      "target": "local/gcp-sdk-ts::send.js::subscription",
+      "level": "exact",
+      "span": {
+        "path": "send.js",
+        "start": 573,
+        "end": 588
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.js::receive::(value)handle#0",
+      "caller": "local/gcp-sdk-ts::send.js::receive",
+      "target": "local/gcp-sdk-ts::send.js::handle",
+      "level": "exact",
+      "span": {
+        "path": "send.js",
+        "start": 600,
+        "end": 606
+      },
+      "kind": "value"
     },
     {
       "id": "local/gcp-sdk-ts::send.js::receive::subscription.on#0",
@@ -346,6 +522,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-ts::send.js::secret::(member)secrets#0",
+      "caller": "local/gcp-sdk-ts::send.js::secret",
+      "target": "local/gcp-sdk-ts::send.js::secrets",
+      "level": "exact",
+      "span": {
+        "path": "send.js",
+        "start": 731,
+        "end": 758
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-ts::send.js::secret::secrets.accessSecretVersion#0",
       "caller": "local/gcp-sdk-ts::send.js::secret",
       "target": null,
@@ -355,6 +543,18 @@
         "start": 731,
         "end": 818
       }
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.js::send::(member)topic#0",
+      "caller": "local/gcp-sdk-ts::send.js::send",
+      "target": "local/gcp-sdk-ts::send.js::topic",
+      "level": "exact",
+      "span": {
+        "path": "send.js",
+        "start": 511,
+        "end": 531
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-ts::send.js::send::topic.publishMessage#0",
@@ -376,7 +576,8 @@
         "path": "send.js",
         "start": 405,
         "end": 433
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.js::object"
     },
     {
       "id": "local/gcp-sdk-ts::send.js::unknown::(call_expression).publishMessage#0",
@@ -401,6 +602,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-ts::send.js::write::(member)object#0",
+      "caller": "local/gcp-sdk-ts::send.js::write",
+      "target": "local/gcp-sdk-ts::send.js::object",
+      "level": "exact",
+      "span": {
+        "path": "send.js",
+        "start": 637,
+        "end": 648
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-ts::send.js::write::object.save#0",
       "caller": "local/gcp-sdk-ts::send.js::write",
       "target": null,
@@ -420,7 +633,34 @@
         "path": "send.ts",
         "start": 405,
         "end": 453
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.ts::object"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::(member)bus#0",
+      "caller": "local/gcp-sdk-ts::send.ts",
+      "target": "local/gcp-sdk-ts::send.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "send.ts",
+        "start": 236,
+        "end": 245
+      },
+      "kind": "member",
+      "holder": "local/gcp-sdk-ts::send.ts::topic"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::(member)storage#0",
+      "caller": "local/gcp-sdk-ts::send.ts",
+      "target": "local/gcp-sdk-ts::send.ts::storage",
+      "level": "exact",
+      "span": {
+        "path": "send.ts",
+        "start": 405,
+        "end": 419
+      },
+      "kind": "member",
+      "holder": "local/gcp-sdk-ts::send.ts::object"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::Bus#0",
@@ -431,7 +671,8 @@
         "path": "send.ts",
         "start": 211,
         "end": 220
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.ts::bus"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::Secrets#0",
@@ -442,7 +683,8 @@
         "path": "send.ts",
         "start": 471,
         "end": 484
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.ts::secrets"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::Store#0",
@@ -453,7 +695,8 @@
         "path": "send.ts",
         "start": 377,
         "end": 388
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.ts::storage"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::bus.subscription#0",
@@ -464,7 +707,8 @@
         "path": "send.ts",
         "start": 302,
         "end": 359
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.ts::subscription"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::bus.topic#0",
@@ -475,7 +719,8 @@
         "path": "send.ts",
         "start": 236,
         "end": 279
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.ts::topic"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::hidden::(call_expression).file#0",
@@ -577,6 +822,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-ts::send.ts::read::(member)object#0",
+      "caller": "local/gcp-sdk-ts::send.ts::read",
+      "target": "local/gcp-sdk-ts::send.ts::object",
+      "level": "exact",
+      "span": {
+        "path": "send.ts",
+        "start": 683,
+        "end": 698
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-ts::send.ts::read::object.download#0",
       "caller": "local/gcp-sdk-ts::send.ts::read",
       "target": null,
@@ -586,6 +843,30 @@
         "start": 683,
         "end": 700
       }
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::receive::(member)subscription#0",
+      "caller": "local/gcp-sdk-ts::send.ts::receive",
+      "target": "local/gcp-sdk-ts::send.ts::subscription",
+      "level": "exact",
+      "span": {
+        "path": "send.ts",
+        "start": 573,
+        "end": 588
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::receive::(value)handle#0",
+      "caller": "local/gcp-sdk-ts::send.ts::receive",
+      "target": "local/gcp-sdk-ts::send.ts::handle",
+      "level": "exact",
+      "span": {
+        "path": "send.ts",
+        "start": 600,
+        "end": 606
+      },
+      "kind": "value"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::receive::subscription.on#0",
@@ -599,6 +880,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-ts::send.ts::secret::(member)secrets#0",
+      "caller": "local/gcp-sdk-ts::send.ts::secret",
+      "target": "local/gcp-sdk-ts::send.ts::secrets",
+      "level": "exact",
+      "span": {
+        "path": "send.ts",
+        "start": 731,
+        "end": 758
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-ts::send.ts::secret::secrets.accessSecretVersion#0",
       "caller": "local/gcp-sdk-ts::send.ts::secret",
       "target": null,
@@ -608,6 +901,18 @@
         "start": 731,
         "end": 818
       }
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::send::(member)topic#0",
+      "caller": "local/gcp-sdk-ts::send.ts::send",
+      "target": "local/gcp-sdk-ts::send.ts::topic",
+      "level": "exact",
+      "span": {
+        "path": "send.ts",
+        "start": 511,
+        "end": 531
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::send::topic.publishMessage#0",
@@ -629,7 +934,8 @@
         "path": "send.ts",
         "start": 405,
         "end": 433
-      }
+      },
+      "holder": "local/gcp-sdk-ts::send.ts::object"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::unknown::(call_expression).publishMessage#0",
@@ -652,6 +958,18 @@
         "start": 1193,
         "end": 1219
       }
+    },
+    {
+      "id": "local/gcp-sdk-ts::send.ts::write::(member)object#0",
+      "caller": "local/gcp-sdk-ts::send.ts::write",
+      "target": "local/gcp-sdk-ts::send.ts::object",
+      "level": "exact",
+      "span": {
+        "path": "send.ts",
+        "start": 637,
+        "end": 648
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-ts::send.ts::write::object.save#0",
@@ -713,6 +1031,72 @@
       "contract": "resource::gcpsecretmanager::token-ts",
       "site": "local/gcp-sdk-ts::send.ts::secret::secrets.accessSecretVersion#0",
       "via": null
+    }
+  ],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "local/gcp-sdk-ts::send.js::bus",
+        "local/gcp-sdk-ts::send.js::send",
+        "local/gcp-sdk-ts::send.js::topic"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "local/gcp-sdk-ts::send.js::handle",
+        "local/gcp-sdk-ts::send.js::receive",
+        "local/gcp-sdk-ts::send.js::subscription"
+      ]
+    },
+    {
+      "name": ".#3",
+      "members": [
+        "local/gcp-sdk-ts::send.js::object",
+        "local/gcp-sdk-ts::send.js::read",
+        "local/gcp-sdk-ts::send.js::storage",
+        "local/gcp-sdk-ts::send.js::write"
+      ]
+    },
+    {
+      "name": ".#4",
+      "members": [
+        "local/gcp-sdk-ts::send.js::secret",
+        "local/gcp-sdk-ts::send.js::secrets"
+      ]
+    },
+    {
+      "name": ".#5",
+      "members": [
+        "local/gcp-sdk-ts::send.ts::bus",
+        "local/gcp-sdk-ts::send.ts::send",
+        "local/gcp-sdk-ts::send.ts::topic"
+      ]
+    },
+    {
+      "name": ".#6",
+      "members": [
+        "local/gcp-sdk-ts::send.ts::handle",
+        "local/gcp-sdk-ts::send.ts::receive",
+        "local/gcp-sdk-ts::send.ts::subscription"
+      ]
+    },
+    {
+      "name": ".#7",
+      "members": [
+        "local/gcp-sdk-ts::send.ts::object",
+        "local/gcp-sdk-ts::send.ts::read",
+        "local/gcp-sdk-ts::send.ts::storage",
+        "local/gcp-sdk-ts::send.ts::write"
+      ]
+    },
+    {
+      "name": ".#8",
+      "members": [
+        "local/gcp-sdk-ts::send.ts::secret",
+        "local/gcp-sdk-ts::send.ts::secrets"
+      ]
     }
   ],
   "links": [

@@ -63,6 +63,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/acme/vets-web::src/block.ts::BASE",
+      "span": {
+        "path": "src/block.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
+    },
+    {
       "id": "example.com/acme/vets-web::src/block.ts::owners",
       "span": {
         "path": "src/block.ts",
@@ -99,6 +108,15 @@
       "hash": "e2159aa412e41387767e572bf16cfbf03cb4717eb9b6e8a2b34080581ecef242"
     },
     {
+      "id": "example.com/acme/vets-web::src/builder.ts::BASE",
+      "span": {
+        "path": "src/builder.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
+    },
+    {
       "id": "example.com/acme/vets-web::src/builder.ts::ownersUrl",
       "span": {
         "path": "src/builder.ts",
@@ -124,6 +142,15 @@
         "end": 207
       },
       "hash": "b224a4ba4ac7a56409b4fa43341b7ce64dfb2be1e71d85c1f1469694fa62f9de"
+    },
+    {
+      "id": "example.com/acme/vets-web::src/env.ts::BASE",
+      "span": {
+        "path": "src/env.ts",
+        "start": 6,
+        "end": 32
+      },
+      "hash": "8df73e915d5b22f084f2b8529593162b2c48edda23ee370611a752701db4d2b9"
     },
     {
       "id": "example.com/acme/vets-web::src/env.ts::owners",
@@ -196,6 +223,15 @@
         "end": 204
       },
       "hash": "d4bc161a9daac1cc3e76287cebd479e1f2eb9742340b50bc9ef9a7c421234a18"
+    },
+    {
+      "id": "example.com/acme/vets-web::src/join.ts::API",
+      "span": {
+        "path": "src/join.ts",
+        "start": 6,
+        "end": 37
+      },
+      "hash": "fbeb918c0e0c70186d0a964bfca6f12525367840d23ed22962b924e7cc002eab"
     },
     {
       "id": "example.com/acme/vets-web::src/join.ts::absolute",
@@ -360,6 +396,15 @@
       "hash": "e8832d7eb55f499f63dd9acc1e3f3055da1f16051b78dca2fc619543b1c857f4"
     },
     {
+      "id": "example.com/acme/vets-web::src/local.ts::BASE",
+      "span": {
+        "path": "src/local.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
+    },
+    {
       "id": "example.com/acme/vets-web::src/local.ts::url",
       "span": {
         "path": "src/local.ts",
@@ -376,6 +421,15 @@
         "end": 186
       },
       "hash": "e2159aa412e41387767e572bf16cfbf03cb4717eb9b6e8a2b34080581ecef242"
+    },
+    {
+      "id": "example.com/acme/vets-web::src/names.ts::BASE",
+      "span": {
+        "path": "src/names.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
     },
     {
       "id": "example.com/acme/vets-web::src/names.ts::vets",
@@ -459,6 +513,15 @@
       "hash": "e2159aa412e41387767e572bf16cfbf03cb4717eb9b6e8a2b34080581ecef242"
     },
     {
+      "id": "example.com/acme/vets-web::src/plain.js::BASE",
+      "span": {
+        "path": "src/plain.js",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
+    },
+    {
       "id": "example.com/acme/vets-web::src/plain.js::url",
       "span": {
         "path": "src/plain.js",
@@ -477,6 +540,15 @@
       "hash": "e2159aa412e41387767e572bf16cfbf03cb4717eb9b6e8a2b34080581ecef242"
     },
     {
+      "id": "example.com/acme/vets-web::src/statements.ts::BASE",
+      "span": {
+        "path": "src/statements.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
+    },
+    {
       "id": "example.com/acme/vets-web::src/statements.ts::url",
       "span": {
         "path": "src/statements.ts",
@@ -493,6 +565,15 @@
         "end": 222
       },
       "hash": "e2159aa412e41387767e572bf16cfbf03cb4717eb9b6e8a2b34080581ecef242"
+    },
+    {
+      "id": "example.com/acme/vets-web::src/whatwg.ts::BASE",
+      "span": {
+        "path": "src/whatwg.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
     },
     {
       "id": "example.com/acme/vets-web::src/whatwg.ts::get",
@@ -558,6 +639,15 @@
       "hash": "4857684ebf93feccce24e0ef52ac79dcf9d42c7fcb8ec6b0c39f58f44e635f18"
     },
     {
+      "id": "example.com/acme/vets-web::src/written.ts::BASE",
+      "span": {
+        "path": "src/written.ts",
+        "start": 6,
+        "end": 38
+      },
+      "hash": "1e73ffb6c947b06092d350bf4c22b2e93be8bb373de37c142f8ee36f2dd85261"
+    },
+    {
       "id": "example.com/acme/vets-web::src/written.ts::owners",
       "span": {
         "path": "src/written.ts",
@@ -600,6 +690,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/block.ts::trimmed::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/block.ts::trimmed",
+      "target": "example.com/acme/vets-web::src/block.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/block.ts",
+        "start": 301,
+        "end": 305
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/block.ts::trimmed::p.trim#0",
       "caller": "example.com/acme/vets-web::src/block.ts::trimmed",
       "target": null,
@@ -609,6 +711,18 @@
         "start": 279,
         "end": 287
       }
+    },
+    {
+      "id": "example.com/acme/vets-web::src/block.ts::url::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/block.ts::url",
+      "target": "example.com/acme/vets-web::src/block.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/block.ts",
+        "start": 144,
+        "end": 148
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/vets-web::src/block.ts::vets::fetch#0",
@@ -631,6 +745,30 @@
         "start": 361,
         "end": 376
       }
+    },
+    {
+      "id": "example.com/acme/vets-web::src/builder.ts::ownersUrl::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/builder.ts::ownersUrl",
+      "target": "example.com/acme/vets-web::src/builder.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/builder.ts",
+        "start": 251,
+        "end": 255
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/acme/vets-web::src/builder.ts::url::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/builder.ts::url",
+      "target": "example.com/acme/vets-web::src/builder.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/builder.ts",
+        "start": 151,
+        "end": 155
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/vets-web::src/declared.ts::vets::(new_expression).toString#0",
@@ -688,6 +826,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/env.ts::url::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/env.ts::url",
+      "target": "example.com/acme/vets-web::src/env.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/env.ts",
+        "start": 64,
+        "end": 68
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/env.ts::vets::fetch#0",
       "caller": "example.com/acme/vets-web::src/env.ts::vets",
       "target": null,
@@ -708,6 +858,19 @@
         "start": 178,
         "end": 193
       }
+    },
+    {
+      "id": "example.com/acme/vets-web::src/hidden.ts::(value)url#0",
+      "caller": "example.com/acme/vets-web::src/hidden.ts",
+      "target": "example.com/acme/vets-web::src/builder.ts::url",
+      "level": "exact",
+      "span": {
+        "path": "src/hidden.ts",
+        "start": 504,
+        "end": 507
+      },
+      "kind": "value",
+      "holder": "example.com/acme/vets-web::src/hidden.ts::unused"
     },
     {
       "id": "example.com/acme/vets-web::src/hidden.ts::owners::fail#0",
@@ -836,6 +999,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/join.ts::absolutePath::(value)API#0",
+      "caller": "example.com/acme/vets-web::src/join.ts::absolutePath",
+      "target": "example.com/acme/vets-web::src/join.ts::API",
+      "level": "exact",
+      "span": {
+        "path": "src/join.ts",
+        "start": 676,
+        "end": 679
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/join.ts::absolutePath::URL#0",
       "caller": "example.com/acme/vets-web::src/join.ts::absolutePath",
       "target": "example.com/acme/vets-web::src/own.ts::URL",
@@ -902,6 +1077,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/join.ts::envReference::(value)API#0",
+      "caller": "example.com/acme/vets-web::src/join.ts::envReference",
+      "target": "example.com/acme/vets-web::src/join.ts::API",
+      "level": "exact",
+      "span": {
+        "path": "src/join.ts",
+        "start": 2190,
+        "end": 2193
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/join.ts::envReference::URL#0",
       "caller": "example.com/acme/vets-web::src/join.ts::envReference",
       "target": "example.com/acme/vets-web::src/own.ts::URL",
@@ -946,6 +1133,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/join.ts::fragmentOnly::(value)API#0",
+      "caller": "example.com/acme/vets-web::src/join.ts::fragmentOnly",
+      "target": "example.com/acme/vets-web::src/join.ts::API",
+      "level": "exact",
+      "span": {
+        "path": "src/join.ts",
+        "start": 2338,
+        "end": 2341
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/join.ts::fragmentOnly::URL#0",
       "caller": "example.com/acme/vets-web::src/join.ts::fragmentOnly",
       "target": "example.com/acme/vets-web::src/own.ts::URL",
@@ -988,6 +1187,18 @@
         "start": 1370,
         "end": 1403
       }
+    },
+    {
+      "id": "example.com/acme/vets-web::src/join.ts::get::(value)API#0",
+      "caller": "example.com/acme/vets-web::src/join.ts::get",
+      "target": "example.com/acme/vets-web::src/join.ts::API",
+      "level": "exact",
+      "span": {
+        "path": "src/join.ts",
+        "start": 1321,
+        "end": 1324
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/vets-web::src/join.ts::get::URL#0",
@@ -1100,6 +1311,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/join.ts::queryOnly::(value)API#0",
+      "caller": "example.com/acme/vets-web::src/join.ts::queryOnly",
+      "target": "example.com/acme/vets-web::src/join.ts::API",
+      "level": "exact",
+      "span": {
+        "path": "src/join.ts",
+        "start": 2264,
+        "end": 2267
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/join.ts::queryOnly::URL#0",
       "caller": "example.com/acme/vets-web::src/join.ts::queryOnly",
       "target": "example.com/acme/vets-web::src/own.ts::URL",
@@ -1120,6 +1343,18 @@
         "start": 2239,
         "end": 2269
       }
+    },
+    {
+      "id": "example.com/acme/vets-web::src/join.ts::relativeUnderSlash::(value)API#0",
+      "caller": "example.com/acme/vets-web::src/join.ts::relativeUnderSlash",
+      "target": "example.com/acme/vets-web::src/join.ts::API",
+      "level": "exact",
+      "span": {
+        "path": "src/join.ts",
+        "start": 880,
+        "end": 883
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/vets-web::src/join.ts::relativeUnderSlash::URL#0",
@@ -1144,6 +1379,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/join.ts::relativeWithoutSlash::(value)API#0",
+      "caller": "example.com/acme/vets-web::src/join.ts::relativeWithoutSlash",
+      "target": "example.com/acme/vets-web::src/join.ts::API",
+      "level": "exact",
+      "span": {
+        "path": "src/join.ts",
+        "start": 1020,
+        "end": 1023
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/join.ts::relativeWithoutSlash::URL#0",
       "caller": "example.com/acme/vets-web::src/join.ts::relativeWithoutSlash",
       "target": "example.com/acme/vets-web::src/own.ts::URL",
@@ -1164,6 +1411,18 @@
         "start": 991,
         "end": 1031
       }
+    },
+    {
+      "id": "example.com/acme/vets-web::src/join.ts::throughConstant::(value)API#0",
+      "caller": "example.com/acme/vets-web::src/join.ts::throughConstant",
+      "target": "example.com/acme/vets-web::src/join.ts::API",
+      "level": "exact",
+      "span": {
+        "path": "src/join.ts",
+        "start": 1144,
+        "end": 1147
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/vets-web::src/join.ts::throughConstant::URL#0",
@@ -1188,6 +1447,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/join.ts::wrapped::(value)API#0",
+      "caller": "example.com/acme/vets-web::src/join.ts::wrapped",
+      "target": "example.com/acme/vets-web::src/join.ts::API",
+      "level": "exact",
+      "span": {
+        "path": "src/join.ts",
+        "start": 1472,
+        "end": 1475
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/join.ts::wrapped::from#0",
       "caller": "example.com/acme/vets-web::src/join.ts::wrapped",
       "target": "example.com/acme/vets-web::src/join.ts::from",
@@ -1210,6 +1481,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/local.ts::url::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/local.ts::url",
+      "target": "example.com/acme/vets-web::src/local.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/local.ts",
+        "start": 70,
+        "end": 74
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/local.ts::vets::fetch#0",
       "caller": "example.com/acme/vets-web::src/local.ts::vets",
       "target": null,
@@ -1230,6 +1513,18 @@
         "start": 167,
         "end": 182
       }
+    },
+    {
+      "id": "example.com/acme/vets-web::src/names.ts::vets.url::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/names.ts::vets.url",
+      "target": "example.com/acme/vets-web::src/names.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/names.ts",
+        "start": 208,
+        "end": 212
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/vets-web::src/names.ts::vets::client.url#0",
@@ -1353,6 +1648,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/plain.js::url::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/plain.js::url",
+      "target": "example.com/acme/vets-web::src/plain.js::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/plain.js",
+        "start": 62,
+        "end": 66
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/plain.js::vets::fetch#0",
       "caller": "example.com/acme/vets-web::src/plain.js::vets",
       "target": null,
@@ -1373,6 +1680,18 @@
         "start": 150,
         "end": 165
       }
+    },
+    {
+      "id": "example.com/acme/vets-web::src/statements.ts::url::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/statements.ts::url",
+      "target": "example.com/acme/vets-web::src/statements.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/statements.ts",
+        "start": 144,
+        "end": 148
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/vets-web::src/statements.ts::url::p.trim#0",
@@ -1419,6 +1738,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/whatwg.ts::owners::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/whatwg.ts::owners",
+      "target": "example.com/acme/vets-web::src/whatwg.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/whatwg.ts",
+        "start": 317,
+        "end": 321
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/whatwg.ts::owners::URL#0",
       "caller": "example.com/acme/vets-web::src/whatwg.ts::owners",
       "target": "example.com/acme/vets-web::src/own.ts::URL",
@@ -1439,6 +1770,18 @@
         "start": 346,
         "end": 359
       }
+    },
+    {
+      "id": "example.com/acme/vets-web::src/whatwg.ts::ownersInTemplate::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/whatwg.ts::ownersInTemplate",
+      "target": "example.com/acme/vets-web::src/whatwg.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/whatwg.ts",
+        "start": 594,
+        "end": 598
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/vets-web::src/whatwg.ts::ownersInTemplate::URL#0",
@@ -1474,6 +1817,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/whatwg.ts::ownersThroughWrapper::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/whatwg.ts::ownersThroughWrapper",
+      "target": "example.com/acme/vets-web::src/whatwg.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/whatwg.ts",
+        "start": 1042,
+        "end": 1046
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/whatwg.ts::ownersThroughWrapper::URL#0",
       "caller": "example.com/acme/vets-web::src/whatwg.ts::ownersThroughWrapper",
       "target": "example.com/acme/vets-web::src/own.ts::URL",
@@ -1507,6 +1862,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/whatwg.ts::vets::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/whatwg.ts::vets",
+      "target": "example.com/acme/vets-web::src/whatwg.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/whatwg.ts",
+        "start": 177,
+        "end": 181
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/whatwg.ts::vets::URL#0",
       "caller": "example.com/acme/vets-web::src/whatwg.ts::vets",
       "target": "example.com/acme/vets-web::src/own.ts::URL",
@@ -1527,6 +1894,18 @@
         "start": 160,
         "end": 205
       }
+    },
+    {
+      "id": "example.com/acme/vets-web::src/whatwg.ts::vetsAsString::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/whatwg.ts::vetsAsString",
+      "target": "example.com/acme/vets-web::src/whatwg.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/whatwg.ts",
+        "start": 486,
+        "end": 490
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/vets-web::src/whatwg.ts::vetsAsString::String#0",
@@ -1560,6 +1939,18 @@
         "start": 513,
         "end": 529
       }
+    },
+    {
+      "id": "example.com/acme/vets-web::src/whatwg.ts::vetsQuery::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/whatwg.ts::vetsQuery",
+      "target": "example.com/acme/vets-web::src/whatwg.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/whatwg.ts",
+        "start": 743,
+        "end": 747
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/vets-web::src/whatwg.ts::vetsQuery::URL#0",
@@ -1606,6 +1997,18 @@
       }
     },
     {
+      "id": "example.com/acme/vets-web::src/written.ts::owners::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/written.ts::owners",
+      "target": "example.com/acme/vets-web::src/written.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/written.ts",
+        "start": 323,
+        "end": 327
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/vets-web::src/written.ts::owners::URL#0",
       "caller": "example.com/acme/vets-web::src/written.ts::owners",
       "target": "example.com/acme/vets-web::src/own.ts::URL",
@@ -1626,6 +2029,18 @@
         "start": 376,
         "end": 389
       }
+    },
+    {
+      "id": "example.com/acme/vets-web::src/written.ts::vets::(value)BASE#0",
+      "caller": "example.com/acme/vets-web::src/written.ts::vets",
+      "target": "example.com/acme/vets-web::src/written.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/written.ts",
+        "start": 148,
+        "end": 152
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/vets-web::src/written.ts::vets::URL#0",
@@ -1873,84 +2288,77 @@
     {
       "name": "src",
       "members": [
+        "example.com/acme/vets-web::src/block.ts::BASE",
         "example.com/acme/vets-web::src/block.ts::owners",
-        "example.com/acme/vets-web::src/block.ts::trimmed"
-      ]
-    },
-    {
-      "name": "src#10",
-      "members": [
-        "example.com/acme/vets-web::src/local.ts::url",
-        "example.com/acme/vets-web::src/local.ts::vets"
-      ]
-    },
-    {
-      "name": "src#11",
-      "members": [
-        "example.com/acme/vets-web::src/plain.js::url",
-        "example.com/acme/vets-web::src/plain.js::vets"
-      ]
-    },
-    {
-      "name": "src#12",
-      "members": [
-        "example.com/acme/vets-web::src/statements.ts::url",
-        "example.com/acme/vets-web::src/statements.ts::vets"
-      ]
-    },
-    {
-      "name": "src#2",
-      "members": [
+        "example.com/acme/vets-web::src/block.ts::trimmed",
         "example.com/acme/vets-web::src/block.ts::url",
         "example.com/acme/vets-web::src/block.ts::vets"
       ]
     },
     {
+      "name": "src#10",
+      "members": [
+        "example.com/acme/vets-web::src/statements.ts::BASE",
+        "example.com/acme/vets-web::src/statements.ts::url",
+        "example.com/acme/vets-web::src/statements.ts::vets"
+      ]
+    },
+    {
+      "name": "src#11",
+      "members": [
+        "example.com/acme/vets-web::src/written.ts::BASE",
+        "example.com/acme/vets-web::src/written.ts::owners",
+        "example.com/acme/vets-web::src/written.ts::vets"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/acme/vets-web::src/builder.ts::BASE",
+        "example.com/acme/vets-web::src/builder.ts::ownersUrl",
+        "example.com/acme/vets-web::src/builder.ts::url",
+        "example.com/acme/vets-web::src/hidden.ts::unused",
+        "example.com/acme/vets-web::src/pages.ts::owners",
+        "example.com/acme/vets-web::src/pages.ts::ownersAgain",
+        "example.com/acme/vets-web::src/pages.ts::vets"
+      ]
+    },
+    {
       "name": "src#3",
       "members": [
-        "example.com/acme/vets-web::src/builder.ts::ownersUrl",
-        "example.com/acme/vets-web::src/pages.ts::ownersAgain"
+        "example.com/acme/vets-web::src/declared.ts::vets",
+        "example.com/acme/vets-web::src/own.ts::URL.toString",
+        "example.com/acme/vets-web::src/own.ts::vets",
+        "example.com/acme/vets-web::src/whatwg.ts::BASE",
+        "example.com/acme/vets-web::src/whatwg.ts::get",
+        "example.com/acme/vets-web::src/whatwg.ts::owners",
+        "example.com/acme/vets-web::src/whatwg.ts::ownersInTemplate",
+        "example.com/acme/vets-web::src/whatwg.ts::ownersThroughWrapper",
+        "example.com/acme/vets-web::src/whatwg.ts::vets",
+        "example.com/acme/vets-web::src/whatwg.ts::vetsAsString",
+        "example.com/acme/vets-web::src/whatwg.ts::vetsQuery"
       ]
     },
     {
       "name": "src#4",
       "members": [
-        "example.com/acme/vets-web::src/builder.ts::url",
-        "example.com/acme/vets-web::src/pages.ts::owners",
-        "example.com/acme/vets-web::src/pages.ts::vets"
-      ]
-    },
-    {
-      "name": "src#5",
-      "members": [
-        "example.com/acme/vets-web::src/declared.ts::vets",
-        "example.com/acme/vets-web::src/own.ts::URL.toString",
-        "example.com/acme/vets-web::src/own.ts::vets",
-        "example.com/acme/vets-web::src/whatwg.ts::get",
-        "example.com/acme/vets-web::src/whatwg.ts::ownersThroughWrapper",
-        "example.com/acme/vets-web::src/whatwg.ts::vets",
-        "example.com/acme/vets-web::src/whatwg.ts::vetsQuery",
-        "example.com/acme/vets-web::src/written.ts::vets"
-      ]
-    },
-    {
-      "name": "src#6",
-      "members": [
+        "example.com/acme/vets-web::src/env.ts::BASE",
         "example.com/acme/vets-web::src/env.ts::owners",
         "example.com/acme/vets-web::src/env.ts::url",
         "example.com/acme/vets-web::src/env.ts::vets"
       ]
     },
     {
-      "name": "src#7",
+      "name": "src#5",
       "members": [
         "example.com/acme/vets-web::src/hidden.ts::pets",
         "example.com/acme/vets-web::src/hidden.ts::pets.url"
       ]
     },
     {
-      "name": "src#8",
+      "name": "src#6",
       "members": [
+        "example.com/acme/vets-web::src/join.ts::API",
         "example.com/acme/vets-web::src/join.ts::absolute",
         "example.com/acme/vets-web::src/join.ts::absolutePath",
         "example.com/acme/vets-web::src/join.ts::envAbsolutePath",
@@ -1958,6 +2366,8 @@
         "example.com/acme/vets-web::src/join.ts::envReference",
         "example.com/acme/vets-web::src/join.ts::envRelative",
         "example.com/acme/vets-web::src/join.ts::fragmentOnly",
+        "example.com/acme/vets-web::src/join.ts::from",
+        "example.com/acme/vets-web::src/join.ts::get",
         "example.com/acme/vets-web::src/join.ts::holeAbsolutePath",
         "example.com/acme/vets-web::src/join.ts::holeBareAbsolutePath",
         "example.com/acme/vets-web::src/join.ts::holeBareRelative",
@@ -1966,19 +2376,31 @@
         "example.com/acme/vets-web::src/join.ts::relativeUnderSlash",
         "example.com/acme/vets-web::src/join.ts::relativeWithoutSlash",
         "example.com/acme/vets-web::src/join.ts::throughConstant",
-        "example.com/acme/vets-web::src/own.ts::URL",
-        "example.com/acme/vets-web::src/whatwg.ts::owners",
-        "example.com/acme/vets-web::src/whatwg.ts::ownersInTemplate",
-        "example.com/acme/vets-web::src/whatwg.ts::vetsAsString",
-        "example.com/acme/vets-web::src/written.ts::owners"
+        "example.com/acme/vets-web::src/join.ts::wrapped",
+        "example.com/acme/vets-web::src/own.ts::URL"
+      ]
+    },
+    {
+      "name": "src#7",
+      "members": [
+        "example.com/acme/vets-web::src/local.ts::BASE",
+        "example.com/acme/vets-web::src/local.ts::url",
+        "example.com/acme/vets-web::src/local.ts::vets"
+      ]
+    },
+    {
+      "name": "src#8",
+      "members": [
+        "example.com/acme/vets-web::src/names.ts::BASE",
+        "example.com/acme/vets-web::src/names.ts::vets.url"
       ]
     },
     {
       "name": "src#9",
       "members": [
-        "example.com/acme/vets-web::src/join.ts::from",
-        "example.com/acme/vets-web::src/join.ts::get",
-        "example.com/acme/vets-web::src/join.ts::wrapped"
+        "example.com/acme/vets-web::src/plain.js::BASE",
+        "example.com/acme/vets-web::src/plain.js::url",
+        "example.com/acme/vets-web::src/plain.js::vets"
       ]
     }
   ],

@@ -117,6 +117,15 @@
       "hash": "d20a5e68bc19266d19ea40faf79732e57fd758c7bc5c67974a7235a5dc03be85"
     },
     {
+      "id": "example.com/acme/backend::src/server.ts::app",
+      "span": {
+        "path": "src/server.ts",
+        "start": 70,
+        "end": 85
+      },
+      "hash": "ab91d989774dae76bf44e54fdab42d07cca448bdbcf381d1046ad2b0927e8966"
+    },
+    {
       "id": "example.com/acme/backend::src/unreadable.ts::GET /guarded",
       "span": {
         "path": "src/unreadable.ts",
@@ -144,6 +153,15 @@
       "hash": "ca8a15c5be37945dca54aac1b30425058c1070c271f7e81069d802a3387e8826"
     },
     {
+      "id": "example.com/acme/backend::src/unreadable.ts::app",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 83,
+        "end": 97
+      },
+      "hash": "c6242bc67329139fdc2c3d29afba26c6f22bb63af819c2f3760b8c5bb3cce88c"
+    },
+    {
       "id": "example.com/acme/backend::src/unreadable.ts::auth",
       "span": {
         "path": "src/unreadable.ts",
@@ -151,6 +169,24 @@
         "end": 1201
       },
       "hash": "3e6098a41a27efa469aa7bcc93f9764adf360b91741d56b6f9b9f3a39b8749db"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::guarded",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 1075,
+        "end": 1093
+      },
+      "hash": "a7c6a71746e3184f4002883faa8d503848d4201d9611953c4ed768869be67999"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::legacy",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 574,
+        "end": 591
+      },
+      "hash": "482af69db47a787a264bd71dcff11db7d679b667b1c6e17c56d0f3d0f5d2f85b"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::mountAt",
@@ -178,6 +214,24 @@
         "end": 1068
       },
       "hash": "a955e62a59d80f71ef4f96263dcbbc7c8ac970c427ef1c72f01900c4fd687639"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::npmGuarded",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 1388,
+        "end": 1409
+      },
+      "hash": "801afab2d3da9ae19ea0d70cfd283b5b87ab62b552243480820bdc88616fe2a1"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::plugin",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 917,
+        "end": 934
+      },
+      "hash": "92ed8ac8ba83e3144f823d925189213e6a2cf32ad5a3f8742bb0ec05a8a4c9e5"
     }
   ],
   "calls": [
@@ -204,6 +258,30 @@
       }
     },
     {
+      "id": "example.com/acme/backend::src/routes/index.ts::(member)api#0",
+      "caller": "example.com/acme/backend::src/routes/index.ts",
+      "target": "example.com/acme/backend::src/routes/index.ts::api",
+      "level": "exact",
+      "span": {
+        "path": "src/routes/index.ts",
+        "start": 166,
+        "end": 173
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/index.ts::(value)users#0",
+      "caller": "example.com/acme/backend::src/routes/index.ts",
+      "target": "example.com/acme/backend::src/routes/users.ts::users",
+      "level": "exact",
+      "span": {
+        "path": "src/routes/index.ts",
+        "start": 184,
+        "end": 189
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/backend::src/routes/index.ts::Router#0",
       "caller": "example.com/acme/backend::src/routes/index.ts",
       "target": null,
@@ -212,7 +290,8 @@
         "path": "src/routes/index.ts",
         "start": 83,
         "end": 91
-      }
+      },
+      "holder": "example.com/acme/backend::src/routes/index.ts::api"
     },
     {
       "id": "example.com/acme/backend::src/routes/index.ts::api.use#0",
@@ -226,6 +305,42 @@
       }
     },
     {
+      "id": "example.com/acme/backend::src/routes/users.ts::(member)users#0",
+      "caller": "example.com/acme/backend::src/routes/users.ts",
+      "target": "example.com/acme/backend::src/routes/users.ts::users",
+      "level": "exact",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 531,
+        "end": 543
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::(value)removeUser#0",
+      "caller": "example.com/acme/backend::src/routes/users.ts",
+      "target": "example.com/acme/backend::src/handlers.ts::removeUser",
+      "level": "exact",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 552,
+        "end": 562
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/acme/backend::src/routes/users.ts::(value)users#0",
+      "caller": "example.com/acme/backend::src/routes/users.ts",
+      "target": "example.com/acme/backend::src/routes/users.ts::users",
+      "level": "exact",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 663,
+        "end": 668
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/backend::src/routes/users.ts::Router#0",
       "caller": "example.com/acme/backend::src/routes/users.ts",
       "target": null,
@@ -234,7 +349,8 @@
         "path": "src/routes/users.ts",
         "start": 91,
         "end": 99
-      }
+      },
+      "holder": "example.com/acme/backend::src/routes/users.ts::users"
     },
     {
       "id": "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}#1::find#0",
@@ -303,6 +419,18 @@
       }
     },
     {
+      "id": "example.com/acme/backend::src/routes/users.ts::register::(member)users#0",
+      "caller": "example.com/acme/backend::src/routes/users.ts::register",
+      "target": "example.com/acme/backend::src/routes/users.ts::users",
+      "level": "exact",
+      "span": {
+        "path": "src/routes/users.ts",
+        "start": 266,
+        "end": 275
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/acme/backend::src/routes/users.ts::register::users.get#0",
       "caller": "example.com/acme/backend::src/routes/users.ts::register",
       "target": null,
@@ -345,6 +473,30 @@
         "start": 531,
         "end": 563
       }
+    },
+    {
+      "id": "example.com/acme/backend::src/server.ts::(member)app#0",
+      "caller": "example.com/acme/backend::src/server.ts",
+      "target": "example.com/acme/backend::src/server.ts::app",
+      "level": "exact",
+      "span": {
+        "path": "src/server.ts",
+        "start": 87,
+        "end": 94
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/acme/backend::src/server.ts::(value)api#0",
+      "caller": "example.com/acme/backend::src/server.ts",
+      "target": "example.com/acme/backend::src/routes/index.ts::api",
+      "level": "exact",
+      "span": {
+        "path": "src/server.ts",
+        "start": 191,
+        "end": 194
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/backend::src/server.ts::GET /health::res.send#0",
@@ -410,7 +562,8 @@
         "path": "src/server.ts",
         "start": 76,
         "end": 85
-      }
+      },
+      "holder": "example.com/acme/backend::src/server.ts::app"
     },
     {
       "id": "example.com/acme/backend::src/server.ts::express.json#0",
@@ -422,6 +575,126 @@
         "start": 95,
         "end": 109
       }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::(member)app#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": "example.com/acme/backend::src/unreadable.ts::app",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 338,
+        "end": 345
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::(member)guarded#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": "example.com/acme/backend::src/unreadable.ts::guarded",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 1095,
+        "end": 1106
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::(member)legacy#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": "example.com/acme/backend::src/unreadable.ts::legacy",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 593,
+        "end": 603
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::(member)npmGuarded#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": "example.com/acme/backend::src/unreadable.ts::npmGuarded",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 1411,
+        "end": 1425
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::(member)plugin#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": "example.com/acme/backend::src/unreadable.ts::plugin",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 936,
+        "end": 946
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::(value)auth#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": "example.com/acme/backend::src/unreadable.ts::auth",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 1210,
+        "end": 1214
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::(value)guarded#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": "example.com/acme/backend::src/unreadable.ts::guarded",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 1216,
+        "end": 1223
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::(value)legacy#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": "example.com/acme/backend::src/unreadable.ts::legacy",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 750,
+        "end": 756
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::(value)npmGuarded#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": "example.com/acme/backend::src/unreadable.ts::npmGuarded",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 1496,
+        "end": 1506
+      },
+      "kind": "value"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::(value)requireAuth#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 1483,
+        "end": 1494
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::GET /guarded::res.send#0",
@@ -465,7 +738,8 @@
         "path": "src/unreadable.ts",
         "start": 89,
         "end": 97
-      }
+      },
+      "holder": "example.com/acme/backend::src/unreadable.ts::app"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::Router#1",
@@ -476,7 +750,8 @@
         "path": "src/unreadable.ts",
         "start": 583,
         "end": 591
-      }
+      },
+      "holder": "example.com/acme/backend::src/unreadable.ts::legacy"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::Router#2",
@@ -487,7 +762,8 @@
         "path": "src/unreadable.ts",
         "start": 926,
         "end": 934
-      }
+      },
+      "holder": "example.com/acme/backend::src/unreadable.ts::plugin"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::Router#3",
@@ -498,7 +774,8 @@
         "path": "src/unreadable.ts",
         "start": 1085,
         "end": 1093
-      }
+      },
+      "holder": "example.com/acme/backend::src/unreadable.ts::guarded"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::Router#4",
@@ -509,7 +786,8 @@
         "path": "src/unreadable.ts",
         "start": 1401,
         "end": 1409
-      }
+      },
+      "holder": "example.com/acme/backend::src/unreadable.ts::npmGuarded"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::app.get#0",
@@ -589,6 +867,18 @@
       }
     },
     {
+      "id": "example.com/acme/backend::src/unreadable.ts::mountAt::(member)app#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts::mountAt",
+      "target": "example.com/acme/backend::src/unreadable.ts::app",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 237,
+        "end": 244
+      },
+      "kind": "member"
+    },
+    {
       "id": "example.com/acme/backend::src/unreadable.ts::mountAt::app.get#0",
       "caller": "example.com/acme/backend::src/unreadable.ts::mountAt",
       "target": null,
@@ -611,6 +901,30 @@
       }
     },
     {
+      "id": "example.com/acme/backend::src/unreadable.ts::mountLegacy::(member)app#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts::mountLegacy",
+      "target": "example.com/acme/backend::src/unreadable.ts::app",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 694,
+        "end": 701
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::mountLegacy::(value)legacy#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts::mountLegacy",
+      "target": "example.com/acme/backend::src/unreadable.ts::legacy",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 724,
+        "end": 730
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/acme/backend::src/unreadable.ts::mountLegacy::app.use#0",
       "caller": "example.com/acme/backend::src/unreadable.ts::mountLegacy",
       "target": null,
@@ -620,6 +934,30 @@
         "start": 694,
         "end": 731
       }
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::mountPlugin::(member)app#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts::mountPlugin",
+      "target": "example.com/acme/backend::src/unreadable.ts::app",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 1042,
+        "end": 1049
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/acme/backend::src/unreadable.ts::mountPlugin::(value)plugin#0",
+      "caller": "example.com/acme/backend::src/unreadable.ts::mountPlugin",
+      "target": "example.com/acme/backend::src/unreadable.ts::plugin",
+      "level": "exact",
+      "span": {
+        "path": "src/unreadable.ts",
+        "start": 1058,
+        "end": 1064
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/acme/backend::src/unreadable.ts::mountPlugin::app.use#0",
@@ -777,7 +1115,59 @@
   "consumers": [],
   "communities": [
     {
+      "name": "src",
+      "members": [
+        "example.com/acme/backend::src/handlers.ts::removeUser"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/acme/backend::src/server.ts::app"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/acme/backend::src/unreadable.ts::app",
+        "example.com/acme/backend::src/unreadable.ts::legacy",
+        "example.com/acme/backend::src/unreadable.ts::mountAt",
+        "example.com/acme/backend::src/unreadable.ts::mountLegacy"
+      ]
+    },
+    {
+      "name": "src#4",
+      "members": [
+        "example.com/acme/backend::src/unreadable.ts::auth"
+      ]
+    },
+    {
+      "name": "src#5",
+      "members": [
+        "example.com/acme/backend::src/unreadable.ts::guarded"
+      ]
+    },
+    {
+      "name": "src#6",
+      "members": [
+        "example.com/acme/backend::src/unreadable.ts::mountPlugin",
+        "example.com/acme/backend::src/unreadable.ts::plugin"
+      ]
+    },
+    {
+      "name": "src#7",
+      "members": [
+        "example.com/acme/backend::src/unreadable.ts::npmGuarded"
+      ]
+    },
+    {
       "name": "src/routes",
+      "members": [
+        "example.com/acme/backend::src/routes/index.ts::api"
+      ]
+    },
+    {
+      "name": "src/routes#2",
       "members": [
         "example.com/acme/backend::src/routes/users.ts::find",
         "example.com/acme/backend::src/routes/users.ts::register.GET /api/users/{}",
@@ -785,10 +1175,17 @@
       ]
     },
     {
-      "name": "src/routes#2",
+      "name": "src/routes#3",
       "members": [
         "example.com/acme/backend::src/routes/users.ts::list",
         "example.com/acme/backend::src/routes/users.ts::register.GET /api/users"
+      ]
+    },
+    {
+      "name": "src/routes#4",
+      "members": [
+        "example.com/acme/backend::src/routes/users.ts::register",
+        "example.com/acme/backend::src/routes/users.ts::users"
       ]
     }
   ],

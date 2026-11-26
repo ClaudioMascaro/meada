@@ -40,7 +40,7 @@ mod values;
 /// Bump when extraction or resolution changes the rows an unchanged checkout should produce
 /// without changing their stored shape. The schema golden pins the revision alongside the shape.
 #[cfg(test)]
-const EXTRACTION_REVISION: u32 = 4;
+const EXTRACTION_REVISION: u32 = 5;
 
 /// The stored format's version, derived from its golden (`tests/golden/schema.txt`, kept by the
 /// unit test `the_stored_format_matches_its_golden`): re-blessing it after a change to `SCHEMA`,
@@ -158,7 +158,7 @@ CREATE INDEX symbols_hash ON symbols (hash);
 CREATE TABLE calls (
     id TEXT NOT NULL, caller TEXT NOT NULL, target TEXT, level TEXT,
     path TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, narrowed INTEGER NOT NULL,
-    decorates TEXT
+    decorates TEXT, kind TEXT, holder TEXT
 );
 CREATE INDEX calls_path ON calls (path);
 CREATE INDEX calls_id ON calls (id);
@@ -180,7 +180,7 @@ CREATE TABLE manifests (
     path TEXT PRIMARY KEY, hash TEXT NOT NULL, mtime INTEGER, size INTEGER NOT NULL,
     summary TEXT NOT NULL
 );
-CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT);
+CREATE TABLE exports (path TEXT NOT NULL, name TEXT, file TEXT, target TEXT, source TEXT);
 CREATE INDEX exports_path ON exports (path);
 CREATE TABLE families (path TEXT NOT NULL, class TEXT NOT NULL, ancestors TEXT);
 CREATE TABLE flexible (path TEXT NOT NULL, name TEXT NOT NULL, least INTEGER NOT NULL, most INTEGER);
@@ -695,6 +695,14 @@ struct Resolved {
     /// The definition an annotation, attribute or decorator call decorates.
     #[serde(skip_serializing_if = "Option::is_none")]
     decorates: Option<String>,
+    /// The use a row of a non-call reference stands for (`lang::Use::as_str`); `None` for a
+    /// call.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<&'static str>,
+    /// For a row whose caller is its file, the innermost symbol of the file whose span holds it
+    /// (`hold`): what the up-walk and communities read in place of the file.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    holder: Option<String>,
 }
 
 /// The symbol and call rows of one file, before they are written.
@@ -1580,7 +1588,8 @@ fn refresh_attempt(
         let resolver = &resolvers[&lang::resolver_of(packs[path])];
         let rows = resolve_file(identity, path, facts, resolver, &names);
         symbols.extend(rows.symbols.iter().map(|(id, ..)| id.clone()));
-        for call in &rows.calls {
+        // A use is no call: a component only rendered stays a door.
+        for call in rows.calls.iter().filter(|c| c.kind.is_none()) {
             // A self-call is no caller: recursion keeps an exported function a door.
             let reached = call.target.iter().chain(&call.candidates);
             called.extend(reached.filter(|t| **t != call.caller).cloned());
@@ -1605,7 +1614,7 @@ fn refresh_attempt(
         }
         for row in &rows.calls {
             tx.execute(
-                "INSERT INTO calls VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                "INSERT INTO calls VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 params![
                     row.id,
                     row.caller,
@@ -1615,7 +1624,9 @@ fn refresh_attempt(
                     row.start,
                     row.end,
                     row.narrowed,
-                    row.decorates
+                    row.decorates,
+                    row.kind,
+                    row.holder
                 ],
             )?;
             for candidate in &row.candidates {
@@ -1663,6 +1674,7 @@ fn refresh_attempt(
         }
     }
     let mut calls: HashMap<&str, Vec<(String, String)>> = HashMap::new();
+    let mut references: HashMap<&str, Vec<(String, String)>> = HashMap::new();
     // One row per side; the shapes of the Founds of one side (a site reached through several
     // wrapper paths) merge into it.
     let mut rows: BTreeMap<_, Option<Shape>> = BTreeMap::new();
@@ -1682,6 +1694,14 @@ fn refresh_attempt(
                 let ids = calls
                     .entry(path)
                     .or_insert_with(|| call_ids(identity, path, all[path.as_str()], &names));
+                let Some((_, id)) = ids.get(*index) else {
+                    continue;
+                };
+                (path, id.clone())
+            }
+            Site::Reference { path, index } => {
+                let ids = (references.entry(path))
+                    .or_insert_with(|| reference_ids(identity, path, all[path.as_str()], &names));
                 let Some((_, id)) = ids.get(*index) else {
                     continue;
                 };
@@ -1734,8 +1754,8 @@ fn refresh_attempt(
     tx.execute("DELETE FROM exports", [])?;
     for e in &exported {
         tx.execute(
-            "INSERT INTO exports VALUES (?1, ?2, ?3, ?4)",
-            params![e.path, e.name, e.file, e.target],
+            "INSERT INTO exports VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![e.path, e.name, e.file, e.target, e.source],
         )?;
     }
     forget_rows_outside(&tx, "families", &kept_files)?;
@@ -2015,13 +2035,14 @@ fn resolver<'a>(
 /// The `exports` rows, in the order they were written.
 fn stored_exports(db: &Connection) -> Result<Vec<Exported>> {
     let mut statement =
-        db.prepare("SELECT path, name, file, target FROM exports ORDER BY rowid")?;
+        db.prepare("SELECT path, name, file, target, source FROM exports ORDER BY rowid")?;
     let rows = statement.query_map([], |r| {
         Ok(Exported {
             path: r.get(0)?,
             name: r.get(1)?,
             file: r.get(2)?,
             target: r.get(3)?,
+            source: r.get(4)?,
         })
     })?;
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
@@ -2034,7 +2055,7 @@ pub(crate) fn exports_of(db: &Connection, paths: &[String]) -> Result<Vec<Export
     }
     Ok(db
         .prepare(
-            "SELECT path, name, file, target FROM exports WHERE path IN \
+            "SELECT path, name, file, target, source FROM exports WHERE path IN \
          (SELECT value FROM json_each(?1)) ORDER BY path, name, file, target",
         )?
         .query_map(params![serde_json::to_string(paths)?], |r| {
@@ -2043,6 +2064,7 @@ pub(crate) fn exports_of(db: &Connection, paths: &[String]) -> Result<Vec<Export
                 name: r.get(1)?,
                 file: r.get(2)?,
                 target: r.get(3)?,
+                source: r.get(4)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?)
@@ -2085,9 +2107,9 @@ fn stored_reach(
         }
     }
     for query in [
-        "SELECT path, caller, target FROM calls WHERE target IS NOT NULL",
+        "SELECT path, caller, target FROM calls WHERE target IS NOT NULL AND kind IS NULL",
         "SELECT calls.path, calls.caller, candidates.target FROM candidates \
-         JOIN calls ON calls.id = candidates.call",
+         JOIN calls ON calls.id = candidates.call WHERE calls.kind IS NULL",
     ] {
         let mut statement = db.prepare(query)?;
         let rows = statement.query_map([], |r| {
@@ -2223,8 +2245,9 @@ pub fn fresh(db: &Connection, root: &Path, identity: &str, serve: &Serve) -> Res
     Ok(configs_digest(digest, &manifest_rows(db)?, &mappings) == configs)
 }
 
-/// What communities read of a file's rows (`write_communities`): its symbols, and the caller and
-/// target of each of its `exact` and `inferred` calls, sorted.
+/// What communities read of a file's rows (`write_communities`): its symbols, and the caller (its
+/// holder, for a row its file makes) and target of each of its `exact` and `inferred` rows, uses
+/// included, sorted.
 type Graph = (Vec<String>, Vec<(String, String)>);
 
 /// The graph a file's stored rows give.
@@ -2233,8 +2256,8 @@ fn stored_graph(tx: &Transaction, path: &str) -> Result<Graph> {
         .query_map(params![path], |r| r.get(0))?
         .collect::<rusqlite::Result<_>>()?;
     let mut calls: Vec<(String, String)> = (tx.prepare_cached(
-        "SELECT caller, target FROM calls WHERE path = ?1 AND level IN ('exact', 'inferred') \
-         AND target IS NOT NULL",
+        "SELECT COALESCE(holder, caller), target FROM calls WHERE path = ?1 \
+         AND level IN ('exact', 'inferred') AND target IS NOT NULL",
     )?)
     .query_map(params![path], |r| Ok((r.get(0)?, r.get(1)?)))?
     .collect::<rusqlite::Result<_>>()?;
@@ -2248,15 +2271,21 @@ fn graph(rows: &Rows) -> Graph {
     let mut symbols: Vec<String> = rows.symbols.iter().map(|(id, ..)| id.clone()).collect();
     let mut calls: Vec<(String, String)> = (rows.calls.iter())
         .filter(|c| matches!(c.level, Some(Level::Exact | Level::Inferred)))
-        .filter_map(|c| Some((c.caller.clone(), c.target.clone()?)))
+        .filter_map(|c| {
+            Some((
+                c.holder.as_ref().unwrap_or(&c.caller).clone(),
+                c.target.clone()?,
+            ))
+        })
         .collect();
     symbols.sort();
     calls.sort();
     (symbols, calls)
 }
 
-/// Rewrites the `communities` rows from the stored calls at `exact` or `inferred` between two
-/// symbols, each named after its members' parent directories.
+/// Rewrites the `communities` rows from the stored rows at `exact` or `inferred` between two
+/// symbols (calls and uses; a row a file makes counts from the symbol holding it), each named
+/// after its members' parent directories.
 fn write_communities(tx: &Transaction) -> Result<()> {
     let dirs: HashMap<String, String> = tx
         .prepare("SELECT id, path FROM symbols")?
@@ -2264,8 +2293,8 @@ fn write_communities(tx: &Transaction) -> Result<()> {
         .collect::<rusqlite::Result<_>>()?;
     let calls: Vec<(String, String)> = tx
         .prepare(
-            "SELECT caller, target FROM calls WHERE level IN ('exact', 'inferred') \
-             AND target IS NOT NULL",
+            "SELECT COALESCE(holder, caller), target FROM calls \
+             WHERE level IN ('exact', 'inferred') AND target IS NOT NULL",
         )?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
@@ -2781,7 +2810,7 @@ fn resolve_file<'a>(
         let name = names.def(t.path, t.name).unwrap_or_else(|| t.name.into());
         format!("{identity}::{}::{name}", t.path)
     };
-    let symbols = facts
+    let symbols: Vec<_> = facts
         .defs
         .iter()
         .filter_map(|def| {
@@ -2840,10 +2869,111 @@ fn resolve_file<'a>(
                     .decorates
                     .as_deref()
                     .map(|d| format!("{identity}::{path}::{}", names.scope(path, d))),
+                kind: None,
+                holder: None,
             }
         })
         .collect();
+    let mut calls: Vec<Resolved> = calls;
+    calls.extend(reference_rows(identity, path, facts, resolver, names));
+    hold(&symbols, &mut calls, &format!("{identity}::{path}"));
     Rows { symbols, calls }
+}
+
+/// The rows of a file's references (`Facts::references`) that resolve (`Resolver::reference`),
+/// in source order: id `<caller>::(<kind>)<name>#<ordinal>`, the ordinal counted per caller,
+/// kind and name, so a call and a use of one name in one scope never share an id.
+fn reference_rows(
+    identity: &str,
+    path: &str,
+    facts: &Facts,
+    resolver: &Resolver,
+    names: &Names,
+) -> Vec<Resolved> {
+    let ids = reference_ids(identity, path, facts, names);
+    let mut rows = Vec::new();
+    for ((index, r), (caller, id)) in facts.references.iter().enumerate().zip(ids) {
+        let Some(target) = resolver.reference(path, index) else {
+            continue;
+        };
+        let target = target.map(|(at, name)| {
+            let name = names.def(at, name).unwrap_or_else(|| name.into());
+            format!("{identity}::{at}::{name}")
+        });
+        rows.push(Resolved {
+            id,
+            caller,
+            level: target.is_some().then_some(Level::Exact),
+            target,
+            start: r.range.start as i64,
+            end: r.range.end as i64,
+            candidates: Vec::new(),
+            narrowed: false,
+            decorates: None,
+            kind: Some(r.kind.as_str()),
+            holder: None,
+        });
+    }
+    rows
+}
+
+/// The `(caller, id)` of each reference of the file `path` (`Facts::references`), in order, row
+/// or not: the caller its folded scope's symbol or the file, the id
+/// `<caller>::(<kind>)<name>#<n>`, `<n>` its ordinal among the file's references of one caller,
+/// kind and name. A package import names its site by it (`Site::Reference`).
+fn reference_ids(
+    identity: &str,
+    path: &str,
+    facts: &Facts,
+    names: &Names,
+) -> Vec<(String, String)> {
+    let base = format!("{identity}::{path}");
+    let mut ordinals: HashMap<(String, &str, &str), usize> = HashMap::new();
+    (facts.references.iter())
+        .map(|r| {
+            let scope = names.scope(path, &r.scope);
+            let caller = match scope.is_empty() {
+                true => base.clone(),
+                false => format!("{base}::{scope}"),
+            };
+            let kind = r.kind.as_str();
+            let ordinal = (ordinals.entry((scope, kind, r.name.as_str())))
+                .and_modify(|n| *n += 1)
+                .or_insert(0);
+            let id = format!("{caller}::({kind}){}#{ordinal}", r.name);
+            (caller, id)
+        })
+        .collect()
+}
+
+/// Sets the `holder` of each row whose caller is the file `file`: the innermost of `symbols`
+/// whose span holds the row's, if one does. One sweep in source order: symbols nest, so the
+/// open ones form a chain, and a row's holder is the innermost of them that ends after it.
+fn hold(symbols: &[(String, i64, i64, &str)], calls: &mut [Resolved], file: &str) {
+    let mut spans: Vec<(i64, i64, &str)> = (symbols.iter())
+        .map(|(id, start, end, _)| (*start, *end, id.as_str()))
+        .collect();
+    spans.sort_by_key(|&(start, end, _)| (start, std::cmp::Reverse(end)));
+    let mut rows: Vec<usize> = (0..calls.len())
+        .filter(|&i| calls[i].caller == file)
+        .collect();
+    rows.sort_by_key(|&i| calls[i].start);
+    let (mut next, mut open) = (0, Vec::<(i64, i64, &str)>::new());
+    for i in rows {
+        let (start, end) = (calls[i].start, calls[i].end);
+        while let Some(&span) = spans.get(next).filter(|span| span.0 <= start) {
+            while open.last().is_some_and(|o| o.1 <= span.0) {
+                open.pop();
+            }
+            open.push(span);
+            next += 1;
+        }
+        while open.last().is_some_and(|o| o.1 < start) {
+            open.pop();
+        }
+        let holder = open.iter().rev().find(|o| o.1 >= end);
+        calls[i].holder = holder.map(|o| o.2.to_string());
+    }
 }
 
 /// `path` relative to `root` with `/` separators; `None` for non-UTF-8 paths.
@@ -3413,7 +3543,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
         false => Vec::new(),
         true => db
             .prepare(
-                "SELECT path, name, file, target FROM exports \
+                "SELECT path, name, file, target, source FROM exports \
                  ORDER BY path, name, file, target",
             )?
             .query_map([], |r| {
@@ -3422,6 +3552,7 @@ pub(crate) fn contracts(db: &Connection, identity: &str) -> Result<Export> {
                     name: r.get(1)?,
                     file: r.get(2)?,
                     target: r.get(3)?,
+                    source: r.get(4)?,
                 })
             })?
             .collect::<rusqlite::Result<_>>()?,
@@ -3633,7 +3764,8 @@ fn calls_where(
     held: &dyn Fn(&str) -> bool,
 ) -> Result<Vec<CallSite>> {
     let sql = format!(
-        "SELECT id, caller, target, level, path, start, end, narrowed, decorates FROM calls \
+        "SELECT id, caller, target, level, path, start, end, narrowed, decorates, kind, holder \
+         FROM calls \
          {filter} ORDER BY id, path, start, end"
     );
     let mut statement = db.prepare(&sql)?;
@@ -3654,6 +3786,8 @@ fn calls_where(
             call.span = span(r, 4)?;
             call.narrowed = r.get(7)?;
             call.decorates = r.get(8)?;
+            call.kind = r.get(9)?;
+            call.holder = r.get(10)?;
             Ok(call)
         })
         .collect::<rusqlite::Result<_>>()?;
@@ -3759,6 +3893,17 @@ pub(crate) fn calls_by<S: AsRef<str>>(
 ) -> Result<Vec<CallSite>> {
     let filter = "WHERE caller IN (SELECT value FROM json_each(?1))";
     calls_where(db, filter, &listed(callers), held)
+}
+
+/// The use rows a file makes that one of `holders` holds (`calls.holder`); `held` as
+/// `calls_where` takes it.
+pub(crate) fn uses_held<S: AsRef<str>>(
+    db: &Connection,
+    holders: &[S],
+    held: &dyn Fn(&str) -> bool,
+) -> Result<Vec<CallSite>> {
+    let filter = "WHERE kind IS NOT NULL AND holder IN (SELECT value FROM json_each(?1))";
+    calls_where(db, filter, &listed(holders), held)
 }
 
 /// The calls that may reach one of `targets`: their target, and, with `candidates`, one of
@@ -4835,6 +4980,13 @@ mod tests {
             let facts = serde_json::to_string_pretty(&facts).unwrap();
             actual += &format!("\n{name}\n{facts}\n");
         }
+        // A `.tsx` file holds JSX, which `sample.ts` cannot: one use of each kind.
+        let src = fs::read(tests.join("fixtures/schema/sample.tsx")).unwrap();
+        let mut facts =
+            lang::LanguagePack::parse(&crate::lang::ts::TsJs, "sample.tsx", &src).unwrap();
+        lang::hash_spans(&mut facts, &src);
+        let facts = serde_json::to_string_pretty(&facts).unwrap();
+        actual += &format!("\nsample.tsx\n{facts}\n");
         for name in ["sample.openapi.yaml", "sample.asyncapi.yaml"] {
             let src = fs::read(tests.join("fixtures/schema").join(name)).unwrap();
             let summary = serde_json::to_string_pretty(&document::read(name, &src)).unwrap();

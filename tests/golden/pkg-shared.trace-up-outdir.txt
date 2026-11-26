@@ -1,4 +1,5 @@
 example.com/pkg/shared src/text.ts:4 normalize
+  example.com/pkg/shared src/index.ts:1 (top level) (reexport)
   →[inferred: package::npm::@example/shared 1.1.0 (local 1.2.0), range mismatch; import outDir] example.com/pkg/api src/label.js:4 label
   →[inferred: package::npm::@example/shared ^1.0.0 (local 1.2.0); import outDir] example.com/pkg/web src/text.ts:8 clean
-chain: inferred · 2 hops · 3 repos · 90 tokens
+chain: inferred · 2 hops · 3 repos · 106 tokens

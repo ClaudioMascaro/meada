@@ -496,6 +496,33 @@
       "hash": "d85ff235c1f6137d3cf02929e126218be013d7d6b1f2d727c49120056e6cca7d"
     },
     {
+      "id": "local/gcp-sdk-controls::control.js::a",
+      "span": {
+        "path": "control.js",
+        "start": 245,
+        "end": 269
+      },
+      "hash": "8988a601fa42fcc56ee39b0a29b2feef1f34df713643c19c05d552b80fd2b276"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::b",
+      "span": {
+        "path": "control.js",
+        "start": 277,
+        "end": 301
+      },
+      "hash": "55f26d4c4d07ed597fc1fe735fa5af69edeed1ba55316af0facfa0a9ad837f92"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::bus",
+      "span": {
+        "path": "control.js",
+        "start": 418,
+        "end": 436
+      },
+      "hash": "94b3456ac466544f5c39c828c34772b0d28322d63993aab66c290bdb3ce1db55"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.js::caught",
       "span": {
         "path": "control.js",
@@ -658,6 +685,24 @@
       "hash": "50ef0079f7cfdcc16dffc7d2b547184f4ec6b4a89bbf5d6802316228891fd465"
     },
     {
+      "id": "local/gcp-sdk-controls::control.js::secrets",
+      "span": {
+        "path": "control.js",
+        "start": 473,
+        "end": 515
+      },
+      "hash": "b5daa895515d3e36b13fe76a2e2ea7546984ab4b12868d19c44d302c5a7ce14c"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::store",
+      "span": {
+        "path": "control.js",
+        "start": 444,
+        "end": 465
+      },
+      "hash": "3bcb2e27392128ae7fea3f24333d07b38cb2581067637a667d46e0880313ae06"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.js::structured",
       "span": {
         "path": "control.js",
@@ -665,6 +710,24 @@
         "end": 2130
       },
       "hash": "460b4ffddecc67e902125cb3799cafd42ff9f12f1181aab280efb98d11dcaca4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::structuredA",
+      "span": {
+        "path": "control.js",
+        "start": 2137,
+        "end": 2189
+      },
+      "hash": "740ec9b3cf1d291809c3fd88be2c9e4cce2b40a8ae750bb836e1523e9c463b3a"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::structuredB",
+      "span": {
+        "path": "control.js",
+        "start": 2197,
+        "end": 2249
+      },
+      "hash": "5fd48e984ad7f8dd238960fca7c6b76b7db73c41e71598ef13a13c3781afe20a"
     },
     {
       "id": "local/gcp-sdk-controls::control.js::withoutNew",
@@ -892,6 +955,33 @@
       "hash": "d85ff235c1f6137d3cf02929e126218be013d7d6b1f2d727c49120056e6cca7d"
     },
     {
+      "id": "local/gcp-sdk-controls::control.ts::a",
+      "span": {
+        "path": "control.ts",
+        "start": 245,
+        "end": 269
+      },
+      "hash": "d154686dee80cea94b386639c0892b57376a24ec620a3edd6be63c16c468e2ef"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::b",
+      "span": {
+        "path": "control.ts",
+        "start": 277,
+        "end": 301
+      },
+      "hash": "44682dab830a43a50708397e520bc45d4da0e7483d234a8f7a43d0d1fcba228b"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::bus",
+      "span": {
+        "path": "control.ts",
+        "start": 418,
+        "end": 436
+      },
+      "hash": "94b3456ac466544f5c39c828c34772b0d28322d63993aab66c290bdb3ce1db55"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.ts::caught",
       "span": {
         "path": "control.ts",
@@ -1054,6 +1144,24 @@
       "hash": "50ef0079f7cfdcc16dffc7d2b547184f4ec6b4a89bbf5d6802316228891fd465"
     },
     {
+      "id": "local/gcp-sdk-controls::control.ts::secrets",
+      "span": {
+        "path": "control.ts",
+        "start": 473,
+        "end": 515
+      },
+      "hash": "b5daa895515d3e36b13fe76a2e2ea7546984ab4b12868d19c44d302c5a7ce14c"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::store",
+      "span": {
+        "path": "control.ts",
+        "start": 444,
+        "end": 465
+      },
+      "hash": "3bcb2e27392128ae7fea3f24333d07b38cb2581067637a667d46e0880313ae06"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.ts::structured",
       "span": {
         "path": "control.ts",
@@ -1061,6 +1169,24 @@
         "end": 2130
       },
       "hash": "460b4ffddecc67e902125cb3799cafd42ff9f12f1181aab280efb98d11dcaca4"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::structuredA",
+      "span": {
+        "path": "control.ts",
+        "start": 2137,
+        "end": 2189
+      },
+      "hash": "e3bc997d68cb44e72887bf75689a5996ce11488db50c25aeaa4b0e36d32be19a"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::structuredB",
+      "span": {
+        "path": "control.ts",
+        "start": 2197,
+        "end": 2249
+      },
+      "hash": "5c0578e119cb77085423caa8af13363dc1da83ef02bb14deb4d6bb325d056ba7"
     },
     {
       "id": "local/gcp-sdk-controls::control.ts::withoutNew",
@@ -2473,7 +2599,8 @@
         "path": "control.js",
         "start": 424,
         "end": 436
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.js::bus"
     },
     {
       "id": "local/gcp-sdk-controls::control.js::SecretManagerServiceClient#0",
@@ -2484,7 +2611,8 @@
         "path": "control.js",
         "start": 483,
         "end": 515
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.js::secrets"
     },
     {
       "id": "local/gcp-sdk-controls::control.js::Storage#0",
@@ -2495,7 +2623,8 @@
         "path": "control.js",
         "start": 452,
         "end": 465
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.js::store"
     },
     {
       "id": "local/gcp-sdk-controls::control.js::caught::(call_expression).publishMessage#0",
@@ -2597,6 +2726,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-controls::control.js::envBucket::(member)store#0",
+      "caller": "local/gcp-sdk-controls::control.js::envBucket",
+      "target": "local/gcp-sdk-controls::control.js::store",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 727,
+        "end": 739
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.js::envBucket::store.bucket#0",
       "caller": "local/gcp-sdk-controls::control.js::envBucket",
       "target": null,
@@ -2619,6 +2760,30 @@
       }
     },
     {
+      "id": "local/gcp-sdk-controls::control.js::envReceive::(member)bus#0",
+      "caller": "local/gcp-sdk-controls::control.js::envReceive",
+      "target": "local/gcp-sdk-controls::control.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 634,
+        "end": 650
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envReceive::(value)handler#0",
+      "caller": "local/gcp-sdk-controls::control.js::envReceive",
+      "target": "local/gcp-sdk-controls::control.js::handler",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 685,
+        "end": 692
+      },
+      "kind": "value"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.js::envReceive::bus.subscription#0",
       "caller": "local/gcp-sdk-controls::control.js::envReceive",
       "target": null,
@@ -2628,6 +2793,18 @@
         "start": 634,
         "end": 670
       }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::envSecret::(member)secrets#0",
+      "caller": "local/gcp-sdk-controls::control.js::envSecret",
+      "target": "local/gcp-sdk-controls::control.js::secrets",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 821,
+        "end": 848
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-controls::control.js::envSecret::secrets.accessSecretVersion#0",
@@ -2652,6 +2829,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-controls::control.js::envSend::(member)bus#0",
+      "caller": "local/gcp-sdk-controls::control.js::envSend",
+      "target": "local/gcp-sdk-controls::control.js::bus",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 545,
+        "end": 554
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.js::envSend::bus.topic#0",
       "caller": "local/gcp-sdk-controls::control.js::envSend",
       "target": null,
@@ -2663,6 +2852,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-controls::control.js::first::(member)a#0",
+      "caller": "local/gcp-sdk-controls::control.js::first",
+      "target": "local/gcp-sdk-controls::control.js::a",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 329,
+        "end": 345
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.js::first::a.publishMessage#0",
       "caller": "local/gcp-sdk-controls::control.js::first",
       "target": null,
@@ -2672,6 +2873,18 @@
         "start": 329,
         "end": 353
       }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::firstStructured::(member)structuredA#0",
+      "caller": "local/gcp-sdk-controls::control.js::firstStructured",
+      "target": "local/gcp-sdk-controls::control.js::structuredA",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 2287,
+        "end": 2313
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-controls::control.js::firstStructured::structuredA.publishMessage#0",
@@ -2763,7 +2976,8 @@
         "path": "control.js",
         "start": 249,
         "end": 269
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.js::a"
     },
     {
       "id": "local/gcp-sdk-controls::control.js::make#1",
@@ -2774,7 +2988,8 @@
         "path": "control.js",
         "start": 281,
         "end": 301
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.js::b"
     },
     {
       "id": "local/gcp-sdk-controls::control.js::make::PubSub#0",
@@ -2909,6 +3124,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-controls::control.js::second::(member)b#0",
+      "caller": "local/gcp-sdk-controls::control.js::second",
+      "target": "local/gcp-sdk-controls::control.js::b",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 384,
+        "end": 400
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.js::second::b.publishMessage#0",
       "caller": "local/gcp-sdk-controls::control.js::second",
       "target": null,
@@ -2918,6 +3145,18 @@
         "start": 384,
         "end": 408
       }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.js::secondStructured::(member)structuredB#0",
+      "caller": "local/gcp-sdk-controls::control.js::secondStructured",
+      "target": "local/gcp-sdk-controls::control.js::structuredB",
+      "level": "exact",
+      "span": {
+        "path": "control.js",
+        "start": 2362,
+        "end": 2388
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-controls::control.js::secondStructured::structuredB.publishMessage#0",
@@ -2939,7 +3178,8 @@
         "path": "control.js",
         "start": 2151,
         "end": 2189
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.js::structuredA"
     },
     {
       "id": "local/gcp-sdk-controls::control.js::structured#1",
@@ -2950,7 +3190,8 @@
         "path": "control.js",
         "start": 2211,
         "end": 2249
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.js::structuredB"
     },
     {
       "id": "local/gcp-sdk-controls::control.js::structured::(new_expression).topic#0",
@@ -3489,7 +3730,8 @@
         "path": "control.ts",
         "start": 424,
         "end": 436
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.ts::bus"
     },
     {
       "id": "local/gcp-sdk-controls::control.ts::SecretManagerServiceClient#0",
@@ -3500,7 +3742,8 @@
         "path": "control.ts",
         "start": 483,
         "end": 515
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.ts::secrets"
     },
     {
       "id": "local/gcp-sdk-controls::control.ts::Storage#0",
@@ -3511,7 +3754,8 @@
         "path": "control.ts",
         "start": 452,
         "end": 465
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.ts::store"
     },
     {
       "id": "local/gcp-sdk-controls::control.ts::caught::(call_expression).publishMessage#0",
@@ -3613,6 +3857,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-controls::control.ts::envBucket::(member)store#0",
+      "caller": "local/gcp-sdk-controls::control.ts::envBucket",
+      "target": "local/gcp-sdk-controls::control.ts::store",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 727,
+        "end": 739
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.ts::envBucket::store.bucket#0",
       "caller": "local/gcp-sdk-controls::control.ts::envBucket",
       "target": null,
@@ -3635,6 +3891,30 @@
       }
     },
     {
+      "id": "local/gcp-sdk-controls::control.ts::envReceive::(member)bus#0",
+      "caller": "local/gcp-sdk-controls::control.ts::envReceive",
+      "target": "local/gcp-sdk-controls::control.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 634,
+        "end": 650
+      },
+      "kind": "member"
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envReceive::(value)handler#0",
+      "caller": "local/gcp-sdk-controls::control.ts::envReceive",
+      "target": "local/gcp-sdk-controls::control.ts::handler",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 685,
+        "end": 692
+      },
+      "kind": "value"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.ts::envReceive::bus.subscription#0",
       "caller": "local/gcp-sdk-controls::control.ts::envReceive",
       "target": null,
@@ -3644,6 +3924,18 @@
         "start": 634,
         "end": 670
       }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::envSecret::(member)secrets#0",
+      "caller": "local/gcp-sdk-controls::control.ts::envSecret",
+      "target": "local/gcp-sdk-controls::control.ts::secrets",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 821,
+        "end": 848
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-controls::control.ts::envSecret::secrets.accessSecretVersion#0",
@@ -3668,6 +3960,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-controls::control.ts::envSend::(member)bus#0",
+      "caller": "local/gcp-sdk-controls::control.ts::envSend",
+      "target": "local/gcp-sdk-controls::control.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 545,
+        "end": 554
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.ts::envSend::bus.topic#0",
       "caller": "local/gcp-sdk-controls::control.ts::envSend",
       "target": null,
@@ -3679,6 +3983,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-controls::control.ts::first::(member)a#0",
+      "caller": "local/gcp-sdk-controls::control.ts::first",
+      "target": "local/gcp-sdk-controls::control.ts::a",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 329,
+        "end": 345
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.ts::first::a.publishMessage#0",
       "caller": "local/gcp-sdk-controls::control.ts::first",
       "target": null,
@@ -3688,6 +4004,18 @@
         "start": 329,
         "end": 353
       }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::firstStructured::(member)structuredA#0",
+      "caller": "local/gcp-sdk-controls::control.ts::firstStructured",
+      "target": "local/gcp-sdk-controls::control.ts::structuredA",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 2287,
+        "end": 2313
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-controls::control.ts::firstStructured::structuredA.publishMessage#0",
@@ -3779,7 +4107,8 @@
         "path": "control.ts",
         "start": 249,
         "end": 269
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.ts::a"
     },
     {
       "id": "local/gcp-sdk-controls::control.ts::make#1",
@@ -3790,7 +4119,8 @@
         "path": "control.ts",
         "start": 281,
         "end": 301
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.ts::b"
     },
     {
       "id": "local/gcp-sdk-controls::control.ts::make::PubSub#0",
@@ -3925,6 +4255,18 @@
       }
     },
     {
+      "id": "local/gcp-sdk-controls::control.ts::second::(member)b#0",
+      "caller": "local/gcp-sdk-controls::control.ts::second",
+      "target": "local/gcp-sdk-controls::control.ts::b",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 384,
+        "end": 400
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/gcp-sdk-controls::control.ts::second::b.publishMessage#0",
       "caller": "local/gcp-sdk-controls::control.ts::second",
       "target": null,
@@ -3934,6 +4276,18 @@
         "start": 384,
         "end": 408
       }
+    },
+    {
+      "id": "local/gcp-sdk-controls::control.ts::secondStructured::(member)structuredB#0",
+      "caller": "local/gcp-sdk-controls::control.ts::secondStructured",
+      "target": "local/gcp-sdk-controls::control.ts::structuredB",
+      "level": "exact",
+      "span": {
+        "path": "control.ts",
+        "start": 2362,
+        "end": 2388
+      },
+      "kind": "member"
     },
     {
       "id": "local/gcp-sdk-controls::control.ts::secondStructured::structuredB.publishMessage#0",
@@ -3955,7 +4309,8 @@
         "path": "control.ts",
         "start": 2151,
         "end": 2189
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.ts::structuredA"
     },
     {
       "id": "local/gcp-sdk-controls::control.ts::structured#1",
@@ -3966,7 +4321,8 @@
         "path": "control.ts",
         "start": 2211,
         "end": 2249
-      }
+      },
+      "holder": "local/gcp-sdk-controls::control.ts::structuredB"
     },
     {
       "id": "local/gcp-sdk-controls::control.ts::structured::(new_expression).topic#0",
@@ -4276,27 +4632,32 @@
     {
       "name": ".#10",
       "members": [
-        "local/gcp-sdk-controls::control.go::mixed",
-        "local/gcp-sdk-controls::control.go::opaque"
+        "local/gcp-sdk-controls::control.js::envBucket",
+        "local/gcp-sdk-controls::control.js::store"
       ]
     },
     {
       "name": ".#11",
       "members": [
-        "local/gcp-sdk-controls::control.js::make"
+        "local/gcp-sdk-controls::control.js::envSecret",
+        "local/gcp-sdk-controls::control.js::secrets"
       ]
     },
     {
       "name": ".#12",
       "members": [
-        "local/gcp-sdk-controls::control.js::mixed",
-        "local/gcp-sdk-controls::control.js::opaque"
+        "local/gcp-sdk-controls::control.js::firstStructured",
+        "local/gcp-sdk-controls::control.js::secondStructured",
+        "local/gcp-sdk-controls::control.js::structured",
+        "local/gcp-sdk-controls::control.js::structuredA",
+        "local/gcp-sdk-controls::control.js::structuredB"
       ]
     },
     {
       "name": ".#13",
       "members": [
-        "local/gcp-sdk-controls::control.js::structured"
+        "local/gcp-sdk-controls::control.js::mixed",
+        "local/gcp-sdk-controls::control.js::opaque"
       ]
     },
     {
@@ -4322,20 +4683,27 @@
     {
       "name": ".#17",
       "members": [
-        "local/gcp-sdk-controls::control.ts::make"
+        "local/gcp-sdk-controls::control.ts::a",
+        "local/gcp-sdk-controls::control.ts::b",
+        "local/gcp-sdk-controls::control.ts::first",
+        "local/gcp-sdk-controls::control.ts::make",
+        "local/gcp-sdk-controls::control.ts::second"
       ]
     },
     {
       "name": ".#18",
       "members": [
-        "local/gcp-sdk-controls::control.ts::mixed",
-        "local/gcp-sdk-controls::control.ts::opaque"
+        "local/gcp-sdk-controls::control.ts::bus",
+        "local/gcp-sdk-controls::control.ts::envReceive",
+        "local/gcp-sdk-controls::control.ts::envSend",
+        "local/gcp-sdk-controls::control.ts::handler"
       ]
     },
     {
       "name": ".#19",
       "members": [
-        "local/gcp-sdk-controls::control.ts::structured"
+        "local/gcp-sdk-controls::control.ts::envBucket",
+        "local/gcp-sdk-controls::control.ts::store"
       ]
     },
     {
@@ -4343,6 +4711,30 @@
       "members": [
         "local/gcp-sdk-controls::Control.cs::Control.Guessed(object)",
         "local/gcp-sdk-controls::Control.cs::Control.MakeClient()"
+      ]
+    },
+    {
+      "name": ".#20",
+      "members": [
+        "local/gcp-sdk-controls::control.ts::envSecret",
+        "local/gcp-sdk-controls::control.ts::secrets"
+      ]
+    },
+    {
+      "name": ".#21",
+      "members": [
+        "local/gcp-sdk-controls::control.ts::firstStructured",
+        "local/gcp-sdk-controls::control.ts::secondStructured",
+        "local/gcp-sdk-controls::control.ts::structured",
+        "local/gcp-sdk-controls::control.ts::structuredA",
+        "local/gcp-sdk-controls::control.ts::structuredB"
+      ]
+    },
+    {
+      "name": ".#22",
+      "members": [
+        "local/gcp-sdk-controls::control.ts::mixed",
+        "local/gcp-sdk-controls::control.ts::opaque"
       ]
     },
     {
@@ -4358,49 +4750,60 @@
         "local/gcp-sdk-controls::Control.java::Control.envBucket()",
         "local/gcp-sdk-controls::Control.java::Control.envReceive()",
         "local/gcp-sdk-controls::Control.java::Control.envSend()",
-        "local/gcp-sdk-controls::Control.java::Control.guessed()",
-        "local/gcp-sdk-controls::Control.java::Control.makeClient()",
-        "local/gcp-sdk-controls::Control.java::Control.reassigned(Publisher)",
-        "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.build()",
-        "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.publish(Object)"
-      ]
-    },
-    {
-      "name": ".#5",
-      "members": [
         "local/gcp-sdk-controls::Control.java::Control.first()",
+        "local/gcp-sdk-controls::Control.java::Control.guessed()",
         "local/gcp-sdk-controls::Control.java::Control.make(String)",
-        "local/gcp-sdk-controls::Control.java::Control.second()"
-      ]
-    },
-    {
-      "name": ".#6",
-      "members": [
+        "local/gcp-sdk-controls::Control.java::Control.makeClient()",
         "local/gcp-sdk-controls::Control.java::Control.mixed(boolean,Publisher)",
-        "local/gcp-sdk-controls::Control.java::Control.opaque(boolean,Publisher)"
-      ]
-    },
-    {
-      "name": ".#7",
-      "members": [
+        "local/gcp-sdk-controls::Control.java::Control.opaque(boolean,Publisher)",
+        "local/gcp-sdk-controls::Control.java::Control.reassigned(Publisher)",
+        "local/gcp-sdk-controls::Control.java::Control.second()",
         "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher",
+        "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.build()",
         "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.newBuilder(String)",
+        "local/gcp-sdk-controls::Hidden.java::Hidden.Publisher.publish(Object)",
         "local/gcp-sdk-controls::Hidden.java::Hidden.hidden()"
       ]
     },
     {
-      "name": ".#8",
+      "name": ".#5",
       "members": [
         "local/gcp-sdk-controls::control.go::Factory.makeClient",
         "local/gcp-sdk-controls::control.go::guessed"
       ]
     },
     {
-      "name": ".#9",
+      "name": ".#6",
       "members": [
         "local/gcp-sdk-controls::control.go::first",
         "local/gcp-sdk-controls::control.go::makeTopic",
         "local/gcp-sdk-controls::control.go::second"
+      ]
+    },
+    {
+      "name": ".#7",
+      "members": [
+        "local/gcp-sdk-controls::control.go::mixed",
+        "local/gcp-sdk-controls::control.go::opaque"
+      ]
+    },
+    {
+      "name": ".#8",
+      "members": [
+        "local/gcp-sdk-controls::control.js::a",
+        "local/gcp-sdk-controls::control.js::b",
+        "local/gcp-sdk-controls::control.js::first",
+        "local/gcp-sdk-controls::control.js::make",
+        "local/gcp-sdk-controls::control.js::second"
+      ]
+    },
+    {
+      "name": ".#9",
+      "members": [
+        "local/gcp-sdk-controls::control.js::bus",
+        "local/gcp-sdk-controls::control.js::envReceive",
+        "local/gcp-sdk-controls::control.js::envSend",
+        "local/gcp-sdk-controls::control.js::handler"
       ]
     }
   ],

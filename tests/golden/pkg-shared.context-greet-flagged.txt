@@ -7,6 +7,8 @@ function greet(name: string): string {
 callers: none
 callees:
 example.com/pkg/shared kit/src/greet.ts:5 shout
+used by:
+example.com/pkg/shared kit/src/index.ts:2 (top level) (reexport)
 consumers:
 example.com/pkg/api src/report.js:4 report [range unchecked]
 example.com/pkg/web e2e/smoke.ts:5 smoke

@@ -129,7 +129,11 @@ impl<'a> Graph<'a> {
             }
             for c in &export.calls {
                 graph.calls.insert(&c.id, (n, c));
-                graph.callees.entry(&c.caller).or_default().push((n, c));
+                // A use is no call: processes and the down-walk follow calls alone, the
+                // up-walk uses too (`callers`).
+                if c.kind.is_none() {
+                    graph.callees.entry(&c.caller).or_default().push((n, c));
+                }
                 for t in c.target.iter().chain(&c.candidates) {
                     graph.callers.entry(t).or_default().push((n, c));
                 }
@@ -760,7 +764,9 @@ pub(crate) fn read(
                     }
                 }
                 let mut calls = sites;
-                calls.extend(partial.callees(None, &new)?);
+                // The down-walk follows calls alone, as `Graph` does; a row started from is read.
+                let callees = partial.callees(None, &new)?;
+                calls.extend(callees.into_iter().filter(|(_, c)| c.kind.is_none()));
                 for (_, c) in &calls {
                     next.extend(c.target.iter().chain(&c.candidates).cloned());
                     across(&c.id, &mut next);
@@ -780,12 +786,22 @@ pub(crate) fn read(
                 }
                 let mut calls = sites;
                 calls.extend(partial.callers(None, &new, candidates)?);
-                next.extend(calls.into_iter().map(|(_, c)| c.caller));
+                // Going up, a file's row reaches the symbol holding it (`held`).
+                for (_, c) in calls {
+                    next.extend(c.holder);
+                    next.push(c.caller);
+                }
             }
         }
         frontier = next;
     }
     Ok(reached)
+}
+
+/// The node a row reaches going up: its holder, the symbol whose span holds a row its file
+/// makes (`CallSite::holder`), else its caller. Processes and the down-walk keep the caller.
+fn held(c: &CallSite) -> &str {
+    c.holder.as_deref().unwrap_or(&c.caller)
 }
 
 /// Reads into `partial` what `Graph::processes_of(id)` reads (#396): the nodes upstream of
@@ -951,12 +967,16 @@ impl<'a> Walk<'_, 'a> {
                         self.writer_up(link, depth + 1, &mut shown);
                     }
                 }
+                // Calls and uses alike; a row a file makes goes to the symbol holding it.
                 for &call @ (n, c) in graph.callers.get(id).into_iter().flatten() {
-                    if !shown.insert((c.caller.as_str(), false)) {
+                    let from = held(c);
+                    if !shown.insert((from, false)) {
                         continue;
                     }
-                    let text = format!("{} {}{}", self.site(call), self.caller(call), mark(c));
-                    self.enter(&c.caller, depth + 1, Row::call(text, n, c.level));
+                    let kind = (c.kind.as_deref()).map_or(String::new(), |k| format!(" ({k})"));
+                    let text =
+                        format!("{} {}{}{kind}", self.site(call), self.holder(call), mark(c));
+                    self.enter(from, depth + 1, Row::call(text, n, c.level));
                 }
                 for link in graph.into.get(id).into_iter().flatten() {
                     let Some(&call @ (n, c)) = graph.calls.get(link.consumer.as_str()) else {
@@ -987,11 +1007,12 @@ impl<'a> Walk<'_, 'a> {
                         }
                         continue;
                     };
-                    if !shown.insert((c.caller.as_str(), true)) {
+                    let from = held(c);
+                    if !shown.insert((from, true)) {
                         continue;
                     }
-                    let text = format!("{} {} {}", arrow(link), self.site(call), self.caller(call));
-                    self.enter(&c.caller, depth + 1, Row::link(text, n, link));
+                    let text = format!("{} {} {}", arrow(link), self.site(call), self.holder(call));
+                    self.enter(from, depth + 1, Row::link(text, n, link));
                 }
                 // A reader goes back to the writers of what it reads, and a channel handler to
                 // the calls that produce what it handles, then to their callers; a
@@ -1276,6 +1297,14 @@ impl<'a> Walk<'_, 'a> {
     fn site(&mut self, (n, c): Call) -> String {
         let at = self.files[n].at(&c.span.path, c.span.start);
         format!("{} {at}", self.graph.workspace.repos[n].identity)
+    }
+
+    /// The name of the symbol a row going up reaches (`held`), `(top level)` outside any.
+    fn holder(&self, call @ (_, c): Call<'a>) -> &'a str {
+        match c.holder.as_deref() {
+            Some(holder) => label(holder),
+            None => self.caller(call),
+        }
     }
 
     /// The name of the symbol making a call, `(top level)` outside any.

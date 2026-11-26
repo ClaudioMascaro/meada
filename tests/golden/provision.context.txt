@@ -31,7 +31,7 @@ resource::s3::archive
   example.com/provision/infra provisioner envs/prod/main.tf:4 aws_s3_bucket.archive (root envs/prod)
 
 example.com/provision/app src/producer.ts:7-11 enqueueOrder
-community: none
+community: src#3
 processes: 1 (1 export; 1 repository): enqueueOrder (example.com/provision/app)
 async function enqueueOrder(body: string) {
   await client.send(
@@ -42,6 +42,9 @@ callers: none
 callees:
 example.com/provision/app src/producer.ts:9 (unresolved) SendMessageCommand
 example.com/provision/app src/producer.ts:8 (unresolved) client.send
+uses:
+example.com/provision/app src/producer.ts:3 client (member)
+example.com/provision/app src/producer.ts:4 BASE (value)
 provisioners:
 example.com/provision/infra envs/dev/main.tf:1 aws_sqs_queue.orders (root envs/dev) [exact: channel::sqs::orders]
 example.com/provision/infra envs/dev/main.tf:2 aws_s3_bucket.archive (root envs/dev) [declared: resource::s3::archive]

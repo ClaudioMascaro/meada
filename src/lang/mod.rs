@@ -463,11 +463,16 @@ pub struct Facts {
     /// `const` bindings that hold no function or class, such as `const USERS = "/users"` or
     /// `const app = express()`. Their values are not kept in the index (see `Call::args`).
     pub consts: Vec<Const>,
-    /// The top-level declarations the file exports that are no definitions (TS/JS), each a
-    /// symbol an import can target. Stored, unlike `consts`' values: `resolve_file` reads it
+    /// The top-level declarations of the file that are no definitions (TS/JS), exported or not,
+    /// each a symbol an import can target or a use can be held by. Stored, unlike `consts`' values: `resolve_file` reads it
     /// from the facts of files not parsed again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub declarations: Vec<Declaration>,
+    /// Each use of a name that is no call (TS/JS): one per scope, name and kind, first range
+    /// kept. Stored, as `declarations`: `resolve_file` resolves them from the facts of files not
+    /// parsed again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub references: Vec<Reference>,
     /// The scope and value of each `let` whose name is bound again in its scope or assigned
     /// again (Rust): no constant, since the name holds no one value, but a value that flows
     /// somewhere unread. Not kept in the index (see `Call::args`).
@@ -1258,14 +1263,87 @@ pub struct Field {
     pub default: Option<Value>,
 }
 
-/// A top-level declaration a file exports that is no definition: a constant holding no
-/// function or class, a type, an enum, or a default-exported expression (`default`).
+/// A top-level declaration of a file that is no definition, exported or not: a constant holding
+/// no function or class, a type, an enum, or a default-exported expression (`default`).
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Declaration {
     pub name: String,
     pub range: Range<usize>,
     /// The BLAKE3 of the exact bytes of `range`, in hex; empty until `hash_spans` fills it.
     pub hash: String,
+}
+
+/// How a name is used where it is not called (`Reference::kind`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Use {
+    /// Rendered as a JSX element (`<Button/>`, `<Ns.Comp/>`).
+    Jsx,
+    /// Written as a type, or as `typeof x` in one.
+    Type,
+    /// Read as a value: an argument, an element, a property value, a returned value.
+    Value,
+    /// Read as a member chain (`config.url`), or the head of a dotted callee (`client`).
+    Member,
+    /// Extended or implemented by a class or an interface.
+    Extends,
+    /// Re-exported from another module (`export { X } from`, `*` for `export * from`).
+    Reexport,
+    /// Taken off a dynamic `import()` of a literal specifier (`Reference::from`).
+    Dynamic,
+}
+
+impl Use {
+    const ALL: [Use; 7] = [
+        Use::Jsx,
+        Use::Type,
+        Use::Value,
+        Use::Member,
+        Use::Extends,
+        Use::Reexport,
+        Use::Dynamic,
+    ];
+
+    /// Whether the row id `id` is a use's, `<caller>::(<kind>)<name>#<n>`: read off the id, so
+    /// it holds where the rows themselves are not read. No callee starts with a kind in
+    /// parentheses.
+    pub fn names(id: &str) -> bool {
+        let last = id.rsplit("::").next().unwrap_or(id);
+        (Self::ALL.iter()).any(|k| {
+            (last.strip_prefix('(')).is_some_and(|rest| {
+                rest.strip_prefix(k.as_str())
+                    .is_some_and(|r| r.starts_with(')'))
+            })
+        })
+    }
+
+    /// The `calls.kind` value and the id prefix of a row of this kind.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Use::Jsx => "jsx",
+            Use::Type => "type",
+            Use::Value => "value",
+            Use::Member => "member",
+            Use::Extends => "extends",
+            Use::Reexport => "reexport",
+            Use::Dynamic => "dynamic",
+        }
+    }
+}
+
+/// A use of a name that is no call (`Facts::references`).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Reference {
+    /// The enclosing definition, as `Call::scope`.
+    pub scope: String,
+    /// The dotted name as written: `Button`, `Ns.Comp`, `config.url`; `*` for `export *`.
+    pub name: String,
+    pub kind: Use,
+    pub range: Range<usize>,
+    /// The specifier a `Reexport` re-exports from, or of the `import()` a `Dynamic` one takes
+    /// its name off; `None` for the other kinds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
 }
 
 /// A `const` binding, qualified by its enclosing definitions like `Def::name`.
@@ -1885,6 +1963,27 @@ fn text<'a>(node: Node, src: &'a [u8]) -> &'a str {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+
+    #[test]
+    fn a_use_id_is_told_from_a_call_id_by_its_last_segment() {
+        use super::Use;
+        for id in [
+            "r::a.ts::(value)X#0",
+            "r::a.ts::f::(member)tokens.gap#1",
+            "r::a.ts::(dynamic)default#0",
+        ] {
+            assert!(Use::names(id), "{id}");
+        }
+        for id in [
+            "r::a.ts::(import)#0",
+            "r::a.ts::f::g#0",
+            "r::a.ts::(values)X#0",
+            "r::a.ts::(value::x#0",
+            "r::(value)x::f::g#0",
+        ] {
+            assert!(!Use::names(id), "{id}");
+        }
+    }
 
     /// What a pack reads of positions: each definition's parameters, each call's arity, labels
     /// and argument counts. A comment inside a parameter or argument list changes none of it

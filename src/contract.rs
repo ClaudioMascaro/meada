@@ -148,6 +148,8 @@ pub enum Site {
     },
     /// The call at this position of the file's `Facts::calls`.
     Call { path: String, index: usize },
+    /// The use at this position of the file's `Facts::references`, a `calls` row of its kind.
+    Reference { path: String, index: usize },
 }
 
 impl Site {
@@ -157,7 +159,8 @@ impl Site {
             Site::Def { path, .. }
             | Site::Inline { path, .. }
             | Site::File(path)
-            | Site::Call { path, .. } => path,
+            | Site::Call { path, .. }
+            | Site::Reference { path, .. } => path,
         }
     }
 }

@@ -1,5 +1,5 @@
 example.com/channels/api src/orders.ts:5-7 createOrder
-community: none
+community: src#5
 processes: 1 (1 export; 1 repository): createOrder (example.com/channels/api)
 async function createOrder(id: string) {
   await producer.send({ topic: ORDERS_CREATED, messages: [{ key: id, value: id }] });
@@ -7,5 +7,8 @@ async function createOrder(id: string) {
 callers: none
 callees:
 example.com/channels/api src/orders.ts:6 (unresolved) producer.send
+uses:
+example.com/channels/api src/kafka.ts:6 producer (member)
+example.com/channels/api src/topics.ts:1 ORDERS_CREATED (value)
 contracts:
 example.com/channels/api src/orders.ts:6 produces channel::kafka::orders.created (no provisioner in the workspace)

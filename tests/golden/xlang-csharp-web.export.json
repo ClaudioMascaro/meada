@@ -93,6 +93,33 @@
       "hash": "039c91e5f95158e81a8dd583663734d75c55a38cca27b273363834abcdf4d161"
     },
     {
+      "id": "example.com/xlang-csharp/web::src/events.ts::kafka",
+      "span": {
+        "path": "src/events.ts",
+        "start": 40,
+        "end": 103
+      },
+      "hash": "c2363845a452d94043ed924dadb475aa8709186c7d5846265c58a1d48f069fc4"
+    },
+    {
+      "id": "example.com/xlang-csharp/web::src/events.ts::producer",
+      "span": {
+        "path": "src/events.ts",
+        "start": 111,
+        "end": 138
+      },
+      "hash": "f0f22c9a47dd2d709e73a4a017637a21743af686aab8fdd921b38ac6f91db3bc"
+    },
+    {
+      "id": "example.com/xlang-csharp/web::src/orders.ts::API",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 6,
+        "end": 31
+      },
+      "hash": "21095d5562fa18a76ec2110a30a5e545803b6f2ec8dff32860bfa384a66ed1b1"
+    },
+    {
       "id": "example.com/xlang-csharp/web::src/orders.ts::orderStatus",
       "span": {
         "path": "src/orders.ts",
@@ -177,6 +204,19 @@
       }
     },
     {
+      "id": "example.com/xlang-csharp/web::src/events.ts::(member)kafka#0",
+      "caller": "example.com/xlang-csharp/web::src/events.ts",
+      "target": "example.com/xlang-csharp/web::src/events.ts::kafka",
+      "level": "exact",
+      "span": {
+        "path": "src/events.ts",
+        "start": 122,
+        "end": 136
+      },
+      "kind": "member",
+      "holder": "example.com/xlang-csharp/web::src/events.ts::producer"
+    },
+    {
       "id": "example.com/xlang-csharp/web::src/events.ts::Kafka#0",
       "caller": "example.com/xlang-csharp/web::src/events.ts",
       "target": null,
@@ -185,7 +225,20 @@
         "path": "src/events.ts",
         "start": 48,
         "end": 103
-      }
+      },
+      "holder": "example.com/xlang-csharp/web::src/events.ts::kafka"
+    },
+    {
+      "id": "example.com/xlang-csharp/web::src/events.ts::announceShipment::(member)producer#0",
+      "caller": "example.com/xlang-csharp/web::src/events.ts::announceShipment",
+      "target": "example.com/xlang-csharp/web::src/events.ts::producer",
+      "level": "exact",
+      "span": {
+        "path": "src/events.ts",
+        "start": 263,
+        "end": 276
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/xlang-csharp/web::src/events.ts::announceShipment::producer.send#0",
@@ -207,7 +260,20 @@
         "path": "src/events.ts",
         "start": 122,
         "end": 138
-      }
+      },
+      "holder": "example.com/xlang-csharp/web::src/events.ts::producer"
+    },
+    {
+      "id": "example.com/xlang-csharp/web::src/orders.ts::orderStatus::(value)API#0",
+      "caller": "example.com/xlang-csharp/web::src/orders.ts::orderStatus",
+      "target": "example.com/xlang-csharp/web::src/orders.ts::API",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 128,
+        "end": 131
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/xlang-csharp/web::src/orders.ts::orderStatus::fetch#0",
@@ -344,6 +410,15 @@
     {
       "name": "src",
       "members": [
+        "example.com/xlang-csharp/web::src/events.ts::announceShipment",
+        "example.com/xlang-csharp/web::src/events.ts::kafka",
+        "example.com/xlang-csharp/web::src/events.ts::producer"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/xlang-csharp/web::src/orders.ts::API",
         "example.com/xlang-csharp/web::src/orders.ts::orderStatus",
         "example.com/xlang-csharp/web::src/orders.ts::reserveOrder",
         "example.com/xlang-csharp/web::src/sync.ts::syncOrders"

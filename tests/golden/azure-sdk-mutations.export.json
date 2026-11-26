@@ -18,6 +18,15 @@
       "hash": "22951c86fa31bbd4f94f547f7c4822ca7c3717f564e0eb2dbf52345b8da3f424"
     },
     {
+      "id": "local/azure-sdk-mutations::worker.ts::bus",
+      "span": {
+        "path": "worker.ts",
+        "start": 61,
+        "end": 99
+      },
+      "hash": "5dde00246f08454dbd6b6b623b5377dc2f0fa0878945b2e31bdd60b9dff2ddcf"
+    },
+    {
       "id": "local/azure-sdk-mutations::worker.ts::mapping",
       "span": {
         "path": "worker.ts",
@@ -73,7 +82,8 @@
         "path": "worker.ts",
         "start": 67,
         "end": 99
-      }
+      },
+      "holder": "local/azure-sdk-mutations::worker.ts::bus"
     },
     {
       "id": "local/azure-sdk-mutations::worker.ts::alias::(call_expression).receiveMessages#0",
@@ -175,6 +185,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-mutations::worker.ts::receiver::(member)bus#0",
+      "caller": "local/azure-sdk-mutations::worker.ts::receiver",
+      "target": "local/azure-sdk-mutations::worker.ts::bus",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 142,
+        "end": 160
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-mutations::worker.ts::receiver::bus.createReceiver#0",
       "caller": "local/azure-sdk-mutations::worker.ts::receiver",
       "target": null,
@@ -268,6 +290,7 @@
       "name": ".",
       "members": [
         "local/azure-sdk-mutations::worker.ts::alias",
+        "local/azure-sdk-mutations::worker.ts::bus",
         "local/azure-sdk-mutations::worker.ts::mapping",
         "local/azure-sdk-mutations::worker.ts::memo",
         "local/azure-sdk-mutations::worker.ts::receiver",

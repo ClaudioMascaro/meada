@@ -285,8 +285,8 @@ sections:
    (`cut after <k> of <m> lines`, `<m>` the range's length); a span left out entirely is read
    from the file at that range. When the span text is unavailable the head shows `<place>` with
    no range, no span follows, and the line before `callers:` says why;
-5. `callers:`, `callees:`, then, only when not empty, `annotations:`, `consumers:` and
-   `contracts:`, each followed by its lines. `callers` and `callees` print `none` when empty.
+5. `callers:`, `callees:`, then, only when not empty, `annotations:`, `used by:`, `uses:`,
+   `consumers:` and `contracts:`, each followed by its lines. `callers` and `callees` print `none` when empty.
 
 The budget cuts the span text first, then the sections from the end; the head, the community and
 the processes lines go last, only under a budget too small for them.
@@ -330,6 +330,8 @@ words:
 | `callers:` | caller |
 | `callees:` | callee, overload set, unresolved call |
 | `annotations:` | callee, overload set, unresolved call |
+| `used by:` | used by |
+| `uses:` | use |
 | `consumers:` | package consumer |
 | `provisioners:` | provisioner |
 | `contracts:` | provides, shape fields, shape open, produces, publishes, consumes, consumes linked, consumes unresolved, environment |
@@ -349,6 +351,8 @@ words:
 | callee | `<repository> <place> <name><mark?><on?>` | A symbol the symbol calls, at its definition; one line per candidate of an ambiguous call. |
 | overload set | `<repository> <place> <name> (one of <n> overloads)<mark?><on?>` | The overloads of one method a call may reach, at the first one's definition. |
 | unresolved call | `<repository> <place> (unresolved) <callee><on?>` | A call whose target Meada cannot read, at the call. |
+| used by | `<repository> <place> <caller> (<use-kind>)` | A use that is no call reaching the symbol (TS/JS), at the use, with the symbol holding it. |
+| use | `<repository> <place> <name> (<use-kind>)` | A symbol the symbol uses without calling it (TS/JS), at its definition. |
 | package consumer | `<repository> <place> <caller><tags?>` | A call in any repository that reaches the symbol through a package import. |
 | provides | `<repository> <place> provides <contract><orphan-note?>` | The symbol provides the contract. |
 | shape fields | `<indent><repository> <shape-source> <carried> fields:<fields?>` | The field paths the shape carries. |
@@ -439,12 +443,21 @@ words:
 | `<section>` | `callers` | The calls that reach the symbol. |
 | `<section>` | `callees` | What the symbol's calls reach. |
 | `<section>` | `annotations` | The symbol's calls that decorate a definition (attributes, decorators, annotations). |
+| `<section>` | `used by` | The uses that are no calls reaching the symbol. |
+| `<section>` | `uses` | What the symbol's uses that are no calls reach. |
 | `<section>` | `consumers` | The calls that reach the symbol through a package import. |
 | `<section>` | `provisioners` | The IaC nodes creating the symbol's resources. |
 | `<section>` | `contracts` | The contracts the symbol provides and consumes. |
 | `<empty-section>` | `callers` | No call reaches the symbol. |
 | `<empty-section>` | `callees` | The symbol calls nothing. |
 | `<on>` | ` on <name>` | The definition an annotation decorates. |
+| `<use-kind>` | `jsx` | Rendered as a JSX element. |
+| `<use-kind>` | `type` | Written as a type, or as `typeof` of a value in one. |
+| `<use-kind>` | `value` | Read as a value: an argument, an element, a property value, a returned value. |
+| `<use-kind>` | `member` | Read as the head of a member chain or of a dotted callee. |
+| `<use-kind>` | `extends` | Extended or implemented by a class or an interface. |
+| `<use-kind>` | `reexport` | Re-exported from another module. |
+| `<use-kind>` | `dynamic` | Taken off a dynamic `import()` of a literal specifier. |
 | `<tags>` | ` [<level>]` | The link is not exact. |
 | `<tags>` | ` [<range-flag>]` | The dependency's range does not plainly accept the provider's version. |
 | `<tags>` | ` [<level>, <range-flag>]` | Both. |
@@ -538,7 +551,7 @@ carries its level with no reason.
 | run by workload | `<indent>runs code [<level>: <reason>] <repository> <place> <address> (root <iac-root>)` | Code reaches a workload that runs it. |
 | provision | `<indent>provisions <contract> [<level>: <reason>] <text>` | A provisioning hop, with its root when it reaches IaC. |
 | process | `process <label>` | The process whose steps follow. |
-| node | `<indent><node><call-mark?><repeat?><drift?>` | A node the walk reaches through a call, or a start. |
+| node | `<indent><node><call-mark?><use-mark?><repeat?><drift?>` | A node the walk reaches through a call, or a start; going up, also through a use that is no call. |
 | link | `<indent><arrow> <node><repeat?><drift?>` | A node the walk reaches through a link. |
 | overloads | `<indent><repository> <place> <name> (<n> overloads)<call-mark?>` | The overloads of one method a call may reach; the walk does not follow them. |
 | unresolved | `<indent><repository> <place> (unresolved) <callee>` | A call whose target Meada cannot read. |
@@ -569,6 +582,7 @@ carries its level with no reason.
 | `<node>` | `<repository> (repository-level)` | A side declared with no `via`; the branch ends there. |
 | `<node>` | `<repository> <path> <name> (documented only)` | A side only a provider document lists, such as `GET /x` or `kafka send orders.created`; the branch ends there. |
 | `<call-mark>` | `<mark>` | The call that reaches the node is not exact. |
+| `<use-mark>` | ` (<use-kind>)` | Going up, the node reaches the one above through a use of this kind, not a call (TS/JS); a row its file makes goes to the symbol holding it. |
 | `<call-mark>` | `<step-level>` | In a process: the call's level, with no reason. |
 | `<step-level>` | ` [<level>]` | The level of a call that is not exact. |
 | `<repeat>` | ` (cycle)` | The node is one of its own ancestors. |

@@ -13,6 +13,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/provision/app::src/consumer.ts::client",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 120,
+        "end": 146
+      },
+      "hash": "c6d3bd19fd0e2dd99de4c4b5714d0e7c71d784ea74608879bb91925205ee1670"
+    },
+    {
       "id": "example.com/provision/app::src/consumer.ts::drain",
       "span": {
         "path": "src/consumer.ts",
@@ -38,6 +47,24 @@
         "end": 577
       },
       "hash": "6de8e3fec0e0e69f98c7b75ca6b7b66d5358a5cf96d2746a728ad5f34f8aaf0d"
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::BASE",
+      "span": {
+        "path": "src/producer.ts",
+        "start": 110,
+        "end": 137
+      },
+      "hash": "7b464647cdae0b87eb32329446cbcdedd14f7bb3180af13012667c4013aeb80a"
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::client",
+      "span": {
+        "path": "src/producer.ts",
+        "start": 76,
+        "end": 102
+      },
+      "hash": "c6d3bd19fd0e2dd99de4c4b5714d0e7c71d784ea74608879bb91925205ee1670"
     },
     {
       "id": "example.com/provision/app::src/producer.ts::enqueue",
@@ -77,7 +104,20 @@
         "path": "src/consumer.ts",
         "start": 129,
         "end": 146
-      }
+      },
+      "holder": "example.com/provision/app::src/consumer.ts::client"
+    },
+    {
+      "id": "example.com/provision/app::src/consumer.ts::drain::(member)client#0",
+      "caller": "example.com/provision/app::src/consumer.ts::drain",
+      "target": "example.com/provision/app::src/consumer.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 269,
+        "end": 280
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/provision/app::src/consumer.ts::drain::ReceiveMessageCommand#0",
@@ -102,6 +142,18 @@
       }
     },
     {
+      "id": "example.com/provision/app::src/consumer.ts::startRefunds::(value)handleRefund#0",
+      "caller": "example.com/provision/app::src/consumer.ts::startRefunds",
+      "target": "example.com/provision/app::src/consumer.ts::handleRefund",
+      "level": "exact",
+      "span": {
+        "path": "src/consumer.ts",
+        "start": 556,
+        "end": 568
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/provision/app::src/consumer.ts::startRefunds::Consumer.create#0",
       "caller": "example.com/provision/app::src/consumer.ts::startRefunds",
       "target": null,
@@ -121,7 +173,20 @@
         "path": "src/producer.ts",
         "start": 85,
         "end": 102
-      }
+      },
+      "holder": "example.com/provision/app::src/producer.ts::client"
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::enqueue::(member)client#0",
+      "caller": "example.com/provision/app::src/producer.ts::enqueue",
+      "target": "example.com/provision/app::src/producer.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "src/producer.ts",
+        "start": 509,
+        "end": 520
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/provision/app::src/producer.ts::enqueue::SendMessageCommand#0",
@@ -144,6 +209,30 @@
         "start": 509,
         "end": 587
       }
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::enqueueOrder::(member)client#0",
+      "caller": "example.com/provision/app::src/producer.ts::enqueueOrder",
+      "target": "example.com/provision/app::src/producer.ts::client",
+      "level": "exact",
+      "span": {
+        "path": "src/producer.ts",
+        "start": 282,
+        "end": 293
+      },
+      "kind": "member"
+    },
+    {
+      "id": "example.com/provision/app::src/producer.ts::enqueueOrder::(value)BASE#0",
+      "caller": "example.com/provision/app::src/producer.ts::enqueueOrder",
+      "target": "example.com/provision/app::src/producer.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/producer.ts",
+        "start": 337,
+        "end": 341
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/provision/app::src/producer.ts::enqueueOrder::SendMessageCommand#0",
@@ -218,6 +307,28 @@
   "communities": [
     {
       "name": "src",
+      "members": [
+        "example.com/provision/app::src/consumer.ts::client",
+        "example.com/provision/app::src/consumer.ts::drain"
+      ]
+    },
+    {
+      "name": "src#2",
+      "members": [
+        "example.com/provision/app::src/consumer.ts::handleRefund",
+        "example.com/provision/app::src/consumer.ts::startRefunds"
+      ]
+    },
+    {
+      "name": "src#3",
+      "members": [
+        "example.com/provision/app::src/producer.ts::BASE",
+        "example.com/provision/app::src/producer.ts::client",
+        "example.com/provision/app::src/producer.ts::enqueueOrder"
+      ]
+    },
+    {
+      "name": "src#4",
       "members": [
         "example.com/provision/app::src/producer.ts::enqueue",
         "example.com/provision/app::src/producer.ts::enqueueRefund"

@@ -18,6 +18,15 @@
         "end": 233
       },
       "hash": "5bc6e300481596247d7c357c3c45aa4e1438295a2a513faeb4874072fa7c3576"
+    },
+    {
+      "id": "example.com/acme/app::send.ts::sqs",
+      "span": {
+        "path": "send.ts",
+        "start": 75,
+        "end": 98
+      },
+      "hash": "395c7b24f7cf68bdd8bca41d3f952fca5b69190b18cf257bfe9deb9e96853694"
     }
   ],
   "calls": [
@@ -30,7 +39,20 @@
         "path": "send.ts",
         "start": 81,
         "end": 98
-      }
+      },
+      "holder": "example.com/acme/app::send.ts::sqs"
+    },
+    {
+      "id": "example.com/acme/app::send.ts::send::(member)sqs#0",
+      "caller": "example.com/acme/app::send.ts::send",
+      "target": "example.com/acme/app::send.ts::sqs",
+      "level": "exact",
+      "span": {
+        "path": "send.ts",
+        "start": 139,
+        "end": 147
+      },
+      "kind": "member"
     },
     {
       "id": "example.com/acme/app::send.ts::send::SendMessageCommand#0",
@@ -68,6 +90,15 @@
     }
   ],
   "consumers": [],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "example.com/acme/app::send.ts::send",
+        "example.com/acme/app::send.ts::sqs"
+      ]
+    }
+  ],
   "iac_nodes": [
     {
       "identity": "example.com/acme/app::.github/workflows/build.yml::jobs.image.steps[0]",

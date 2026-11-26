@@ -31,6 +31,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/chain/web::src/api/client.ts::BASE",
+      "span": {
+        "path": "src/api/client.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "4b91029ca5da7b89c17c424818d3b6d88572f84614a2b51603b4836346ba9d17"
+    },
+    {
       "id": "example.com/chain/web::src/api/client.ts::request",
       "span": {
         "path": "src/api/client.ts",
@@ -92,6 +101,15 @@
         "end": 238
       },
       "hash": "6e3d64ac3f76355e2d40bc2ad7802e07734c283a7fd5dc716feb989af0f9fada"
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::BASE",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 6,
+        "end": 36
+      },
+      "hash": "4b91029ca5da7b89c17c424818d3b6d88572f84614a2b51603b4836346ba9d17"
     },
     {
       "id": "example.com/chain/web::src/shipments.ts::edgeShipment",
@@ -168,6 +186,18 @@
   ],
   "calls": [
     {
+      "id": "example.com/chain/web::src/api/client.ts::request::(value)BASE#0",
+      "caller": "example.com/chain/web::src/api/client.ts::request",
+      "target": "example.com/chain/web::src/api/client.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/api/client.ts",
+        "start": 194,
+        "end": 198
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/api/client.ts::request::fetch#0",
       "caller": "example.com/chain/web::src/api/client.ts::request",
       "target": null,
@@ -223,6 +253,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/orders.ts::cancelOrder::(value)ORDERS_PATH#0",
+      "caller": "example.com/chain/web::src/orders.ts::cancelOrder",
+      "target": "example.com/chain/web::src/api/paths.ts::ORDERS_PATH",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 302,
+        "end": 313
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/orders.ts::cancelOrder::request#0",
       "caller": "example.com/chain/web::src/orders.ts::cancelOrder",
       "target": "example.com/chain/web::src/api/client.ts::request",
@@ -234,6 +276,18 @@
       }
     },
     {
+      "id": "example.com/chain/web::src/orders.ts::createOrder::(value)ORDERS_PATH#0",
+      "caller": "example.com/chain/web::src/orders.ts::createOrder",
+      "target": "example.com/chain/web::src/api/paths.ts::ORDERS_PATH",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 399,
+        "end": 410
+      },
+      "kind": "value"
+    },
+    {
       "id": "example.com/chain/web::src/orders.ts::createOrder::request#0",
       "caller": "example.com/chain/web::src/orders.ts::createOrder",
       "target": "example.com/chain/web::src/api/client.ts::request",
@@ -243,6 +297,18 @@
         "start": 388,
         "end": 426
       }
+    },
+    {
+      "id": "example.com/chain/web::src/orders.ts::listOrders::(value)ORDERS_PATH#0",
+      "caller": "example.com/chain/web::src/orders.ts::listOrders",
+      "target": "example.com/chain/web::src/api/paths.ts::ORDERS_PATH",
+      "level": "exact",
+      "span": {
+        "path": "src/orders.ts",
+        "start": 223,
+        "end": 234
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/orders.ts::listOrders::request#0",
@@ -298,6 +364,18 @@
         "start": 907,
         "end": 950
       }
+    },
+    {
+      "id": "example.com/chain/web::src/shipments.ts::shipment::(value)BASE#0",
+      "caller": "example.com/chain/web::src/shipments.ts::shipment",
+      "target": "example.com/chain/web::src/shipments.ts::BASE",
+      "level": "exact",
+      "span": {
+        "path": "src/shipments.ts",
+        "start": 179,
+        "end": 183
+      },
+      "kind": "value"
     },
     {
       "id": "example.com/chain/web::src/shipments.ts::shipment::fetch#0",
@@ -406,24 +484,28 @@
     {
       "name": "src",
       "members": [
+        "example.com/chain/web::src/api/client.ts::BASE",
         "example.com/chain/web::src/api/client.ts::request",
-        "example.com/chain/web::src/orders.ts::createOrder",
-        "example.com/chain/web::src/orders.ts::listOrders"
+        "example.com/chain/web::src/api/paths.ts::ORDERS_PATH",
+        "example.com/chain/web::src/dashboard.ts::cancel",
+        "example.com/chain/web::src/orders.ts::cancelOrder",
+        "example.com/chain/web::src/orders.ts::createOrder"
       ]
     },
     {
       "name": "src#2",
       "members": [
-        "example.com/chain/web::src/dashboard.ts::cancel",
-        "example.com/chain/web::src/orders.ts::cancelOrder"
+        "example.com/chain/web::src/dashboard.ts::dashboard",
+        "example.com/chain/web::src/orders.ts::listOrders",
+        "example.com/chain/web::src/status.ts::health",
+        "example.com/chain/web::src/status.ts::track"
       ]
     },
     {
       "name": "src#3",
       "members": [
-        "example.com/chain/web::src/dashboard.ts::dashboard",
-        "example.com/chain/web::src/status.ts::health",
-        "example.com/chain/web::src/status.ts::track"
+        "example.com/chain/web::src/shipments.ts::BASE",
+        "example.com/chain/web::src/shipments.ts::shipment"
       ]
     }
   ],

@@ -86,6 +86,7 @@ mod test_services;
 mod trace;
 mod ui;
 mod urls;
+mod uses;
 mod wide;
 mod workspace;
 mod xlang;

@@ -54,6 +54,15 @@
       "hash": "19d0f9ff13d77d0ce198022ede5b67db427d97be643e17c629c18d3c79d145c8"
     },
     {
+      "id": "local/azure-sdk-values-env::worker.ts::secrets",
+      "span": {
+        "path": "worker.ts",
+        "start": 264,
+        "end": 309
+      },
+      "hash": "57413199d003f68711fe581e7cae6992aae5ca0e79dcd589df062790cc220201"
+    },
+    {
       "id": "local/azure-sdk-values-env::worker.ts::send",
       "span": {
         "path": "worker.ts",
@@ -61,6 +70,15 @@
         "end": 410
       },
       "hash": "c7c39b45ceca6a0f71bae50e959f952583c8cc2b06dae69ce0f7e38c99826cc0"
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::storage",
+      "span": {
+        "path": "worker.ts",
+        "start": 203,
+        "end": 256
+      },
+      "hash": "dcadeccbc118866fb28b1873d0fa6aae65202b831fec284c53f2f5c69dc00ede"
     },
     {
       "id": "local/azure-sdk-values-env::worker.ts::write",
@@ -109,7 +127,8 @@
         "path": "worker.ts",
         "start": 213,
         "end": 256
-      }
+      },
+      "holder": "local/azure-sdk-values-env::worker.ts::storage"
     },
     {
       "id": "local/azure-sdk-values-env::worker.ts::SecretClient#0",
@@ -120,7 +139,20 @@
         "path": "worker.ts",
         "start": 274,
         "end": 309
-      }
+      },
+      "holder": "local/azure-sdk-values-env::worker.ts::secrets"
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::missingSecret::(member)secrets#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::missingSecret",
+      "target": "local/azure-sdk-values-env::worker.ts::secrets",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1169,
+        "end": 1186
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-values-env::worker.ts::missingSecret::secrets.getSecret#0",
@@ -132,6 +164,18 @@
         "start": 1169,
         "end": 1207
       }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::privateSecret::(member)secrets#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::privateSecret",
+      "target": "local/azure-sdk-values-env::worker.ts::secrets",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1245,
+        "end": 1262
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-values-env::worker.ts::privateSecret::secrets.getSecret#0",
@@ -167,6 +211,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-values-env::worker.ts::read::(member)storage#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::read",
+      "target": "local/azure-sdk-values-env::worker.ts::storage",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 677,
+        "end": 703
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-values-env::worker.ts::read::storage.getContainerClient#0",
       "caller": "local/azure-sdk-values-env::worker.ts::read",
       "target": null,
@@ -198,6 +254,18 @@
         "start": 439,
         "end": 499
       }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::secret::(member)secrets#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::secret",
+      "target": "local/azure-sdk-values-env::worker.ts::secrets",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 797,
+        "end": 814
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-values-env::worker.ts::secret::secrets.getSecret#0",
@@ -255,6 +323,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-values-env::worker.ts::write::(member)storage#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::write",
+      "target": "local/azure-sdk-values-env::worker.ts::storage",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 548,
+        "end": 574
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-values-env::worker.ts::write::storage.getContainerClient#0",
       "caller": "local/azure-sdk-values-env::worker.ts::write",
       "target": null,
@@ -288,6 +368,18 @@
       }
     },
     {
+      "id": "local/azure-sdk-values-env::worker.ts::wrongBlob::(member)storage#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::wrongBlob",
+      "target": "local/azure-sdk-values-env::worker.ts::storage",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 974,
+        "end": 1000
+      },
+      "kind": "member"
+    },
+    {
       "id": "local/azure-sdk-values-env::worker.ts::wrongBlob::storage.getContainerClient#0",
       "caller": "local/azure-sdk-values-env::worker.ts::wrongBlob",
       "target": null,
@@ -319,6 +411,18 @@
         "start": 867,
         "end": 923
       }
+    },
+    {
+      "id": "local/azure-sdk-values-env::worker.ts::wrongSecret::(member)secrets#0",
+      "caller": "local/azure-sdk-values-env::worker.ts::wrongSecret",
+      "target": "local/azure-sdk-values-env::worker.ts::secrets",
+      "level": "exact",
+      "span": {
+        "path": "worker.ts",
+        "start": 1095,
+        "end": 1112
+      },
+      "kind": "member"
     },
     {
       "id": "local/azure-sdk-values-env::worker.ts::wrongSecret::secrets.getSecret#0",
@@ -395,6 +499,27 @@
       "contract": "resource::keyvault",
       "site": "local/azure-sdk-values-env::worker.ts::wrongSecret::secrets.getSecret#0",
       "via": "env:WRONG"
+    }
+  ],
+  "communities": [
+    {
+      "name": ".",
+      "members": [
+        "local/azure-sdk-values-env::worker.ts::missingSecret",
+        "local/azure-sdk-values-env::worker.ts::privateSecret",
+        "local/azure-sdk-values-env::worker.ts::secret",
+        "local/azure-sdk-values-env::worker.ts::secrets",
+        "local/azure-sdk-values-env::worker.ts::wrongSecret"
+      ]
+    },
+    {
+      "name": ".#2",
+      "members": [
+        "local/azure-sdk-values-env::worker.ts::read",
+        "local/azure-sdk-values-env::worker.ts::storage",
+        "local/azure-sdk-values-env::worker.ts::write",
+        "local/azure-sdk-values-env::worker.ts::wrongBlob"
+      ]
     }
   ],
   "iac_nodes": [
