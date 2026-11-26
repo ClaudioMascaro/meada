@@ -428,6 +428,9 @@ pub struct Resolver<'a> {
     /// constant marked `.Name` (Go, and a Java or Kotlin write whose class is unknown). A
     /// variable of such a name holds no one value.
     written: HashSet<&'a str>,
+    /// The names of `written` some file other than a Go test file (`_test.go`) writes: `go build`
+    /// leaves test files out of the program (`Code::field_written_in`).
+    written_outside_tests: HashSet<&'a str>,
     /// The fields some file writes in the code of their class (`.name@class`, Java and Kotlin),
     /// by class and name.
     written_in: HashSet<(&'a str, &'a str)>,
@@ -946,16 +949,20 @@ impl<'a> Resolver<'a> {
             paths.dedup();
             (2..=TYPE_PARTS).contains(&paths.len())
         });
-        let marks: Vec<&str> = (files.values())
-            .flat_map(|f| f.consts.iter())
-            .filter_map(|c| c.name.strip_prefix('.'))
+        let marks: Vec<(&str, &str)> = (files.iter())
+            .flat_map(|(&path, f)| f.consts.iter().map(move |c| (path, c)))
+            .filter_map(|(path, c)| Some((path, c.name.strip_prefix('.')?)))
             .collect();
         let written = (marks.iter())
-            .filter(|m| !m.contains('@'))
-            .copied()
+            .filter(|(_, m)| !m.contains('@'))
+            .map(|&(_, m)| m)
+            .collect();
+        let written_outside_tests = (marks.iter())
+            .filter(|(path, m)| !m.contains('@') && !path.ends_with("_test.go"))
+            .map(|&(_, m)| m)
             .collect();
         let written_in = (marks.iter())
-            .filter_map(|m| m.split_once('@'))
+            .filter_map(|(_, m)| m.split_once('@'))
             .map(|(name, class)| (class, name))
             .collect();
         // Those of the definition `defs` keeps for each name.
@@ -1115,6 +1122,7 @@ impl<'a> Resolver<'a> {
             static_imports_inherit: language.static_imports_inherit(),
             namespaced: language.namespaced(),
             written,
+            written_outside_tests,
             written_in,
             consts,
             internal,
@@ -6210,9 +6218,15 @@ impl<'a> Code<'a> {
     }
 
     /// Whether some file of the repository writes the field `field` of `class` (Java and
-    /// Kotlin): a write in the code of `class`, or one whose class the pack could not tell.
-    pub fn field_written_in(&self, class: &str, field: &str) -> bool {
-        self.field_written(field) || self.resolver.written_in.contains(&(class, field))
+    /// Kotlin): a write in the code of `class`, or one whose class the pack could not tell. For
+    /// a read outside Go test files (`test_read` false), a write in a `_test.go` file does not
+    /// count: `go build` leaves those files out of the program.
+    pub fn field_written_in(&self, class: &str, field: &str, test_read: bool) -> bool {
+        let written = match test_read {
+            true => &self.resolver.written,
+            false => &self.resolver.written_outside_tests,
+        };
+        written.contains(field) || self.resolver.written_in.contains(&(class, field))
     }
 
     /// The environment read the struct field `field` holds: the one every composite literal of
@@ -8170,8 +8184,11 @@ impl<'a> Code<'a> {
                 Value::Str(vec![Part::Env(var.var.clone())])
             }
             // A field no file assigns holds what an annotation on it injects, else the
-            // environment read every composite literal that sets it gives it.
-            Binding::Local(at, class, field) if !self.field_written_in(class, field) => {
+            // environment read every composite literal that sets it gives it. A Go test file's
+            // write counts only for a read in a test file.
+            Binding::Local(at, class, field)
+                if !self.field_written_in(class, field, path.ends_with("_test.go")) =>
+            {
                 let marks = |on: &Marked| matches!(on, Marked::Field { class: c, name, .. } if c == class && name == field);
                 let injected = fold.inject.and_then(|i| self.injected(at, marks, i));
                 let field = (at, class, field);

@@ -420,3 +420,56 @@ func callRun() { _, _ = http.Post(os.Getenv("RUN_URL")+"/run", "application/json
         assert!(reason.starts_with(why), "{reason}");
     }
 }
+
+/// A `_test.go` file of another package that writes a field named like the client's base.
+const OTHER_TEST: &str = r#"package main
+
+import "testing"
+
+type other struct{ base string }
+
+func TestOther(t *testing.T) {
+	o := &other{}
+	o.base = "http://127.0.0.1:1"
+	_ = o
+}
+"#;
+
+/// Run and Cancel of the Go client link `declared` to their routes.
+fn assert_client_declared(found: &[Value]) {
+    let reason =
+        format!("base URL from B_BASE_URL, declared for svc-b/ in meada.toml; served by {MONO}");
+    for (site, provider) in [
+        ("svc-a/client/client.go::Client.Run", "Routes.run"),
+        ("svc-a/client/client.go::Client.Cancel", "Routes.cancel"),
+    ] {
+        let row = (
+            "declared".to_string(),
+            format!("{MONO}::svc-b/routes.go::{provider}"),
+            reason.clone(),
+        );
+        assert_eq!(shown(&of(found, site)), [row], "{found:#?}");
+    }
+}
+
+#[test]
+fn a_test_file_write_elsewhere_does_not_cancel_the_client_base() {
+    let repo = mono("base_url_test_write");
+    std::fs::write(repo.join("svc-b/other_test.go"), OTHER_TEST).unwrap();
+    assert_client_declared(&links(&repo));
+}
+
+#[test]
+fn a_test_file_write_still_cancels_a_read_in_a_test_file() {
+    let repo = mono("base_url_test_write_read");
+    std::fs::write(repo.join("svc-b/other_test.go"), OTHER_TEST).unwrap();
+    let probe = r#"package client
+
+import "net/http"
+
+func probe(c *Client) { _, _ = http.Post(c.base+"/run", "application/json", nil) }
+"#;
+    std::fs::write(repo.join("svc-a/client/probe_test.go"), probe).unwrap();
+    let found = links(&repo);
+    assert_no_base(&found, "svc-a/client/probe_test.go::probe");
+}
