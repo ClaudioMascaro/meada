@@ -112,6 +112,7 @@ impl LanguagePack for TsJs {
         let mut query_locals = Vec::new();
         // Each function definition by its node: the `return`s written in its body.
         let mut functions: HashMap<usize, usize> = HashMap::new();
+        let mut results: HashMap<usize, usize> = HashMap::new();
         // Explicit stack instead of recursion: generated code can nest deeper than the call
         // stack.
         let mut stack = vec![Visit {
@@ -186,6 +187,10 @@ impl LanguagePack for TsJs {
                     let arguments =
                         (node.child_by_field_name("arguments")).filter(|a| a.kind() == "arguments");
                     if let Some(function) = callee_node(node) {
+                        if let Some(receiver) = results.remove(&node.id()) {
+                            facts.receivers[receiver].class =
+                                super::Class::Result(facts.calls.len());
+                        }
                         // The artifact's `await` is outside the call: so is its span.
                         let start = if awaited_artifact(node) {
                             function.start_byte()
@@ -195,7 +200,7 @@ impl LanguagePack for TsJs {
                         facts.calls.push(Call {
                             arity: None,
                             labels: None,
-                            awaited: false,
+                            awaited: receivers::awaited(node, &parents),
                             constructs: false,
                             scope: scope.clone(),
                             callee: callee(function, src),
@@ -433,7 +438,7 @@ impl LanguagePack for TsJs {
                     &parents,
                 );
                 let receiver =
-                    receivers::local(node, *value_node, name, src, &scope, &parents, &mut facts);
+                    receivers::local(node, name, src, &scope, &parents, &mut facts, &mut results);
                 receivers::record(
                     &mut facts.ts_locals,
                     qualify(&scope, name),
@@ -914,6 +919,7 @@ struct Parents<'t> {
     /// Whether the file binds or assigns `require` anywhere: a `require(..)` is then no load.
     // ponytail: per file, not per scope; a file that shadows `require` once records none.
     require_declared: bool,
+    promise_shadows: Vec<Range<usize>>,
     /// Merged lexical scopes that hide the runtime String conversion.
     string_shadows: Vec<Range<usize>>,
     /// Merged lexical scopes that hide the Node.js process object.
@@ -933,6 +939,7 @@ impl<'t> Parents<'t> {
         let mut url_required = false;
         let mut require_declared = false;
         let mut arrow_parameters = Vec::new();
+        let mut promise_bindings = Vec::new();
         let mut string_bindings = Vec::new();
         let mut string_writes = Vec::new();
         let mut process_bindings = Vec::new();
@@ -969,6 +976,9 @@ impl<'t> Parents<'t> {
             {
                 arrow_parameters.push(left.start_byte());
             }
+            if declares_promise(node, src) {
+                promise_bindings.push(node);
+            }
             url_declared |= shadows_runtime(node, src, "URL");
             url_required |= runtime_url_require(node, src);
             require_declared |= shadows_runtime(node, src, "require");
@@ -1004,11 +1014,13 @@ impl<'t> Parents<'t> {
             assigned,
             written,
             url_declared,
+            promise_shadows: Vec::new(),
             string_shadows: Vec::new(),
             process_shadows: Vec::new(),
             strict_scopes,
             arrow_parameters,
         };
+        parents.promise_shadows = parents.runtime_shadows(promise_bindings, Vec::new(), root, src);
         parents.string_shadows = parents.runtime_shadows(string_bindings, string_writes, root, src);
         parents.process_shadows =
             parents.runtime_shadows(process_bindings, process_writes, root, src);
@@ -1152,6 +1164,29 @@ fn loads_from(node: Node, src: &[u8], up: &Parents) -> Option<String> {
     let mut args = named(node.child_by_field_name("arguments")?);
     let arg = args.next().filter(|a| a.kind() == "string")?;
     (loads && args.next().is_none()).then(|| unquote(arg, src))
+}
+
+/// Type declarations and imported local names can hide the built-in Promise type.
+fn declares_promise(node: Node, src: &[u8]) -> bool {
+    match node.kind() {
+        "type_alias_declaration"
+        | "interface_declaration"
+        | "class_declaration"
+        | "abstract_class_declaration"
+        | "class"
+        | "enum_declaration" => node
+            .child_by_field_name("name")
+            .is_some_and(|name| text(name, src) == "Promise"),
+        "internal_module" | "module" => node.child_by_field_name("name").is_some_and(|name| {
+            let start = name.start_byte();
+            name.named_descendant_for_byte_range(start, start + 1)
+                .is_some_and(|first| first.kind() == "identifier" && text(first, src) == "Promise")
+        }),
+        "import_statement" | "import_alias" | "import_require_clause" => {
+            shadows_runtime(node, src, "Promise")
+        }
+        _ => false,
+    }
 }
 
 /// Whether `node` binds `name`, hiding the runtime name. Only the named `URL` export of Node's
@@ -2646,6 +2681,29 @@ fn callee(node: Node, src: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::lang::Use;
+
+    #[test]
+    fn only_the_global_promise_supplies_an_awaited_output() {
+        for (declaration, global) in [
+            ("interface Promise<T> {}", false),
+            ("abstract class Promise<T> {}", false),
+            ("enum Promise { A }", false),
+            ("namespace Promise {}", false),
+            ("namespace Promise.Inner.Other {}", false),
+            ("import type { Other as Promise } from 'some-lib';", false),
+            ("import * as Promise from 'some-lib';", false),
+            ("import Promise = require('some-lib');", false),
+            ("import { Promise as Other } from 'some-lib';", true),
+            ("function other() { type Promise<T> = T; }", true),
+        ] {
+            let source = format!("function open(): Promise<Client> {{}} {declaration}");
+            let facts = TsJs.parse("a.ts", source.as_bytes()).unwrap();
+            let open = facts.defs.iter().find(|def| def.name == "open").unwrap();
+            assert_eq!(open.output.is_some(), global, "{declaration}");
+        }
+        let source = b"function open<Promise>(): Promise<Client> {}";
+        assert!(TsJs.parse("a.ts", source).unwrap().defs[0].output.is_none());
+    }
 
     #[test]
     fn a_tsconfig_that_is_invalid_or_past_the_size_limit_declares_no_paths() {

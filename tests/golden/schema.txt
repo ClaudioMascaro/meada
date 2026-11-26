@@ -674,6 +674,13 @@ sample.ts
   "receivers": [
     {
       "scope": "",
+      "name": "app",
+      "class": {
+        "Result": 0
+      }
+    },
+    {
+      "scope": "",
       "name": "sdk",
       "class": {
         "Named": "SNSClient"
@@ -681,6 +688,16 @@ sample.ts
     }
   ],
   "ts_locals": {
+    "app": [
+      {
+        "block": {
+          "start": 0,
+          "end": 1233
+        },
+        "declared": 370,
+        "receiver": 0
+      }
+    ],
     "sdk": [
       {
         "block": {
@@ -688,7 +705,7 @@ sample.ts
           "end": 1233
         },
         "declared": 1142,
-        "receiver": 0
+        "receiver": 1
       }
     ]
   },
@@ -3452,6 +3469,7 @@ sample.tsx
     {
       "scope": "load",
       "callee": "(import)",
+      "awaited": true,
       "range": {
         "start": 282,
         "end": 306

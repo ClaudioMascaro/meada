@@ -2751,7 +2751,22 @@ impl<'a> Resolver<'a> {
             }
             Class::Returned(callee) => self.returned(path, scope, callee, false, work),
             Class::Called(callee) => self.returned(path, scope, callee, true, work),
-            Class::Result(index) => self.result_of(path, *index, Through::default(), work),
+            Class::Result(index) => {
+                let awaited = self.ts
+                    && self.files[path]
+                        .calls
+                        .get(*index)
+                        .is_some_and(|c| c.awaited);
+                self.result_of(
+                    path,
+                    *index,
+                    Through {
+                        awaited,
+                        ..Through::default()
+                    },
+                    work,
+                )
+            }
             Class::Imported | Class::Member(_) | Class::Unknown => Binding::Unknown,
         };
         self.leave(work);
@@ -3690,6 +3705,11 @@ impl<'a> Resolver<'a> {
                     return Binding::Hidden;
                 }
                 if local.receiver.is_some() {
+                    if let Some(Class::Result(_)) = self.receiver_class(path, s, name)
+                        && let Some(constant) = self.consts[path].get(candidate.as_str())
+                    {
+                        return Binding::Const(path, constant);
+                    }
                     return Binding::Local(path, s, name);
                 }
                 if let Some(constant) = self.consts[path].get(candidate.as_str()) {

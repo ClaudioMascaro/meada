@@ -1,4 +1,5 @@
 export default class Client {
+  static make(): Client { return new Client(); }
   send() {}
   listen() {}
 }

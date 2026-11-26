@@ -1,10 +1,11 @@
 use super::{Parents, callee, children, named, text, types};
 use crate::lang::{Class, Facts, Kind, Receiver, TsClass, TsLocal, Ty};
+use std::collections::HashMap;
 use tree_sitter::Node;
 
 /// Only a named type gives a receiver. The type reader rejects a shadowing type parameter.
 fn annotation(node: Node, src: &[u8], up: &Parents) -> Option<Class> {
-    let ty = named(node).next()?;
+    let ty = named(node).find(|n| n.kind() != "comment")?;
     if ty.kind() != "type_identifier" {
         return None;
     }
@@ -47,20 +48,68 @@ pub(super) fn record(
 
 pub(super) fn local(
     node: Node,
-    value: Node,
     name: &str,
     src: &[u8],
     scope: &str,
     up: &Parents,
     facts: &mut Facts,
+    results: &mut HashMap<usize, usize>,
 ) -> Option<usize> {
+    let value = node.child_by_field_name("value")?;
+    let index = facts.receivers.len();
     let class = match node.child_by_field_name("type") {
         Some(ty) => annotation(ty, src, up),
-        None => constructed(value, src),
+        None => constructed(value, src).or_else(|| {
+            let mut call = super::unwrapped(value);
+            if call.kind() == "await_expression" {
+                call = super::unwrapped(named(call).find(|n| n.kind() != "comment")?);
+            }
+            if call.kind() != "call_expression"
+                || callee(super::callee_node(call)?, src).starts_with('(')
+            {
+                return None;
+            }
+            // The call's visit fills in its final index, after the declarator's visit.
+            results.insert(call.id(), index);
+            Some(Class::Unknown)
+        }),
     };
-    let index = facts.receivers.len();
     put(facts, scope, name, class?);
     Some(index)
+}
+
+/// A Promise's output becomes a receiver only when the call was awaited.
+fn result(typed: Node, src: &[u8], up: &Parents) -> (Option<Class>, Option<Class>) {
+    let inner = named(typed).find(|n| n.kind() != "comment");
+    if let Some(generic) = inner.filter(|n| n.kind() == "generic_type")
+        && let Some(head) = generic.child_by_field_name("name")
+        && text(head, src) == "Promise"
+        && !super::runtime_hidden(&up.promise_shadows, head.start_byte())
+        && matches!(types::ty(head, src, up, &mut 0), Ty::Named(n) if n == "Promise")
+    {
+        let output = generic
+            .child_by_field_name("type_arguments")
+            .filter(|args| named(*args).filter(|n| n.kind() != "comment").count() == 1)
+            .and_then(|args| annotation(args, src, up));
+        (None, output)
+    } else {
+        (annotation(typed, src, up), None)
+    }
+}
+
+pub(super) fn awaited(call: Node, up: &Parents) -> bool {
+    let mut node = call;
+    while let Some(parent) = up.of(node) {
+        match parent.kind() {
+            "await_expression" => return true,
+            "parenthesized_expression"
+            | "non_null_expression"
+            | "as_expression"
+            | "satisfies_expression" => node = parent,
+            _ => break,
+        }
+    }
+    super::awaited_artifact(call)
 }
 
 fn property(param: Node) -> bool {
@@ -114,6 +163,11 @@ fn constructor_receivers(
 }
 
 pub(super) fn definition(node: Node, src: &[u8], scope: &str, up: &Parents, facts: &mut Facts) {
+    if let Some(ty) = node.child_by_field_name("return_type")
+        && let Some(def) = facts.defs.last_mut()
+    {
+        (def.result, def.output) = result(ty, src, up);
+    }
     if facts.defs.last().is_some_and(|d| d.kind == Kind::Class) {
         let mut info = TsClass::default();
         let heritage = named(node).find(|n| n.kind() == "class_heritage");

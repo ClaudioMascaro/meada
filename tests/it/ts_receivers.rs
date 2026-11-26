@@ -327,3 +327,35 @@ fn private_fields_count_only_writes_reachable_in_their_class() {
         field_target(caller);
     }
 }
+
+#[test]
+fn a_static_factory_result_resolves() {
+    exact(
+        call("a", "results", "fromStatic", "send"),
+        "a/src/client.ts::Client.send",
+    );
+}
+#[test]
+fn an_awaited_async_result_resolves() {
+    exact(
+        call("a", "results", "fromAsync", "send"),
+        "a/src/client.ts::Client.send",
+    );
+}
+#[test]
+fn an_unawaited_async_result_keeps_todays_answer() {
+    by_name(call("a", "results", "withoutAwait", "send"), SEND);
+}
+#[test]
+fn a_generic_result_keeps_todays_answer() {
+    by_name(call("a", "results", "fromGeneric", "send"), SEND);
+}
+#[test]
+fn a_result_typed_by_an_outside_class_keeps_todays_answer() {
+    by_name(call("a", "results", "fromOutside", "send"), SEND);
+}
+
+#[test]
+fn an_awaited_local_type_alias_does_not_unwrap_as_the_global_promise() {
+    by_name(call("a", "shadowed-result", "shadowed", "send"), SEND);
+}
