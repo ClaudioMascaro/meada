@@ -185,6 +185,9 @@ struct Seen<'a> {
     /// The links the walks around it had followed when it began (`Resolver::links`): a link cut
     /// past them depends on those walks (`Resolver::cut_link`).
     from: usize,
+    /// Set by `Resolver::row` alone: `gives` may answer a top-level declaration the scope
+    /// leaves unknown (an enum, an `export default` expression, `Facts::declarations`).
+    rows: bool,
 }
 
 /// What a pair exports, and whether it met a cycle (`Seen::looped`).
@@ -410,6 +413,8 @@ pub struct Resolver<'a> {
     /// The pack's `LanguagePack::namespaced`.
     namespaced: bool,
     consts: HashMap<&'a str, HashSet<&'a str>>,
+    /// The names of each file's `Facts::declarations`, for `gives` under `Seen::rows`.
+    declared: HashMap<&'a str, HashSet<&'a str>>,
     /// The types each file of a compilation keeps to it (`Facts::private` of a file with a
     /// `Facts::unit`), for `hidden`.
     internal: HashMap<&'a str, HashSet<&'a str>>,
@@ -1083,8 +1088,16 @@ impl<'a> Resolver<'a> {
         } else {
             HashMap::new()
         };
+        let declared = (files.iter())
+            .filter(|(_, facts)| !facts.declarations.is_empty())
+            .map(|(&path, facts)| {
+                let names = facts.declarations.iter().map(|d| d.name.as_str());
+                (path, names.collect())
+            })
+            .collect();
         let mut resolver = Self {
             files,
+            declared,
             defs,
             overloads,
             constructors,
@@ -4370,7 +4383,17 @@ impl<'a> Resolver<'a> {
                     _ => ("", local.as_str()),
                 };
                 let reading = if value { Reading::Value } else { Reading::Any };
-                Some(self.lexical_as(path, scope, bare, seen, reading))
+                let found = self.lexical_as(path, scope, bare, seen, reading);
+                // An export row targets a declaration symbol (`Facts::declarations`) no reading
+                // binds; every other reader keeps it unknown.
+                if seen.rows
+                    && scope.is_empty()
+                    && matches!(found, Binding::Unknown)
+                    && self.declared.get(path).is_some_and(|d| d.contains(bare))
+                {
+                    return Some(Binding::Const(path, bare));
+                }
+                Some(found)
             }
             Export::From {
                 exported,
@@ -4464,7 +4487,8 @@ impl<'a> Resolver<'a> {
 
     /// What each file exports, for an import of the repository as a package (spec #22), as
     /// `export` reads it: for each name a file exports, the definition, the module-level
-    /// constant or type (issue #175) or the whole file it names, or nothing when that is outside
+    /// constant or type (issue #175), the exported top-level enum or default expression
+    /// (`Facts::declarations`) or the whole file it names, or nothing when that is outside
     /// the repository or not known (an import from another package stops there); for each `export * from` a file of the repository, that
     /// file. The names a pack keeps to the package (`Facts::private`, but for one that is also
     /// public: `mod x; pub use x::x;`) are left out, so are the files the pack does not publish
@@ -4528,11 +4552,16 @@ impl<'a> Resolver<'a> {
 
     /// The row of `file` exporting `exported`, read as an item when `value`.
     fn row(&self, path: &'a str, exported: &'a str, value: bool) -> Row<'a> {
-        match self.export_as(path, exported, &mut Seen::new(), value) {
+        let mut seen = Seen {
+            rows: true,
+            ..Seen::new()
+        };
+        match self.export_as(path, exported, &mut seen, value) {
             Binding::Def(t) => (Some(exported), Some(t.path), Some(t.name)),
             Binding::Module(m) => (Some(exported), Some(m), None),
-            // A constant or a type: the shape a package keeps of it (issue #175) is found
-            // through it; it is no symbol a call reaches.
+            // A constant, a type, an enum or a default-exported expression: the shape a package
+            // keeps of it (issue #175) is found through it, and an exported top-level one is a
+            // symbol an import reaches (`Facts::declarations`).
             Binding::Const(at, c) => (Some(exported), Some(at), Some(c)),
             _ => (Some(exported), None, None),
         }
@@ -8624,6 +8653,41 @@ mod tests {
             // 2.4 s measured in a local debug build; the bound is over twenty times that.
             assert!(took.as_secs() < 50, "{label}: {took:?}");
         }
+    }
+
+    #[test]
+    fn a_file_of_many_declarations_exports_them_in_linear_time() {
+        use crate::lang::{Declaration, ts::TsJs};
+
+        // Enums and default expressions: no scope binds them, so each export row looks its
+        // name up among the declarations.
+        let n = 150_000;
+        let facts = Facts {
+            exports: (0..n)
+                .map(|i| Export::Local {
+                    exported: format!("a{i}"),
+                    local: format!("a{i}"),
+                })
+                .collect(),
+            declarations: (0..n)
+                .map(|i| Declaration {
+                    name: format!("a{i}"),
+                    range: 0..0,
+                    hash: String::new(),
+                })
+                .collect(),
+            ..Facts::default()
+        };
+        let files = BTreeMap::from([("a.ts", &facts)]);
+        let modules = TsJs.modules(&[], &BTreeMap::new()).unwrap();
+        let start = std::time::Instant::now();
+        let exported = Resolver::new(&files, modules, &TsJs).exported();
+        let took = start.elapsed();
+        assert_eq!(exported.len(), n);
+        assert!(exported.iter().all(|e| e.target == e.name));
+        // 1.2 s measured in a local debug build, the bound over twenty times that; each name
+        // looked up among the declarations one by one took 46 s.
+        assert!(took.as_secs() < 30, "{took:?}");
     }
 
     /// An import nothing looks up: its `local` is no name asked for.

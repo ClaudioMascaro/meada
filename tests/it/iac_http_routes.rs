@@ -581,3 +581,20 @@ resource "aws_apigatewayv2_route" "read" {
     .unwrap();
     assert_eq!(providers(&repo), json!([]));
 }
+
+#[test]
+fn an_exported_constant_handler_is_the_provider_site() {
+    let repo = repository("iac_http_constant_handler", "iac-http-sam", "sam");
+    std::fs::write(
+        repo.join("runtime/app.ts"),
+        "const localOrchard = () => ({});\nexport const orchard = wrap(localOrchard);\n",
+    )
+    .unwrap();
+    assert_eq!(
+        providers(&repo),
+        json!([
+            {"contract": "http::GET::/orchards/{}", "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"},
+            {"contract": "http::POST::/orchards", "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"}
+        ])
+    );
+}

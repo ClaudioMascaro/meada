@@ -180,6 +180,15 @@
       "hash": "ca731fab5f3c16dfdb22bcc8b3ba6c3586d1dc5eca12ce8bcc96de4018aeaff8"
     },
     {
+      "id": "example.com/acme/vets-web::src/hidden.ts::unused",
+      "span": {
+        "path": "src/hidden.ts",
+        "start": 495,
+        "end": 507
+      },
+      "hash": "502567502f0b06f6de84f10d0e574d0a2e98ae43af52f154dfa5f9f019b8df4a"
+    },
+    {
       "id": "example.com/acme/vets-web::src/hidden.ts::vets",
       "span": {
         "path": "src/hidden.ts",

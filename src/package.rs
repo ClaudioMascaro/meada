@@ -1468,12 +1468,15 @@ fn declares<'e>(
 /// ones whose exported constants and types keep a shape: for each named manifest, the entry
 /// file (`Provided::entry`, as an import resolves it) of the bare name and of each subpath its
 /// `exports` lists without a `*`, then every file the `exports` rows of those name, a definition's,
-/// a constant's or a re-exported one's, in turn.
+/// a constant's or a re-exported one's, in turn. A row to an `opaque` target (file, name) is not
+/// followed: it names a declaration symbol that is no constant (an enum, an `export default`
+/// expression), which keeps no shape.
 fn surface(
     manifests: &[Manifest],
     configs: &[Config],
     exported: &[Exported],
     files: &[&str],
+    opaque: &HashSet<(&str, &str)>,
 ) -> HashSet<String> {
     let mut by_file: HashMap<&str, Vec<&Exported>> = HashMap::new();
     for e in exported {
@@ -1517,7 +1520,11 @@ fn surface(
             continue;
         }
         let rows = provided.exported.get(file.as_str()).into_iter().flatten();
-        queue.extend(rows.filter_map(|e| e.file.clone()));
+        let followed = rows.filter(|e| match (&e.file, &e.target) {
+            (Some(f), Some(t)) => !opaque.contains(&(f.as_str(), t.as_str())),
+            _ => true,
+        });
+        queue.extend(followed.filter_map(|e| e.file.clone()));
     }
     seen
 }
@@ -2072,11 +2079,22 @@ impl ContractKind for Packages {
             }
         }
         // The files an import of one of the repository's packages reaches: only they keep shapes.
+        // The declaration symbols that are no constant (`Facts::declarations`).
+        let opaque: HashSet<(&str, &str)> = (code.files().iter())
+            .filter(|(_, facts)| !facts.declarations.is_empty())
+            .flat_map(|(&path, facts)| {
+                let consts: HashSet<&str> = facts.consts.iter().map(|c| c.name.as_str()).collect();
+                (facts.declarations.iter())
+                    .filter(move |d| !consts.contains(d.name.as_str()))
+                    .map(move |d| (path, d.name.as_str()))
+            })
+            .collect();
         let surface = surface(
             indexed.manifests,
             indexed.tsconfigs,
             indexed.exported,
             indexed.files,
+            &opaque,
         );
         if !surface.is_empty() {
             found.extend(exported_shapes(code, &surface));
@@ -2589,7 +2607,7 @@ mod tests {
             "sub/b.ts",
             "sub/c/d.ts",
         ];
-        let surface = surface(&manifests, &[], &rows, &files);
+        let surface = surface(&manifests, &[], &rows, &files, &HashSet::new());
         let mut got: Vec<&str> = surface.iter().map(String::as_str).collect();
         got.sort();
         // A file no entry leads to, one of an unnamed package and a `*` subpath's are left out.

@@ -36,6 +36,15 @@
       "hash": "5cc3a63c2d48ea68365d5e97e54a4425c16d6ce5399c954dae54469e16e91111"
     },
     {
+      "id": "example.com/chain/web::src/api/paths.ts::ORDERS_PATH",
+      "span": {
+        "path": "src/api/paths.ts",
+        "start": 76,
+        "end": 103
+      },
+      "hash": "130c74282dad18369770f7d26fc22dbc1355788de1d5a765d7b9a4c6c8c84101"
+    },
+    {
       "id": "example.com/chain/web::src/dashboard.ts::cancel",
       "span": {
         "path": "src/dashboard.ts",

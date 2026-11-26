@@ -11,6 +11,15 @@
   ],
   "symbols": [
     {
+      "id": "example.com/acme/portal::src/call.ts::REPORTS",
+      "span": {
+        "path": "src/call.ts",
+        "start": 731,
+        "end": 751
+      },
+      "hash": "f980d0fa2476707821dcc80023375c9ad0cdea2abab4bb5cba6d445cad5c73d2"
+    },
+    {
       "id": "example.com/acme/portal::src/call.ts::call",
       "span": {
         "path": "src/call.ts",

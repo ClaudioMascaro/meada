@@ -385,6 +385,10 @@ pub fn hash_spans(facts: &mut Facts, src: &[u8]) {
         let text = src.get(def.range.clone()).unwrap_or_default();
         def.hash = blake3::hash(text).to_hex().to_string();
     }
+    for declaration in &mut facts.declarations {
+        let text = src.get(declaration.range.clone()).unwrap_or_default();
+        declaration.hash = blake3::hash(text).to_hex().to_string();
+    }
 }
 
 thread_local! {
@@ -459,6 +463,11 @@ pub struct Facts {
     /// `const` bindings that hold no function or class, such as `const USERS = "/users"` or
     /// `const app = express()`. Their values are not kept in the index (see `Call::args`).
     pub consts: Vec<Const>,
+    /// The top-level declarations the file exports that are no definitions (TS/JS), each a
+    /// symbol an import can target. Stored, unlike `consts`' values: `resolve_file` reads it
+    /// from the facts of files not parsed again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub declarations: Vec<Declaration>,
     /// The scope and value of each `let` whose name is bound again in its scope or assigned
     /// again (Rust): no constant, since the name holds no one value, but a value that flows
     /// somewhere unread. Not kept in the index (see `Call::args`).
@@ -1247,6 +1256,16 @@ pub struct Field {
     /// The default value, as written. Not kept in the index.
     #[serde(default, skip_serializing_if = "lean")]
     pub default: Option<Value>,
+}
+
+/// A top-level declaration a file exports that is no definition: a constant holding no
+/// function or class, a type, an enum, or a default-exported expression (`default`).
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Declaration {
+    pub name: String,
+    pub range: Range<usize>,
+    /// The BLAKE3 of the exact bytes of `range`, in hex; empty until `hash_spans` fills it.
+    pub hash: String,
 }
 
 /// A `const` binding, qualified by its enclosing definitions like `Def::name`.

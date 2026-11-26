@@ -343,6 +343,116 @@ fn build_output_is_inferred_and_an_unmappable_entry_lists_its_candidates() {
     assert!(items.iter().all(|i| i.path != "src/text.ts"));
 }
 
+/// The rows a query asks of the index of `repo`, one line each with its columns spaced.
+fn rows_of(repo: &Path, sql: &str) -> Vec<String> {
+    let db = rusqlite::Connection::open(repo.join(".meada/index.db")).unwrap();
+    let mut rows = db.prepare(sql).unwrap();
+    let count = rows.column_count();
+    rows.query_map([], |row| {
+        let cols = (0..count).map(|n| {
+            row.get::<_, Option<String>>(n)
+                .map(|v| v.unwrap_or("-".into()))
+        });
+        cols.collect::<Result<Vec<_>, _>>().map(|c| c.join(" "))
+    })
+    .unwrap()
+    .map(Result::unwrap)
+    .collect()
+}
+
+#[test]
+fn an_exported_constant_or_default_expression_is_an_import_target() {
+    let repo = fixture_repo(
+        "packages_exported",
+        "pkg-exported",
+        Some("https://example.com/pkg/exported.git"),
+    );
+    let at = |callee: &str| {
+        format!("example.com/pkg/exported::packages/b/src/use.ts::useAll::{callee}#0")
+    };
+    let sym = |file: &str, name: &str| format!("example.com/pkg/exported::packages/{file}::{name}");
+    let exact = |target: String| vec![("exact".to_string(), "main".to_string(), target)];
+
+    let plugin = exact(sym("a/src/plugin.ts", "aPlugin"));
+    assert_eq!(imports_of(&repo, &at("a")), plugin);
+    assert_eq!(imports_of(&repo, &at("aPlugin")), plugin);
+    assert_eq!(
+        imports_of(&repo, &at("handler")),
+        exact(sym("c/src/index.ts", "default"))
+    );
+
+    let json: serde_json::Value = serde_json::from_str(&export(&repo)).unwrap();
+    let ids: Vec<&str> = (json["symbols"].as_array().unwrap().iter())
+        .map(|s| s["id"].as_str().unwrap())
+        .collect();
+    for (file, name) in [
+        ("a/src/plugin.ts", "aPlugin"),
+        ("a/src/plugin.ts", "APlugin"),
+        ("a/src/status.ts", "S"),
+        ("a/src/status.ts", "EXTRA"),
+        ("c/src/index.ts", "default"),
+    ] {
+        assert!(ids.contains(&sym(file, name).as_str()), "{file} {name}");
+    }
+    let exports = rows_of(
+        &repo,
+        "SELECT path, name, file, target FROM exports ORDER BY path, name",
+    );
+    for row in [
+        "packages/a/src/index.ts S packages/a/src/status.ts S",
+        "packages/c/src/index.ts default packages/c/src/index.ts default",
+    ] {
+        assert!(exports.iter().any(|r| r == row), "{row} in {exports:#?}");
+    }
+    // A URL built from an enum member reads as before: no contract.
+    let fetches: Vec<&serde_json::Value> = (json["consumers"].as_array().unwrap().iter())
+        .filter(|c| (c["site"].as_str()).is_some_and(|s| s.contains("use.ts::useAll::fetch")))
+        .collect();
+    assert_eq!(fetches.len(), 1, "{fetches:#?}");
+    assert!(fetches[0]["contract"].is_null(), "{fetches:#?}");
+    // The `S` row alone does not bring `status.ts` into the package's surface.
+    let shapes = rows_of(
+        &repo,
+        "SELECT path, method FROM contracts WHERE role = 'shape' ORDER BY path, method",
+    );
+    assert!(
+        shapes
+            .iter()
+            .all(|s| !s.starts_with("packages/a/src/status.ts")),
+        "{shapes:#?}"
+    );
+
+    // A refresh resolves `plugin.ts` from its stored facts and writes the same rows.
+    let symbols = rows_of(
+        &repo,
+        "SELECT id, start || ' ' || end, hash FROM symbols ORDER BY id",
+    );
+    let imports = (
+        json["imports"].as_array().unwrap().clone(),
+        json["symbols"].clone(),
+    );
+    let use_ts = repo.join("packages/b/src/use.ts");
+    let mut text = fs::read_to_string(&use_ts).unwrap();
+    text.push('\n');
+    fs::write(&use_ts, text).unwrap();
+    Engine::open(&repo).unwrap().refresh().unwrap();
+    assert_eq!(
+        rows_of(
+            &repo,
+            "SELECT id, start || ' ' || end, hash FROM symbols ORDER BY id"
+        ),
+        symbols
+    );
+    let again: serde_json::Value = serde_json::from_str(&export(&repo)).unwrap();
+    assert_eq!(
+        (
+            again["imports"].as_array().unwrap().clone(),
+            again["symbols"].clone()
+        ),
+        imports
+    );
+}
+
 #[test]
 fn a_nested_tsconfig_that_is_invalid_or_leaves_the_repository_maps_nothing() {
     let p = packages("packages_tsconfig_hostile");
@@ -490,4 +600,103 @@ fn consumers_in_the_same_repository_show_through_workspace_ranges() {
     // `b` names `a` through `workspace:*` (`range unchecked`, exact); `c` names it with
     // `^1.0.0`, which accepts 1.0.0, while `fork` also provides `@example/a` (`ambiguous`).
     assert_golden("pkg-mono.context-add.txt", &found);
+}
+
+#[test]
+fn exported_declarations_are_searchable_and_have_context() {
+    let repo = fixture_repo(
+        "packages_exported_search",
+        "pkg-exported",
+        Some("https://example.com/pkg/exported.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    let found = engine.search("aPlugin", Some("symbol"), None).unwrap();
+    assert!(
+        (found.lines()).any(|l| l == "example.com/pkg/exported packages/a/src/plugin.ts:1 aPlugin"),
+        "{found}"
+    );
+    let context = engine
+        .context(
+            "example.com/pkg/exported::packages/a/src/plugin.ts::aPlugin",
+            None,
+        )
+        .unwrap();
+    let consumers = context.split_once("consumers:\n").map(|(_, c)| c);
+    assert!(
+        consumers.is_some_and(|c| (c.lines())
+            .any(|l| l.starts_with("example.com/pkg/exported packages/b/src/use.ts:3 "))),
+        "{context}"
+    );
+    assert!(context.lines().any(|l| l == "callees: none"), "{context}");
+    // The same constant in two packages: a bare name fits both, and they are two copies.
+    let limit = engine.context("LIMIT", None).unwrap();
+    assert!(
+        limit.starts_with("`LIMIT` fits 2 symbols; pass one of:\n"),
+        "{limit}"
+    );
+    let copies = engine.search("LIMIT", Some("duplicate"), None).unwrap();
+    assert!(copies.starts_with("2 copies\n"), "{copies}");
+}
+
+#[test]
+fn declaration_files_give_rows_and_a_committed_copy_is_a_duplicate() {
+    let repo = fixture_repo(
+        "packages_exported_dts",
+        "pkg-exported",
+        Some("https://example.com/pkg/exported.git"),
+    );
+    let engine = Engine::open(&repo).unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
+    let ids: Vec<&str> = (json["symbols"].as_array().unwrap().iter())
+        .map(|s| s["id"].as_str().unwrap())
+        .collect();
+    let shape = "example.com/pkg/exported::packages/a/dist/shape.d.ts::Shape";
+    assert!(ids.contains(&shape), "{ids:#?}");
+    // `dist/shape.d.ts` holds the same interface as `src/shape.ts`: one group of two.
+    let copies = engine.search("Shape", Some("duplicate"), None).unwrap();
+    assert!(copies.starts_with("2 copies\n"), "{copies}");
+    for path in ["packages/a/dist/shape.d.ts", "packages/a/src/shape.ts"] {
+        assert!(copies.contains(path), "{path} in {copies}");
+    }
+}
+
+#[test]
+fn an_exported_value_and_type_of_one_name_keep_their_zod_shapes() {
+    let repo = fixture_repo(
+        "packages_exported_zod",
+        "pkg-exported",
+        Some("https://example.com/pkg/exported.git"),
+    );
+    Engine::open(&repo).unwrap().export().unwrap();
+
+    // The type comes first in `schema.ts`; the one row is the value's.
+    let symbols = rows_of(
+        &repo,
+        "SELECT id, start || ' ' || end FROM symbols WHERE path = 'packages/a/src/schema.ts'",
+    );
+    let src = fs::read_to_string(repo.join("packages/a/src/schema.ts")).unwrap();
+    let at = src.find("Foo = z.object").unwrap();
+    let end = src.rfind(')').unwrap() + 1;
+    assert_eq!(
+        symbols,
+        [format!(
+            "example.com/pkg/exported::packages/a/src/schema.ts::Foo {at} {end}"
+        )]
+    );
+    // What meada 1.5.0 keeps for this fixture: the `Foo` row reaches `schema.ts` as before.
+    let shapes = rows_of(
+        &repo,
+        "SELECT method, via, shape FROM contracts WHERE role = 'shape' \
+         AND path = 'packages/a/src/schema.ts' ORDER BY method, via",
+    );
+    assert_eq!(
+        shapes,
+        [
+            r#"Foo infer {"source":{"zod":"packages/a/src/schema.ts"},"fields":["id","size"],"declared":["id","size"]}"#,
+            r#"Foo type {"source":{"reads":"packages/a/src/schema.ts"},"fields":["id","size"],"declared":["id","size"]}"#,
+            r#"Foo zod {"source":{"zod":"packages/a/src/schema.ts"},"fields":["id","size"],"scalars":["id","size"]}"#,
+        ]
+    );
 }

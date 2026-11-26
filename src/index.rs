@@ -40,7 +40,7 @@ mod values;
 /// Bump when extraction or resolution changes the rows an unchanged checkout should produce
 /// without changing their stored shape. The schema golden pins the revision alongside the shape.
 #[cfg(test)]
-const EXTRACTION_REVISION: u32 = 2;
+const EXTRACTION_REVISION: u32 = 3;
 
 /// The stored format's version, derived from its golden (`tests/golden/schema.txt`, kept by the
 /// unit test `the_stored_format_matches_its_golden`): re-blessing it after a change to `SCHEMA`,
@@ -2768,7 +2768,8 @@ fn call_ids(identity: &str, path: &str, facts: &Facts, names: &Names) -> Vec<(St
         .collect()
 }
 
-/// The symbol and call rows of one file, in source order.
+/// The symbol and call rows of one file: its definitions then its declarations, each in source
+/// order, and its calls in source order.
 fn resolve_file<'a>(
     identity: &str,
     path: &'a str,
@@ -2793,6 +2794,20 @@ fn resolve_file<'a>(
                 def.hash.as_str(),
             ))
         })
+        // A dropped file keeps no declaration rows: `meada status` names it by having no symbols.
+        .chain(
+            (facts.declarations.iter())
+                .filter(|_| facts.budget.is_none() && facts.usings.is_none() && !facts.misparsed)
+                .filter_map(|d| {
+                    let name = names.def(path, &d.name)?;
+                    Some((
+                        format!("{identity}::{path}::{name}"),
+                        d.range.start as i64,
+                        d.range.end as i64,
+                        d.hash.as_str(),
+                    ))
+                }),
+        )
         .collect();
     let calls = facts
         .calls

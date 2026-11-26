@@ -347,3 +347,32 @@ fn ignore_files_are_honoured_and_a_refresh_drops_what_they_add() {
     ignores(&cold);
     assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
 }
+
+/// A file past its budget keeps no symbols, so `meada status` lists it as dropped: an exported
+/// constant of that file gives no symbol either, or the file would look kept.
+#[test]
+fn a_ts_file_dropped_by_its_budget_keeps_no_declaration_rows() {
+    let repo = fixture_repo("budget_declarations", "ts-basic", None);
+    let mut src = String::from("export const K = 1;\nconst o = {};\n");
+    for i in 0..20_000 {
+        src.push_str(&format!("o.a{i} = 1;\n"));
+    }
+    fs::write(repo.join("src/a.ts"), src).unwrap();
+    git(&repo, &["add", "src/a.ts"]);
+    git(&repo, &["commit", "-q", "-m", "past the budget"]);
+
+    let export = Engine::open(&repo).unwrap().export().unwrap();
+    let status = meada::engine::status(&repo).unwrap();
+
+    assert!(
+        status
+            .lines()
+            .any(|l| l.trim_start().starts_with("src/a.ts: ") && l.ends_with("no symbols or calls")),
+        "{status}"
+    );
+    let export: serde_json::Value = serde_json::from_str(&export).unwrap();
+    let ids: Vec<&str> = (export["symbols"].as_array().unwrap().iter())
+        .map(|s| s["id"].as_str().unwrap())
+        .collect();
+    assert!(!ids.iter().any(|id| id.ends_with("src/a.ts::K")), "{ids:?}");
+}

@@ -1115,3 +1115,24 @@ fn a_service_past_the_size_ceiling_adds_no_node() {
             .contains("api/serverless.yml")
     );
 }
+
+/// A symbol and a CloudFormation resource share a name: the name answers with the symbol, and
+/// the node stays reachable by its own lookups.
+#[test]
+fn a_symbol_comes_before_an_iac_node_of_its_name() {
+    let repo = fixture_repo("iac_cfn_symbol_first", "cloudformation-nodes", ORIGIN);
+    fs::write(
+        repo.join("jobs.ts"),
+        "export const JobsQueue = { name: 'legacy-jobs' };\n",
+    )
+    .unwrap();
+    let engine = Engine::open(&repo).unwrap();
+
+    let context = engine.context("JobsQueue", None).unwrap();
+
+    let first = context.lines().next().unwrap_or_default();
+    assert_eq!(
+        first, "example.com/acme/infra jobs.ts:1-1 JobsQueue",
+        "{context}"
+    );
+}
