@@ -715,6 +715,11 @@ from the environment. Its contract names only the broker kind (`channel::kafka`)
 `(unresolved)` in search, context, trace and the export, and it is never linked nor an open item.
 _Avoid_: hole, dynamic channel
 
+**Client declaration**:
+A `meada.toml` entry (`[[channel_client]]`) that says a call produces or consumes a broker's
+channel, and which argument holds the topic.
+_Avoid_: client wrapper (the code's), adapter
+
 **Binding**:
 A RabbitMQ `bindQueue(queue, exchange, pattern)`: neither side of a channel, but the rule that
 sends a publish to an exchange to a queue whose pattern matches the routing key. Bindings from
@@ -745,6 +750,11 @@ A variable a workload sets, with its name and its target: a literal, an IaC node
 ConfigMap or Secret key, or `envFrom`. An environment read in code resolves against the entries
 of the workloads that run that code, and only those.
 _Avoid_: env var (the read in code), setting
+
+**Chart environment declaration**:
+A `meada.toml` entry (`[[helm_env]]`) that names the values key where a Helm chart keeps its
+container's environment, when the chart's templates are not in the repository.
+_Avoid_: env mapping, values override
 
 **Image contract**:
 The contract `image::<registry>/<repository>` between the repository that builds an image and the

@@ -10,7 +10,9 @@ use std::path::Path;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
-pub use meada_core::manifest::{BaseUrl, Resource, Serve, declared, gateway_path, line_of};
+pub use meada_core::manifest::{
+    BaseUrl, ChannelClient, HelmEnv, Resource, Serve, declared, gateway_path, line_of,
+};
 
 use crate::Result;
 
@@ -33,6 +35,14 @@ pub struct Config {
     /// variable reaches. No variable is in two of them (`read_config_up_to`).
     #[serde(default, rename = "base_url")]
     pub base_urls: Vec<BaseUrl>,
+    /// Chart environment declarations (`[[helm_env]]`): where a Helm chart's values keep its
+    /// container's environment. No key is in two of them (`read_config_up_to`).
+    #[serde(default)]
+    pub helm_env: Vec<HelmEnv>,
+    /// Client declarations (`[[channel_client]]`): calls that produce or consume a channel. No
+    /// `call` is in two of them (`read_config_up_to`).
+    #[serde(default, rename = "channel_client")]
+    pub channel_clients: Vec<ChannelClient>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -72,29 +82,37 @@ pub fn load_own(root: &Path) -> Result<Option<Config>> {
 }
 
 /// `<root>/meada.toml` as `read_own_up_to` reads it, `None` when it does not exist, refused
-/// when a variable is in two Base URL declarations (`check_base_urls`). Every read of a
-/// `Config` goes through it.
+/// when a variable is in two Base URL declarations, a key in two Chart environment declarations
+/// or a call in two Client declarations (`listed_twice`). Every read of a `Config` goes through
+/// it.
 pub(crate) fn read_config_up_to(root: &Path, max: Option<u64>) -> Result<Option<Config>> {
     let file = root.join("meada.toml");
     let Some(src) = text(&file, max)? else {
         return Ok(None);
     };
     let config: Config = parse(&file, &src, "meada.toml")?;
-    if !config.base_urls.is_empty() {
-        check_base_urls(&src, &file)?;
+    for (table, key, declared) in [
+        ("base_url", "env", !config.base_urls.is_empty()),
+        ("helm_env", "key", !config.helm_env.is_empty()),
+        ("channel_client", "call", !config.channel_clients.is_empty()),
+    ] {
+        if declared {
+            listed_twice(&src, &file, table, key)?;
+        }
     }
     Ok(Some(config))
 }
 
-/// An error naming `file`, the line and the variable when a variable is written a second time
-/// in the `base_url` entries of `src` (in two entries, or twice in one), at that second place.
-fn check_base_urls(src: &str, file: &Path) -> Result<()> {
+/// An error naming `file`, the line and the value when a value is written a second time under
+/// `key` in the `table` entries of `src` (in two entries, or twice in the list of one), at that
+/// second place.
+fn listed_twice(src: &str, file: &Path, table: &str, key: &str) -> Result<()> {
     use toml::de::{DeTable, DeValue};
-    let Ok(table) = DeTable::parse(src) else {
+    let Ok(parsed) = DeTable::parse(src) else {
         return Ok(());
     };
     let mut seen = std::collections::HashSet::new();
-    let entries = (table.get_ref().iter()).filter(|(k, _)| k.get_ref() == "base_url");
+    let entries = (parsed.get_ref().iter()).filter(|(k, _)| k.get_ref() == table);
     for (_, value) in entries {
         let DeValue::Array(entries) = value.get_ref() else {
             continue;
@@ -103,20 +121,20 @@ fn check_base_urls(src: &str, file: &Path) -> Result<()> {
             let DeValue::Table(entry) = entry.get_ref() else {
                 continue;
             };
-            let env = entry.iter().filter(|(k, _)| k.get_ref() == "env");
-            for (_, names) in env {
-                let DeValue::Array(names) = names.get_ref() else {
-                    continue;
+            for (_, written) in entry.iter().filter(|(k, _)| k.get_ref() == key) {
+                let values = match written.get_ref() {
+                    DeValue::Array(values) => values.iter().collect(),
+                    _ => vec![written],
                 };
-                for name in names.iter() {
-                    let DeValue::String(var) = name.get_ref() else {
+                for value in values {
+                    let DeValue::String(text) = value.get_ref() else {
                         continue;
                     };
-                    if !seen.insert(var.to_string()) {
+                    if !seen.insert(text.to_string()) {
                         let twice = meada_core::msg::Msg::ListedTwice.text();
-                        let line = line_of(src, name.span().start);
+                        let line = line_of(src, value.span().start);
                         let at = format!("{}:{line}", file.display());
-                        return Err(format!("{at}: `base_url.env`: `{var}` {twice}").into());
+                        return Err(format!("{at}: `{table}.{key}`: `{text}` {twice}").into());
                     }
                 }
             }
@@ -416,6 +434,123 @@ mod tests {
     fn no_base_url_leaves_serve_undeclared() {
         let src = "[[base_url]]\nenv = [\"A_URL\"]\ndir = \"a\"\n";
         assert!(!config_of("serve", src, None).unwrap().serve.declared);
+    }
+
+    #[test]
+    fn a_helm_env_declaration_is_read() {
+        let src = "[[helm_env]]\nkey = \"lib-chart.envs\"\n";
+        let config = config_of("helm", src, None).unwrap();
+        let keys: Vec<&str> = config.helm_env.iter().map(|h| h.key.as_str()).collect();
+        assert_eq!(keys, ["lib-chart.envs"]);
+    }
+
+    #[test]
+    fn a_bad_helm_env_key_is_refused() {
+        for (n, key) in ["", "a..b", "a.*", ".a", "a."].iter().enumerate() {
+            let src = format!("[serve]\n\n[[helm_env]]\nkey = \"{key}\"\n");
+            let e = config_of(&format!("helm-bad{n}"), &src, None)
+                .err()
+                .unwrap();
+            assert!(e.contains("meada.toml:4: `helm_env.key`"), "{key:?}: {e}");
+        }
+    }
+
+    #[test]
+    fn a_helm_env_key_declared_twice_is_refused() {
+        let src = "[[helm_env]]\nkey = \"a.envs\"\n\n[[helm_env]]\nkey = \"b.envs\"\n\n\
+                   [[helm_env]]\nkey = \"a.envs\"\n";
+        let e = config_of("helm-twice", src, None).err().unwrap();
+        assert!(e.contains("meada.toml:8: `helm_env.key`"), "{e}");
+        assert!(e.contains("a.envs"), "{e}");
+    }
+
+    #[test]
+    fn a_channel_client_is_read() {
+        use meada_core::manifest::{Broker, ClientRole};
+        let src = "[[channel_client]]\ncall = \"example.com/acme/flow.NewProducer\"\n\
+                   role = \"producer\"\nbroker = \"kafka\"\ntopic = \"0.TopicName\"\n\n\
+                   [[channel_client]]\ncall = \"svc/kafka/client.go::Client.Consume\"\n\
+                   role = \"consumer\"\nbroker = \"kafka\"\ntopic = \"1\"\n";
+        let config = config_of("client", src, None).unwrap();
+        let [producer, consumer] = &config.channel_clients[..] else {
+            panic!("two clients");
+        };
+        assert_eq!(producer.call, "example.com/acme/flow.NewProducer");
+        assert!(producer.role == ClientRole::Producer && producer.broker == Broker::Kafka);
+        assert_eq!(producer.topic.arg, 0);
+        assert_eq!(producer.topic.field.as_deref(), Some("TopicName"));
+        assert_eq!(consumer.call, "svc/kafka/client.go::Client.Consume");
+        assert!(consumer.role == ClientRole::Consumer);
+        assert_eq!(
+            (consumer.topic.arg, consumer.topic.field.as_deref()),
+            (1, None)
+        );
+    }
+
+    /// One `[[channel_client]]` with `call` and `topic` as written, the other keys valid.
+    fn client(call: &str, topic: &str) -> String {
+        format!(
+            "[serve]\n\n[[channel_client]]\ncall = \"{call}\"\nrole = \"consumer\"\n\
+             broker = \"kafka\"\ntopic = \"{topic}\"\n"
+        )
+    }
+
+    #[test]
+    fn a_bare_type_method_is_refused() {
+        for (n, call) in [
+            "Client.Consume",
+            "",
+            "a/b",
+            "a/b.",
+            "::Client.Consume",
+            "x.go::",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let src = client(call, "1");
+            let e = config_of(&format!("bare{n}"), &src, None).err().unwrap();
+            assert!(
+                e.contains("meada.toml:4: `channel_client.call`"),
+                "{call:?}: {e}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_bad_topic_position_is_refused() {
+        for (n, topic) in ["x", "0.", "-1", "", ".A", "0.A.B", "0.a-b"]
+            .iter()
+            .enumerate()
+        {
+            let src = client("example.com/acme/flow.New", topic);
+            let e = config_of(&format!("topic{n}"), &src, None).err().unwrap();
+            assert!(
+                e.contains("meada.toml:7: `channel_client.topic`"),
+                "{topic:?}: {e}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_channel_client_declared_twice_is_refused() {
+        let one = "[[channel_client]]\ncall = \"example.com/acme/flow.New\"\n\
+                   role = \"producer\"\nbroker = \"kafka\"\ntopic = \"0\"\n\n";
+        let src = format!("{one}{one}");
+        let e = config_of("client-twice", &src, None).err().unwrap();
+        assert!(e.contains("meada.toml:8: `channel_client.call`"), "{e}");
+    }
+
+    #[test]
+    fn an_unknown_role_or_broker_is_refused() {
+        let src = "[[channel_client]]\ncall = \"example.com/acme/flow.New\"\n\
+                   role = \"both\"\nbroker = \"kafka\"\ntopic = \"0\"\n";
+        let e = config_of("role", src, None).err().unwrap();
+        assert!(e.contains("meada.toml:3: `channel_client.role`"), "{e}");
+        let src = "[[channel_client]]\ncall = \"example.com/acme/flow.New\"\n\
+                   role = \"producer\"\nbroker = \"rabbitmq\"\ntopic = \"0\"\n";
+        let e = config_of("broker", src, None).err().unwrap();
+        assert!(e.contains("meada.toml:4: `channel_client.broker`"), "{e}");
     }
 
     fn serve(prefix: Option<&str>, strip: Option<&str>) -> Serve {

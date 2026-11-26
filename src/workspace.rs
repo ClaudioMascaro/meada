@@ -331,6 +331,8 @@ fn config_of(entry: EntryFile) -> Config {
         test_routes: false,
         iac: Default::default(),
         base_urls: Vec::new(),
+        helm_env: Vec::new(),
+        channel_clients: Vec::new(),
     }
 }
 
