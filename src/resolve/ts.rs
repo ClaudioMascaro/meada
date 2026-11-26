@@ -3,21 +3,22 @@ use super::{HashMap, HashSet, Kind, Resolver, Target, own_name};
 use crate::lang::{Class, Facts, TsLocal};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod fields;
+pub(super) use fields::Writes;
+
 type Changes<'a> = Vec<(usize, Option<&'a TsLocal>)>;
 
 /// Each change in the innermost visible declaration, so repeated calls in sibling blocks
 /// need one binary search instead of a scan of every declaration of the name.
 pub(super) struct FileLocals<'a> {
     id: usize,
+    test: bool,
     changes: HashMap<(&'a str, &'a str), Changes<'a>>,
 }
 
 pub(super) fn locals<'a>(files: &BTreeMap<&'a str, &'a Facts>) -> HashMap<&'a str, FileLocals<'a>> {
     let mut result = HashMap::new();
     for (id, (&path, &facts)) in files.iter().enumerate() {
-        if facts.ts_locals.is_empty() {
-            continue;
-        }
         let mut names = HashMap::new();
         for (qualified, bindings) in &facts.ts_locals {
             let mut events = Vec::new();
@@ -47,7 +48,14 @@ pub(super) fn locals<'a>(files: &BTreeMap<&'a str, &'a Facts>) -> HashMap<&'a st
             }
             names.insert((super::scope_of(qualified), own_name(qualified)), changes);
         }
-        result.insert(path, FileLocals { id, changes: names });
+        result.insert(
+            path,
+            FileLocals {
+                id,
+                test: crate::http::is_test_file(path),
+                changes: names,
+            },
+        );
     }
     result
 }
@@ -60,7 +68,7 @@ impl<'a> Resolver<'a> {
         scope: &str,
         name: &str,
     ) -> Option<Option<&'a TsLocal>> {
-        let (file, at) = self.ts_site.get()?;
+        let (file, at, _) = self.ts_site.get()?;
         let locals = self.ts_locals.get(path)?;
         if file != locals.id {
             return None;
@@ -70,7 +78,12 @@ impl<'a> Resolver<'a> {
         Some(n.checked_sub(1).and_then(|i| changes[i].1))
     }
 
-    pub(super) fn receiver_class(&self, path: &str, scope: &str, name: &str) -> Option<&'a Class> {
+    pub(super) fn receiver_class(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &str,
+    ) -> Option<&'a Class> {
         if let Some(Some(binding)) = self.ts_local(path, scope, name) {
             if self.ts_site.get()?.1 < binding.declared {
                 return None;
@@ -80,7 +93,19 @@ impl<'a> Resolver<'a> {
                 .and_then(|i| self.files[path].receivers.get(i))
                 .map(|r| &r.class);
         }
-        self.receivers[path].get(&(scope, name)).copied()
+        let class = self.receivers[path].get(&(scope, name)).copied()?;
+        if self.ts
+            && self.files[path]
+                .ts_classes
+                .get(scope)
+                .is_some_and(|c| c.constructed.contains_key(name))
+        {
+            let test = self.ts_site.get().is_some_and(|(_, _, test)| test);
+            if self.ts_field_written(Target { path, name: scope }, name, test) {
+                return None;
+            }
+        }
+        Some(class)
     }
 
     pub(super) fn at_ts_site<R>(&self, path: &'a str, at: usize, read: impl FnOnce() -> R) -> R {
@@ -89,7 +114,7 @@ impl<'a> Resolver<'a> {
         }
         let previous = self
             .ts_site
-            .replace(self.ts_locals.get(path).map(|locals| (locals.id, at)));
+            .replace(self.ts_locals.get(path).map(|f| (f.id, at, f.test)));
         let answer = read();
         self.ts_site.set(previous);
         answer

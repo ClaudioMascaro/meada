@@ -22,6 +22,15 @@ fn put(facts: &mut Facts, scope: &str, name: &str, class: Class) {
     });
 }
 
+fn constructed(value: Node, src: &[u8]) -> Option<Class> {
+    (value.kind() == "new_expression")
+        .then(|| value.child_by_field_name("constructor"))
+        .flatten()
+        .map(|c| callee(c, src))
+        .filter(|c| !c.starts_with('('))
+        .map(Class::Named)
+}
+
 pub(super) fn record(
     locals: &mut std::collections::BTreeMap<String, Vec<TsLocal>>,
     name: String,
@@ -47,12 +56,7 @@ pub(super) fn local(
 ) -> Option<usize> {
     let class = match node.child_by_field_name("type") {
         Some(ty) => annotation(ty, src, up),
-        None if value.kind() == "new_expression" => value
-            .child_by_field_name("constructor")
-            .map(|c| callee(c, src))
-            .filter(|c| !c.starts_with('('))
-            .map(Class::Named),
-        None => None,
+        None => constructed(value, src),
     };
     let index = facts.receivers.len();
     put(facts, scope, name, class?);
@@ -66,6 +70,47 @@ fn property(param: Node) -> bool {
             "accessibility_modifier" | "readonly" | "override_modifier"
         )
     })
+}
+
+/// A plain assignment in the constructor body can supply an untyped field's receiver.
+fn constructor_receivers(
+    ctor: Node,
+    scope: &str,
+    src: &[u8],
+    declared: &std::collections::HashSet<String>,
+    info: &mut TsClass,
+    facts: &mut Facts,
+) {
+    for statement in ctor.child_by_field_name("body").into_iter().flat_map(named) {
+        let Some(assign) = named(statement).find(|n| n.kind() != "comment") else {
+            continue;
+        };
+        if statement.kind() != "expression_statement" || assign.kind() != "assignment_expression" {
+            continue;
+        }
+        let Some(left) = assign.child_by_field_name("left") else {
+            continue;
+        };
+        let Some(name) = left.child_by_field_name("property") else {
+            continue;
+        };
+        let name = text(name, src);
+        if !left
+            .child_by_field_name("object")
+            .is_some_and(|o| o.kind() == "this")
+            || declared.contains(name)
+            || info.constructed.contains_key(name)
+        {
+            continue;
+        }
+        if let Some(class) = assign
+            .child_by_field_name("right")
+            .and_then(|v| constructed(v, src))
+        {
+            info.constructed.insert(name.into(), assign.start_byte());
+            put(facts, scope, name, class);
+        }
+    }
 }
 
 pub(super) fn definition(node: Node, src: &[u8], scope: &str, up: &Parents, facts: &mut Facts) {
@@ -84,6 +129,8 @@ pub(super) fn definition(node: Node, src: &[u8], scope: &str, up: &Parents, fact
                 }));
             }
         }
+        let mut declared = std::collections::HashSet::new();
+        let mut ctor = None;
         for member in node.child_by_field_name("body").into_iter().flat_map(named) {
             let Some(name) = member.child_by_field_name("name") else {
                 continue;
@@ -95,20 +142,62 @@ pub(super) fn definition(node: Node, src: &[u8], scope: &str, up: &Parents, fact
                     _ => text(name, src).to_string(),
                 };
                 info.fields.push(field);
+                if let Some((field, private, _)) = super::instance_field(member, src) {
+                    if private {
+                        info.private.push(field.clone());
+                    }
+                    let init = member.child_by_field_name("value");
+                    let ty = member.child_by_field_name("type");
+                    if let Some(value) = init {
+                        info.initialized.insert(field.clone(), value.start_byte());
+                    }
+                    if ty.is_some() || init.is_some() {
+                        declared.insert(field.clone());
+                    }
+                    let class = match ty {
+                        Some(ty) => annotation(ty, src, up),
+                        None => init.and_then(|v| constructed(v, src)),
+                    };
+                    if let Some(class) = class {
+                        put(facts, scope, &field, class);
+                    }
+                }
             } else if member.kind() == "method_definition" && text(name, src) == "constructor" {
-                info.fields.extend(
-                    member
-                        .child_by_field_name("parameters")
-                        .into_iter()
-                        .flat_map(named)
-                        .filter(|p| property(*p))
-                        .filter_map(|p| p.child_by_field_name("pattern"))
-                        .filter(|p| p.kind() == "identifier")
-                        .map(|p| text(p, src).to_string()),
-                );
+                ctor = Some(member);
+                for p in member
+                    .child_by_field_name("parameters")
+                    .into_iter()
+                    .flat_map(named)
+                    .filter(|p| property(*p))
+                {
+                    let Some(n) = p
+                        .child_by_field_name("pattern")
+                        .filter(|n| n.kind() == "identifier")
+                    else {
+                        continue;
+                    };
+                    let field = text(n, src);
+                    info.fields.push(field.into());
+                    declared.insert(field.into());
+                    info.initialized.insert(field.into(), p.start_byte());
+                    if children(p)
+                        .any(|c| c.kind() == "accessibility_modifier" && text(c, src) == "private")
+                    {
+                        info.private.push(field.into());
+                    }
+                    if let Some(class) = p
+                        .child_by_field_name("type")
+                        .and_then(|t| annotation(t, src, up))
+                    {
+                        put(facts, scope, field, class);
+                    }
+                }
             }
         }
-        if !info.fields.is_empty() || !info.implements.is_empty() {
+        if let Some(ctor) = ctor {
+            constructor_receivers(ctor, scope, src, &declared, &mut info, facts);
+        }
+        if !info.fields.is_empty() || !info.implements.is_empty() || !info.constructed.is_empty() {
             facts.ts_classes.insert(scope.to_string(), info);
         }
     }

@@ -359,7 +359,7 @@ impl LanguagePack for TsJs {
             {
                 query_locals.push((qualify(&scope, text(name, src)), scope.clone(), initial));
             }
-            selector_writes(node, src, &scope, &mut facts, &mut write_bytes);
+            selector_writes(node, src, &scope, &parents, &mut facts, &mut write_bytes);
             if node.kind() == "assignment_expression"
                 && named.is_some()
                 && let Some(Assigned {
@@ -1357,23 +1357,26 @@ fn written_name_target(node: Node) -> Option<Node> {
     }
 }
 
-fn selector_writes(node: Node, src: &[u8], scope: &str, facts: &mut Facts, spent: &mut usize) {
+fn selector_writes(
+    node: Node,
+    src: &[u8],
+    scope: &str,
+    up: &Parents,
+    facts: &mut Facts,
+    spent: &mut usize,
+) {
     if facts.member_writes.is_none() {
         return;
     }
-    let target = match node.kind() {
-        "assignment_expression" | "augmented_assignment_expression" => {
-            node.child_by_field_name("left")
-        }
-        "update_expression" => node
-            .child_by_field_name("argument")
-            .or_else(|| named(node).next()),
-        "unary_expression" if children(node).any(|n| text(n, src) == "delete") => node
-            .child_by_field_name("argument")
-            .or_else(|| named(node).next()),
-        _ => return,
-    };
-    let mut pending: Vec<_> = target.into_iter().collect();
+    let target =
+        if node.kind() == "unary_expression" && children(node).any(|n| text(n, src) == "delete") {
+            node.child_by_field_name("argument")
+                .or_else(|| named(node).next())
+        } else {
+            written_name_target(node)
+        };
+    let Some(target) = target else { return };
+    let mut pending = vec![target];
     while let Some(target) = pending.pop() {
         if facts.member_writes.is_none() {
             break;
@@ -1401,10 +1404,14 @@ fn selector_writes(node: Node, src: &[u8], scope: &str, facts: &mut Facts, spent
             }
         };
         if let Some(object) = target.child_by_field_name("object") {
+            let mut object = callee(object, src);
+            if (object == "this" || object.starts_with("this.")) && !instance_context(target, up) {
+                object = "(this)".into();
+            }
             facts.member_write(
                 super::MemberWrite {
                     scope: scope.into(),
-                    object: callee(object, src),
+                    object,
                     field,
                     range: node.byte_range(),
                 },
@@ -2345,24 +2352,29 @@ fn this_member(node: Node, src: &[u8], up: &Parents) -> Option<String> {
     if object.kind() != "this" || !named {
         return None;
     }
+    instance_context(node, up).then(|| format!("this.{}", text(property, src)))
+}
+
+fn instance_context(node: Node, up: &Parents) -> bool {
     let mut at = node;
     for _ in 0..THIS_CLIMB {
-        let parent = up.of(at)?;
+        let Some(parent) = up.of(at) else {
+            return false;
+        };
         match parent.kind() {
             "class_body" => {
-                let shared = (at.children(&mut at.walk())).any(|c| c.kind() == "static");
-                let instance = !shared && at.kind() != "class_static_block";
-                return instance.then(|| format!("this.{}", text(property, src)));
+                return at.kind() != "class_static_block"
+                    && !children(at).any(|c| c.kind() == "static");
             }
             "method_definition" if up.of(parent).is_none_or(|b| b.kind() != "class_body") => {
-                return None;
+                return false;
             }
-            kind if kind != "arrow_function" && FUNCTIONS.contains(&kind) => return None,
-            "function_declaration" | "generator_function_declaration" => return None,
+            kind if kind != "arrow_function" && FUNCTIONS.contains(&kind) => return false,
+            "function_declaration" | "generator_function_declaration" => return false,
             _ => at = parent,
         }
     }
-    None
+    false
 }
 
 /// The name of the instance field `node` (a `public_field_definition`) declares, when only its

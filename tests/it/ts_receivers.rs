@@ -28,7 +28,7 @@ fn call(plugin: &str, file: &str, caller: &str, method: &str) -> &'static Value 
             if row.get("kind").is_some() || row["caller"] != caller {
                 return false;
             }
-            let id = row["id"].as_str().unwrap().split('#').next().unwrap();
+            let id = row["id"].as_str().unwrap().rsplit_once('#').unwrap().0;
             id.rsplit('.').next() == Some(method)
         })
         .collect();
@@ -267,4 +267,63 @@ fn switch_fallthrough_leaves_a_braced_local_behind() {
 #[test]
 fn a_call_before_the_local_declaration_has_no_typed_receiver() {
     by_name(call("a", "blocks", "beforeDeclaration", "send"), SEND);
+}
+
+fn field_target(caller: &str) {
+    exact(
+        call("a", "fields", caller, "send"),
+        "a/src/client.ts::Client.send",
+    );
+}
+
+#[test]
+fn a_parameter_property_field_resolves() {
+    field_target("S.go");
+}
+
+#[test]
+fn an_annotated_field_resolves() {
+    field_target("T.go");
+}
+
+#[test]
+fn an_annotated_field_written_again_still_resolves() {
+    field_target("T2.go");
+}
+
+#[test]
+fn an_initialized_field_resolves() {
+    field_target("V.go");
+}
+
+#[test]
+fn a_field_assigned_once_in_the_constructor_resolves() {
+    field_target("U.go");
+}
+
+#[test]
+fn a_field_written_again_keeps_todays_answer() {
+    for caller in ["Changes.go", "Parent.go", "Shared.go"] {
+        by_name(call("a", "fields", caller, "send"), SEND);
+    }
+}
+
+#[test]
+fn a_write_in_an_unrelated_class_does_not_count() {
+    field_target("Separate.go");
+}
+
+#[test]
+fn a_bare_name_in_a_class_initializer_is_not_the_field() {
+    exact(
+        call("a", "fields", "V2", "send"),
+        "b/src/client.ts::Client.send",
+    );
+}
+
+#[test]
+fn private_fields_count_only_writes_reachable_in_their_class() {
+    for caller in ["PrivateStore.first", "PrivateStore.second"] {
+        field_target(caller);
+    }
 }

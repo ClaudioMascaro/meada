@@ -396,9 +396,10 @@ impl<'a> Binders<'a> {
 /// The files of one language pack, resolved together.
 pub struct Resolver<'a> {
     ts: bool,
-    ts_site: Cell<Option<(usize, usize)>>,
+    ts_site: Cell<Option<(usize, usize, bool)>>,
     ts_locals: HashMap<&'a str, ts::FileLocals<'a>>,
     ts_heirs: HashMap<String, Vec<Target<'a>>>,
+    ts_writes: Option<ts::Writes<'a>>,
     ts_overrides: RefCell<HashMap<String, HashMap<String, bool>>>,
     files: &'a BTreeMap<&'a str, &'a Facts>,
     defs: HashMap<&'a str, HashMap<&'a str, &'a Def>>,
@@ -1120,11 +1121,17 @@ impl<'a> Resolver<'a> {
                 (path, names.collect())
             })
             .collect();
+        let ts = language.extensions().contains(&"ts");
         let mut resolver = Self {
-            ts: language.extensions().contains(&"ts"),
+            ts,
             ts_heirs: HashMap::new(),
+            ts_writes: None,
             ts_site: Cell::new(None),
-            ts_locals: ts::locals(files),
+            ts_locals: if ts {
+                ts::locals(files)
+            } else {
+                HashMap::new()
+            },
             ts_overrides: RefCell::default(),
             files,
             declared,
@@ -1335,6 +1342,9 @@ impl<'a> Resolver<'a> {
         if !resolver.extension_methods {
             resolver.reaches = reaches.take();
             resolver.built_final = true;
+        }
+        if resolver.ts {
+            resolver.ts_writes = Some(ts::Writes::index(&resolver));
         }
         let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         let mut extension_callers: HashMap<Target, Vec<Caller>> = HashMap::new();
@@ -2731,6 +2741,7 @@ impl<'a> Resolver<'a> {
         }
         let found = match class {
             Class::Enclosing => self.class(path, scope),
+            Class::Named(class) if self.ts => self.ts_construction(path, scope, name, class, work),
             Class::Named(class) => {
                 self.resolve(path, scope, class, &mut self.seen(path, scope), work)
             }
@@ -3674,7 +3685,7 @@ impl<'a> Resolver<'a> {
                 if self
                     .ts_site
                     .get()
-                    .is_some_and(|(_, at)| at < local.declared)
+                    .is_some_and(|(_, at, _)| at < local.declared)
                 {
                     return Binding::Hidden;
                 }
@@ -3711,6 +3722,14 @@ impl<'a> Resolver<'a> {
                 && let Some(found) = self.inherited_field(path, s, name)
             {
                 return found;
+            }
+            // Class fields in TypeScript require an explicit receiver, including in initializers.
+            let field = self.ts
+                && self.files[path].ts_classes.get(s).is_some_and(|c| {
+                    c.fields.iter().any(|f| f == name) || c.constructed.contains_key(name)
+                });
+            if field {
+                continue;
             }
             if local.is_none()
                 && let Some(constant) = self.consts[path].get(candidate.as_str())
@@ -6366,11 +6385,20 @@ impl<'a> Code<'a> {
         self.resolver.written.contains(field)
     }
 
-    /// Whether some file of the repository writes the field `field` of `class` (Java and
-    /// Kotlin): a write in the code of `class`, or one whose class the pack could not tell. For
-    /// a read outside Go test files (`test_read` false), a write in a `_test.go` file does not
-    /// count: `go build` leaves those files out of the program.
+    /// A selector write to a field of this class, including one on an unknown receiver.
+    /// TypeScript also considers overrides in subclasses and the scope of private names.
+    /// A production read excludes writes in test files for Go and TypeScript.
     pub fn field_written_in(&self, class: &str, field: &str, test_read: bool) -> bool {
+        if self.resolver.ts {
+            return self.resolver.defs.iter().any(|(&path, defs)| {
+                defs.get_key_value(class).is_some_and(|(&name, def)| {
+                    def.kind == Kind::Class
+                        && self
+                            .resolver
+                            .ts_field_written(Target { path, name }, field, test_read)
+                })
+            });
+        }
         let written = match test_read {
             true => &self.resolver.written,
             false => &self.resolver.written_outside_tests,

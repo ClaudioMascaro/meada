@@ -977,6 +977,13 @@ pub struct TsClass {
     pub implements: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub private: Vec<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub initialized: BTreeMap<String, usize>,
+    /// Constructor assignments that supply a receiver if no other write reaches the field.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub constructed: BTreeMap<String, usize>,
 }
 
 /// What the syntax says a name holds. It is read as written: the shared side decides whether
