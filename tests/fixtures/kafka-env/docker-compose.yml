@@ -1,0 +1,9 @@
+services:
+  consumer:
+    build: ./go
+    environment:
+      ORDERS_TOPIC: orders.created
+  producer:
+    build: ./ts
+    environment:
+      ORDERS_TOPIC: orders.created

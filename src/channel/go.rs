@@ -12,7 +12,8 @@
 //! polling one, the function that holds the call naming the topic or the queue.
 
 use crate::channel::message::{
-    Handler, Message, bind, channel_name as name, consume, produce, publish, topic, topics,
+    Handler, Message, bind, channel_name as name, consume, consume_env, env_of, produce,
+    produce_env, publish, topic, topics,
 };
 use crate::lang::go::modfile::unversioned;
 use crate::lang::go::package_call;
@@ -178,7 +179,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             };
             if method == "NewReader" {
                 if is_kafka_reader(code, path, call) {
-                    out.extend(consume(code, path, n, "kafka", &reader, None));
+                    out.extend(consume_env(code, path, n, "kafka", &reader, None));
                 }
                 continue;
             }
@@ -230,15 +231,16 @@ fn form<'a>(
         (Client::KafkaWriter, "WriteMessages") => {
             let given = configured(code, path, call, receiver);
             let read = move |a: &[Value], _: &Keywords| match &given {
-                Some(topic) => Some(vec![topic.clone()]),
+                Some((topic, environment)) => Some((vec![topic.clone()], environment.clone())),
                 None => (a.get(1..).unwrap_or(&[]).iter())
                     .map(messages_topics)
                     .try_fold(Vec::new(), |mut all, next| {
                         all.extend(next?);
                         Some(all)
-                    }),
+                    })
+                    .map(|names| (names, None)),
             };
-            produce(code, path, n, "kafka", &read)
+            produce_env(code, path, n, "kafka", &read)
         }
         (Client::ConfluentProducer, "Produce") => {
             produce(code, path, n, "kafka", &|a, _| confluent_topic(arg(a, 0)))
@@ -320,8 +322,9 @@ fn is_library<'a>(
         .is_some_and(|n| unversioned(&n) == format!("{KAFKA_GO}.{function}"))
 }
 
-/// The topics of `kafka.NewReader(kafka.ReaderConfig{Topic:, GroupTopics:})`.
-fn reader(args: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
+/// The topics of `kafka.NewReader(kafka.ReaderConfig{Topic:, GroupTopics:})`, with the
+/// variable `Topic` is read from.
+fn reader(args: &[Value], _: &Keywords) -> Option<(Vec<Option<String>>, Option<String>)> {
     let config = arg(args, 0);
     let (single, group) = (field(config, "Topic")?, field(config, "GroupTopics")?);
     let mut names = Vec::new();
@@ -331,21 +334,23 @@ fn reader(args: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
     if let Some(v) = group {
         names.extend(topics(v)?);
     }
-    Some(match names.is_empty() {
+    let names = match names.is_empty() {
         true => vec![None],
         false => names,
-    })
+    };
+    Some((names, single.and_then(env_of)))
 }
 
 /// The topic the Writer `receiver` is configured with when it is a constant the source builds:
-/// `Writer{Topic:}` or `NewWriter(WriterConfig{Topic:})`. `None` when it sets none (the messages
-/// name it), the name `Some(None)` when it cannot be evaluated.
+/// `Writer{Topic:}` or `NewWriter(WriterConfig{Topic:})`, with the variable it is read from.
+/// `None` when it sets none (the messages name it), the name `None` when it cannot be
+/// evaluated.
 fn configured<'a>(
     code: &Code<'a>,
     path: &'a str,
     call: &'a Call,
     receiver: &'a str,
-) -> Option<Option<String>> {
+) -> Option<(Option<String>, Option<String>)> {
     let ((file, constant), value) = code.constant(path, &call.scope, receiver)?;
     let scope = crate::parent(constant);
     let config = match value {
@@ -359,7 +364,7 @@ fn configured<'a>(
     };
     // A `Topic` written after the literal (`w.Topic = ..`) may be any other.
     if code.field_written("Topic") {
-        return Some(None);
+        return Some((None, None));
     }
     let topic = field(config, "Topic")??;
     let folded = code.value(file, scope, topic);
@@ -368,7 +373,7 @@ fn configured<'a>(
     named
         .as_deref()
         .is_none_or(|t| !t.is_empty())
-        .then_some(named)
+        .then(|| (named, env_of(&folded)))
 }
 
 /// The topics of the messages a `WriteMessages` is given: a message, or a slice of them. A

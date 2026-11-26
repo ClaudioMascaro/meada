@@ -8,7 +8,9 @@
 
 use std::collections::BTreeMap;
 
-use super::message::{Handler, Message, Side, bind, channel_name as name, publish, queue_name};
+use super::message::{
+    Handler, Message, Side, bind, channel_name as name, env_of, publish, queue_name,
+};
 use crate::lang::{Value, literal, property};
 use crate::names::ts::{Factory, factory};
 use crate::resolve::{Code, Expand, Expanded};
@@ -112,7 +114,8 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 continue;
             };
             let produce = |broker, read: Read| {
-                producers(broker, code.expand(Expand::Call(path, n), &|a, _| read(a)))
+                let read = |a: &[Value], _: &_| read(a).map(|names| (names, None));
+                producers(broker, code.expand(Expand::Call(path, n), &read))
             };
             // The handler of the call itself (its `option` of argument `arg`), else the
             // function the call is in.
@@ -141,7 +144,11 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             };
             match (package, expr.as_str(), method) {
                 (KAFKAJS, KAFKA_PRODUCER, "send") => {
-                    out.extend(produce("kafka", &|a| names(a, &["topic"])));
+                    let read = |a: &[Value], _: &_| names_env(a, &["topic"]);
+                    out.extend(producers(
+                        "kafka",
+                        code.expand(Expand::Call(path, n), &read),
+                    ));
                 }
                 (KAFKAJS, KAFKA_CONSUMER, "subscribe") => {
                     subscriptions.push((path, n, binding));
@@ -185,7 +192,12 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                             },
                             &|a, _| first(a),
                         );
-                        out.extend(producers("bullmq", found));
+                        let found = found.into_iter().map(|e| Expanded {
+                            site: e.site,
+                            frames: e.frames,
+                            found: (e.found, None),
+                        });
+                        out.extend(producers("bullmq", found.collect()));
                     }
                 }
                 // ponytail: a processor given as a file path is not followed (the function
@@ -230,19 +242,19 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
         }
     }
     for (path, n, binding) in subscriptions {
-        let read = |a: &[Value]| names(a, &["topics", "topic"]);
+        let read = |a: &[Value], _: &_| names_env(a, &["topics", "topic"]);
         for Expanded {
             site: (site, at),
-            found: names,
+            found: (names, environment),
             ..
-        } in code.expand(Expand::Call(path, n), &|a, _| read(a))
+        } in code.expand(Expand::Call(path, n), &read)
         {
             // With no `run` handler Meada can read, the function that subscribes handles.
             // ponytail: a handler passed through a wrapper's parameter is not followed.
             let handler = binding.and_then(|b| handlers.get(&b)).cloned();
             let handler = handler.unwrap_or_else(|| enclosing(code, site, at));
             out.extend(names.into_iter().map(|name| Message {
-                environment: None,
+                environment: environment.clone(),
                 broker: "kafka",
                 name,
                 path: site.into(),
@@ -254,17 +266,20 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
     out
 }
 
+/// The names and the variable an unresolved one is read from, at each site an expansion found.
+type Found<'a> = Vec<Expanded<'a, (Vec<Option<String>>, Option<String>)>>;
+
 /// A producer per name read at each site an expansion found.
-fn producers(broker: &'static str, found: Vec<Expanded<Vec<Option<String>>>>) -> Vec<Message> {
+fn producers(broker: &'static str, found: Found) -> Vec<Message> {
     (found.into_iter())
         .flat_map(
             |Expanded {
                  site: (site, at),
-                 found: names,
+                 found: (names, environment),
                  ..
              }| {
                 names.into_iter().map(move |name| Message {
-                    environment: None,
+                    environment: environment.clone(),
                     broker,
                     name,
                     path: site.into(),
@@ -348,6 +363,14 @@ fn names(args: &[Value], keys: &[&str]) -> Option<Vec<Option<String>>> {
         Some(value) => Some(vec![name(value)?]),
         None => Some(vec![None]),
     }
+}
+
+/// `names`, with the variable the first of `keys` the options set is read from.
+fn names_env(args: &[Value], keys: &[&str]) -> Option<(Vec<Option<String>>, Option<String>)> {
+    let found = names(args, keys)?;
+    let given = (options(args).flatten())
+        .and_then(|o| keys.iter().find_map(|key| property(o, key).ok().flatten()));
+    Some((found, given.and_then(env_of)))
 }
 
 /// The options object a call takes first: `None` when it is a parameter (a client wrapper),
