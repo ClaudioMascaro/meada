@@ -6205,20 +6205,30 @@ impl<'a> Code<'a> {
                             || (self.resolver.receivers.get(t.path))
                                 .is_some_and(|r| r.contains_key(&(t.name, name))) => {}
                     Binding::External(..) => {}
-                    // A type declared inside a function (an unqualified name a local binds) is
-                    // another type than any package-level struct: its literal by position sets
-                    // none of their fields.
+                    // A local can shadow a package type outside the literal's block or after
+                    // its initializer. Skip only when the bare name has no outer type to hide.
                     // ponytail: a function-local alias of the struct (`type L = T; L{a, b}`) or
                     // a type parameter instantiated with it sets the struct's fields unseen;
                     // read local type declarations when one matters.
                     Binding::Hidden
                         if by_position
-                            && written.chars().all(|c| c.is_alphanumeric() || c == '_') => {}
+                            && written.chars().all(|c| c.is_alphanumeric() || c == '_')
+                            && !self.go_package_may_name_type(path, written) => {}
                     _ => return None,
                 }
             }
         }
         Some(out)
+    }
+
+    /// Go gives a bare type name the scope of its package and the file's dot imports.
+    fn go_package_may_name_type(&self, path: &str, name: &str) -> bool {
+        let r = self.resolver;
+        r.defs[path].contains_key(name)
+            || r.shared
+                .get(path)
+                .is_some_and(|&g| r.groups[g].tops.contains_key(name))
+            || (name.starts_with(char::is_uppercase) && !r.by_local[path].stars.is_empty())
     }
 
     /// Whether some file of the repository writes the field `field` through a selector

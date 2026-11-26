@@ -497,3 +497,79 @@ fn a_literal_of_a_type_that_binds_to_nothing_keeps_the_base_unknown() {
         assert_no_base(&found, "svc-a/client/client.go::Client.Cancel");
     }
 }
+
+fn assert_shadowed_client_has_no_base(case: &str, body: &str) {
+    let repo = mono(case);
+    let source = format!("package client\n\nfunc other() {{ {body} }}\n");
+    std::fs::write(repo.join("svc-a/client/other.go"), source).unwrap();
+    let found = links(&repo);
+    assert_no_base(&found, "svc-a/client/client.go::Client.Run");
+    assert_no_base(&found, "svc-a/client/client.go::Client.Cancel");
+}
+
+#[test]
+fn a_local_name_declared_later_keeps_the_package_literal() {
+    assert_shadowed_client_has_no_base(
+        "base_url_shadow_later",
+        r#"_ = Client{"http://x", nil}; var Client struct{}; _ = Client"#,
+    );
+}
+
+#[test]
+fn a_local_name_in_a_sibling_block_keeps_the_package_literal() {
+    assert_shadowed_client_has_no_base(
+        "base_url_shadow_sibling",
+        r#"{ var Client struct{}; _ = Client }; { _ = Client{"http://x", nil} }"#,
+    );
+}
+
+#[test]
+fn the_tagged_field_competes_with_the_positional_initializer() {
+    let repo = mono("base_url_initializer_control");
+    let src = r#"package main
+
+import "net/http"
+
+type client struct{ baseURL string }
+func New(c Config) *client { return &client{baseURL: c.BaseURL} }
+func (c *client) send() { _, _ = http.Post(c.baseURL+"/run", "application/json", nil) }
+"#;
+    let config = "package main\ntype Config struct{ BaseURL string `env:\"A\"` }\n";
+    std::fs::write(repo.join("svc-b/config.go"), config).unwrap();
+    let manifest = repo.join("meada.toml");
+    let manifest_text = std::fs::read_to_string(&manifest).unwrap();
+    std::fs::write(
+        manifest,
+        manifest_text + "\n[[base_url]]\nenv = [\"A\"]\ndir = \"svc-b\"\n",
+    )
+    .unwrap();
+    let site = "svc-b/local.go::client.send";
+    let file = repo.join("svc-b/local.go");
+    std::fs::write(&file, src).unwrap();
+    assert_eq!(
+        shown(&of(&links(&repo), site)),
+        [declared("base URL from A")]
+    );
+    let other = "func other() { client := client{\"http://x\"}; _ = client }\n";
+    std::fs::write(file, src.to_owned() + other).unwrap();
+    assert_no_base(&links(&repo), site);
+}
+
+#[test]
+fn a_local_name_in_a_nested_initializer_keeps_the_package_literal() {
+    assert_shadowed_client_has_no_base(
+        "base_url_shadow_nested",
+        r#"{ Client := Client{"http://x", nil}; _ = Client }"#,
+    );
+}
+
+#[test]
+fn a_local_name_can_hide_a_dot_imported_type() {
+    let repo = mono("base_url_shadow_dot_import");
+    let source = r#"package client
+import . "image"
+func other() { { Point := Point{1, 2}; _ = Point } }
+"#;
+    std::fs::write(repo.join("svc-a/client/other.go"), source).unwrap();
+    assert_no_base(&links(&repo), "svc-a/client/client.go::Client.Run");
+}
