@@ -201,7 +201,7 @@ impl LanguagePack for TsJs {
                             arity: None,
                             labels: None,
                             awaited: receivers::awaited(node, &parents),
-                            constructs: false,
+                            constructs: node.kind() == "new_expression",
                             scope: scope.clone(),
                             callee: callee(function, src),
                             range: start..node.end_byte(),

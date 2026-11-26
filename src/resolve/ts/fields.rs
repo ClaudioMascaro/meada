@@ -1,4 +1,5 @@
-use super::super::{Binding, Resolver, Target, Work};
+use super::super::{Binding, Caller, Code, Fold, Resolver, Target, Work};
+use crate::lang::Value;
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -154,8 +155,13 @@ impl<'a> Resolver<'a> {
         }
         let info = self.files[class.path].ts_classes.get(class.name);
         let seed = info
-            .and_then(|c| c.constructed.get(field))
-            .map(|&at| (class.path, at));
+            .and_then(|c| {
+                c.constructed
+                    .get(field)
+                    .copied()
+                    .or_else(|| c.parameters.get(field)?.assignment)
+            })
+            .map(|at| (class.path, at));
         let written = |owner| {
             [&writes.program, &writes.tests][..if test { 2 } else { 1 }]
                 .iter()
@@ -181,5 +187,85 @@ impl<'a> Resolver<'a> {
                         .get(heir.name)
                         .is_some_and(|c| c.initialized.contains_key(field))
             })
+    }
+}
+
+impl<'a> Code<'a> {
+    pub(in crate::resolve) fn field_callers(&self, target: Target<'a>) -> &[Caller<'a>] {
+        let callers = if self.resolver.is_class(target) {
+            &self.resolver.ts_constructions
+        } else {
+            &self.resolver.callers
+        };
+        callers.get(&target).map_or(&[], Vec::as_slice)
+    }
+
+    /// Read the argument at each exact construction, including values supplied to its factory.
+    pub(in crate::resolve) fn ts_field_argument(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        field: &'a str,
+        fold: &mut Fold<'a, '_>,
+    ) -> Option<Value> {
+        let r = self.resolver;
+        let Binding::Def(class) = r.class(path, scope) else {
+            return None;
+        };
+        let parameter = r.files[path]
+            .ts_classes
+            .get(class.name)?
+            .parameters
+            .get(field)?;
+        let Some(frames) = fold.field_frames else {
+            return Some(Value::Unknown);
+        };
+        if r.ts_any_heir(class.name, |_| true)
+            || r.ts_field_written(class, field, crate::http::is_test_file(path))
+        {
+            return Some(Value::Unknown);
+        }
+        let (name, def) =
+            r.defs[path].get_key_value(crate::qualify(class.name, "constructor").as_str())?;
+        let ctor = Target { path, name };
+        let &(n, None) = r.params[path].get(&(ctor.name, parameter.name.as_str()))? else {
+            return Some(Value::Unknown);
+        };
+        if !self.unchanged_parameter(ctor, &parameter.name) {
+            return Some(Value::Unknown);
+        }
+        let Some((i, frame)) = frames.iter().enumerate().find(|(_, f)| f.def == class) else {
+            if self.field_callers(class).is_empty() {
+                return Some(Value::Unknown);
+            }
+            fold.field_wants.get_or_insert(class);
+            return Some(Value::Ref(format!("this.{field}")));
+        };
+        let call = self.call(frame.path, frame.index)?;
+        let mut wants = None;
+        fold.field_frames = Some(&frames[i + 1..]);
+        let value = match self.arg(frame.path, frame.index, ctor, n) {
+            Some(arg) => self.argument_value(
+                frame.path,
+                &call.scope,
+                arg,
+                frames,
+                i + 1,
+                fold,
+                &mut wants,
+            ),
+            None => match &def.params[n].default {
+                Some(default) => self.eval(path, ctor.name, default, &[], 0, fold, &mut wants),
+                None => Value::Undefined,
+            },
+        };
+        fold.field_frames = Some(frames);
+        if let Some(target) = wants {
+            if self.field_callers(target).is_empty() {
+                return Some(super::super::unbind(value, fold.chain, &[]));
+            }
+            fold.field_wants.get_or_insert(target);
+        }
+        Some(value)
     }
 }

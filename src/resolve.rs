@@ -506,6 +506,8 @@ pub struct Resolver<'a> {
     /// reach another function: it is not kept, so a wrapper or a parameter is never climbed
     /// through it.
     callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
+    /// Exact constructions eligible to supply fields read in the class's file.
+    ts_constructions: HashMap<Target<'a>, Vec<Caller<'a>>>,
     /// What each call resolved to when the resolver was built, by file and position
     /// (`resolved_at`).
     built: HashMap<&'a str, Vec<Resolution<'a>>>,
@@ -1180,6 +1182,7 @@ impl<'a> Resolver<'a> {
             known: crate::lang::known_outside(language),
             globals: language.globals(),
             callers: HashMap::new(),
+            ts_constructions: HashMap::new(),
             built: HashMap::new(),
             built_final: false,
             extension_callers: HashMap::new(),
@@ -1360,6 +1363,17 @@ impl<'a> Resolver<'a> {
                             .entry(target)
                             .or_default()
                             .push(Caller { path, index });
+                        if resolver.ts
+                            && call.constructs
+                            && (!crate::http::is_test_file(path)
+                                || crate::http::is_test_file(target.path))
+                        {
+                            resolver
+                                .ts_constructions
+                                .entry(target)
+                                .or_default()
+                                .push(Caller { path, index });
+                        }
                     }
                     Resolution::Inferred(target) if resolver.extension_call(path, call, target) => {
                         (extension_callers.entry(target).or_default()).push(Caller { path, index });
@@ -1544,7 +1558,8 @@ impl<'a> Resolver<'a> {
     ) -> Resolution<'a> {
         if self.ts {
             return self.at_ts_site(path, call.range.start, || {
-                self.resolved_as(path, call, call.constructs, matching, work)
+                // A TS construction calls the class itself.
+                self.resolved_as(path, call, false, matching, work)
             });
         }
         let found = self.resolved_as(path, call, call.constructs, matching, work);
@@ -5235,6 +5250,9 @@ struct Fold<'a, 'i> {
     external_value: Option<&'i ExternalValue<'a, 'i>>,
     returning: Vec<(&'a str, usize)>,
     foreign: usize,
+    /// Constructions and their factory callers supply fields independently of a method's callers.
+    field_frames: Option<&'i [Frame<'a>]>,
+    field_wants: Option<Target<'a>>,
     /// How many struct fields deep the value is folded (`Code::field_read`).
     field_depth: usize,
 }
@@ -7452,7 +7470,14 @@ impl<'a> Code<'a> {
                     external_value,
                     writes: None,
                 };
-                self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
+                self.walk(
+                    &written,
+                    &mut Vec::new(),
+                    &mut Vec::new(),
+                    read,
+                    &mut out,
+                    &mut Vec::new(),
+                );
             }
             Expand::Chain(path, index) => {
                 let Some(call) = self.call(path, index) else {
@@ -7469,7 +7494,14 @@ impl<'a> Code<'a> {
                     external_value,
                     writes: None,
                 };
-                self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
+                self.walk(
+                    &written,
+                    &mut Vec::new(),
+                    &mut Vec::new(),
+                    read,
+                    &mut out,
+                    &mut Vec::new(),
+                );
             }
             Expand::Constructed {
                 held: (file, constant),
@@ -7489,7 +7521,14 @@ impl<'a> Code<'a> {
                     external_value,
                     writes: None,
                 };
-                self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
+                self.walk(
+                    &written,
+                    &mut Vec::new(),
+                    &mut Vec::new(),
+                    read,
+                    &mut out,
+                    &mut Vec::new(),
+                );
             }
         }
         out
@@ -7520,7 +7559,14 @@ impl<'a> Code<'a> {
             external_value: None,
             writes: Some(writes),
         };
-        self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
+        self.walk(
+            &written,
+            &mut Vec::new(),
+            &mut Vec::new(),
+            read,
+            &mut out,
+            &mut Vec::new(),
+        );
         out
     }
 
@@ -7530,6 +7576,7 @@ impl<'a> Code<'a> {
         &self,
         written: &Written<'a, '_>,
         frames: &mut Vec<Frame<'a>>,
+        fields: &mut Vec<Frame<'a>>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
         out: &mut Vec<Expanded<'a, R>>,
         cuts: &mut Vec<usize>,
@@ -7539,7 +7586,7 @@ impl<'a> Code<'a> {
             return;
         }
         let chain = written.chain.is_some();
-        let ((values, kwargs), wants) = self.folded(written, frames);
+        let ((values, kwargs), wants, field) = self.folded(written, frames, fields);
         if let Some(found) = read(&values, &kwargs) {
             out.push(Expanded {
                 site: (site, at),
@@ -7548,7 +7595,30 @@ impl<'a> Code<'a> {
             });
             return;
         }
+        if let Some(def) = field
+            && fields.len() + frames.len() < WRAPPER_DEPTH
+            && !fields.iter().any(|f| f.def == def)
+        {
+            for caller in self.field_callers(def) {
+                fields.push(Frame {
+                    def,
+                    path: caller.path,
+                    index: caller.index,
+                });
+                self.walk(written, frames, fields, read, out, cuts);
+                fields.pop();
+            }
+            return;
+        }
         let Some(wrapper) = wants else {
+            if field.is_some() {
+                let (values, kwargs) = unbound((values, kwargs), chain, &[]);
+                out.extend(read(&values, &kwargs).map(|found| Expanded {
+                    site: (site, at),
+                    frames: frames.clone(),
+                    found,
+                }));
+            }
             return;
         };
         // A wrapper reached again closes a cycle: another turn of it is climbed no further.
@@ -7556,7 +7626,8 @@ impl<'a> Code<'a> {
             // A value the check could not fold for its budget is not one the cycle changed.
             let more = || {
                 self.refused.set(false);
-                self.cycle_sends_more(written, frames, first, wrapper, read) && !self.refused.get()
+                self.cycle_sends_more(written, frames, fields, first, wrapper, read)
+                    && !self.refused.get()
             };
             if self.cut_apart(more) {
                 cuts.push(first);
@@ -7568,11 +7639,13 @@ impl<'a> Code<'a> {
         // ponytail: so a wrapper reached only by a name match (a method on a receiver whose
         // class Meada cannot tell, a bare name no import binds) is read where it stands, its
         // parameters unknown.
-        let callers: Vec<Caller> = (self.resolver.callers.get(&wrapper).into_iter().flatten())
-            .copied()
-            .collect();
+        let callers = self
+            .resolver
+            .callers
+            .get(&wrapper)
+            .map_or(&[][..], Vec::as_slice);
         // A wrapper `WRAPPER_DEPTH` calls up is read where it stands too.
-        if callers.is_empty() || frames.len() >= WRAPPER_DEPTH {
+        if callers.is_empty() || frames.len() + fields.len() >= WRAPPER_DEPTH {
             let (values, kwargs) = unbound((values, kwargs), chain, &[]);
             out.extend(read(&values, &kwargs).map(|found| Expanded {
                 site: (site, at),
@@ -7588,7 +7661,7 @@ impl<'a> Code<'a> {
                 path: caller.path,
                 index: caller.index,
             });
-            self.walk(written, frames, read, out, cuts);
+            self.walk(written, frames, fields, read, out, cuts);
             frames.pop();
         }
         if !cuts.contains(&under) {
@@ -7625,7 +7698,8 @@ impl<'a> Code<'a> {
         &self,
         written: &Written<'a, '_>,
         frames: &[Frame<'a>],
-    ) -> (Folded, Option<Target<'a>>) {
+        fields: &[Frame<'a>],
+    ) -> (Folded, Option<Target<'a>>, Option<Target<'a>>) {
         let &Written {
             path,
             scope,
@@ -7634,9 +7708,11 @@ impl<'a> Code<'a> {
             ..
         } = written;
         let mut wants = None;
+        let mut field = None;
         let chain = written.chain.is_some();
         let mut eval = |v: &'a Value| {
             let fold = &mut Fold {
+                field_frames: Some(fields),
                 chain,
                 inject: written.inject,
                 external_value: written.external_value,
@@ -7646,7 +7722,9 @@ impl<'a> Code<'a> {
                 }),
                 ..Fold::default()
             };
-            self.eval(path, scope, v, frames, 0, fold, &mut wants)
+            let value = self.eval(path, scope, v, frames, 0, fold, &mut wants);
+            field = field.or(fold.field_wants);
+            value
         };
         let folded = match written.chain {
             Some(call) => {
@@ -7666,7 +7744,7 @@ impl<'a> Code<'a> {
                 (kwargs.iter()).map(|(k, v)| (k.clone(), eval(v))).collect(),
             ),
         };
-        (folded, wants)
+        (folded, wants, field)
     }
 
     /// Whether a turn of the cycle `frames[first..]` closes on `wrapper` sends what the first
@@ -7677,6 +7755,7 @@ impl<'a> Code<'a> {
         &self,
         written: &Written<'a, '_>,
         frames: &[Frame<'a>],
+        fields: &[Frame<'a>],
         first: usize,
         wrapper: Target<'a>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
@@ -7703,7 +7782,7 @@ impl<'a> Code<'a> {
         }
         // What the first turn read, with those parameters alone left as names: `read` answers
         // `None` when it needs one of them.
-        let (first_turn, _) = self.folded(written, &frames[..first]);
+        let (first_turn, _, _) = self.folded(written, &frames[..first], fields);
         let (values, kwargs) = unbound(first_turn, chain, &changed);
         read(&values, &kwargs).is_none()
     }
@@ -8221,6 +8300,12 @@ impl<'a> Code<'a> {
         fold: &mut Fold<'a, '_>,
         wants: &mut Option<Target<'a>>,
     ) -> Value {
+        if self.resolver.ts
+            && let Some(field) = name.strip_prefix("this.")
+            && let Some(value) = self.ts_field_argument(path, scope, field, fold)
+        {
+            return value;
+        }
         match self.resolver.read(path, scope, name) {
             Binding::Const(at, constant) => {
                 // `const a = b; const b = a;` folds to nothing.

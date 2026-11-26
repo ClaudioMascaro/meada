@@ -1054,16 +1054,15 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
         ("missingKey", None),
         // Another pack's config file (`application.yaml`) is no Backstage config.
         ("notAppConfig", None),
-        // A field only the constructor writes, once (#688), and the fields that stay unread: a
-        // public mutable one, one written twice, under a condition or outside the constructor,
-        // one its callers give, and one of a JavaScript file.
+        // OrdersClient reads its own initializer. The two constructor parameters get the
+        // same base from makeClients; competing writes and the JS field stay unknown.
         ("OrdersClient.list", Some("env:API_URL")),
         ("PublicClient.list", None),
         ("TwiceClient.list", None),
         ("ConditionalClient.list", None),
         ("LateClient.list", None),
-        ("ParameterClient.list", None),
-        ("AssignedClient.list", None),
+        ("ParameterClient.list", Some("env:API_URL")),
+        ("AssignedClient.list", Some("env:API_URL")),
         ("LegacyClient.list", None),
     ];
     for (function, via) in expected {
@@ -1079,6 +1078,8 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
             [
                 "viaGetString",
                 "OrdersClient",
+                "ParameterClient",
+                "AssignedClient",
                 "viaIncludedKey",
                 "viaIncludedBlock",
             ]
@@ -1098,7 +1099,7 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
         "inferred",
         "base URL from API_URL, a base_url_env of peer example.com/backstage/api",
     );
-    assert_eq!(links, [link; 4]);
+    assert_eq!(links, [link; 6]);
 }
 
 /// A method's context explains the inferred peer through its readonly field and an included

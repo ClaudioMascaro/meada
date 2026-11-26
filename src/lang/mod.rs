@@ -987,6 +987,16 @@ pub struct TsClass {
     /// Constructor assignments that supply a receiver if no other write reaches the field.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub constructed: BTreeMap<String, usize>,
+    /// A constructor parameter held in the field; the position distinguishes an explicit write.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub parameters: BTreeMap<String, TsFieldParameter>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TsFieldParameter {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignment: Option<usize>,
 }
 
 /// What the syntax says a name holds. It is read as written: the shared side decides whether

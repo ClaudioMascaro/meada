@@ -1,5 +1,5 @@
 use super::{Parents, callee, children, named, text, types};
-use crate::lang::{Class, Facts, Kind, Receiver, TsClass, TsLocal, Ty};
+use crate::lang::{Class, Facts, Kind, Receiver, TsClass, TsFieldParameter, TsLocal, Ty};
 use std::collections::HashMap;
 use tree_sitter::Node;
 
@@ -130,6 +130,14 @@ fn constructor_receivers(
     info: &mut TsClass,
     facts: &mut Facts,
 ) {
+    let parameters: std::collections::HashSet<_> = ctor
+        .child_by_field_name("parameters")
+        .into_iter()
+        .flat_map(named)
+        .filter_map(|p| p.child_by_field_name("pattern"))
+        .filter(|p| p.kind() == "identifier")
+        .map(|p| text(p, src))
+        .collect();
     for statement in ctor.child_by_field_name("body").into_iter().flat_map(named) {
         let Some(assign) = named(statement).find(|n| n.kind() != "comment") else {
             continue;
@@ -147,14 +155,26 @@ fn constructor_receivers(
         if !left
             .child_by_field_name("object")
             .is_some_and(|o| o.kind() == "this")
-            || declared.contains(name)
-            || info.constructed.contains_key(name)
         {
             continue;
         }
-        if let Some(class) = assign
-            .child_by_field_name("right")
-            .and_then(|v| constructed(v, src))
+        let Some(value) = assign.child_by_field_name("right") else {
+            continue;
+        };
+        if value.kind() == "identifier"
+            && parameters.contains(text(value, src))
+            && !info.initialized.contains_key(name)
+        {
+            info.parameters
+                .entry(name.into())
+                .or_insert_with(|| TsFieldParameter {
+                    name: text(value, src).into(),
+                    assignment: Some(assign.start_byte()),
+                });
+        }
+        if !declared.contains(name)
+            && !info.constructed.contains_key(name)
+            && let Some(class) = constructed(value, src)
         {
             info.constructed.insert(name.into(), assign.start_byte());
             put(facts, scope, name, class);
@@ -233,6 +253,13 @@ pub(super) fn definition(node: Node, src: &[u8], scope: &str, up: &Parents, fact
                     let field = text(n, src);
                     info.fields.push(field.into());
                     declared.insert(field.into());
+                    info.parameters.insert(
+                        field.into(),
+                        TsFieldParameter {
+                            name: field.into(),
+                            assignment: None,
+                        },
+                    );
                     info.initialized.insert(field.into(), p.start_byte());
                     if children(p)
                         .any(|c| c.kind() == "accessibility_modifier" && text(c, src) == "private")
@@ -251,7 +278,11 @@ pub(super) fn definition(node: Node, src: &[u8], scope: &str, up: &Parents, fact
         if let Some(ctor) = ctor {
             constructor_receivers(ctor, scope, src, &declared, &mut info, facts);
         }
-        if !info.fields.is_empty() || !info.implements.is_empty() || !info.constructed.is_empty() {
+        if !info.fields.is_empty()
+            || !info.implements.is_empty()
+            || !info.constructed.is_empty()
+            || !info.parameters.is_empty()
+        {
             facts.ts_classes.insert(scope.to_string(), info);
         }
     }

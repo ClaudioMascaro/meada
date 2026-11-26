@@ -1,0 +1,11 @@
+[[channel_client]]
+call = "plugins/orders/src/client.ts::KafkaClient.sendMessage"
+role = "producer"
+broker = "kafka"
+topic = "0"
+
+[[channel_client]]
+call = "plugins/orders/src/client.ts::KafkaClient.createConsumer"
+role = "consumer"
+broker = "kafka"
+topic = "0"

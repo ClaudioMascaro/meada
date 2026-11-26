@@ -399,6 +399,7 @@ sample.ts
     {
       "scope": "",
       "callee": "SNSClient",
+      "constructs": true,
       "range": {
         "start": 1125,
         "end": 1142
@@ -415,6 +416,7 @@ sample.ts
     {
       "scope": "publishAws",
       "callee": "PublishCommand",
+      "constructs": true,
       "range": {
         "start": 1179,
         "end": 1228
