@@ -6258,7 +6258,7 @@ impl<'a> Code<'a> {
     /// environment read (`Env` or `EnvOr`), when a function whose parameter it takes has no
     /// exact caller, past `FIELD_DEPTH`, and while it is folded (a field met again). `test_read`:
     /// the read is in a Go `_test.go` file, whose callers then count (`Code::literal_reads`).
-    /// The caller checks that no file writes it through a selector (`Code::field_written`).
+    /// The caller uses `Code::field_written_in` with the same `test_read` to check selector writes.
     fn field_read(&self, field: Field<'a>, depth: usize, nested: usize, test_read: bool) -> Value {
         let (at, ty, _) = field;
         let struct_field = (self.resolver.defs.get(at).and_then(|d| d.get(ty)))

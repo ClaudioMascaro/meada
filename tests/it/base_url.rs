@@ -509,10 +509,14 @@ fn assert_shadowed_client_has_no_base(case: &str, body: &str) {
 
 #[test]
 fn a_local_name_declared_later_keeps_the_package_literal() {
-    assert_shadowed_client_has_no_base(
-        "base_url_shadow_later",
-        r#"_ = Client{"http://x", nil}; var Client struct{}; _ = Client"#,
-    );
+    let repo = mono("base_url_shadow_later");
+    let file = repo.join("svc-a/client/client.go");
+    let client = std::fs::read_to_string(&file).unwrap();
+    let other = r#"func other() { _ = Client{"http://x", nil}; var Client struct{}; _ = Client }"#;
+    std::fs::write(file, client + "\n" + other).unwrap();
+    let found = links(&repo);
+    assert_no_base(&found, "svc-a/client/client.go::Client.Run");
+    assert_no_base(&found, "svc-a/client/client.go::Client.Cancel");
 }
 
 #[test]
@@ -572,4 +576,52 @@ func other() { { Point := Point{1, 2}; _ = Point } }
 "#;
     std::fs::write(repo.join("svc-a/client/other.go"), source).unwrap();
     assert_no_base(&links(&repo), "svc-a/client/client.go::Client.Run");
+}
+
+#[test]
+fn a_positional_literal_with_several_type_definitions_keeps_the_base_unknown() {
+    let repo = mono("base_url_several_types");
+    // Go selects one legacy build tag. Both definitions are visible to the index.
+    for (file, tag) in [("first.go", "variant"), ("second.go", "!variant")] {
+        let source = format!("// +build {tag}\n\npackage main\ntype pair struct {{ n int }}\n");
+        std::fs::write(repo.join("svc-b").join(file), source).unwrap();
+    }
+    let literal = "package main\nfunc other() { _ = pair{1} }\n";
+    std::fs::write(repo.join("svc-b/other.go"), literal).unwrap();
+    assert_no_base(&links(&repo), "svc-a/client/client.go::Client.Run");
+}
+
+#[test]
+fn a_qualified_literal_with_a_local_head_keeps_the_base_unknown() {
+    let repo = mono("base_url_local_qualifier");
+    let source = r#"package main
+import "image"
+func other() { { var image struct{}; _ = image }; _ = image.Point{1, 2} }
+"#;
+    std::fs::write(repo.join("svc-b/other.go"), source).unwrap();
+    assert_no_base(&links(&repo), "svc-a/client/client.go::Client.Run");
+}
+
+#[test]
+fn a_test_file_write_still_counts_for_a_resty_request_field() {
+    let repo = mono("base_url_test_request_write");
+    let source = r#"package client
+import (
+    "os"
+    "github.com/go-resty/resty/v2"
+)
+type sender struct { req *resty.Request }
+func newSender() *sender { return &sender{req: resty.New().SetBaseURL(os.Getenv("B_URL")).R()} }
+func (s *sender) send() { _, _ = s.req.Post("/run") }
+"#;
+    std::fs::write(repo.join("svc-a/client/sender.go"), source).unwrap();
+    let site = "svc-a/client/sender.go::sender.send";
+    assert_eq!(
+        shown(&of(&links(&repo), site)),
+        [declared("base URL from B_URL")]
+    );
+
+    let write = "package client\nfunc clear(s *sender) { s.req = nil }\n";
+    std::fs::write(repo.join("svc-a/client/sender_test.go"), write).unwrap();
+    assert_no_base(&links(&repo), site);
 }
