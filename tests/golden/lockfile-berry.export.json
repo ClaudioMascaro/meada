@@ -1,0 +1,162 @@
+{
+  "format": 1,
+  "repository": "example.com/scope/berry",
+  "commit": "071f6b634f2138d1ceb9cbd752cb07a264c4f96c",
+  "dirty": false,
+  "files": [
+    {
+      "path": "packages/a/src/index.ts",
+      "hash": "e9ed0ee11dc0a3115578582de50155f21f3250c64eaadd728239ad5c3586d87b"
+    },
+    {
+      "path": "packages/b/src/index.ts",
+      "hash": "de2b922f2e074dce76b317b265e039071bc6ceb1610b536cc8bf4a20ad0263f6"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "example.com/scope/berry::packages/a/src/index.ts::f",
+      "span": {
+        "path": "packages/a/src/index.ts",
+        "start": 38,
+        "end": 98
+      },
+      "hash": "913d197fc8bda6da840cc68d115fe18e9f86e26f8edf4f4cfe309b9d045dd7e0"
+    },
+    {
+      "id": "example.com/scope/berry::packages/b/src/index.ts::g",
+      "span": {
+        "path": "packages/b/src/index.ts",
+        "start": 38,
+        "end": 71
+      },
+      "hash": "6958a38f94389e0263a7c245b1abe308420e6000844ccdf18018e8572daddcf2"
+    }
+  ],
+  "calls": [
+    {
+      "id": "example.com/scope/berry::packages/a/src/index.ts::f::map#0",
+      "caller": "example.com/scope/berry::packages/a/src/index.ts::f",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/a/src/index.ts",
+        "start": 74,
+        "end": 95
+      }
+    },
+    {
+      "id": "example.com/scope/berry::packages/b/src/index.ts::g::f#0",
+      "caller": "example.com/scope/berry::packages/b/src/index.ts::g",
+      "target": null,
+      "level": null,
+      "span": {
+        "path": "packages/b/src/index.ts",
+        "start": 62,
+        "end": 68
+      }
+    }
+  ],
+  "providers": [
+    {
+      "contract": "package::npm::@scope/a",
+      "site": "example.com/scope/berry::packages/a/package.json"
+    },
+    {
+      "contract": "package::npm::@scope/b",
+      "site": "example.com/scope/berry::packages/b/package.json"
+    },
+    {
+      "contract": "package::npm::root",
+      "site": "example.com/scope/berry::package.json"
+    }
+  ],
+  "consumers": [
+    {
+      "contract": "package::npm::@scope/a",
+      "site": "example.com/scope/berry::packages/b/package.json::dependencies::@scope/a",
+      "via": null
+    },
+    {
+      "contract": "package::npm::@scope/a",
+      "site": "example.com/scope/berry::packages/b/src/index.ts::g::f#0",
+      "via": null
+    }
+  ],
+  "packages": [
+    {
+      "name": "@scope/a",
+      "version": "1.0.0",
+      "repository": "example.com/scope/berry",
+      "directory": "packages/a"
+    },
+    {
+      "name": "@scope/b",
+      "version": "1.0.0",
+      "repository": "example.com/scope/berry",
+      "directory": "packages/b"
+    },
+    {
+      "name": "root",
+      "repository": "example.com/scope/berry",
+      "directory": "."
+    }
+  ],
+  "dependencies": [
+    {
+      "manifest": "packages/b/package.json",
+      "field": "dependencies",
+      "name": "@scope/a",
+      "range": "workspace:^"
+    }
+  ],
+  "resolved": [
+    {
+      "manifest": "packages/a/package.json",
+      "name": "@scope/kit",
+      "range": "^2.0.0",
+      "origin": "npm",
+      "version": "2.0.0"
+    },
+    {
+      "manifest": "packages/a/package.json",
+      "name": "lodash",
+      "range": "^4.17.0",
+      "origin": "npm",
+      "version": "4.17.21"
+    },
+    {
+      "manifest": "packages/b/package.json",
+      "name": "@scope/a",
+      "range": "workspace:^",
+      "origin": "workspace",
+      "version": "0.0.0-use.local"
+    }
+  ],
+  "imports": [
+    {
+      "site": "example.com/scope/berry::packages/b/src/index.ts::g::f#0",
+      "specifier": "@scope/a",
+      "name": "f",
+      "level": "exact",
+      "how": "main",
+      "target": "example.com/scope/berry::packages/a/src/index.ts::f"
+    }
+  ],
+  "links": [
+    {
+      "consumer": "example.com/scope/berry::packages/b/package.json::dependencies::@scope/a",
+      "provider": "example.com/scope/berry::packages/a/package.json",
+      "contract": "package::npm::@scope/a",
+      "level": "exact",
+      "reason": "package::npm::@scope/a workspace:^ (local 1.0.0), range unchecked"
+    },
+    {
+      "consumer": "example.com/scope/berry::packages/b/src/index.ts::g::f#0",
+      "provider": "example.com/scope/berry::packages/a/src/index.ts::f",
+      "contract": "package::npm::@scope/a",
+      "level": "exact",
+      "reason": "package::npm::@scope/a workspace:^ (local 1.0.0), range unchecked; import main"
+    }
+  ]
+}

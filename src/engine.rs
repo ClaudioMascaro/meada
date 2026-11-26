@@ -17,7 +17,7 @@ use crate::render::{
 use crate::repo::Change;
 pub use crate::repo::Changes;
 pub use crate::trace::affected::Affected;
-use crate::trace::affected::Open;
+use crate::trace::affected::{Attributed, Open};
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Manifest, Missing, Repository, Workspace};
 use crate::{
@@ -662,9 +662,10 @@ impl Engine {
     /// Everything `changes` may affect (`meada trace --affected`): the walk up over the edges
     /// that mean "depends on", with what it could not place listed apart.
     pub fn affected(&self, changes: Changes) -> Result<Affected> {
+        let base = changes.base();
         let changes = [changes.read(&self.root)?];
-        let mut answers = self.walked(&changes, |graph, changes, roots, open| {
-            trace::affected::answer(graph, changes, roots, open)
+        let mut answers = self.walked(&changes, base, |graph, changes, roots, open, a| {
+            trace::affected::answer(graph, changes, roots, open, a)
         })?;
         Ok(answers.remove(0))
     }
@@ -678,8 +679,8 @@ impl Engine {
         let changes = (blocks.iter())
             .map(|(_, paths)| Changes::Files(paths).read(&self.root))
             .collect::<Result<Vec<_>>>()?;
-        let answers = self.walked(&changes, |graph, changes, roots, open| {
-            trace::affected::answer(graph, changes, roots, open)
+        let answers = self.walked(&changes, None, |graph, changes, roots, open, a| {
+            trace::affected::answer(graph, changes, roots, open, a)
         })?;
         Ok(blocks
             .into_iter()
@@ -689,12 +690,20 @@ impl Engine {
     }
 
     /// Reads what each block of `blocks` touches and what the affected walk from them needs,
-    /// then hands `then`, per block, the graph, its changes, the ids they root and the paths
-    /// left open.
+    /// then hands `then`, per block, the graph, its changes, the ids they root, the paths left
+    /// open and what its lockfiles root. `base` is the revision the changes start from, which a
+    /// lockfile is compared with.
     pub(crate) fn walked<R>(
         &self,
         blocks: &[Vec<(String, Change)>],
-        mut then: impl FnMut(&trace::Graph<'_>, &[(String, Change)], &[String], Vec<Open>) -> R,
+        base: Option<&str>,
+        mut then: impl FnMut(
+            &trace::Graph<'_>,
+            &[(String, Change)],
+            &[String],
+            Vec<Open>,
+            Attributed,
+        ) -> R,
     ) -> Result<Vec<R>> {
         self.refresh()?;
         let mut partial = self.partial()?;
@@ -702,10 +711,27 @@ impl Engine {
         for changes in blocks {
             trace::starts(&mut partial, Start::Changes, Some(changes), Direction::Up)?;
         }
+        let attributed: Vec<Attributed> = {
+            let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
+            let facts = |names: &[&str]| crate::index::facts_loading(&self.dbs[0], names);
+            let facts_at = |paths: &[&str]| crate::index::facts_of(&self.dbs[0], paths);
+            (blocks.iter())
+                .map(|changes| trace::affected::attribute(&graph, changes, base, facts, facts_at))
+                .collect::<Result<_>>()?
+        };
+        // The files a lockfile roots are read as whole files are.
+        for a in &attributed {
+            trace::starts(
+                &mut partial,
+                Start::Changes,
+                Some(&a.as_changes()),
+                Direction::Up,
+            )?;
+        }
         let rooted: Vec<(Vec<String>, Vec<Open>)> = {
             let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
-            (blocks.iter())
-                .map(|changes| trace::affected::roots(&graph, changes))
+            (blocks.iter().zip(&attributed))
+                .map(|(changes, a)| trace::affected::roots(&graph, changes, a))
                 .collect()
         };
         let every: Vec<String> = rooted.iter().flat_map(|(roots, _)| roots.clone()).collect();
@@ -721,8 +747,8 @@ impl Engine {
         partial.symbols(None, &read)?;
         partial.calls(None, &read)?;
         let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
-        Ok((blocks.iter().zip(rooted))
-            .map(|(changes, (roots, open))| then(&graph, changes, &roots, open))
+        Ok((blocks.iter().zip(rooted).zip(attributed))
+            .map(|((changes, (roots, open)), a)| then(&graph, changes, &roots, open, a))
             .collect())
     }
 
@@ -1426,6 +1452,9 @@ impl Engine {
             };
             let exports = partial.exports;
             let mut lines = self.contract_sides(&exports, &links, contract, view, kind);
+            if contract.starts_with("package::npm::") {
+                lines.extend(resolved_lines(&exports, repos, contract));
+            }
             if view.follows_drift() {
                 let entries = drift_view::entries(repos, &exports, &links);
                 lines.extend(drift_view::consumers(&entries, contract));
@@ -2402,6 +2431,24 @@ fn relative(from: &Path, to: &Path) -> String {
     }
 }
 
+/// What the dependencies of the manifest providing the npm package `contract` resolve to, one
+/// line each: `  <name> resolves <range or -> to <version> (<origin>)`.
+fn resolved_lines(exports: &[Export], repos: &[Repository], contract: &str) -> Vec<String> {
+    let mut lines = Vec::new();
+    for (export, repo) in exports.iter().zip(repos) {
+        let manifests = (export.providers.iter())
+            .filter(|p| p.contract == contract)
+            .filter_map(|p| p.site.strip_prefix(&repo.identity)?.strip_prefix("::"));
+        for manifest in manifests {
+            for r in export.resolved.iter().filter(|r| r.manifest == manifest) {
+                let range = r.range.as_deref().unwrap_or("-");
+                let (name, version, origin) = (&r.name, &r.version, &r.origin);
+                lines.push(format!("  {name} resolves {range} to {version} ({origin})"));
+            }
+        }
+    }
+    lines
+}
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;

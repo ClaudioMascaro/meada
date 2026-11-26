@@ -1,0 +1,1 @@
+{"name": "@scope/a", "version": "1.0.0", "main": "src/index.ts", "dependencies": {"lodash": "^4.17.0", "@scope/kit": "^2.0.0"}}

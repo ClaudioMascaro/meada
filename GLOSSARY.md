@@ -623,6 +623,16 @@ behind the `Ecosystem` trait, registered in a list. A dependency links only to a
 its own ecosystem, so an npm and a PyPI package of one name never link.
 _Avoid_: registry, package manager, language
 
+**Resolved version**:
+The version a dependency entry installs, read from the lockfile (a Yarn Berry `yarn.lock`),
+beside the range the member's manifest declares (`resolved` in `meada export`).
+_Avoid_: installed version, locked version
+
+**Origin**:
+Where a resolved version comes from: `npm`, `workspace`, `patch` and the like, the lockfile's
+protocol for the entry.
+_Avoid_: protocol
+
 **Gateway prefix**:
 The rewrite a gateway applies to the paths of a repository: `prefix` is added in front, `strip`
 is removed from the start. It is declared in `[serve]`, and the **server path** of each root

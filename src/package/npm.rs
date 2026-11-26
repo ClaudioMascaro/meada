@@ -243,7 +243,7 @@ fn target(value: &Value, star: Option<&str>, depth: usize) -> Option<String> {
 /// The package a bare specifier names and the subpath inside it: `@a/b/c` is `@a/b` and
 /// `./c`, `x` is `x` and `.`. `None` for a relative or absolute specifier, or a name npm does not
 /// accept (`node:fs` among them).
-pub(super) fn split(specifier: &str) -> Option<(&str, String)> {
+pub(crate) fn split(specifier: &str) -> Option<(&str, String)> {
     if specifier.starts_with(['.', '/']) {
         return None;
     }

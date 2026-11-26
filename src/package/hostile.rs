@@ -1,6 +1,8 @@
 //! Hostile input (`CODING_STANDARDS.md`): the readers of the manifests and configurations a
 //! repository holds, each fed a file built to explode (many keys, deep nesting, wide fan-out)
-//! within `lang::MAX_BYTES`, the most any of them reads. `probes` is the table a new reader adds
+//! within `lang::MAX_BYTES`, the most each of them reads. A lockfile is read up to its own cap,
+//! `lock::MAX_LOCK_BYTES`, and `a_lockfile_at_its_cap_stays_bounded` holds it to its own time
+//! and heap, `LOCK_BUDGET` and `LOCK_HEAP`. `probes` is the table a new reader adds
 //! its row to: a row reads such a file and answers the size of what the reader returned, and the
 //! test holds every row to `BUDGET` in time, to `MAX_OUT` in size and to `HEAP` in memory, the
 //! most its thread held above what it held when the row started (`heap` counts it). A file past
@@ -2279,6 +2281,114 @@ fn http_iac_route_reader_stays_bounded_on_a_full_file() {
     eprintln!("HTTP IaC hostile probe: {elapsed:?}, {size} stored bytes");
     assert!(size <= MAX_OUT, "{size}");
     assert!(elapsed < BUDGET, "{elapsed:?}");
+}
+
+/// A Berry lockfile at `lock::MAX_LOCK_BYTES`, with a dependency chain through every entry, each
+/// with wide keys and an edge that matches no key (so it reaches by name every entry of a name
+/// half the file holds), read twice as `trace --affected` reads base and head, then diffed,
+/// walked from the deepest entry and from one of that name, and listed.
+fn lockfile_probe() -> usize {
+    use super::lock;
+    let text = |bumped: bool| {
+        let mut text = "__metadata:\n  version: 8\n\n\"root@workspace:., root@workspace:^\":\n  \
+                        version: 0.0.0-use.local\n  resolution: \"root@workspace:.\"\n  \
+                        dependencies:\n    c0: \"npm:^1\"\n    x: \"weird:1\"\n\n"
+            .to_string();
+        let mut i = 0;
+        while text.len() < lock::MAX_LOCK_BYTES - (1 << 12) {
+            let keys: Vec<String> = (0..16).map(|k| format!("c{i}@npm:^1.{k}")).collect();
+            let (next, keys) = (i + 1, keys.join(", "));
+            text += &format!(
+                "\"{keys}, c{i}@npm:^1\":\n  version: 1.0.0\n  resolution: \"c{i}@npm:1.0.0\"\n  \
+                 dependencies:\n    c{next}: \"npm:^1\"\n    x: \"weird:1\"\n  checksum: 10c0/{i}\n\n\
+                 \"x@npm:^{i}\":\n  version: {i}.0.0\n  resolution: \"x@npm:{i}.0.0\"\n  \
+                 checksum: 10c0/x{i}\n\n"
+            );
+            i += 1;
+        }
+        if bumped {
+            let last = i - 1;
+            text = text.replace(&format!("checksum: 10c0/{last}\n"), "checksum: 10c0/z\n");
+            text = text.replace("checksum: 10c0/x0\n", "checksum: 10c0/xz\n");
+        }
+        assert!(text.len() <= lock::MAX_LOCK_BYTES, "{} bytes", text.len());
+        text.into_bytes()
+    };
+    let (base, head) = (text(false), text(true));
+    let none = BTreeMap::new();
+    let (base, head) = (
+        lock::read(&base, &none).unwrap(),
+        lock::read(&head, &none).unwrap(),
+    );
+    let moved = lock::diff(&base, &head);
+    assert_eq!(moved.len(), 18, "{moved:?}");
+    let reached = lock::reached(&base, &head, &moved);
+    assert_eq!(reached.len(), 1, "{reached:?}");
+    format!("{moved:?}{reached:?}").len() + lock::direct(&head).len()
+}
+
+/// The heap `lockfile_probe` may hold: two parse trees of a full lockfile and the entries read
+/// from them. A reader that copies the keys of every entry of a name per edge passes it by far.
+const LOCK_HEAP: usize = 768 << 20;
+
+/// The time `lockfile_probe` may take: two full parses of 16 MiB in a debug build.
+const LOCK_BUDGET: Duration = Duration::from_secs(120);
+
+/// Entries that all list one descriptor in their key and all depend on it: the walk takes that
+/// descriptor's dependents once, not once per entry that lists it.
+#[test]
+fn a_lockfile_of_shared_keys_stays_bounded() {
+    use super::lock;
+    let n = 30_000;
+    let text = |bumped: bool| {
+        let mut text = "__metadata:\n  version: 8\n\n\"root@workspace:.\":\n  version: \
+                        0.0.0-use.local\n  resolution: \"root@workspace:.\"\n  dependencies:\n    \
+                        e0: \"npm:1\"\n\n"
+            .to_string();
+        for i in 0..n {
+            let sum = if bumped && (i == 0 || i == n - 1) {
+                "z"
+            } else {
+                ""
+            };
+            text += &format!(
+                "\"e{i}@npm:1, x@npm:1\":\n  version: 1.0.{i}\n  resolution: \"e{i}@npm:1.0.{i}\"\n  \
+                 dependencies:\n    x: \"npm:1\"\n  checksum: 10c0/{i}{sum}\n\n"
+            );
+        }
+        assert!(text.len() <= lock::MAX_LOCK_BYTES, "{} bytes", text.len());
+        text.into_bytes()
+    };
+    let start = Instant::now();
+    let held = heap::watch(LOCK_HEAP);
+    let none = BTreeMap::new();
+    let base = lock::read(&text(false), &none).unwrap();
+    let head = lock::read(&text(true), &none).unwrap();
+    let reached = lock::reached(&base, &head, &lock::diff(&base, &head));
+    let peak = heap::unwatch().saturating_sub(held);
+    let took = start.elapsed();
+    eprintln!("shared keys: {took:?}, {} MiB", peak >> 20);
+    assert_eq!(reached.keys().collect::<Vec<_>>(), ["."]);
+    assert!(took < LOCK_BUDGET, "{took:?}");
+    assert!(peak < LOCK_HEAP, "{} MiB", peak >> 20);
+}
+
+/// A lockfile built to explode, at its own cap (16 MiB, past `MAX_BYTES`), stays within its own
+/// time and heap bounds and returns a bounded size.
+#[test]
+fn a_lockfile_at_its_cap_stays_bounded() {
+    let start = Instant::now();
+    let held = heap::watch(HEAP_CEILING.max(2 * LOCK_HEAP));
+    let size = lockfile_probe();
+    let peak = heap::unwatch().saturating_sub(held);
+    let took = start.elapsed();
+    eprintln!(
+        "hostile lockfile: {took:?}, {size} bytes, {} MiB",
+        peak >> 20
+    );
+    assert!(size <= MAX_OUT, "{size}");
+    assert!(took < LOCK_BUDGET, "{took:?}");
+    assert!(peak < LOCK_HEAP, "{} MiB", peak >> 20);
 }
 
 /// Every reader, given a file built to explode, returns within `BUDGET` of its start, holds no

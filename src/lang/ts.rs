@@ -166,6 +166,7 @@ impl LanguagePack for TsJs {
             references.visit(node, &scope, src, &parents);
             match node.kind() {
                 "call_expression" | "new_expression" => {
+                    facts.loads.extend(loads_from(node, src, &parents));
                     // `new X(...)` is a call of `X`: constructors are how some libraries are
                     // used (`new SendMessageCommand(...)`, `new Worker(...)`).
                     let arguments =
@@ -260,7 +261,15 @@ impl LanguagePack for TsJs {
                         at.push(plain);
                     }
                 }
-                "import_statement" => imports(node, src, &mut facts.imports),
+                "import_statement" => {
+                    imports(node, src, &mut facts.imports);
+                    // `import 'x'`: a source and no clause binds nothing.
+                    if !children(node).any(|c| c.kind() == "import_clause")
+                        && let Some(source) = node.child_by_field_name("source")
+                    {
+                        facts.loads.push(unquote(source, src));
+                    }
+                }
                 "export_statement" => exports(node, src, &mut facts.exports),
                 // A `return` of a function that is no definition (one returned in place, or
                 // one past `DEFINITION_DEPTH`) is nobody's.
@@ -480,6 +489,8 @@ impl LanguagePack for TsJs {
         }
         facts.declarations = declarations(root, src, &facts);
         facts.references = references.into_vec();
+        facts.loads.sort();
+        facts.loads.dedup();
         facts.loops = super::outermost(
             root,
             &[
@@ -839,6 +850,9 @@ struct Parents<'t> {
     /// Whether the file binds a `URL` other than the runtime constructor: `new URL(x)` is then
     /// no runtime global.
     url_declared: bool,
+    /// Whether the file binds or assigns `require` anywhere: a `require(..)` is then no load.
+    // ponytail: per file, not per scope; a file that shadows `require` once records none.
+    require_declared: bool,
     /// Merged lexical scopes that hide the runtime String conversion.
     string_shadows: Vec<Range<usize>>,
     /// Merged lexical scopes that hide the Node.js process object.
@@ -922,8 +936,10 @@ impl<'t> Parents<'t> {
         }
         url_declared |= assigned.contains("URL")
             || (url_required && (require_declared || assigned.contains("require")));
+        let require_declared = require_declared || assigned.contains("require");
         let mut parents = Self {
             up,
+            require_declared,
             assigned,
             written,
             url_declared,
@@ -1061,6 +1077,20 @@ fn strict_directive(body: Node, src: &[u8]) -> bool {
         }
     }
     false
+}
+
+/// The specifier a call loads without a binding: `require('x')` of the runtime's `require`, or
+/// `import('x')`, each with one plain string argument.
+fn loads_from(node: Node, src: &[u8], up: &Parents) -> Option<String> {
+    let function = node.child_by_field_name("function")?;
+    let loads = match function.kind() {
+        "import" => true,
+        "identifier" => text(function, src) == "require" && !up.require_declared,
+        _ => false,
+    };
+    let mut args = named(node.child_by_field_name("arguments")?);
+    let arg = args.next().filter(|a| a.kind() == "string")?;
+    (loads && args.next().is_none()).then(|| unquote(arg, src))
 }
 
 /// Whether `node` binds `name`, hiding the runtime name. Only the named `URL` export of Node's
@@ -3020,6 +3050,63 @@ mod tests {
 
     fn parse(src: &str) -> Facts {
         TsJs.parse("a.ts", src.as_bytes()).unwrap()
+    }
+
+    #[test]
+    fn a_bare_import_is_a_load() {
+        let facts = parse("import 'x/polyfill';\nimport \"./side.css\";\n");
+        assert_eq!(facts.loads, ["./side.css", "x/polyfill"]);
+        assert!(facts.imports.is_empty());
+    }
+
+    #[test]
+    fn a_require_of_a_string_is_a_load() {
+        assert_eq!(parse("const a = require('lodash');").loads, ["lodash"]);
+        assert!(parse("const a = require(name);").loads.is_empty());
+        assert!(parse("const a = require('a', 'b');").loads.is_empty());
+        assert!(parse("const a = require(`a${b}`);").loads.is_empty());
+        assert!(parse("const a = x.require('a');").loads.is_empty());
+    }
+
+    #[test]
+    fn a_shadowed_require_is_no_load() {
+        assert!(
+            parse("function f(require) { require('x') }")
+                .loads
+                .is_empty()
+        );
+        assert!(parse("require = load; require('x');").loads.is_empty());
+    }
+
+    #[test]
+    fn a_load_makes_no_binding() {
+        let rows = |src: &str| {
+            let facts = parse(src);
+            let calls: Vec<(String, String)> = (facts.calls.iter())
+                .map(|c| (c.scope.clone(), c.callee.clone()))
+                .collect();
+            let imports: Vec<(String, String)> = (facts.imports.iter())
+                .map(|i| (i.local.clone(), i.source.clone()))
+                .collect();
+            (calls, imports)
+        };
+        assert_eq!(
+            rows("import y from 'y';\nimport 'x';\nfunction f() { x(); y(); }\n"),
+            rows("import y from 'y';\nfunction f() { x(); y(); }\n"),
+        );
+    }
+
+    #[test]
+    fn loaded_unites_every_form() {
+        let facts = parse(
+            "import a from 'a'; export * from 'b'; export { q } from 'q'; import('c');\n\
+             import 'd'; require('e'); import('d');\n",
+        );
+        let loaded: Vec<&str> = crate::lang::loaded(&facts).into_iter().collect();
+        assert_eq!(loaded, ["a", "b", "c", "d", "e", "q"]);
+        // Stored facts keep them: the index reads loads back from `files.facts`.
+        let stored: Facts = serde_json::from_str(&serde_json::to_string(&facts).unwrap()).unwrap();
+        assert_eq!(crate::lang::loaded(&stored), crate::lang::loaded(&facts));
     }
 
     /// The `(scope, name, kind)` of each reference of `src` parsed as `path`, sorted.
