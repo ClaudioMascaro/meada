@@ -19,6 +19,11 @@ export class KafkaClient {
     await this.subscribe(config.getOptionalString('acme.orders.topics.approved'), async () => {});
   }
 
+  async listenShipped(config: Config) {
+    await this.connect('approvals');
+    await this.subscribe(config.getString('acme.approvals.topics.shipped'), async () => {});
+  }
+
   async subscribe(topic: string | undefined, handler: (value: string) => Promise<void>) {
     if (!this.#consumer) {
       return;

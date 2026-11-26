@@ -11,6 +11,10 @@ use serde_json::Value;
 use crate::common::fixture_repo;
 
 const APPROVED: &str = "channel::kafka::orders.approved";
+/// What approvals' `listenShipped` consumes beside it.
+const SHIPPED: &str = "channel::kafka::orders.shipped";
+/// Approvals' consumers: the `run` handler of its client.
+const APPROVALS: &str = "::plugins/approvals/src/KafkaClient.ts::";
 
 /// The `kafkajs-plugins` fixture, copied for `case`.
 fn fixture(case: &str) -> PathBuf {
@@ -53,10 +57,7 @@ fn levels(export: &Value, contract: &str) -> Vec<String> {
 fn a_kafkajs_client_in_a_class_field_makes_sides() {
     let export = export("kafkajs_sides", |_| {});
     assert_eq!(sides(&export, "providers", "::plugins/orders/"), [APPROVED]);
-    assert_eq!(
-        sides(&export, "consumers", "::plugins/approvals/"),
-        [APPROVED]
-    );
+    assert_eq!(sides(&export, "consumers", APPROVALS), [APPROVED, SHIPPED]);
 }
 
 /// Orders' consumer is set in `connect`, not in the constructor; no call gives its `subscribe` a
@@ -75,12 +76,8 @@ fn a_consumer_field_set_in_a_method_is_a_client() {
 #[test]
 fn a_hash_private_field_is_a_client() {
     let export = export("kafkajs_hash_field", |_| {});
-    let consumers = sides(
-        &export,
-        "consumers",
-        "::plugins/approvals/src/KafkaClient.ts::",
-    );
-    assert_eq!(consumers, [APPROVED]);
+    let consumers = sides(&export, "consumers", APPROVALS);
+    assert_eq!(consumers, [APPROVED, SHIPPED]);
 }
 
 #[test]
@@ -101,8 +98,8 @@ fn two_app_config_values_give_one_inferred_side_each() {
         [APPROVED, v2]
     );
     assert_eq!(
-        sides(&export, "consumers", "::plugins/approvals/"),
-        [APPROVED, v2]
+        sides(&export, "consumers", APPROVALS),
+        [APPROVED, SHIPPED, v2]
     );
     assert_eq!(levels(&export, APPROVED), ["inferred"]);
     assert_eq!(levels(&export, v2), ["inferred"]);

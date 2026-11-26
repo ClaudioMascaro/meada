@@ -10,6 +10,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use meada::engine::{Changes, Engine};
+use serde_json::Value;
+
 /// Copies `tests/fixtures/<fixture>` to `<CARGO_TARGET_TMPDIR>/<case>/<fixture>` and makes the
 /// copy a repository of its own: `git init`, `origin` set to `origin` when given, and one
 /// commit of every file. Fixtures live inside Meada's repository, so they are never used in
@@ -468,4 +471,44 @@ pub fn set_mtime(path: &Path, time: std::time::SystemTime) {
         .unwrap()
         .set_modified(time)
         .unwrap();
+}
+
+// `meada trace --affected` helpers (front 3), shared by `affected` and `kafka_lock`.
+
+/// The affected answer of `changes` in `repo`, as JSON.
+pub fn affected(repo: &Path, changes: Changes) -> Value {
+    let answer = Engine::open(repo).unwrap().affected(changes).unwrap();
+    serde_json::to_value(answer).unwrap()
+}
+
+/// The answer of whole files `paths`.
+pub fn of_files(repo: &Path, paths: &[&str]) -> Value {
+    let files: Vec<String> = paths.iter().map(|p| p.to_string()).collect();
+    affected(repo, Changes::Files(&files))
+}
+
+/// The `files` entry of `path` in the repository `repo`.
+pub fn in_repo<'a>(answer: &'a Value, repo: &str, path: &str) -> Option<&'a Value> {
+    (answer["files"].as_array().into_iter().flatten())
+        .find(|f| f["repo"] == repo && f["path"] == path)
+}
+
+/// The answer of a commit that replaces `old` with `new` in `path`, as a range.
+pub fn edited(repo: &Path, path: &str, old: &str, new: &str) -> Value {
+    let file = repo.join(path);
+    let text = fs::read_to_string(&file).unwrap();
+    assert!(text.contains(old), "{path}: {old}");
+    fs::write(&file, text.replace(old, new)).unwrap();
+    commit_all(repo, "edit");
+    let range = Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    affected(repo, range)
+}
+
+/// Commits every change of `repo` as `message`.
+pub fn commit_all(repo: &Path, message: &str) {
+    git(repo, &["add", "-A"]);
+    git(repo, &["commit", "-q", "-m", message]);
 }

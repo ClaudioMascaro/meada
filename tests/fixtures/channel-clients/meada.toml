@@ -12,3 +12,6 @@ call = "example.com/acme/flow.NewProducer"
 role = "producer"
 broker = "kafka"
 topic = "0.TopicName"
+
+[[peer]]
+repo = "example.com/acme/peer-worker"

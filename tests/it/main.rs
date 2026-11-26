@@ -63,6 +63,7 @@ mod indexed_commit;
 mod items;
 mod jvmpkg;
 mod kafka_env;
+mod kafka_lock;
 mod kafkajs_classes;
 mod kotlinpkg;
 mod kubernetes;
