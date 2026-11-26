@@ -671,7 +671,27 @@ sample.ts
     "serve.item",
     "serve.error"
   ],
-  "receivers": [],
+  "receivers": [
+    {
+      "scope": "",
+      "name": "sdk",
+      "class": {
+        "Named": "SNSClient"
+      }
+    }
+  ],
+  "ts_locals": {
+    "sdk": [
+      {
+        "block": {
+          "start": 0,
+          "end": 1233
+        },
+        "declared": 1142,
+        "receiver": 0
+      }
+    ]
+  },
   "member_writes": [],
   "loops": [
     {
@@ -3348,6 +3368,9 @@ sample.tsx
         "end": 222
       },
       "params": [],
+      "bases": [
+        "Base"
+      ],
       "hash": "a2feefd823768a4791f10402389d9d823cf94d26fa280ce9ebab6fa6e1ae8479"
     },
     {
@@ -3519,7 +3542,15 @@ sample.tsx
   "locals": [
     "load.Widget"
   ],
-  "receivers": [],
+  "receivers": [
+    {
+      "scope": "Page",
+      "name": "t",
+      "class": {
+        "Type": "Theme"
+      }
+    }
+  ],
   "member_writes": []
 }
 

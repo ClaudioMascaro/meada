@@ -13,6 +13,7 @@ use super::{
 };
 use crate::{Result, package, qualify};
 
+mod receivers;
 mod references;
 mod types;
 mod uses;
@@ -115,6 +116,7 @@ impl LanguagePack for TsJs {
         // stack.
         let mut stack = vec![Visit {
             node: root,
+            block: root,
             scope: String::new(),
             depth: 0,
             body: root,
@@ -122,12 +124,18 @@ impl LanguagePack for TsJs {
         }];
         while let Some(Visit {
             node,
+            block,
             scope,
             depth,
             body,
             binding,
         }) = stack.pop()
         {
+            let block = match node.kind() {
+                "statement_block" | "switch_body" | "for_statement" | "for_in_statement"
+                | "catch_clause" | "class_static_block" => node,
+                _ => block,
+            };
             let mut inner = scope.clone();
             let mut defined = definition(node, binding, src, &parents);
             if depth >= DEFINITION_DEPTH
@@ -167,6 +175,7 @@ impl LanguagePack for TsJs {
                         .unwrap_or_default(),
                     ..Def::new(inner.clone(), kind, range)
                 });
+                receivers::definition(node, src, &inner, &parents, &mut facts);
             }
             references.visit(node, &scope, src, &parents);
             match node.kind() {
@@ -201,7 +210,7 @@ impl LanguagePack for TsJs {
                             kwargs: Vec::new(),
                             decorates: None,
                             by_path: false,
-                            root: None,
+                            root: receivers::wrapped(function, src),
                             on: None,
                             unwraps: false,
                             awaits: false,
@@ -386,7 +395,29 @@ impl LanguagePack for TsJs {
             };
             for name in pattern.map(|p| bound(p, src)).unwrap_or_default() {
                 if !(BODIES.contains(&node.kind()) && kept(&name)) {
-                    facts.locals.push(qualify(&inner, &name));
+                    let qualified = qualify(&inner, &name);
+                    if matches!(
+                        node.kind(),
+                        "variable_declarator" | "catch_clause" | "for_in_statement"
+                    ) {
+                        let start = pattern.map_or(node.start_byte(), |p| p.end_byte());
+                        let binding_block = if parents
+                            .of(node)
+                            .is_some_and(|p| p.kind() == "variable_declaration")
+                        {
+                            body
+                        } else {
+                            block
+                        };
+                        receivers::record(
+                            &mut facts.ts_locals,
+                            qualified.clone(),
+                            binding_block,
+                            start,
+                            None,
+                        );
+                    }
+                    facts.locals.push(qualified);
                 }
             }
             if node.kind() == "variable_declarator"
@@ -400,6 +431,15 @@ impl LanguagePack for TsJs {
                     src,
                     &scope,
                     &parents,
+                );
+                let receiver =
+                    receivers::local(node, *value_node, name, src, &scope, &parents, &mut facts);
+                receivers::record(
+                    &mut facts.ts_locals,
+                    qualify(&scope, name),
+                    block,
+                    node.end_byte(),
+                    receiver,
                 );
                 // A `new URL` whose path or host the file writes through its name is no longer
                 // the string it was built from.
@@ -420,6 +460,7 @@ impl LanguagePack for TsJs {
                         .filter(|(value, _, _)| value.id() == child.id())
                         .map(|(_, name, range)| (name.clone(), range.clone())),
                     node: child,
+                    block,
                     scope: inner.clone(),
                     depth: depth + usize::from(is_def),
                     body: if BODIES.contains(&node.kind()) {
@@ -515,6 +556,10 @@ impl LanguagePack for TsJs {
                 "do_statement",
             ],
         );
+        let typed: HashSet<_> = facts.receivers.iter().map(|r| r.name.as_str()).collect();
+        facts
+            .ts_locals
+            .retain(|name, _| typed.contains(name.rsplit('.').next().unwrap_or(name)));
         Ok(facts)
     }
 
@@ -796,6 +841,7 @@ fn join(dir: &str, path: &str) -> Option<String> {
 
 struct Visit<'t> {
     node: Node<'t>,
+    block: Node<'t>,
     scope: String,
     /// How many definitions enclose `node`.
     depth: usize,

@@ -18,6 +18,7 @@ use crate::lang::{
 };
 
 mod mutations;
+mod ts;
 pub(crate) use mutations::MemberEffect;
 pub(crate) type CallWrites = for<'a> fn(&Code<'a>, &'a str, usize) -> Option<Vec<MemberEffect<'a>>>;
 
@@ -394,6 +395,11 @@ impl<'a> Binders<'a> {
 
 /// The files of one language pack, resolved together.
 pub struct Resolver<'a> {
+    ts: bool,
+    ts_site: Cell<Option<(usize, usize)>>,
+    ts_locals: HashMap<&'a str, ts::FileLocals<'a>>,
+    ts_heirs: HashMap<String, Vec<Target<'a>>>,
+    ts_overrides: RefCell<HashMap<String, HashMap<String, bool>>>,
     files: &'a BTreeMap<&'a str, &'a Facts>,
     defs: HashMap<&'a str, HashMap<&'a str, &'a Def>>,
     overloads: HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
@@ -1009,8 +1015,18 @@ impl<'a> Resolver<'a> {
         let receivers = files
             .iter()
             .map(|(path, facts)| {
-                let names = (facts.receivers.iter())
-                    .map(|l| ((l.scope.as_str(), l.name.as_str()), &l.class))
+                let scoped: HashSet<_> = facts
+                    .ts_locals
+                    .values()
+                    .flatten()
+                    .filter_map(|b| b.receiver)
+                    .collect();
+                let names = facts
+                    .receivers
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| !scoped.contains(index))
+                    .map(|(_, l)| ((l.scope.as_str(), l.name.as_str()), &l.class))
                     .collect();
                 (*path, names)
             })
@@ -1105,6 +1121,11 @@ impl<'a> Resolver<'a> {
             })
             .collect();
         let mut resolver = Self {
+            ts: language.extensions().contains(&"ts"),
+            ts_heirs: HashMap::new(),
+            ts_site: Cell::new(None),
+            ts_locals: ts::locals(files),
+            ts_overrides: RefCell::default(),
             files,
             declared,
             defs,
@@ -1178,6 +1199,9 @@ impl<'a> Resolver<'a> {
             parts,
             actuals,
         };
+        if resolver.ts {
+            resolver.ts_heirs = resolver.index_ts_heirs();
+        }
         let mut work = Work::default();
         for (path, facts) in files {
             for def in facts.defs.iter().filter(|d| d.kind == Kind::Class) {
@@ -1508,6 +1532,11 @@ impl<'a> Resolver<'a> {
         matching: bool,
         work: &mut Work<'a>,
     ) -> Resolution<'a> {
+        if self.ts {
+            return self.at_ts_site(path, call.range.start, || {
+                self.resolved_as(path, call, call.constructs, matching, work)
+            });
+        }
         let found = self.resolved_as(path, call, call.constructs, matching, work);
         if !(self.guesses_constructs && call.constructs) || matches!(found, Resolution::Exact(_)) {
             return found;
@@ -1543,6 +1572,23 @@ impl<'a> Resolver<'a> {
         let mut on = None;
         let labels = call.labels.as_deref();
         let binding = match (call.on, constructs, call.by_path) {
+            (None, false, false)
+                if self.ts
+                    && let Some(root) = call.root.as_deref() =>
+            {
+                let receiver = self.read_member(path, scope, root);
+                let members = own_name(callee);
+                if root == "this"
+                    && let Binding::Def(class) = receiver
+                    && !self.ts_override(class, members)
+                {
+                    self.member(class, members, false, labels, work)
+                } else if self.holder(&receiver).is_some() {
+                    self.walk(receiver, members, seen, work, Reading::Value, labels)
+                } else {
+                    Binding::Unknown
+                }
+            }
             (Some(inner), false, _) => {
                 let members = callee.split_once('.').map_or("", |(_, m)| m);
                 match self.on_result(path, call, inner, work) {
@@ -2251,6 +2297,10 @@ impl<'a> Resolver<'a> {
     /// last method, to something outside it, as a direct `client.send()` does. Such a call
     /// resolves to nothing, never to a repository method of the same name.
     fn owned_outside(&self, path: &'a str, call: &'a Call) -> bool {
+        // A TS root unwraps the receiver for class lookup. Its by-name fallback stays open.
+        if self.ts {
+            return false;
+        }
         let Some((head, last)) = call.callee.rsplit_once('.') else {
             return false;
         };
@@ -2493,6 +2543,8 @@ impl<'a> Resolver<'a> {
             // are separate namespaces (`Reading::Read`).
             let read = self.members_in_scope && (!last || reading.read());
             let labels = labels.filter(|_| last);
+            let direct_instance = n == 0 && matches!(binding, Binding::Instance(_));
+            let typed_ts = self.ts && self.holder(&binding).is_some();
             let instance = self.instance(binding, work);
             // A Go field of an anonymous struct type has no class to be an instance of: the
             // rest of the chain may be the path to a tagged field of the file defining the
@@ -2503,6 +2555,22 @@ impl<'a> Resolver<'a> {
                 return found;
             }
             binding = match instance {
+                Binding::External(..) if typed_ts => Binding::Unknown,
+                Binding::Instance(class) if self.ts => {
+                    let found = self.member(class, member, read, labels, work);
+                    match found {
+                        Binding::Def(t)
+                            if self.defs[t.path][t.name].kind == Kind::Method
+                                && !(direct_instance
+                                    && t.path == class.path
+                                    && crate::parent(t.name) == class.name)
+                                && self.ts_override(class, member) =>
+                        {
+                            Binding::Unknown
+                        }
+                        _ => found,
+                    }
+                }
                 // A class's name (`Type.m()`, `Type.X`) reaches a Kotlin companion's members
                 // before the class's, which only an instance reaches; past the companion, a
                 // nested class or a constant of the class (an enum entry).
@@ -2652,7 +2720,7 @@ impl<'a> Resolver<'a> {
         let Some((path, scope, name)) = self.holder(&binding) else {
             return binding;
         };
-        let Some(class) = self.receivers[path].get(&(scope, name)) else {
+        let Some(class) = self.receiver_class(path, scope, name) else {
             return Binding::Unknown;
         };
         if let Class::Imported = class {
@@ -2792,6 +2860,9 @@ impl<'a> Resolver<'a> {
             if self.receivers[c.path].contains_key(&(c.name, member)) {
                 return Binding::Local(c.path, c.name, member);
             }
+            if self.ts && self.ts_field(c, member) {
+                return Binding::Unknown;
+            }
         }
         match self.companion(class, work) {
             Some(companion) => self.member(companion, member, read, labels, work),
@@ -2901,7 +2972,7 @@ impl<'a> Resolver<'a> {
         &self,
         path: &'a str,
         scope: &str,
-        member: &str,
+        member: &'a str,
         work: &mut Work<'a>,
         labels: Option<&[String]>,
     ) -> Binding<'a> {
@@ -2909,6 +2980,12 @@ impl<'a> Resolver<'a> {
             return Binding::Unknown;
         };
         let family = self.family(class, work).unwrap_or_default();
+        if self.ts {
+            return match family.get(1) {
+                Some(Ancestor::Class(base)) => self.member(*base, member, false, labels, work),
+                _ => Binding::Unknown,
+            };
+        }
         (family.get(1..))
             .and_then(|bases| self.overloaded(bases, member, labels))
             .unwrap_or(Binding::Unknown)
@@ -3592,7 +3669,24 @@ impl<'a> Resolver<'a> {
             // A `let`, a `catch` binding, a destructured name: what it holds is not known, and
             // it hides every name it spells, outer ones and those of its own definition (a
             // definition, constant or parameter it may shadow in a block alike).
-            if self.locals[path].contains(candidate.as_str()) {
+            let local = self.ts_local(path, s, name);
+            if let Some(Some(local)) = local {
+                if self
+                    .ts_site
+                    .get()
+                    .is_some_and(|(_, at)| at < local.declared)
+                {
+                    return Binding::Hidden;
+                }
+                if local.receiver.is_some() {
+                    return Binding::Local(path, s, name);
+                }
+                if let Some(constant) = self.consts[path].get(candidate.as_str()) {
+                    return Binding::Const(path, constant);
+                }
+                return Binding::Hidden;
+            }
+            if local.is_none() && self.locals[path].contains(candidate.as_str()) {
                 return Binding::Hidden;
             }
             if let Some((name, def)) = defs.get_key_value(candidate.as_str())
@@ -3618,7 +3712,9 @@ impl<'a> Resolver<'a> {
             {
                 return found;
             }
-            if let Some(constant) = self.consts[path].get(candidate.as_str()) {
+            if local.is_none()
+                && let Some(constant) = self.consts[path].get(candidate.as_str())
+            {
                 return Binding::Const(path, constant);
             }
             if let Some(&(n, field)) = self.params[path].get(&(s, name)) {
@@ -6137,7 +6233,7 @@ impl<'a> Code<'a> {
         let r = self.resolver;
         let binding = r.read_member(path, scope, name);
         let (at, within, held) = r.holder(&binding)?;
-        match r.receivers[at].get(&(within, held))? {
+        match r.receiver_class(at, within, held)? {
             Class::Type(written) => {
                 let outside = self.outside_written(at, within, written);
                 // A type of the repository is an answer with no spelling.
@@ -6770,7 +6866,7 @@ impl<'a> Code<'a> {
     ) -> Option<(&'a str, &'a str, &'a str)> {
         let r = self.resolver;
         let (at, within, held) = r.holder(&r.read_member(path, scope, name))?;
-        match r.receivers[at].get(&(within, held))? {
+        match r.receiver_class(at, within, held)? {
             Class::Type(written) => Some((at, within, written)),
             _ => None,
         }

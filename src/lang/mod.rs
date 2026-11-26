@@ -516,6 +516,12 @@ pub struct Facts {
     /// Names bound in a scope whose class the syntax may tell, one per scope and name: what a
     /// method call on the name reaches. Each also hides an outer binding of its name.
     pub receivers: Vec<Receiver>,
+    /// Lexical visibility of TS bindings of names with a receiver, indexed by qualified name.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub ts_locals: BTreeMap<String, Vec<TsLocal>>,
+    /// TypeScript class members which affect dispatch without defining a method.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub ts_classes: BTreeMap<String, TsClass>,
     /// The program entry points of the file (spec #31), set by `parse`, which sees the path and
     /// the source: the qualified names (`Def::name`) of the definitions that start a program,
     /// such as `func main` in package `main`, `fn main` in `src/main.rs`. Where the entry point
@@ -954,6 +960,23 @@ pub struct Receiver {
     pub scope: String,
     pub name: String,
     pub class: Class,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TsLocal {
+    pub block: Range<usize>,
+    pub declared: usize,
+    /// Index into receivers, absent for a binding with no known class.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receiver: Option<usize>,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+pub struct TsClass {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub implements: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fields: Vec<String>,
 }
 
 /// What the syntax says a name holds. It is read as written: the shared side decides whether
@@ -1498,7 +1521,7 @@ pub struct Call {
     /// The name a method call on a call chain starts at (`client` in `client.get(u).send()`,
     /// whose callee is `(call_expression).send`), when it is a plain name or a member chain of
     /// them. An outside type owns the whole chain, so the resolver reads the call as one on
-    /// that name.
+    /// that name. TS also records a named receiver inside parentheses or await for class lookup.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root: Option<String>,
     /// The value a method is called on (`Router::new()` in `Router::new().route(..)`), when
