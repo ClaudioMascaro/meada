@@ -4,6 +4,8 @@
 //!   `types`, `module`, `main`) of a `package.json`.
 //! - `names_package`, `entries`: a bare specifier splits into its package (scoped or not) and
 //!   the subpath, and names the entry of the importing file's nearest `package.json`.
+//! - `imports`: the default's, plus the `default` a Backstage backend adds by
+//!   `backend.add(import('<package>'))` (`added_plugin`).
 //! - `flag`: npm semver, by the `nodejs-semver` crate behind a comparator grammar check.
 //! - `reaches`: a `workspace:` range keeps a dependency inside its own repository.
 //! - `shapes`: shapes cross npm packages alone.
@@ -15,9 +17,13 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::{Ecosystem, Entry, Flag, MAX_BYTES, Providers, Summary, nearest, valid_name};
+use super::{
+    Ecosystem, Entry, Flag, MAX_BYTES, Providers, Summary, head_imports, nearest, valid_name,
+};
 use crate::index::Export;
 use crate::lang::ts::EXTENSIONS;
+use crate::lang::{Call, Part, Value as Fact};
+use crate::resolve::{Code, Follow, Form, Of};
 
 /// The dependency fields of a manifest that `read` collects.
 const FIELDS: [&str; 4] = [
@@ -107,6 +113,18 @@ impl Ecosystem for Npm {
         split(specifier).is_some()
     }
 
+    fn imports<'a>(
+        &self,
+        code: &Code<'a>,
+        path: &'a str,
+        index: usize,
+        call: &'a Call,
+    ) -> Vec<(String, String)> {
+        let mut found = head_imports(code, path, call);
+        found.extend(added_plugin(code, path, index, call).map(|s| (s, "default".to_string())));
+        found
+    }
+
     /// The entry of the split name in the importing file's nearest `package.json`.
     fn entries<'e>(
         &self,
@@ -157,6 +175,55 @@ impl Ecosystem for Npm {
     /// Shapes cross npm packages alone.
     fn shapes(&self) -> bool {
         true
+    }
+}
+
+/// The bare specifier a Backstage backend adds by `<b>.add(import('<specifier>'))`, whose
+/// `default` export `add` takes as the feature. `<b>` must be one name that holds exactly the call
+/// of `@backstage/backend-defaults`' `createBackend` (a `const`, no method called on the result).
+///
+/// `Follow::Constants`, not `Values`: a parameter fed `createBackend()` by every caller, or a
+/// local wrapper's return, would also link, and each may be handed another receiver. It spends
+/// no `EVAL_BUDGET` and goes at most `EVAL_DEPTH` constants deep per call.
+///
+/// The arguments come through `Code::args` because the facts `extract` walks hold no values. Its
+/// `None` is a miss, not an answer: the call's file may not be read in full yet (when the receiver's
+/// `const` is in another file, `origins` reads that one first), and the index parses it again
+/// (`src/index.rs`, the reparse loop). The two filters on the callee read nothing and only spare
+/// `origins` the calls that cannot match (`a.b.add`, `(call_expression).add`); the channel kind
+/// already pays the same `origins` read for every `.add` call (`channel/ts.rs`).
+fn added_plugin<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    index: usize,
+    call: &'a Call,
+) -> Option<String> {
+    let receiver = call.callee.strip_suffix(".add")?;
+    if receiver.is_empty() || receiver.contains('.') || receiver.starts_with('(') {
+        return None;
+    }
+    let origins = code.origins(path, &call.scope, Of::Name(receiver), Follow::Constants);
+    let [origin] = origins.as_slice() else {
+        return None;
+    };
+    let made = (origin.outside.as_ref())
+        .and_then(|o| o.imported.as_ref())
+        .map(|(package, name)| (*package, name.as_str()));
+    let made_here = origin.form == Form::Call
+        && made == Some(("@backstage/backend-defaults", "createBackend"))
+        && origin.routes.iter().all(|r| r.steps.is_empty());
+    if !made_here {
+        return None;
+    }
+    let [Fact::Call(import)] = code.args(path, index)? else {
+        return None;
+    };
+    let [Fact::Str(parts)] = import.args.as_slice() else {
+        return None;
+    };
+    match (import.callee.as_str(), parts.as_slice()) {
+        ("(import)", [Part::Text(specifier)]) => Some(specifier.clone()),
+        _ => None,
     }
 }
 
