@@ -1491,6 +1491,30 @@ pub enum Msg<'a> {
     AnswerUnknown(&'a str),
     DecideMinP,
     DecideMinPHelp,
+    Trace,
+    TraceFrom,
+    TraceChanges,
+    TraceUp,
+    TraceBudget,
+    /// `meada trace --changes` given what it does not take.
+    TraceChangesValue(&'a str),
+    TraceFiles,
+    TraceAffected,
+    TraceBatch,
+    /// A `meada trace --changes <base>..<head>` whose head is not the checked-out commit.
+    RangeNotCheckedOut {
+        head: &'a str,
+    },
+    /// A range traced over a working tree that differs from `HEAD`.
+    TreeNotClean,
+    /// A `meada trace --files` path that is absolute or leaves the repository.
+    PathOutside {
+        path: &'a str,
+    },
+    /// A `meada trace --files` path that names a directory.
+    PathIsDirectory {
+        path: &'a str,
+    },
     DecideFailures(usize),
     DeciderInvalid(&'a str),
     DeciderProtocol,
@@ -5530,6 +5554,129 @@ impl Msg<'_> {
                 format!("With --decider: write a model decision only from this probability up (default {}).", crate::decider::MIN_P),
                 format!("Com --decider: grava a decisão do modelo só a partir desta probabilidade (padrão {}).", crate::decider::MIN_P),
                 format!("Con --decider: escribe la decisión del modelo solo a partir de esta probabilidad (por defecto {}).", crate::decider::MIN_P),
+            ),
+            Msg::Trace => pick(
+                "Follow a chain through calls and cross-repository links, down or up, until it \
+                 ends, as the MCP trace tool answers."
+                    .into(),
+                "Segue uma cadeia por chamadas e links entre repositórios, para baixo ou para \
+                 cima, até o fim, como responde a ferramenta trace do MCP."
+                    .into(),
+                "Sigue una cadena por llamadas y links entre repositorios, hacia abajo o hacia \
+                 arriba, hasta que termina, como responde la herramienta trace del MCP."
+                    .into(),
+            ),
+            Msg::TraceFrom => pick(
+                "Where the chain starts: a symbol, a route or a call site, by identity or by \
+                 name, or process::<entry point>."
+                    .into(),
+                "Onde a cadeia começa: um símbolo, uma rota ou um ponto de chamada, por \
+                 identidade ou por nome, ou process::<ponto de entrada>."
+                    .into(),
+                "Dónde empieza la cadena: un símbolo, una ruta o un punto de llamada, por \
+                 identidad o por nombre, o process::<punto de entrada>."
+                    .into(),
+            ),
+            Msg::TraceChanges => pick(
+                "Start from the symbols a change touches: uncommitted (the working tree against \
+                 HEAD), or <base>..<head> with <head> checked out and a clean tree."
+                    .into(),
+                "Começa pelos símbolos que uma mudança toca: uncommitted (a árvore de trabalho \
+                 contra o HEAD), ou <base>..<head> com <head> em uso e a árvore limpa."
+                    .into(),
+                "Empieza por los símbolos que toca un cambio: uncommitted (el árbol de trabajo \
+                 frente a HEAD), o <base>..<head> con <head> actual y el árbol limpio."
+                    .into(),
+            ),
+            Msg::TraceFiles => pick(
+                "Start from whole files: each path, relative to the repository root, changed as \
+                 a whole (a path not on disk is deleted)."
+                    .into(),
+                "Começa por arquivos inteiros: cada caminho, relativo à raiz do repositório, \
+                 mudou por inteiro (um caminho ausente do disco foi apagado)."
+                    .into(),
+                "Empieza por archivos enteros: cada ruta, relativa a la raíz del repositorio, \
+                 cambió entera (una ruta que no está en disco se borró)."
+                    .into(),
+            ),
+            Msg::TraceAffected => pick(
+                "With --changes or --files: print, as JSON, everything the change may affect, \
+                 file by file, each with the weakest link of its strongest chain, and what stays \
+                 open."
+                    .into(),
+                "Com --changes ou --files: imprime, em JSON, tudo o que a mudança pode afetar, \
+                 arquivo por arquivo, cada um com o elo mais fraco da sua cadeia mais forte, e o \
+                 que fica em aberto."
+                    .into(),
+                "Con --changes o --files: imprime, en JSON, todo lo que el cambio puede afectar, \
+                 archivo por archivo, cada uno con el eslabón más débil de su cadena más fuerte, y \
+                 lo que queda abierto."
+                    .into(),
+            ),
+            Msg::TraceBatch => pick(
+                "With --affected: answer many changes in one run. The file holds blocks, a line \
+                 `@@<label>` then one repository-relative path per line, each path a whole file; \
+                 prints one JSON line per block, with its label."
+                    .into(),
+                "Com --affected: responde a muitas mudanças numa execução. O arquivo traz blocos, \
+                 uma linha `@@<rótulo>` e depois um caminho relativo ao repositório por linha, \
+                 cada caminho um arquivo inteiro; imprime uma linha JSON por bloco, com o rótulo."
+                    .into(),
+                "Con --affected: responde a muchos cambios en una ejecución. El archivo trae \
+                 bloques, una línea `@@<etiqueta>` y luego una ruta relativa al repositorio por \
+                 línea, cada ruta un archivo entero; imprime una línea JSON por bloque, con su \
+                 etiqueta."
+                    .into(),
+            ),
+            Msg::RangeNotCheckedOut { head } => pick(
+                format!(
+                    "the range ends at `{head}`, which is not the checked-out commit: check it \
+                     out first, since the index answers about the working tree"
+                ),
+                format!(
+                    "o intervalo termina em `{head}`, que não é o commit em uso: faça checkout \
+                     dele antes, pois o índice responde sobre a árvore de trabalho"
+                ),
+                format!(
+                    "el rango termina en `{head}`, que no es el commit actual: haz checkout de él \
+                     antes, pues el índice responde sobre el árbol de trabajo"
+                ),
+            ),
+            Msg::TreeNotClean => pick(
+                "the working tree differs from HEAD: commit or stash the changes before tracing \
+                 a range"
+                    .into(),
+                "a árvore de trabalho difere do HEAD: faça commit ou stash das mudanças antes de \
+                 seguir um intervalo"
+                    .into(),
+                "el árbol de trabajo difiere de HEAD: haz commit o stash de los cambios antes de \
+                 seguir un rango"
+                    .into(),
+            ),
+            Msg::PathOutside { path } => pick(
+                format!("`{path}` is not a path inside the repository"),
+                format!("`{path}` não é um caminho dentro do repositório"),
+                format!("`{path}` no es una ruta dentro del repositorio"),
+            ),
+            Msg::PathIsDirectory { path } => pick(
+                format!("`{path}` is a directory: name its files"),
+                format!("`{path}` é um diretório: nomeie os arquivos dele"),
+                format!("`{path}` es un directorio: nombra sus archivos"),
+            ),
+            Msg::TraceUp => pick(
+                "Walk up, to what calls or reaches the start, instead of down.".into(),
+                "Sobe, até o que chama ou alcança o início, em vez de descer.".into(),
+                "Sube, hasta lo que llama o alcanza el inicio, en vez de bajar.".into(),
+            ),
+            Msg::TraceBudget => pick(
+                format!("Token budget of the answer (default {}).", meada_core::render::DEFAULT_BUDGET),
+                format!("Orçamento de tokens da resposta (padrão {}).", meada_core::render::DEFAULT_BUDGET),
+                format!("Presupuesto de tokens de la respuesta (por defecto {}).", meada_core::render::DEFAULT_BUDGET),
+            ),
+            Msg::TraceChangesValue(value) => pick(
+                format!("`--changes` takes `uncommitted` or `<base>..<head>`, not `{value}`"),
+                format!("`--changes` aceita `uncommitted` ou `<base>..<head>`, não `{value}`"),
+                format!("`--changes` acepta `uncommitted` o `<base>..<head>`, no `{value}`"),
             ),
             Msg::DecideFailures(n) => pick(
                 format!("{n} item(s) failed, see above; the other decisions were handled"),

@@ -191,7 +191,7 @@ fn fragments(parts: &[Part]) -> Vec<String> {
 /// and a JVM `src/test` tree.
 // ponytail: only the conventions the ticket names (#620), not `*Test.java` or `*Tests.cs`; add
 // one when a repository needs it, or let it set `test_routes`.
-fn is_test_file(path: &str) -> bool {
+pub(crate) fn is_test_file(path: &str) -> bool {
     let parts: Vec<&str> = path.split('/').collect();
     let Some((name, dirs)) = parts.split_last() else {
         return false;

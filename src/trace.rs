@@ -17,6 +17,8 @@ use crate::partial::Partial;
 use crate::repo::Change;
 use crate::workspace::{Missing, Workspace};
 
+pub(crate) mod affected;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
     /// From callers to callees, from consumers to the providers they reach, and from writers
@@ -34,6 +36,9 @@ pub enum Start<'a> {
     /// The symbols of the repository where Meada runs whose spans overlap the working-tree
     /// diff against `HEAD`, untracked files included.
     Uncommitted,
+    /// The symbols of the repository where Meada runs that given changes touch (a range, a
+    /// file list).
+    Changes,
 }
 
 /// A call site, with the position of its repository in the workspace.
@@ -204,10 +209,13 @@ impl<'a> Graph<'a> {
             limit: WALK_DEPTH,
         };
         match start {
-            Start::Uncommitted => {
+            Start::Uncommitted | Start::Changes => {
                 let roots = self.changed(changes.unwrap_or_default(), &mut walk.files[0]);
-                if roots.is_empty() {
+                if roots.is_empty() && matches!(start, Start::Uncommitted) {
                     return "no symbol overlaps the uncommitted changes\n".into();
+                }
+                if roots.is_empty() {
+                    return "no symbol overlaps the changes\n".into();
                 }
                 for id in roots {
                     walk.root(id);
@@ -497,6 +505,7 @@ impl<'a> Graph<'a> {
             };
             let hit = match change {
                 Change::Untracked => true,
+                Change::Deleted => false,
                 Change::Lines(ranges) => {
                     let first = files.line(&s.span.path, s.span.start);
                     let last = files.line(&s.span.path, (s.span.end - 1).max(s.span.start));
@@ -638,12 +647,23 @@ pub(crate) fn starts(
     direction: Direction,
 ) -> Result<Vec<String>> {
     let from = match start {
-        Start::Uncommitted => {
+        Start::Uncommitted | Start::Changes => {
             let changed = changes.unwrap_or_default().iter();
             let paths: Vec<&str> = changed.map(|(p, _)| p.as_str()).collect();
             let found = crate::index::symbols_in(partial.db(0), &paths)?;
-            let ids = found.iter().map(|s| s.id.clone()).collect();
+            let mut ids: Vec<String> = found.iter().map(|s| s.id.clone()).collect();
             partial.add_symbols(0, found);
+            if matches!(start, Start::Changes) {
+                // A file is the caller of its top-level calls, which an `import` line rebinds:
+                // the file ids of what still exists, with the calls they make.
+                let identity = &partial.exports[0].repository;
+                let files: Vec<String> = (changes.unwrap_or_default().iter())
+                    .filter(|(_, c)| !matches!(c, Change::Deleted))
+                    .map(|(p, _)| format!("{identity}::{p}"))
+                    .collect();
+                partial.callees(Some(0), &files)?;
+                ids.extend(files);
+            }
             return Ok(ids);
         }
         Start::From(from) => from,
@@ -723,6 +743,30 @@ pub(crate) fn read(
     direction: Direction,
     candidates: bool,
 ) -> Result<HashSet<String>> {
+    reading(partial, links, starts, direction, candidates, false)
+}
+
+/// Reads into `partial` what the affected walk (`affected::fan`) may follow from `starts`:
+/// `read` up with candidates, plus, from each node, the consumers of the data links the calls
+/// it makes provide (a write goes on to its readers) and the definitions a call that reaches it
+/// decorates. Executions and IaC nodes are contract rows the partial already holds.
+pub(crate) fn read_affected(
+    partial: &mut Partial,
+    links: &[Link],
+    starts: Vec<String>,
+) -> Result<()> {
+    reading(partial, links, starts, Direction::Up, true, true).map(drop)
+}
+
+/// `read`, and with `affected` the steps `read_affected` adds.
+fn reading(
+    partial: &mut Partial,
+    links: &[Link],
+    starts: Vec<String>,
+    direction: Direction,
+    candidates: bool,
+    affected: bool,
+) -> Result<HashSet<String>> {
     let receiving: HashSet<String> = partial
         .exports
         .iter()
@@ -783,11 +827,22 @@ pub(crate) fn read(
                             .filter(|link| contract::flows_to_consumer(Some(&link.contract)))
                             .map(|link| link.provider.clone()),
                     );
+                    if affected {
+                        let written = by_provider.get(call.id.as_str()).into_iter().flatten();
+                        next.extend(
+                            written
+                                .filter(|link| contract::flows_to_consumer(Some(&link.contract)))
+                                .map(|link| link.consumer.clone()),
+                        );
+                    }
                 }
                 let mut calls = sites;
                 calls.extend(partial.callers(None, &new, candidates)?);
                 // Going up, a file's row reaches the symbol holding it (`held`).
                 for (_, c) in calls {
+                    if affected {
+                        next.extend(c.decorates);
+                    }
                     next.extend(c.holder);
                     next.push(c.caller);
                 }

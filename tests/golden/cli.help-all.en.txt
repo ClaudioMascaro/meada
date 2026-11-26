@@ -9,6 +9,7 @@ Commands:
   export  Print the index as sorted JSON, with the links that touch it.
   mcp     Serve the repository in the current directory to agents over MCP (stdio).
   decide  Resolve the open items of this repository, ambiguous links and dynamic URLs, and record the picks in meada.decisions.toml.
+  trace   Follow a chain through calls and cross-repository links, down or up, until it ends, as the MCP trace tool answers.
   help    Print this message or the help of the given subcommand(s)
 
 Options:
@@ -67,4 +68,21 @@ Options:
       --show-request   With --decider: print every request the run would send, and send none.
       --min-p <MIN_P>  With --decider: write a model decision only from this probability up (default 0.5).
   -h, --help           Print help
+
+$ meada trace --help
+Follow a chain through calls and cross-repository links, down or up, until it ends, as the MCP trace tool answers.
+
+Usage: meada trace [OPTIONS] <FROM|--changes <CHANGES>|--files <FILES>...|--batch <BATCH>>
+
+Arguments:
+  [FROM]  Where the chain starts: a symbol, a route or a call site, by identity or by name, or process::<entry point>.
+
+Options:
+      --changes <CHANGES>  Start from the symbols a change touches: uncommitted (the working tree against HEAD), or <base>..<head> with <head> checked out and a clean tree.
+      --files <FILES>...   Start from whole files: each path, relative to the repository root, changed as a whole (a path not on disk is deleted).
+      --up                 Walk up, to what calls or reaches the start, instead of down.
+      --budget <BUDGET>    Token budget of the answer (default 2000).
+      --affected           With --changes or --files: print, as JSON, everything the change may affect, file by file, each with the weakest link of its strongest chain, and what stays open.
+      --batch <BATCH>      With --affected: answer many changes in one run. The file holds blocks, a line `@@<label>` then one repository-relative path per line, each path a whole file; prints one JSON line per block, with its label.
+  -h, --help               Print help
 

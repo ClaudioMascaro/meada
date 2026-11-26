@@ -5,6 +5,7 @@ use std::process::Command;
 use std::sync::Mutex;
 
 use crate::Result;
+use crate::msg::Msg;
 
 /// The top level of the git repository containing `dir`, or `dir` itself outside git.
 pub fn root(dir: &Path) -> Result<PathBuf> {
@@ -107,19 +108,96 @@ pub fn relative(dir: &str, rel: &str) -> Option<String> {
     Some(parts.join("/"))
 }
 
-/// What a path of the working tree changed against `HEAD`.
+/// Whether `rev` names the commit `HEAD` names in the checkout at `root`.
+fn resolves_to_head(root: &Path, rev: &str) -> bool {
+    let commit = git(
+        root,
+        &[
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            &format!("{rev}^{{commit}}"),
+        ],
+    );
+    commit.is_some_and(|commit| head(root).is_ok_and(|h| h == commit))
+}
+
+/// What a change did to a path.
+#[derive(Clone, Debug, PartialEq)]
 pub enum Change {
     /// Inclusive 1-based line ranges of the file as it is now; a deletion touches the line
     /// before it.
     Lines(Vec<(usize, usize)>),
-    /// An untracked file: all of it.
+    /// All of the file: an untracked file, a path given as a whole, or a change with no line
+    /// (a binary file, a mode change, a new empty file).
     Untracked,
+    /// A path the change removes.
+    Deleted,
+}
+
+/// Where a change list comes from.
+#[derive(Clone, Copy, Debug)]
+pub enum Changes<'a> {
+    /// The working tree against `HEAD`, untracked files included.
+    Uncommitted,
+    /// The commits from `base` to `head`, which must be the checked-out commit of a clean tree:
+    /// the index answers about the working tree.
+    Range { base: &'a str, head: &'a str },
+    /// Repository-relative paths, each changed as a whole; one not on disk is deleted.
+    Files(&'a [String]),
+}
+
+impl Changes<'_> {
+    /// The changed paths of the repository at `root`, each with what changed.
+    pub fn read(&self, root: &Path) -> Result<Vec<(String, Change)>> {
+        match *self {
+            Changes::Uncommitted => working_tree(root, true),
+            Changes::Range { base, head } => {
+                // `git diff` would take a revision starting with `-` as an option.
+                if let Some(rev) = [base, head].into_iter().find(|r| r.starts_with('-')) {
+                    return Err(Msg::TraceChangesValue(rev).text().into());
+                }
+                if !resolves_to_head(root, head) {
+                    return Err(Msg::RangeNotCheckedOut { head }.text().into());
+                }
+                if changed(root)? {
+                    return Err(Msg::TreeNotClean.text().into());
+                }
+                diff(root, &[base, head], true)
+            }
+            Changes::Files(paths) => paths
+                .iter()
+                .map(|path| {
+                    let Some(rel) = relative("", path)
+                        .filter(|r| !r.is_empty() && r != ".." && !r.starts_with("../"))
+                    else {
+                        return Err(Msg::PathOutside { path }.text().into());
+                    };
+                    let full = root.join(&rel);
+                    // A symlink is a file to git, whatever it points to.
+                    if std::fs::symlink_metadata(&full).is_ok_and(|m| m.is_dir()) {
+                        return Err(Msg::PathIsDirectory { path }.text().into());
+                    }
+                    let change = match full.exists() {
+                        true => Change::Untracked,
+                        false => Change::Deleted,
+                    };
+                    Ok((rel, change))
+                })
+                .collect(),
+        }
+    }
 }
 
 /// Every repository-relative path whose working-tree content differs from `HEAD`, tracked or
 /// untracked (ignored files are left out, deleted files too, since nothing of theirs is left).
 /// Before the first commit, every file counts as untracked.
 pub fn uncommitted(root: &Path) -> Result<Vec<(String, Change)>> {
+    working_tree(root, false)
+}
+
+/// The working tree against `HEAD`; with `whole`, as `diff` reads it.
+fn working_tree(root: &Path, whole: bool) -> Result<Vec<(String, Change)>> {
     let untracked = |more: &[&str]| -> Result<Vec<(String, Change)>> {
         let args = [&["ls-files", "--others", "--exclude-standard", "-z"], more].concat();
         Ok(run(root, &args)?
@@ -131,37 +209,70 @@ pub fn uncommitted(root: &Path) -> Result<Vec<(String, Change)>> {
     if git(root, &["rev-parse", "--verify", "--quiet", "HEAD"]).is_none() {
         return untracked(&["--cached"]);
     }
+    let mut changes = diff(root, &["HEAD"], whole)?;
+    changes.extend(untracked(&[])?);
+    Ok(changes)
+}
+
+/// The paths `git diff <revs>` lists, with the lines of the new side each one changed. With
+/// `whole`, an entry with no line (a binary file, a mode change, a new empty file) is
+/// `Untracked` and a removed path `Deleted`; without it both are left out.
+fn diff(root: &Path, revs: &[&str], whole: bool) -> Result<Vec<(String, Change)>> {
     // Explicit prefixes and no external diff, whatever the user's git configuration says.
-    let diff = run(
-        root,
-        &[
-            "-c",
-            "core.quotePath=false",
-            "diff",
-            "HEAD",
-            "--no-renames",
-            "--no-ext-diff",
-            "--no-color",
-            "--unified=0",
-            "--src-prefix=a/",
-            "--dst-prefix=b/",
-        ],
-    )?;
-    let mut changes: Vec<(String, Change)> = Vec::new();
+    let mut args = vec!["-c", "core.quotePath=false", "diff"];
+    args.extend(revs);
+    args.extend([
+        "--no-renames",
+        "--no-ext-diff",
+        "--no-color",
+        "--unified=0",
+        "--src-prefix=a/",
+        "--dst-prefix=b/",
+    ]);
+    Ok(parse_diff(&run(root, &args)?, whole))
+}
+
+/// One entry of a diff: its path, whether it removes the file, the new side's changed lines.
+struct Entry {
+    path: Option<String>,
+    deleted: bool,
+    lines: Vec<(usize, usize)>,
+}
+
+/// `diff`'s reading of git's output.
+fn parse_diff(diff: &str, whole: bool) -> Vec<(String, Change)> {
+    let mut changes = Vec::new();
+    let mut finish = |entry: Option<Entry>| {
+        let Some(Entry {
+            path: Some(path),
+            deleted,
+            lines,
+        }) = entry
+        else {
+            return;
+        };
+        let change = match (deleted, lines.is_empty()) {
+            (true, _) => whole.then_some(Change::Deleted),
+            (false, false) => Some(Change::Lines(lines)),
+            (false, true) => whole.then_some(Change::Untracked),
+        };
+        changes.extend(change.map(|c| (path, c)));
+    };
+    let mut entry: Option<Entry> = None;
     let mut header = false;
-    let mut path: Option<String> = None;
     for line in diff.lines() {
-        if line.starts_with("diff --git ") {
+        if let Some(paths) = line.strip_prefix("diff --git ") {
+            finish(entry.take());
+            entry = Some(Entry {
+                path: header_path(paths),
+                deleted: false,
+                lines: Vec::new(),
+            });
             header = true;
-            path = None;
-        } else if header && let Some(to) = line.strip_prefix("+++ ") {
-            // `/dev/null` for a deleted file; a name with a space ends with a tab. ponytail: a
-            // path git still quotes (a tab, a newline or a quote in the name) is skipped.
-            let to = to.strip_suffix('\t').unwrap_or(to);
-            path = to.strip_prefix("b/").map(str::to_string);
+        } else if header && (line.starts_with("deleted file mode") || line == "+++ /dev/null") {
+            entry.iter_mut().for_each(|e| e.deleted = true);
         } else if line.starts_with("@@ ") {
             header = false;
-            let Some(path) = &path else { continue };
             // `@@ -a,b +c,d @@`: `d` lines from line `c` on; `d` is 1 when left out.
             let new = line.split_whitespace().nth(2).unwrap_or("+0");
             let new = new.trim_start_matches('+');
@@ -172,14 +283,21 @@ pub fn uncommitted(root: &Path) -> Result<Vec<(String, Change)>> {
                 0 => (start.max(1), start.max(1)),
                 n => (start, start + n - 1),
             };
-            match changes.last_mut() {
-                Some((p, Change::Lines(ranges))) if p == path => ranges.push(range),
-                _ => changes.push((path.clone(), Change::Lines(vec![range]))),
-            }
+            entry.iter_mut().for_each(|e| e.lines.push(range));
         }
     }
-    changes.extend(untracked(&[])?);
-    Ok(changes)
+    finish(entry);
+    changes
+}
+
+/// The path of a `diff --git a/<path> b/<path>` header (the rest after `diff --git `): with
+/// `--no-renames` both sides are the same path. ponytail: a path git still quotes (a tab, a
+/// newline or a quote in the name) is skipped.
+fn header_path(paths: &str) -> Option<String> {
+    let len = paths.len().checked_sub(5).filter(|n| n % 2 == 0)? / 2;
+    let a = paths.strip_prefix("a/")?.get(..len)?;
+    let b = paths.get(2 + len..)?.strip_prefix(" b/")?;
+    (a == b).then(|| a.to_string())
 }
 
 /// The mirrors a server-mode manifest lists, which `git` may read although another user owns
@@ -273,7 +391,228 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{command, is_dubious, isolate, normalize_remote, relative, trust};
+    use super::{
+        Change, Changes, command, is_dubious, isolate, normalize_remote, relative, trust,
+        uncommitted,
+    };
+    use std::path::{Path, PathBuf};
+
+    /// A new repository under the temporary directory, named for the test.
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("meada-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["-c", "init.defaultBranch=main", "init", "-q"]);
+        dir
+    }
+
+    /// `git` in `dir`, isolated from the user's configuration, with a fixed author.
+    fn git(dir: &Path, args: &[&str]) {
+        let out = std::process::Command::new("git")
+            .current_dir(dir)
+            .args(args)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_AUTHOR_NAME", "Meada")
+            .env("GIT_AUTHOR_EMAIL", "fixtures@example.com")
+            .env("GIT_COMMITTER_NAME", "Meada")
+            .env("GIT_COMMITTER_EMAIL", "fixtures@example.com")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+
+    fn commit(dir: &Path, message: &str) {
+        git(dir, &["add", "-A"]);
+        git(dir, &["commit", "-q", "-m", message]);
+    }
+
+    fn write(dir: &Path, path: &str, text: &[u8]) {
+        std::fs::write(dir.join(path), text).unwrap();
+    }
+
+    fn range<'a>(base: &'a str, head: &'a str) -> Changes<'a> {
+        Changes::Range { base, head }
+    }
+
+    fn sorted(mut changes: Vec<(String, Change)>) -> Vec<(String, Change)> {
+        changes.sort_by(|a, b| a.0.cmp(&b.0));
+        changes
+    }
+
+    #[test]
+    fn a_range_gives_the_lines_of_its_head() {
+        let dir = scratch("range-lines");
+        write(&dir, "kept.ts", b"a\nb\nc\nd\n");
+        write(&dir, "gone.ts", b"x\n");
+        commit(&dir, "base");
+        write(&dir, "kept.ts", b"a\nB\nc\nd\ne\n");
+        std::fs::remove_file(dir.join("gone.ts")).unwrap();
+        write(&dir, "new.ts", b"1\n2\n3\n");
+        commit(&dir, "head");
+        let changes = sorted(range("HEAD~1", "HEAD").read(&dir).unwrap());
+        assert_eq!(
+            changes,
+            [
+                ("gone.ts".to_string(), Change::Deleted),
+                ("kept.ts".to_string(), Change::Lines(vec![(2, 2), (5, 5)])),
+                ("new.ts".to_string(), Change::Lines(vec![(1, 3)])),
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_change_with_no_hunk_is_a_whole_file() {
+        let dir = scratch("no-hunk");
+        write(&dir, "image.bin", b"\x00\x01\x02");
+        write(&dir, "run.sh", b"echo\n");
+        write(&dir, "gone.bin", b"\x00\x09");
+        write(&dir, "gone-empty", b"");
+        commit(&dir, "base");
+        write(&dir, "image.bin", b"\x00\x03\x04");
+        git(&dir, &["update-index", "--chmod=+x", "run.sh"]);
+        std::fs::set_permissions(
+            dir.join("run.sh"),
+            std::os::unix::fs::PermissionsExt::from_mode(0o755),
+        )
+        .unwrap();
+        std::fs::remove_file(dir.join("gone.bin")).unwrap();
+        std::fs::remove_file(dir.join("gone-empty")).unwrap();
+        write(&dir, "new-empty", b"");
+        git(&dir, &["add", "new-empty"]);
+        let whole = [
+            ("gone-empty".to_string(), Change::Deleted),
+            ("gone.bin".to_string(), Change::Deleted),
+            ("image.bin".to_string(), Change::Untracked),
+            ("new-empty".to_string(), Change::Untracked),
+            ("run.sh".to_string(), Change::Untracked),
+        ];
+        assert_eq!(sorted(Changes::Uncommitted.read(&dir).unwrap()), whole);
+        // The MCP tool's reading keeps dropping them, so a chmod moves no answer.
+        assert_eq!(uncommitted(&dir).unwrap(), []);
+        commit(&dir, "head");
+        assert_eq!(sorted(range("HEAD~1", "HEAD").read(&dir).unwrap()), whole);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_path_with_a_space_is_read() {
+        let dir = scratch("space");
+        write(&dir, "my file.ts", b"a\n");
+        write(&dir, "a\u{e7}\u{e3}o.ts", b"a\n");
+        commit(&dir, "base");
+        write(&dir, "my file.ts", b"b\n");
+        write(&dir, "a\u{e7}\u{e3}o.ts", b"b\n");
+        commit(&dir, "head");
+        let lines = || Change::Lines(vec![(1, 1)]);
+        let expected = [
+            ("a\u{e7}\u{e3}o.ts".to_string(), lines()),
+            ("my file.ts".to_string(), lines()),
+        ];
+        assert_eq!(
+            sorted(range("HEAD~1", "HEAD").read(&dir).unwrap()),
+            expected
+        );
+        let files = ["my file.ts".to_string(), "a\u{e7}\u{e3}o.ts".to_string()];
+        assert_eq!(
+            sorted(Changes::Files(&files).read(&dir).unwrap()),
+            [
+                ("a\u{e7}\u{e3}o.ts".to_string(), Change::Untracked),
+                ("my file.ts".to_string(), Change::Untracked),
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_empty_range_changes_nothing() {
+        let dir = scratch("empty-range");
+        write(&dir, "a.ts", b"a\n");
+        commit(&dir, "base");
+        assert_eq!(range("HEAD", "HEAD").read(&dir).unwrap(), []);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn files_mark_a_missing_path_deleted() {
+        let dir = scratch("files-missing");
+        write(&dir, "a.ts", b"a\n");
+        let files = ["a.ts".to_string(), "./sub/../gone.ts".to_string()];
+        assert_eq!(
+            Changes::Files(&files).read(&dir).unwrap(),
+            [
+                ("a.ts".to_string(), Change::Untracked),
+                ("gone.ts".to_string(), Change::Deleted),
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_range_refuses_a_revision_shaped_as_an_option() {
+        let dir = scratch("range-option");
+        write(&dir, "a.ts", b"a\n");
+        commit(&dir, "base");
+        let written = dir.join("written");
+        let base = format!("--output={}", written.display());
+        let refused = range(&base, "HEAD").read(&dir).err().map(|e| e.to_string());
+        assert!(refused.is_some_and(|e| e.contains("`--changes` takes")));
+        assert!(!written.exists(), "git took the base as an option");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn files_refuse_a_directory() {
+        let dir = scratch("files-directory");
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        write(&dir, "sub/a.ts", b"a\n");
+        let files = ["sub".to_string()];
+        let refused = Changes::Files(&files)
+            .read(&dir)
+            .err()
+            .map(|e| e.to_string());
+        assert!(refused.is_some_and(|e| e.contains("`sub` is a directory")));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Git tracks a symlink as a file, whatever it points to.
+    #[cfg(unix)]
+    #[test]
+    fn files_take_a_symlink_to_a_directory() {
+        let dir = scratch("files-symlink");
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        std::os::unix::fs::symlink("sub", dir.join("link")).unwrap();
+        let files = ["link".to_string()];
+        assert_eq!(
+            Changes::Files(&files).read(&dir).unwrap(),
+            [("link".to_string(), Change::Untracked)]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn files_refuse_a_path_outside() {
+        let dir = scratch("files-outside");
+        for path in ["../x.ts", "/etc/hosts", "a/../../x.ts", ""] {
+            let files = [path.to_string()];
+            let refused = Changes::Files(&files)
+                .read(&dir)
+                .err()
+                .map(|e| e.to_string());
+            assert!(
+                refused
+                    .as_ref()
+                    .is_some_and(|e| e.contains("not a path inside the repository")),
+                "{path:?}: {refused:?}"
+            );
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn git_refusal_of_another_owner_is_recognized() {

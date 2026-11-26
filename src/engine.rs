@@ -14,6 +14,10 @@ use crate::partial::{self, Partial};
 use crate::render::{
     DOCUMENTED_ONLY, Files, REPOSITORY_LEVEL, callee, label, mark, rank, section, unresolved,
 };
+use crate::repo::Change;
+pub use crate::repo::Changes;
+pub use crate::trace::affected::Affected;
+use crate::trace::affected::Open;
 pub use crate::trace::{Direction, Start};
 use crate::workspace::{Manifest, Missing, Repository, Workspace};
 use crate::{
@@ -636,19 +640,109 @@ impl Engine {
         direction: Direction,
         budget: Option<usize>,
     ) -> Result<String> {
+        let changes = match start {
+            Start::Uncommitted => Some(repo::uncommitted(&self.root)?),
+            Start::From(_) | Start::Changes => None,
+        };
+        self.traced(start, changes, direction, budget)
+    }
+
+    /// The chain from the symbols `changes` touch (`Start::Changes`), as `trace` answers it;
+    /// a range whose head is not checked out, or over a tree that differs from it, is refused.
+    pub fn trace_changes(
+        &self,
+        changes: Changes,
+        direction: Direction,
+        budget: Option<usize>,
+    ) -> Result<String> {
+        let changes = changes.read(&self.root)?;
+        self.traced(Start::Changes, Some(changes), direction, budget)
+    }
+
+    /// Everything `changes` may affect (`meada trace --affected`): the walk up over the edges
+    /// that mean "depends on", with what it could not place listed apart.
+    pub fn affected(&self, changes: Changes) -> Result<Affected> {
+        let changes = [changes.read(&self.root)?];
+        let mut answers = self.walked(&changes, |graph, changes, roots, open| {
+            trace::affected::answer(graph, changes, roots, open)
+        })?;
+        Ok(answers.remove(0))
+    }
+
+    /// `affected` for many changes in one run, each a block of whole files with its label:
+    /// one refresh, one reading over every block's starts, one graph, one walk per block.
+    pub fn affected_batch(
+        &self,
+        blocks: Vec<(String, Vec<String>)>,
+    ) -> Result<Vec<(String, Affected)>> {
+        let changes = (blocks.iter())
+            .map(|(_, paths)| Changes::Files(paths).read(&self.root))
+            .collect::<Result<Vec<_>>>()?;
+        let answers = self.walked(&changes, |graph, changes, roots, open| {
+            trace::affected::answer(graph, changes, roots, open)
+        })?;
+        Ok(blocks
+            .into_iter()
+            .map(|(label, _)| label)
+            .zip(answers)
+            .collect())
+    }
+
+    /// Reads what each block of `blocks` touches and what the affected walk from them needs,
+    /// then hands `then`, per block, the graph, its changes, the ids they root and the paths
+    /// left open.
+    pub(crate) fn walked<R>(
+        &self,
+        blocks: &[Vec<(String, Change)>],
+        mut then: impl FnMut(&trace::Graph<'_>, &[(String, Change)], &[String], Vec<Open>) -> R,
+    ) -> Result<Vec<R>> {
+        self.refresh()?;
+        let mut partial = self.partial()?;
+        let links = self.links(&partial.exports);
+        for changes in blocks {
+            trace::starts(&mut partial, Start::Changes, Some(changes), Direction::Up)?;
+        }
+        let rooted: Vec<(Vec<String>, Vec<Open>)> = {
+            let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
+            (blocks.iter())
+                .map(|changes| trace::affected::roots(&graph, changes))
+                .collect()
+        };
+        let every: Vec<String> = rooted.iter().flat_map(|(roots, _)| roots.clone()).collect();
+        trace::read_affected(&mut partial, &links, every)?;
+        // What the changed lines read, so the answer can place it.
+        let read: Vec<String> = {
+            let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
+            (blocks.iter().zip(&rooted))
+                .flat_map(|(changes, (roots, _))| trace::affected::reads(&graph, changes, roots))
+                .map(|(id, _)| id.to_string())
+                .collect()
+        };
+        partial.symbols(None, &read)?;
+        partial.calls(None, &read)?;
+        let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
+        Ok((blocks.iter().zip(rooted))
+            .map(|(changes, (roots, open))| then(&graph, changes, &roots, open))
+            .collect())
+    }
+
+    /// `trace`'s body: `changes` holds what a change start touches.
+    fn traced(
+        &self,
+        start: Start,
+        changes: Option<Vec<(String, repo::Change)>>,
+        direction: Direction,
+        budget: Option<usize>,
+    ) -> Result<String> {
         self.refresh()?;
         let mut partial = self.partial()?;
         let links = self.links(&partial.exports);
         // A CI contract starts at the pipeline that provides it, as the pipeline's name does.
         let node = match start {
             Start::From(from) => trace::provider_node(&partial.exports, from),
-            Start::Uncommitted => None,
+            Start::Uncommitted | Start::Changes => None,
         };
         let start = node.as_deref().map_or(start, Start::From);
-        let changes = match start {
-            Start::Uncommitted => Some(repo::uncommitted(&self.root)?),
-            Start::From(_) => None,
-        };
         let starts = trace::starts(&mut partial, start, changes.as_deref(), direction)?;
         let none = starts.is_empty();
         trace::read(&mut partial, &links, starts, direction, true)?;

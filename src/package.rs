@@ -903,6 +903,14 @@ fn owner<'m>(
     (holding(manifests, path, ecosystem).into_iter()).find(|m| ecosystem.owns(m))
 }
 
+/// The manifest of the package `path` belongs to in any ecosystem: the deepest of each
+/// ecosystem's `owner`, the first ecosystem on a tie.
+pub(crate) fn owner_of<'m>(manifests: &'m [Manifest], path: &str) -> Option<&'m Manifest> {
+    (ECOSYSTEMS.iter())
+        .filter_map(|ecosystem| owner(manifests, path, *ecosystem))
+        .min_by_key(|m| std::cmp::Reverse(m.path.rsplit_once('/').map_or(0, |(d, _)| d.len() + 1)))
+}
+
 /// The ways an import of `subpath` of the package at `manifest` may be followed, in the order to
 /// try them, each with the files it may name (most likely first) and what named them: `exports`
 /// when the manifest has it, the only way in; else, for the bare name, one for each of `types`,

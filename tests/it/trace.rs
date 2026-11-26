@@ -9,7 +9,7 @@ use std::fs;
 use std::path::Path;
 
 use common::{assert_golden, chain, fixture_repo, without_processes, worker};
-use meada::engine::{Direction, Engine, Start};
+use meada::engine::{Changes, Direction, Engine, Start};
 
 #[test]
 fn every_expected_link_of_the_chain_appears_at_its_level() {
@@ -631,4 +631,102 @@ client.send(new GetObjectCommand({Bucket:'shared'}));
             "{extension}: {writer_export}"
         );
     }
+}
+
+/// Commits every change of `repo` with `message`.
+fn commit_all(repo: &Path, message: &str) {
+    common::git(repo, &["add", "-A"]);
+    common::git(repo, &["commit", "-q", "-m", message]);
+}
+
+/// Edits the body of `add` in `ts-basic`'s `src/math.ts`.
+fn edit_add(repo: &Path) {
+    let math = repo.join("src/math.ts");
+    let text = fs::read_to_string(&math).unwrap();
+    fs::write(&math, text.replace("return a + b;", "return b + a;")).unwrap();
+}
+
+#[test]
+fn a_range_whose_head_is_not_checked_out_is_refused() {
+    let repo = fixture_repo("trace_range_head", "ts-basic", None);
+    edit_add(&repo);
+    commit_all(&repo, "edit");
+    let engine = Engine::open(&repo).unwrap();
+    let range = Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD~1",
+    };
+    let refused = engine
+        .trace_changes(range, Direction::Up, None)
+        .unwrap_err();
+    assert!(
+        refused.to_string().contains("not the checked-out commit"),
+        "{refused}"
+    );
+}
+
+#[test]
+fn a_range_over_a_dirty_tree_is_refused() {
+    let repo = fixture_repo("trace_range_dirty", "ts-basic", None);
+    edit_add(&repo);
+    commit_all(&repo, "edit");
+    let range = || Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    let engine = Engine::open(&repo).unwrap();
+    // Once by a tracked edit, once by an untracked file.
+    fs::write(repo.join("src/math.ts"), "export const x = 1;\n").unwrap();
+    let tracked = engine.trace_changes(range(), Direction::Up, None);
+    common::git(&repo, &["checkout", "--", "src/math.ts"]);
+    fs::write(repo.join("src/new.ts"), "export const y = 1;\n").unwrap();
+    let untracked = engine.trace_changes(range(), Direction::Up, None);
+    for refused in [tracked, untracked] {
+        let refused = refused.unwrap_err().to_string();
+        assert!(
+            refused.contains("working tree differs from HEAD"),
+            "{refused}"
+        );
+    }
+}
+
+/// A deleted file roots nothing: an edit plus a deletion answers as the edit alone, from the
+/// uncommitted changes as the MCP tool reads them and as `Changes::Uncommitted` reads them.
+#[test]
+fn an_uncommitted_deletion_answers_as_before() {
+    let repo = fixture_repo("trace_uncommitted_deletion", "ts-basic", None);
+    edit_add(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let alone = engine
+        .trace(Start::Uncommitted, Direction::Down, None)
+        .unwrap();
+    fs::remove_file(repo.join("src/view.tsx")).unwrap();
+    let mcp = engine
+        .trace(Start::Uncommitted, Direction::Down, None)
+        .unwrap();
+    let read = engine
+        .trace_changes(Changes::Uncommitted, Direction::Down, None)
+        .unwrap();
+    assert!(alone.contains("add"), "{alone}");
+    assert_eq!(mcp, alone);
+    assert_eq!(read, alone);
+}
+
+/// A committed range answers as the same edit did uncommitted.
+#[test]
+fn trace_changes_from_a_range_roots_the_edited_symbol() {
+    let repo = fixture_repo("trace_range_roots", "ts-basic", None);
+    edit_add(&repo);
+    let engine = Engine::open(&repo).unwrap();
+    let uncommitted = engine
+        .trace(Start::Uncommitted, Direction::Up, None)
+        .unwrap();
+    commit_all(&repo, "edit");
+    let range = Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    let answer = engine.trace_changes(range, Direction::Up, None).unwrap();
+    assert!(answer.contains("sum"), "{answer}");
+    assert_eq!(answer, uncommitted);
 }

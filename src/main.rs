@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use meada::decide;
-use meada::engine::{self, Engine};
+use meada::engine::{self, Changes, Direction, Engine, Start};
 use meada::msg::{self, Msg};
 
 #[derive(Parser)]
@@ -60,6 +60,22 @@ enum Command {
         show_request: bool,
         #[arg(long, requires = "decider", allow_negative_numbers = true)]
         min_p: Option<f64>,
+    },
+    #[command(group(clap::ArgGroup::new("start").required(true).args(["from", "changes", "files", "batch"])))]
+    Trace {
+        from: Option<String>,
+        #[arg(long)]
+        changes: Option<String>,
+        #[arg(long, num_args = 1..)]
+        files: Vec<String>,
+        #[arg(long)]
+        up: bool,
+        #[arg(long)]
+        budget: Option<usize>,
+        #[arg(long, conflicts_with = "from")]
+        affected: bool,
+        #[arg(long, requires = "affected")]
+        batch: Option<PathBuf>,
     },
     #[cfg(feature = "snapshot")]
     Snapshot {
@@ -644,6 +660,24 @@ fn drained(serve: impl FnOnce() -> meada::Result<()>) -> meada::Result<()> {
     serve()
 }
 
+/// The blocks of a `meada trace --batch` file: a line `@@<label>` opens one, each other
+/// non-empty line is a path of the open block; paths before the first label form a block
+/// labelled "".
+fn blocks(text: &str) -> Vec<(String, Vec<String>)> {
+    let mut blocks: Vec<(String, Vec<String>)> = Vec::new();
+    for line in text.lines() {
+        match line.strip_prefix("@@") {
+            Some(label) => blocks.push((label.to_string(), Vec::new())),
+            None if line.is_empty() => {}
+            None => match blocks.last_mut() {
+                Some((_, paths)) => paths.push(line.to_string()),
+                None => blocks.push((String::new(), vec![line.to_string()])),
+            },
+        }
+    }
+    blocks
+}
+
 /// Prints `text` on stdout, as `print!` does, but a reader that closed its end early
 /// (`meada export | head`) is no error: the rest is dropped and the command ends as it would.
 fn out(text: impl std::fmt::Display) {
@@ -688,6 +722,16 @@ fn main() -> ExitCode {
                     a.help(Msg::DecideShowRequestHelp.text())
                 })
                 .mut_arg("min_p", |a| a.help(Msg::DecideMinPHelp.text()))
+        })
+        .mut_subcommand("trace", |c| {
+            c.about(Msg::Trace.text())
+                .mut_arg("from", |a| a.help(Msg::TraceFrom.text()))
+                .mut_arg("changes", |a| a.help(Msg::TraceChanges.text()))
+                .mut_arg("files", |a| a.help(Msg::TraceFiles.text()))
+                .mut_arg("up", |a| a.help(Msg::TraceUp.text()))
+                .mut_arg("budget", |a| a.help(Msg::TraceBudget.text()))
+                .mut_arg("affected", |a| a.help(Msg::TraceAffected.text()))
+                .mut_arg("batch", |a| a.help(Msg::TraceBatch.text()))
         });
     #[cfg(feature = "snapshot")]
     let matches = matches.mut_subcommand("snapshot", |c| {
@@ -1185,6 +1229,49 @@ fn main() -> ExitCode {
                 &mut std::io::stdin().lock(),
                 &mut std::io::stdout(),
             )
+        })(),
+        Command::Trace {
+            from,
+            changes,
+            files,
+            up,
+            budget,
+            affected,
+            batch,
+        } => (|| {
+            if let Some(batch) = batch {
+                let text = std::fs::read_to_string(&batch).map_err(|e| e.to_string())?;
+                let answers = Engine::open(here)?.affected_batch(blocks(&text))?;
+                for (label, answer) in answers {
+                    let mut json = serde_json::to_value(&answer).map_err(|e| e.to_string())?;
+                    json["label"] = label.into();
+                    out(format_args!("{json}\n"));
+                }
+                return Ok(());
+            }
+            let direction = if up { Direction::Up } else { Direction::Down };
+            let start = match (from.as_deref(), changes.as_deref()) {
+                (Some(from), _) => Ok(Start::From(from)),
+                // The affected set reads deletions and whole-file changes too.
+                (None, Some("uncommitted")) if affected => Err(Changes::Uncommitted),
+                (None, Some("uncommitted")) => Ok(Start::Uncommitted),
+                (None, Some(range)) => match range.split_once("..") {
+                    Some((base, head)) => Err(Changes::Range { base, head }),
+                    None => return Err(Msg::TraceChangesValue(range).text().into()),
+                },
+                (None, None) => Err(Changes::Files(&files)),
+            };
+            let engine = Engine::open(here)?;
+            match start {
+                Err(changes) if affected => {
+                    let answer = engine.affected(changes)?;
+                    let json = serde_json::to_string_pretty(&answer).map_err(|e| e.to_string())?;
+                    out(format_args!("{json}\n"));
+                    Ok(())
+                }
+                Ok(start) => engine.trace(start, direction, budget).map(out),
+                Err(changes) => engine.trace_changes(changes, direction, budget).map(out),
+            }
         })(),
         command => Engine::open(here).and_then(|engine| match command {
             Command::Export { .. } => engine.export().map(out),
