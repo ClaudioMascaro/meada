@@ -522,6 +522,9 @@ pub struct Facts {
     /// TypeScript class members which affect dispatch without defining a method.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub ts_classes: BTreeMap<String, TsClass>,
+    /// Top-level TS/JS const literal methods, true when a later key may replace the method.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub ts_literal_methods: BTreeMap<String, BTreeMap<String, bool>>,
     /// The program entry points of the file (spec #31), set by `parse`, which sees the path and
     /// the source: the qualified names (`Def::name`) of the definitions that start a program,
     /// such as `func main` in package `main`, `fn main` in `src/main.rs`. Where the entry point

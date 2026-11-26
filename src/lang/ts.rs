@@ -245,6 +245,14 @@ impl LanguagePack for TsJs {
                         });
                     }
                 }
+                "object" => {
+                    if let Some(owner) = literal_name(node, src, &parents) {
+                        let methods = literal_methods(node, src);
+                        if !methods.is_empty() {
+                            facts.ts_literal_methods.insert(owner, methods);
+                        }
+                    }
+                }
                 "interface_declaration" | "type_alias_declaration" => {
                     if let Some(name) = node.child_by_field_name("name") {
                         facts.consts.push(Const {
@@ -1749,7 +1757,10 @@ fn assignment(node: Node, src: &[u8], up: &Parents) -> Option<Assigned> {
 /// The name of the top-level `const` whose object literal holds `property` (a pair or a
 /// method): `o` for the `litM` of `const o = { litM() {} }`.
 fn literal_owner(property: Node, src: &[u8], up: &Parents) -> Option<String> {
-    let object = up.of(property).filter(|o| o.kind() == "object")?;
+    literal_name(up.of(property).filter(|o| o.kind() == "object")?, src, up)
+}
+
+fn literal_name(object: Node, src: &[u8], up: &Parents) -> Option<String> {
     let declarator = (up.of(object)).filter(|d| d.kind() == "variable_declarator")?;
     let name = declarator.child_by_field_name("name")?;
     let declaration = up.of(declarator)?;
@@ -1764,6 +1775,47 @@ fn literal_owner(property: Node, src: &[u8], up: &Parents) -> Option<String> {
             .is_some_and(|k| text(k, src) == "const")
         && top.kind() == "program")
         .then(|| text(name, src).to_string())
+}
+
+/// Inspect each key once. A later spread or computed key may change any earlier method.
+fn literal_methods(object: Node, src: &[u8]) -> BTreeMap<String, bool> {
+    let mut methods = BTreeMap::new();
+    let mut wildcard = 0;
+    for member in named(object) {
+        let key = member
+            .child_by_field_name("name")
+            .or_else(|| member.child_by_field_name("key"))
+            .or_else(|| (member.kind() == "shorthand_property_identifier").then_some(member));
+        if member.kind() == "spread_element"
+            || key.is_some_and(|k| k.kind() == "computed_property_name")
+        {
+            wildcard = member.end_byte();
+            continue;
+        }
+        let Some(key) = key else { continue };
+        let name = if key.kind() == "string" {
+            unquote(key, src)
+        } else {
+            text(key, src).to_string()
+        };
+        let method = key.kind() == "property_identifier"
+            && match member.kind() {
+                "method_definition" => !children(member).any(|n| matches!(n.kind(), "get" | "set")),
+                "pair" => member
+                    .child_by_field_name("value")
+                    .is_some_and(|v| FUNCTIONS.contains(&v.kind())),
+                _ => false,
+            };
+        if let Some(position) = methods.get_mut(&name) {
+            *position = 0;
+        } else if method {
+            methods.insert(name, member.end_byte());
+        }
+    }
+    methods
+        .into_iter()
+        .map(|(name, at)| (name, at <= wildcard))
+        .collect()
 }
 
 /// The bindings of `import d, { a, b as c } from 's'` and `import * as ns from 's'`.

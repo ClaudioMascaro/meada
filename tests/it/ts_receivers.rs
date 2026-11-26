@@ -359,3 +359,49 @@ fn a_result_typed_by_an_outside_class_keeps_todays_answer() {
 fn an_awaited_local_type_alias_does_not_unwrap_as_the_global_promise() {
     by_name(call("a", "shadowed-result", "shadowed", "send"), SEND);
 }
+
+#[test]
+fn an_imported_literal_method_resolves() {
+    exact(
+        call("a", "importer", "imported", "list"),
+        "a/src/service.ts::svc.list",
+    );
+    exact(
+        call("a", "importer", "imported", "go"),
+        "a/src/service.ts::svc.go",
+    );
+    exact(
+        call("a", "importer", "star", "go"),
+        "a/src/service.ts::svc.go",
+    );
+    exact(
+        call("a", "importer", "importedBefore", "send"),
+        "a/src/service.ts::before.send",
+    );
+}
+
+#[test]
+fn a_spread_after_the_method_keeps_the_by_name_answer() {
+    by_name(call("a", "service", "localAfter", "send"), SEND);
+    by_name(call("a", "importer", "importedAfter", "send"), SEND);
+}
+
+#[test]
+fn a_computed_key_after_the_method_keeps_the_by_name_answer() {
+    by_name(call("a", "service", "localComputed", "send"), SEND);
+    by_name(call("a", "importer", "importedComputed", "send"), SEND);
+}
+
+#[test]
+fn a_spread_before_the_method_resolves() {
+    exact(
+        call("a", "service", "localBefore", "send"),
+        "a/src/service.ts::before.send",
+    );
+}
+
+#[test]
+fn a_repository_write_of_the_member_keeps_the_by_name_answer() {
+    by_name(call("a", "service", "localWritten", "send"), SEND);
+    by_name(call("a", "importer", "importedWritten", "send"), SEND);
+}

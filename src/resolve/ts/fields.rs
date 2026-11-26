@@ -4,6 +4,7 @@ use std::collections::HashMap;
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum Owner<'a> {
     Class(Target<'a>),
+    Literal(Target<'a>),
     Unknown,
     UnknownIn(Target<'a>),
 }
@@ -39,14 +40,20 @@ impl<'a> Writes<'a> {
                     _ => None,
                 };
                 let owner = if w.object == "this" {
-                    enclosing
+                    enclosing.map(Owner::Class)
                 } else {
                     let receiver = r.at_ts_site(path, w.range.start, || {
                         let b = r.read_member(path, &w.scope, &w.object);
+                        if let Binding::Const(p, name) = b
+                            && r.files[p].ts_literal_methods.contains_key(name)
+                        {
+                            return b;
+                        }
                         r.instance(b, &mut Work::default())
                     });
                     match receiver {
-                        Binding::Instance(t) => Some(t),
+                        Binding::Instance(t) => Some(Owner::Class(t)),
+                        Binding::Const(path, name) => Some(Owner::Literal(Target { path, name })),
                         // A property written directly on the constructor is static.
                         Binding::Def(t) if r.is_class(t) => continue,
                         _ => None,
@@ -58,8 +65,8 @@ impl<'a> Writes<'a> {
                         .and_modify(|only| *only = None)
                         .or_insert(Some((path, w.range.start)));
                 };
-                if let Some(t) = owner {
-                    mark(Owner::Class(t));
+                if let Some(owner) = owner {
+                    mark(owner);
                 } else {
                     mark(Owner::Unknown);
                     if let Some(t) = enclosing {
@@ -73,6 +80,34 @@ impl<'a> Writes<'a> {
 }
 
 impl<'a> Resolver<'a> {
+    pub(in crate::resolve) fn ts_literal_method(
+        &self,
+        path: &'a str,
+        name: &'a str,
+        member: &str,
+    ) -> Option<Binding<'a>> {
+        let &overwritten = self.files[path].ts_literal_methods.get(name)?.get(member)?;
+        let owner = Owner::Literal(Target { path, name });
+        let written = self.ts_writes.as_ref().is_none_or(|writes| {
+            [
+                (&writes.program, writes.incomplete[0]),
+                (&writes.tests, writes.incomplete[1]),
+            ]
+            .into_iter()
+            .any(|(marks, incomplete)| {
+                incomplete
+                    || [owner, Owner::Unknown].into_iter().any(|o| {
+                        marks.contains_key(&(o, Some(member))) || marks.contains_key(&(o, None))
+                    })
+            })
+        });
+        Some(if overwritten || written {
+            Binding::Unknown
+        } else {
+            self.def(path, &crate::qualify(name, member))
+        })
+    }
+
     /// A field or local binds its constructor where the new expression was written.
     pub(in crate::resolve) fn ts_construction(
         &self,

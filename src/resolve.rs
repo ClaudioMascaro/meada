@@ -2519,6 +2519,13 @@ impl<'a> Resolver<'a> {
             if let Some((name, def)) = self.defs[path].get_key_value(candidate.as_str())
                 && def.kind != Kind::Method
             {
+                if self.ts
+                    && s.is_empty()
+                    && let Some((object, member)) = name.split_once('.')
+                    && let Some(found) = self.ts_literal_method(path, object, member)
+                {
+                    return Some(found);
+                }
                 return Some(Binding::Def(Target { path, name }));
             }
             let held = crate::qualify(s, head);
@@ -2555,6 +2562,13 @@ impl<'a> Resolver<'a> {
             let labels = labels.filter(|_| last);
             let direct_instance = n == 0 && matches!(binding, Binding::Instance(_));
             let typed_ts = self.ts && self.holder(&binding).is_some();
+            if self.ts
+                && let Binding::Const(p, name) = binding
+                && let Some(found) = self.ts_literal_method(p, name, member)
+            {
+                binding = found;
+                continue;
+            }
             let instance = self.instance(binding, work);
             // A Go field of an anonymous struct type has no class to be an instance of: the
             // rest of the chain may be the path to a tagged field of the file defining the
@@ -8777,6 +8791,31 @@ mod tests {
         let mut sources = vec![(format!("f0.{ext}"), define.to_string())];
         sources.extend((1..n).map(|i| (format!("f{i}.{ext}"), link(i - 1))));
         sources
+    }
+
+    #[test]
+    fn an_import_through_export_star_binds_the_literal() {
+        use crate::lang::ts::TsJs;
+        let source = TsJs
+            .parse("service.ts", b"export const svc = { go() {} };")
+            .unwrap();
+        let barrel = TsJs
+            .parse("barrel.ts", b"export * from './service';")
+            .unwrap();
+        let main = TsJs.parse("main.ts", b"import { svc as direct } from './service'; import { svc as shared } from './barrel';").unwrap();
+        let files = BTreeMap::from([
+            ("main.ts", &main),
+            ("barrel.ts", &barrel),
+            ("service.ts", &source),
+        ]);
+        let resolver = Resolver::new(&files, TsJs.modules(&[], &files).unwrap(), &TsJs);
+        for name in ["direct", "shared"] {
+            let found = resolver.read_member("main.ts", "", name);
+            assert!(
+                matches!(found, Binding::Const("service.ts", "svc")),
+                "{name}"
+            );
+        }
     }
 
     /// The file defining the target of the call of `callee` in `main`, when it is exact.
