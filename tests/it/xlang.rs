@@ -299,6 +299,10 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         ("Typed.Get", "CROSS_URL"),
         ("TwinA.Get", "TWIN_A_URL"),
         ("TwinB.Get", "TWIN_B_URL"),
+        ("AnonSvc.Get", "ANON_URL"),
+        ("AnonLocal", "ANON_BUS_URL"),
+        ("AnonLoaded", "ANON_URL"),
+        ("AnonNamed", "ANON_BROKER_URL"),
     ];
     for (function, variable) in read {
         let expected = format!("env:{variable}");

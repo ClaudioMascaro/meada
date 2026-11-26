@@ -2493,7 +2493,16 @@ impl<'a> Resolver<'a> {
             // are separate namespaces (`Reading::Read`).
             let read = self.members_in_scope && (!last || reading.read());
             let labels = labels.filter(|_| last);
-            binding = match self.instance(binding, work) {
+            let instance = self.instance(binding, work);
+            // A Go field of an anonymous struct type has no class to be an instance of: the
+            // rest of the chain may be the path to a tagged field of the file defining the
+            // named type (`Facts::env_fields`, class `Config.Kafka.Topics`).
+            if let Binding::Instance(t) = instance
+                && let Some(found) = self.anonymous_field(t, &members[n..])
+            {
+                return found;
+            }
+            binding = match instance {
                 // A class's name (`Type.m()`, `Type.X`) reaches a Kotlin companion's members
                 // before the class's, which only an instance reaches; past the companion, a
                 // nested class or a constant of the class (an enum entry).
@@ -2535,6 +2544,24 @@ impl<'a> Resolver<'a> {
             };
         }
         binding
+    }
+
+    /// The tagged field the members `rest` reach from an instance of `class` through anonymous
+    /// struct types (`Kafka.Topics.Orders` from `Config`): the `Facts::env_fields` entry of the
+    /// file defining `class` whose class is the path to the last member, which only an
+    /// anonymous nesting records (a named type's own fields are `member`'s).
+    fn anonymous_field(&self, class: Target<'a>, rest: &[&str]) -> Option<Binding<'a>> {
+        let (last, inner) = rest.split_last()?;
+        if inner.is_empty() {
+            return None;
+        }
+        let path = std::iter::once(class.name)
+            .chain(inner.iter().copied())
+            .collect::<Vec<_>>()
+            .join(".");
+        let facts: &'a Facts = self.files.get(class.path)?;
+        let found = (facts.env_fields.iter()).find(|e| e.class == path && e.field == *last)?;
+        Some(Binding::Local(class.path, &found.class, &found.field))
     }
 
     /// A written type path without an import, after lexical lookup left its head unbound.

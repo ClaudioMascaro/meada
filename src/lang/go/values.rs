@@ -181,9 +181,40 @@ fn tagged(root: Node, src: &[u8]) -> HashMap<String, String> {
 }
 
 /// Each field of a named struct type of the file whose tag names an environment variable, by
-/// the rules `tagged` applies (`env_tag`); a field of a nested anonymous struct has no class to
-/// be reached by and is left to `tagged`.
+/// the rules `tagged` applies (`env_tag`). A field of a nested anonymous struct is recorded with
+/// the path of field names from the named type as its class (`Config.Kafka.Topics`), the one
+/// way a selector can reach it.
 pub(super) fn env_fields(root: Node, src: &[u8]) -> Vec<EnvField> {
+    fn walk(body: Node, src: &[u8], class: &str, level: usize, out: &mut Vec<EnvField>) {
+        if level >= VALUE_DEPTH {
+            return;
+        }
+        for field in named(body).filter(|f| f.kind() == "field_declaration") {
+            let mut cursor = field.walk();
+            let names: Vec<Node> = field.children_by_field_name("name", &mut cursor).collect();
+            let anonymous = (field.child_by_field_name("type"))
+                .filter(|t| t.kind() == "struct_type")
+                .and_then(|t| named(t).find(|n| n.kind() == "field_declaration_list"));
+            if let Some(inner) = anonymous {
+                for name in &names {
+                    let path = format!("{class}.{}", text(*name, src));
+                    walk(inner, src, &path, level + 1, out);
+                }
+                continue;
+            }
+            let tag = field.child_by_field_name("tag").map(|t| text(t, src));
+            let Some(var) = tag.and_then(env_tag) else {
+                continue;
+            };
+            for each in names {
+                out.push(EnvField {
+                    class: class.to_string(),
+                    field: text(each, src).to_string(),
+                    var: var.clone(),
+                });
+            }
+        }
+    }
     let mut out = Vec::new();
     let mut cursor = root.walk();
     let decls = root.children(&mut cursor);
@@ -200,20 +231,7 @@ pub(super) fn env_fields(root: Node, src: &[u8]) -> Vec<EnvField> {
         ) else {
             continue;
         };
-        for field in named(body).filter(|f| f.kind() == "field_declaration") {
-            let tag = field.child_by_field_name("tag").map(|t| text(t, src));
-            let Some(var) = tag.and_then(env_tag) else {
-                continue;
-            };
-            let mut cursor = field.walk();
-            for each in field.children_by_field_name("name", &mut cursor) {
-                out.push(EnvField {
-                    class: text(name, src).to_string(),
-                    field: text(each, src).to_string(),
-                    var: var.clone(),
-                });
-            }
-        }
+        walk(body, src, text(name, src), 0, &mut out);
     }
     out
 }
