@@ -26,6 +26,7 @@ mod rust;
 mod swift;
 mod ts;
 pub(crate) use infrastructure::Prepared;
+pub(crate) use ts::Config as AppConfig;
 #[cfg(test)]
 pub(crate) use ts::app_config_probe;
 pub(crate) use ts::{INCLUDE_DEPTH, INCLUDES, IncludeReason, config_inputs};

@@ -1073,6 +1073,23 @@ resource "aws_apigatewayv2_route" "wide" {{
                 files.iter().map(|(p, s)| (p.as_str(), s.clone())).collect();
             crate::http::app_config_probe(&files)
         }),
+        // Thousands of roots each giving every key a value of its own: the channel kind keeps
+        // every value of a key (`Config::literals`, front 6), so all of them are held at once.
+        (
+            "app-config: many roots each giving every key its own value",
+            || {
+                let files: Vec<(String, Vec<u8>)> = (0..4096)
+                    .map(|r| {
+                        let root =
+                            format!("acme:\n{}", count(64, |i| format!("  k{i}: v{r}-{i}\n")));
+                        (format!("r{r}/app-config.yaml"), file(root))
+                    })
+                    .collect();
+                let files: Vec<(&str, Vec<u8>)> =
+                    files.iter().map(|(p, s)| (p.as_str(), s.clone())).collect();
+                crate::http::app_config_probe(&files)
+            },
+        ),
         // Hundreds of roots each including, from many keys, a partial of 335 bytes whose aliases
         // expand it to 48 KB: an include is charged its value's size, not its file's bytes.
         (

@@ -651,6 +651,13 @@ pub struct Facts {
     /// Not kept in the lean index, like the bound values above.
     #[serde(default, skip_serializing_if = "lean")]
     pub first_results: Vec<FirstResult>,
+    /// The private fields of each class (TypeScript `private`, `#x`), each with every non-null
+    /// value its class assigns it: its initializer and each plain `this.f = v` statement of any
+    /// of its methods, with the scope it is written in. A field another write reaches (an
+    /// operator, a pattern, a computed member of `this`, an assignment that is no statement) has
+    /// none. Not kept in the index (see `Call::args`).
+    #[serde(default, skip_serializing_if = "lean")]
+    pub field_writes: Vec<FieldWrites>,
     /// Scoped selector assignments/deletions, with their source order. None means this
     /// parse does not establish complete write knowledge; no literal values are retained.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -765,6 +772,15 @@ pub struct Bound {
     pub within: String,
     pub name: String,
     pub value: Value,
+}
+
+/// A private field and the values its class assigns it (`Facts::field_writes`).
+#[derive(Serialize, Deserialize)]
+pub struct FieldWrites {
+    /// The field's qualified name, its class's then its own (`Client.#consumer`).
+    pub name: String,
+    /// Each non-null value, with the scope it is written in.
+    pub values: Vec<(String, Value)>,
 }
 
 #[derive(Serialize, Deserialize)]

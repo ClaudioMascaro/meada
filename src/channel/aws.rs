@@ -268,6 +268,7 @@ pub(super) fn test_messages(
                 call,
                 role,
                 client: None,
+                cap: None,
             })
         })
         .collect()

@@ -5854,6 +5854,12 @@ impl<'a> Code<'a> {
         self.full(path).map_or(&[], |f| f.private_fields.as_slice())
     }
 
+    /// The private fields of the classes of `path` with every non-null value their class
+    /// assigns them (`Facts::field_writes`).
+    pub fn field_writes(&self, path: &'a str) -> &'a [crate::lang::FieldWrites] {
+        self.full(path).map_or(&[], |f| f.field_writes.as_slice())
+    }
+
     /// Every value `path` assigns to a bare name, and every initializer `bindings` drops
     /// (`Facts::assigned`), in source order: a reader that needs every use of a value reads them.
     pub fn assigned(&self, path: &'a str) -> &'a [Bound] {

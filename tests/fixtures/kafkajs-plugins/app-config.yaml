@@ -1,0 +1,4 @@
+app:
+  title: acme
+acme:
+  orders: { $include: ./partials/orders.yaml }

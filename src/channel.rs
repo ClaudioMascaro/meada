@@ -300,7 +300,7 @@ impl ContractKind for Channel {
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
         // Each reader answers for its own pack only; the order is the order found.
         let messages: Vec<Message> = [
-            ts::messages(code),
+            ts::messages(code, indexed),
             python::messages(code),
             rust::messages(code),
             go::messages(code, indexed.channel_clients),
@@ -372,7 +372,7 @@ impl ContractKind for Channel {
                     fragments: Vec::new(),
                     shape: None,
                     lead: None,
-                    cap: None,
+                    cap: m.cap,
                     client: m.client.clone(),
                 }
             })

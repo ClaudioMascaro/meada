@@ -305,6 +305,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                                 call: if here { n } else { m.call },
                                 role: Side::Producer,
                                 client: None,
+                                cap: None,
                             });
                         }
                     }

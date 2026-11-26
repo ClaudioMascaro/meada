@@ -20,6 +20,9 @@ pub struct Message {
     pub role: Side,
     /// The declared `call` of the Client declaration that made the side (`[[channel_client]]`).
     pub client: Option<String>,
+    /// The weakest level a link of the side may take: `inferred` for one of several names a
+    /// configuration key holds (`Found::cap`).
+    pub cap: Option<crate::contract::Level>,
 }
 
 #[derive(Clone)]
@@ -160,6 +163,7 @@ pub fn produce_env_with<'a>(
                     call: at,
                     role: Side::Producer,
                     client: None,
+                    cap: None,
                 })
             },
         )
@@ -232,6 +236,7 @@ pub fn consume_env_with<'a>(
                     call: at,
                     role: Side::Consumer(handler.clone()),
                     client: None,
+                    cap: None,
                 })
             },
         )
@@ -290,6 +295,7 @@ pub fn publish_with<'a>(
                     call: at,
                     role,
                     client: None,
+                    cap: None,
                 }
             },
         )
@@ -328,6 +334,7 @@ pub fn bind_with<'a>(
                     call: at,
                     role: Side::Binding { exchange, pattern },
                     client: None,
+                    cap: None,
                 })
             },
         )

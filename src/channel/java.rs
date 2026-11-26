@@ -645,6 +645,7 @@ fn listen<'a>(
         call: n,
         role,
         client: None,
+        cap: None,
     };
     let handler = || {
         Side::Consumer(Handler::Def {

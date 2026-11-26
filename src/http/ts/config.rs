@@ -45,7 +45,7 @@ use crate::lang::{ConfigInput, Part, Value};
 use crate::resolve::Code;
 
 /// The reads of one extraction; the configuration files are parsed the first time one asks.
-pub(in crate::http) struct Config<'i> {
+pub(crate) struct Config<'i> {
     files: &'i [(&'i str, &'i [u8])],
     /// The config inputs that are symbolic links (`Indexed::symlinks`).
     symlinks: &'i [&'i str],
@@ -59,6 +59,8 @@ struct Read {
     keys: Properties,
     /// The keys two files give different values.
     contested: BTreeSet<String>,
+    /// Every value the files give each key (`Config::literals`).
+    literals: BTreeMap<String, BTreeSet<String>>,
     /// The includes no root followed, each once, sorted.
     unfollowed: Vec<Unfollowed>,
     /// Whether any file has a `proxy.endpoints` that is not null, an empty object included, or an
@@ -100,7 +102,7 @@ const ENDPOINTS: &str = "proxy.endpoints.";
 const LEGACY: &str = "proxy.";
 
 impl<'i> Config<'i> {
-    pub(in crate::http) fn new(indexed: &Indexed<'i>) -> Self {
+    pub(crate) fn new(indexed: &Indexed<'i>) -> Self {
         Self::of(indexed.configs, indexed.symlinks)
     }
 
@@ -140,6 +142,14 @@ impl<'i> Config<'i> {
         env_var(self.keys().get(key)?)
     }
 
+    /// Every value the `app-config*.yaml` files give the dotted `key`, each once: a value two
+    /// files share counts once. The channel kind names a topic by them, where HTTP reads the first
+    /// and `contested` (`keys`).
+    pub(crate) fn literals(&self, key: &str) -> &BTreeSet<String> {
+        static NONE: BTreeSet<String> = BTreeSet::new();
+        self.read().literals.get(key).unwrap_or(&NONE)
+    }
+
     /// The keys of every `app-config*.yaml`, parsed the first time they are asked for.
     fn keys(&self) -> &Properties {
         &self.read().keys
@@ -158,6 +168,7 @@ impl<'i> Config<'i> {
             };
             let mut keys = BTreeMap::new();
             let mut contested = BTreeSet::new();
+            let mut literals: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
             let mut unfollowed = BTreeSet::new();
             let mut endpoints_table = false;
             let mut reading = includes::Reading::default();
@@ -174,6 +185,7 @@ impl<'i> Config<'i> {
                 expand(&mut tree);
                 endpoints_table |= !tree["proxy"]["endpoints"].is_null();
                 for (k, v) in flatten(&tree) {
+                    literals.entry(k.clone()).or_default().insert(v.clone());
                     match keys.get(&k) {
                         Some(kept) if *kept != v => {
                             contested.insert(k);
@@ -188,6 +200,7 @@ impl<'i> Config<'i> {
             Read {
                 keys,
                 contested,
+                literals,
                 unfollowed: unfollowed.into_iter().collect(),
                 endpoints_table,
             }
@@ -459,10 +472,13 @@ pub(crate) fn probe(files: &[(&str, Vec<u8>)]) -> usize {
     let url = [Value::Str(vec![Part::Text("/api/proxy/zz/x".into())])];
     let missed = config.proxied(&url).is_some() as usize;
     let keys: usize = (config.keys().iter()).map(|(k, v)| k.len() + v.len()).sum();
+    let literals: usize = (config.keys().keys())
+        .map(|k| config.literals(k).iter().map(String::len).sum::<usize>())
+        .sum();
     let unfollowed: usize = (config.unfollowed().iter())
         .map(|u| u.file.len() + u.include.len())
         .sum();
-    keys + config.endpoints().len() + missed + unfollowed
+    keys + literals + config.endpoints().len() + missed + unfollowed
 }
 
 #[cfg(test)]

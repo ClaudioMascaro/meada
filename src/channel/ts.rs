@@ -11,8 +11,11 @@ use std::collections::BTreeMap;
 use super::message::{
     Handler, Message, Side, bind, channel_name as name, env_of, publish, queue_name,
 };
-use crate::lang::{Value, literal, property};
-use crate::names::ts::{Factory, factory};
+use crate::contract::Level;
+use crate::http::AppConfig;
+use crate::index::Indexed;
+use crate::lang::{Part, Value, literal, property};
+use crate::names::ts::{Factory, factory, field_factory};
 use crate::resolve::{Code, Expand, Expanded};
 
 const KAFKAJS: &str = "kafkajs";
@@ -80,10 +83,12 @@ pub(super) fn aws(code: &Code) -> Vec<crate::contract::Found> {
     out
 }
 
-pub(super) fn messages(code: &Code) -> Vec<Message> {
+pub(super) fn messages(code: &Code, indexed: &Indexed) -> Vec<Message> {
     if !code.pack().extensions().contains(&"js") {
         return Vec::new();
     }
+    // Parsed the first time a kafkajs topic is a read of it.
+    let config = AppConfig::new(indexed);
     let mut out = Vec::new();
     // kafkajs subscriptions, each with the consumer binding it is made on.
     let mut subscriptions = Vec::new();
@@ -105,16 +110,18 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 }
                 _ => continue,
             };
+            let found = factory(code, path, &call.scope, chain)
+                .or_else(|| field_factory(code, path, &call.scope, chain));
             let Some(Factory {
                 package,
                 expr,
                 binding,
-            }) = factory(code, path, &call.scope, chain)
+            }) = found
             else {
                 continue;
             };
             let produce = |broker, read: Read| {
-                let read = |a: &[Value], _: &_| read(a).map(|names| (names, None));
+                let read = |a: &[Value], _: &_| read(a).map(|names| (names, None, None));
                 producers(broker, code.expand(Expand::Call(path, n), &read))
             };
             // The handler of the call itself (its `option` of argument `arg`), else the
@@ -138,6 +145,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                             call: at,
                             role: Side::Consumer(handler.clone()),
                             client: None,
+                            cap: None,
                         })
                     },
                 )
@@ -145,7 +153,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
             };
             match (package, expr.as_str(), method) {
                 (KAFKAJS, KAFKA_PRODUCER, "send") => {
-                    let read = |a: &[Value], _: &_| names_env(a, &["topic"]);
+                    let read = |a: &[Value], _: &_| topics(&config, a, &["topic"]);
                     out.extend(producers(
                         "kafka",
                         code.expand(Expand::Call(path, n), &read),
@@ -196,7 +204,7 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                         let found = found.into_iter().map(|e| Expanded {
                             site: e.site,
                             frames: e.frames,
-                            found: (e.found, None),
+                            found: (e.found, None, None),
                         });
                         out.extend(producers("bullmq", found.collect()));
                     }
@@ -243,10 +251,10 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
         }
     }
     for (path, n, binding) in subscriptions {
-        let read = |a: &[Value], _: &_| names_env(a, &["topics", "topic"]);
+        let read = |a: &[Value], _: &_| topics(&config, a, &["topics", "topic"]);
         for Expanded {
             site: (site, at),
-            found: (names, environment),
+            found: (names, environment, cap),
             ..
         } in code.expand(Expand::Call(path, n), &read)
         {
@@ -262,14 +270,20 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 call: at,
                 role: Side::Consumer(handler.clone()),
                 client: None,
+                cap,
             }));
         }
     }
     out
 }
 
-/// The names and the variable an unresolved one is read from, at each site an expansion found.
-type Found<'a> = Vec<Expanded<'a, (Vec<Option<String>>, Option<String>)>>;
+/// The names, the variable an unresolved one is read from and the cap of its sides (`topics`),
+/// at each site an expansion found.
+type Found<'a> = Vec<Expanded<'a, Named>>;
+
+/// What a form reads of a call's arguments: the channel names, the variable an unresolved one is
+/// read from, and the weakest level a link of the sides may take.
+type Named = (Vec<Option<String>>, Option<String>, Option<Level>);
 
 /// A producer per name read at each site an expansion found.
 fn producers(broker: &'static str, found: Found) -> Vec<Message> {
@@ -277,7 +291,7 @@ fn producers(broker: &'static str, found: Found) -> Vec<Message> {
         .flat_map(
             |Expanded {
                  site: (site, at),
-                 found: (names, environment),
+                 found: (names, environment, cap),
                  ..
              }| {
                 names.into_iter().map(move |name| Message {
@@ -288,6 +302,7 @@ fn producers(broker: &'static str, found: Found) -> Vec<Message> {
                     call: at,
                     role: Side::Producer,
                     client: None,
+                    cap,
                 })
             },
         )
@@ -374,6 +389,46 @@ fn names_env(args: &[Value], keys: &[&str]) -> Option<(Vec<Option<String>>, Opti
     let given = (options(args).flatten())
         .and_then(|o| keys.iter().find_map(|key| property(o, key).ok().flatten()));
     Some((found, given.and_then(env_of)))
+}
+
+/// `names_env` of a kafkajs call, whose topic may be a read of Backstage's configuration alone
+/// (`config.getString('a.b')`, `getOptionalString`): the read names each value the
+/// `app-config*.yaml` files give its key that is a channel name. With several values, the
+/// configuration picks one at run time, so each side is capped at `inferred`; with none that is
+/// a name, the side is unresolved.
+// ponytail: a `${VAR}` value is not mapped to its variable as HTTP's `decided` does, and a read
+// inside a list of topics is not looked up.
+fn topics(config: &AppConfig, args: &[Value], keys: &[&str]) -> Option<Named> {
+    let (names, environment) = names_env(args, keys)?;
+    let given = (options(args).flatten())
+        .and_then(|o| keys.iter().find_map(|key| property(o, key).ok().flatten()));
+    let Some(key) = given.and_then(config_key) else {
+        return Some((names, environment, None));
+    };
+    let values = config.literals(key);
+    let mut names: Vec<Option<String>> = (values.iter())
+        .filter(|v| crate::contract::environment_name("channel::kafka", v).is_some())
+        .map(|v| Some(v.clone()))
+        .collect();
+    if names.is_empty() {
+        names.push(None);
+    }
+    Some((
+        names,
+        environment,
+        (values.len() > 1).then_some(Level::Inferred),
+    ))
+}
+
+/// The key a value reads of Backstage's configuration when it is that read alone.
+fn config_key(value: &Value) -> Option<&str> {
+    match value {
+        Value::Str(parts) => match &parts[..] {
+            [Part::Read { key, .. }] => Some(key),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 /// The options object a call takes first: `None` when it is a parameter (a client wrapper),
@@ -482,6 +537,7 @@ fn sqs<'a>(
             call: expanded.site.1,
             role: role.clone(),
             client: None,
+            cap: None,
         })
     })
     .collect()
@@ -496,12 +552,110 @@ mod tests {
 
     /// The messages of the TypeScript file `src` as lines.
     fn lines(src: &str) -> Vec<String> {
+        configured(src, &[])
+    }
+
+    /// `lines`, with the configuration files `configs`.
+    fn configured(src: &str, configs: &[(&str, &[u8])]) -> Vec<String> {
+        crate::channel::message::lines(configured_messages(src, configs))
+    }
+
+    /// The messages of the TypeScript file `src`, with the configuration files `configs`.
+    fn configured_messages(src: &str, configs: &[(&str, &[u8])]) -> Vec<Message> {
         let facts = TsJs.parse("x.ts", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("x.ts", &facts)]);
         let modules = TsJs.modules(&[], &BTreeMap::new()).unwrap();
         let resolver = Resolver::new(&files, modules, &TsJs);
         let code = Code::new(&resolver, &files, &TsJs);
-        crate::channel::message::lines(messages(&code))
+        let indexed = Indexed {
+            manifests: &[],
+            tsconfigs: &[],
+            exported: &[],
+            files: &[],
+            configs,
+            symlinks: &[],
+            channel_clients: &[],
+        };
+        messages(&code, &indexed)
+    }
+
+    /// A kafkajs topic that is a Backstage configuration read alone names each value the
+    /// `app-config*.yaml` files give its key that is a channel name. Several values cap each side
+    /// at `inferred`, whether or not each is a name; a key no file holds, or whose one value is no
+    /// name, leaves the side unresolved.
+    #[test]
+    fn a_kafkajs_topic_read_from_app_config_names_each_value_of_its_key() {
+        let send = |f: &str, key: &str| {
+            format!(
+                "export async function {f}(config) {{ await producer.send({{ topic: config.getString('{key}') }}); }}\n"
+            )
+        };
+        let src = format!(
+            "import {{ Kafka }} from 'kafkajs';\nconst kafka = new Kafka({{ brokers: [] }});\n\
+             const producer = kafka.producer();\n{}",
+            ["one", "two", "none", "bad", "mixed"]
+                .map(|k| send(k, &format!("t.{k}")))
+                .concat()
+        );
+        let base = b"t:\n  one: orders.created\n  two: orders.v2\n  bad: '${TOPIC}'\n  mixed: orders.shipped\n";
+        let production = b"t:\n  two: orders.audit\n  mixed: 'orders shipped'\n";
+        let configs: [(&str, &[u8]); 2] = [
+            ("app-config.yaml", base),
+            ("app-config.production.yaml", production),
+        ];
+        let found: Vec<(Option<String>, Option<Level>)> = (configured_messages(&src, &configs))
+            .into_iter()
+            .map(|m| (m.name, m.cap))
+            .collect();
+        let named = |n: &str| Some(n.to_string());
+        let inferred = Some(Level::Inferred);
+        assert_eq!(
+            found,
+            [
+                (named("orders.created"), None),
+                (named("orders.audit"), inferred),
+                (named("orders.v2"), inferred),
+                (None, None),
+                (None, None),
+                (named("orders.shipped"), inferred),
+            ]
+        );
+        // With no configuration file, the read names nothing.
+        let unconfigured = configured(&src, &[]);
+        assert!(
+            unconfigured
+                .iter()
+                .all(|l| l == "kafka unresolved producer"),
+            "{unconfigured:?}"
+        );
+    }
+
+    /// A private field is a client when every value its class writes it comes from one factory,
+    /// through another field (`this.kafka.producer()`) in an initializer too; fields made from
+    /// each other, or from a producer and a consumer, are none.
+    #[test]
+    fn a_private_field_is_the_one_client_its_class_writes_it() {
+        let src = r#"import { Kafka } from 'kafkajs';
+class Held {
+  private kafka = new Kafka({ brokers: [] });
+  private p = this.kafka.producer();
+  async go() { await this.p.send({ topic: 'orders.audit' }); }
+}
+class Loop {
+  private a: any;
+  private b: any;
+  constructor() { this.a = this.b.producer(); this.b = this.a.producer(); }
+  async go() { await this.a.send({ topic: 'orders.created' }); }
+}
+class Split {
+  private kafka = new Kafka({ brokers: [] });
+  private p: any;
+  constructor() { this.p = this.kafka.producer(); }
+  swap() { this.p = this.kafka.consumer({ groupId: 'g' }); }
+  async go() { await this.p.send({ topic: 'orders.v2' }); }
+}
+"#;
+        assert_eq!(lines(src), ["kafka orders.audit producer"]);
     }
 
     #[test]
