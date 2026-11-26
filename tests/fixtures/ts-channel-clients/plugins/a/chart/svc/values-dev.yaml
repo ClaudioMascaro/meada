@@ -1,0 +1,2 @@
+envs:
+  ORDERS_TOPIC: orders.created

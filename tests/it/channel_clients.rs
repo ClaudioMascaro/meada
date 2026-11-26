@@ -175,3 +175,98 @@ fn a_topic_position_the_call_lacks_leaves_the_side_unresolved() {
         ["channel::kafka"]
     );
 }
+
+fn ts_clients() -> &'static (Value, String) {
+    static RESULT: std::sync::OnceLock<(Value, String)> = std::sync::OnceLock::new();
+    RESULT.get_or_init(|| {
+        let repo = fixture_repo("ts_channel_clients", "ts-channel-clients", None);
+        let export = export_of(&Engine::open(&repo).unwrap());
+        (export, engine::status(&repo).unwrap())
+    })
+}
+
+#[test]
+fn a_declared_ts_method_makes_sides_through_typed_receivers() {
+    let (export, status) = ts_clients();
+    let contract = "channel::kafka::orders.created";
+    let provider = "::plugins/a/src/client.ts::publish";
+    assert_eq!(sides(export, "providers", provider), [contract]);
+    for consumer in [
+        "::plugins/a/src/client.ts::subscribe",
+        "::plugins/a/src/client.ts::Service.listen",
+    ] {
+        assert_eq!(sides(export, "consumers", consumer), [contract]);
+        assert_eq!(level(export, contract, consumer, provider), "declared");
+    }
+    for method in ["KafkaClient.sendMessage", "KafkaClient.createConsumer"] {
+        assert!(
+            !status
+                .lines()
+                .any(|line| line.contains("channel_client") && line.contains(method)),
+            "{status}"
+        );
+    }
+}
+
+#[test]
+fn a_same_named_method_of_another_class_makes_no_side() {
+    let (export, _) = ts_clients();
+    assert!(sides(export, "providers", "::plugins/b/src/client.ts::publish").is_empty());
+}
+
+#[test]
+fn the_status_line_names_an_unreached_ts_declaration_once() {
+    let (_, status) = ts_clients();
+    assert_eq!(
+        status
+            .lines()
+            .filter(|line| line.contains("channel_client")
+                && line.contains("plugins/a/src/client.ts::KafkaClient.missing"))
+            .count(),
+        1,
+        "{status}"
+    );
+}
+
+#[test]
+fn an_external_entry_is_counted_unreached_once() {
+    let (_, status) = ts_clients();
+    assert_eq!(
+        status
+            .lines()
+            .filter(|line| line.contains("channel_client")
+                && line.contains("example.com/acme/flow.NewConsumer"))
+            .count(),
+        1,
+        "{status}"
+    );
+}
+
+#[test]
+fn a_declared_ts_client_reads_the_configured_argument_field() {
+    let repo = fixture_repo("ts_client_topic_field", "ts-channel-clients", None);
+    let manifest = repo.join("meada.toml");
+    let config = std::fs::read_to_string(&manifest).unwrap();
+    std::fs::write(
+        manifest,
+        config.replacen("topic = \"0\"", "topic = \"1.topic\"", 1),
+    )
+    .unwrap();
+    let file = repo.join("plugins/a/src/client.ts");
+    let source = std::fs::read_to_string(&file).unwrap();
+    std::fs::write(
+        file,
+        source
+            .replace(
+                "sendMessage(process.env.ORDERS_TOPIC, \"message\")",
+                "sendMessage('message', { topic: 'orders.shipped' })",
+            )
+            .replace("message: string", "message: { topic: string }"),
+    )
+    .unwrap();
+    let export = export_of(&Engine::open(&repo).unwrap());
+    assert_eq!(
+        sides(&export, "providers", "::plugins/a/src/client.ts::publish"),
+        ["channel::kafka::orders.shipped"]
+    );
+}

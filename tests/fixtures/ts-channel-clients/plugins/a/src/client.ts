@@ -1,0 +1,18 @@
+export class KafkaClient {
+  sendMessage(topic: string, message: string) {}
+  createConsumer(topic: string) {}
+}
+
+export function publish() {
+  const client = new KafkaClient();
+  client.sendMessage(process.env.ORDERS_TOPIC, "message");
+}
+
+export function subscribe(client: KafkaClient) {
+  client.createConsumer(process.env.ORDERS_TOPIC);
+}
+
+export class Service {
+  constructor(private client: KafkaClient) {}
+  listen() { this.client.createConsumer(process.env.ORDERS_TOPIC); }
+}

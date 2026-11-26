@@ -1,0 +1,26 @@
+[[helm_env]]
+key = "envs"
+
+[[channel_client]]
+call = "plugins/a/src/client.ts::KafkaClient.sendMessage"
+role = "producer"
+broker = "kafka"
+topic = "0"
+
+[[channel_client]]
+call = "plugins/a/src/client.ts::KafkaClient.createConsumer"
+role = "consumer"
+broker = "kafka"
+topic = "0"
+
+[[channel_client]]
+call = "plugins/a/src/client.ts::KafkaClient.missing"
+role = "consumer"
+broker = "kafka"
+topic = "0"
+
+[[channel_client]]
+call = "example.com/acme/flow.NewConsumer"
+role = "consumer"
+broker = "kafka"
+topic = "0"
