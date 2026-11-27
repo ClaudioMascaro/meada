@@ -109,6 +109,7 @@ impl ContractKind for Image {
             }
         }
         for (path, summary) in read {
+            chart_envs(repo, export, &path, summary.envs);
             for side in summary.runners {
                 export.consumers.push(runner(
                     &repo.identity,
@@ -594,6 +595,73 @@ impl ContractKind for Image {
     }
 }
 
+/// A chart environment's workload node per Chart environment declaration the values file at
+/// `path` gives (`config::chart_envs`), and its `executions` row: the package that owns the
+/// chart runs from it, `declared`. A chart no package owns runs nothing.
+fn chart_envs(repo: &Repository, export: &mut Export, path: &str, envs: Vec<config::ChartEnv>) {
+    let Some(owner) = (!envs.is_empty())
+        .then(|| crate::package::owner_of(&export.manifests, path))
+        .flatten()
+    else {
+        return;
+    };
+    let owner = match owner.path.rsplit_once('/') {
+        Some((dir, _)) => dir.to_string(),
+        None => ".".to_string(),
+    };
+    let root = match crate::config_values::parent(path) {
+        "" => ".",
+        parent => parent,
+    };
+    for env in envs {
+        let environment = (env.entries.into_iter())
+            .map(|(name, value)| crate::iac::environment::Entry {
+                container: String::new(),
+                image: None,
+                name,
+                target: "Helm value".into(),
+                // A template a chart may render later is no literal.
+                value: crate::iac::environment::literal(&value).filter(|v| !v.contains("{{")),
+                contract: None,
+            })
+            .collect();
+        let node = crate::iac::Node {
+            address: env.key.clone(),
+            root: root.into(),
+            ty: "HelmValues".into(),
+            path: path.into(),
+            line: env.line,
+            end_line: env.line,
+            block: "env".into(),
+            environment,
+            ..Default::default()
+        };
+        export.executions.push(meada_core::export::Execution {
+            workload: node.identity(&repo.identity),
+            root: root.into(),
+            repository: repo.identity.clone(),
+            path: owner.clone(),
+            level: Level::Declared,
+            reason: format!("{CHART_RUNS}{} ({path})", env.key),
+        });
+        export.iac.push(node);
+    }
+}
+
+/// How a chart environment's execution row's reason starts (`chart_envs`).
+const CHART_RUNS: &str = "helm_env ";
+
+/// Whether the execution row `x` is a chart environment's (`chart_envs`): its path is the owning
+/// package's directory, which runs no package nested under it.
+pub(crate) fn chart_execution(x: &meada_core::export::Execution) -> bool {
+    x.reason.starts_with(CHART_RUNS)
+}
+
+/// Whether `node` is a chart environment's workload node (`chart_envs`).
+pub(crate) fn chart_env(node: &crate::iac::Node) -> bool {
+    node.ty == "HelmValues" && node.block == "env"
+}
+
 /// The repository of a builder's site: the site itself, or the repository of its CI step.
 fn repository(site: &str) -> &str {
     site.split_once("::")
@@ -805,6 +873,8 @@ fn runner(
         hops: Vec::new(),
         root: Some(root.into()),
         lead: None,
+        cap: None,
+        client: None,
     }
 }
 

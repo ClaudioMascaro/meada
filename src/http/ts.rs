@@ -18,10 +18,11 @@ use std::collections::BTreeSet;
 
 pub(super) use backstage::{name, unread};
 pub(super) use clients::consumers;
+pub(crate) use config::Config;
 #[cfg(test)]
 pub(crate) use config::probe as app_config_probe;
-pub(in crate::http) use config::{Config, unfollowed, unfollowed_of};
 pub(crate) use config::{DEPTH as INCLUDE_DEPTH, INCLUDES, Reason as IncludeReason, config_inputs};
+pub(in crate::http) use config::{unfollowed, unfollowed_of};
 
 use super::{
     CallAt, HTTP_METHODS, METHODS, Mounts, contract, join, normalize_path, prefixes, provider,

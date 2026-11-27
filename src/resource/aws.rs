@@ -398,6 +398,8 @@ impl Operation {
             fragments: Vec::new(),
             shape: None,
             lead: None,
+            cap: None,
+            client: None,
         }
     }
 }

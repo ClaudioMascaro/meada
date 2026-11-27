@@ -1,0 +1,5 @@
+[serve]
+hosts = ["orders.example.com"]
+
+[[helm_env]]
+key = "lib-chart.envs"

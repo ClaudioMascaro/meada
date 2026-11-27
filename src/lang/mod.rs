@@ -126,6 +126,13 @@ pub trait LanguagePack {
         false
     }
 
+    /// Whether a reference (`Facts::references`) to a name of an outside package gives no row
+    /// (Go: every `*http.Request` or `context.Context` would otherwise be a row with no target
+    /// and a package link's site), rather than a row with no target the package kind reads.
+    fn drops_external_uses(&self) -> bool {
+        false
+    }
+
     /// Whether a definition named by a dotted path (`app.use` of `app.use = function () {}`, `o.m`
     /// of a method of `const o = {}`) is what that path written in a call reaches, though its
     /// head is a local or a constant (JavaScript's).
@@ -479,6 +486,11 @@ pub struct Facts {
     /// parsed again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub references: Vec<Reference>,
+    /// Each struct field whose tag names an environment variable (Go's `env:"X"`): the read of
+    /// the field wherever the types reach it. Stored, as `declarations`: a file of another
+    /// package resolves through it from the facts of files not parsed again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub env_fields: Vec<EnvField>,
     /// The scope and value of each `let` whose name is bound again in its scope or assigned
     /// again (Rust): no constant, since the name holds no one value, but a value that flows
     /// somewhere unread. Not kept in the index (see `Call::args`).
@@ -639,6 +651,13 @@ pub struct Facts {
     /// Not kept in the lean index, like the bound values above.
     #[serde(default, skip_serializing_if = "lean")]
     pub first_results: Vec<FirstResult>,
+    /// The private fields of each class (TypeScript `private`, `#x`), each with every non-null
+    /// value its class assigns it: its initializer and each plain `this.f = v` statement of any
+    /// of its methods, with the scope it is written in. A field another write reaches (an
+    /// operator, a pattern, a computed member of `this`, an assignment that is no statement) has
+    /// none. Not kept in the index (see `Call::args`).
+    #[serde(default, skip_serializing_if = "lean")]
+    pub field_writes: Vec<FieldWrites>,
     /// Scoped selector assignments/deletions, with their source order. None means this
     /// parse does not establish complete write knowledge; no literal values are retained.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -753,6 +772,15 @@ pub struct Bound {
     pub within: String,
     pub name: String,
     pub value: Value,
+}
+
+/// A private field and the values its class assigns it (`Facts::field_writes`).
+#[derive(Serialize, Deserialize)]
+pub struct FieldWrites {
+    /// The field's qualified name, its class's then its own (`Client.#consumer`).
+    pub name: String,
+    /// Each non-null value, with the scope it is written in.
+    pub values: Vec<(String, Value)>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1362,6 +1390,16 @@ pub struct Reference {
     /// its name off; `None` for the other kinds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<String>,
+}
+
+/// A struct field whose tag names the environment variable it is read from
+/// (`Facts::env_fields`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EnvField {
+    /// The struct, as `Def::name`.
+    pub class: String,
+    pub field: String,
+    pub var: String,
 }
 
 /// A `const` binding, qualified by its enclosing definitions like `Def::name`.
@@ -2101,6 +2139,7 @@ mod tests {
     /// decision to take in review: list it here with its class, or move it.
     const TABLES: &[(&str, &str)] = &[
         ("csharp.rs:TRIMS", "runtime"),
+        ("go.rs:PREDECLARED", "syntax"),
         ("go/build.rs:ARCHITECTURES", "runtime"),
         ("go/build.rs:SYSTEMS", "runtime"),
         ("go/values.rs:METHODS", "exception"),

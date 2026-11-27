@@ -96,6 +96,15 @@ pub enum Msg<'a> {
     NotLowercase,
     /// A `[serve]` rewrite without its leading `/`; the value is not quoted.
     NoLeadingSlash,
+    /// A `[[base_url]]` `dir` that is not written as a directory of the repository (`a/b`);
+    /// the value is not quoted.
+    NotRepoDir,
+    /// A `[[helm_env]]` `key` that is not a dotted path of keys; the value is not quoted.
+    NotDottedKey,
+    /// A `[[channel_client]]` `call` in neither of its forms; the value is not quoted.
+    NotClientCall,
+    /// A `[[channel_client]]` `topic` that is not an argument's position or a field of it.
+    NotTopicPosition,
     Empty,
     OwnerNotString,
     OwnerTooLong,
@@ -208,6 +217,40 @@ impl Msg<'_> {
                 "must start with `/`".into(),
                 "deve começar com `/`".into(),
                 "debe empezar con `/`".into(),
+            ),
+            Msg::NotRepoDir => pick(
+                "must be a directory of the repository written as `a/b` \
+                 (no `.`, `..`, `\\` or leading `/`)"
+                    .into(),
+                "deve ser um diretório do repositório escrito como `a/b` \
+                 (sem `.`, `..`, `\\` nem `/` no início)"
+                    .into(),
+                "debe ser un directorio del repositorio escrito como `a/b` \
+                 (sin `.`, `..`, `\\` ni `/` al inicio)"
+                    .into(),
+            ),
+            Msg::NotDottedKey => pick(
+                "must be a dotted path of keys (`a.b`), no segment empty or holding `*`".into(),
+                "deve ser um caminho de chaves com pontos (`a.b`), sem segmento vazio ou com `*`"
+                    .into(),
+                "debe ser una ruta de claves con puntos (`a.b`), sin segmentos vacíos ni con `*`"
+                    .into(),
+            ),
+            Msg::NotClientCall => pick(
+                "must name a function by its import path (`example.com/x/pkg.Func`) or a \
+                 definition of the repository by its file (`dir/file.go::Type.Method`)"
+                    .into(),
+                "deve nomear uma função pelo caminho de importação (`example.com/x/pkg.Func`) \
+                 ou uma definição do repositório pelo arquivo (`dir/file.go::Type.Method`)"
+                    .into(),
+                "debe nombrar una función por su ruta de importación (`example.com/x/pkg.Func`) \
+                 o una definición del repositorio por su archivo (`dir/file.go::Type.Method`)"
+                    .into(),
+            ),
+            Msg::NotTopicPosition => pick(
+                "must be an argument's position (`0`) or a field of it (`0.Topic`)".into(),
+                "deve ser a posição de um argumento (`0`) ou um campo dele (`0.Topic`)".into(),
+                "debe ser la posición de un argumento (`0`) o un campo de él (`0.Topic`)".into(),
             ),
             Msg::Empty => pick("is empty".into(), "está vazio".into(), "está vacío".into()),
             Msg::OwnerNotString => pick(

@@ -402,6 +402,8 @@ pub struct Resolver<'a> {
     arities: HashMap<Target<'a>, Arity<'a>>,
     statics: HashSet<Target<'a>>,
     members_in_scope: bool,
+    /// The pack's `LanguagePack::drops_external_uses`.
+    drops_external_uses: bool,
     /// The pack's `LanguagePack::assigned_members`.
     assigned_members: bool,
     guesses_constructs: bool,
@@ -426,6 +428,9 @@ pub struct Resolver<'a> {
     /// constant marked `.Name` (Go, and a Java or Kotlin write whose class is unknown). A
     /// variable of such a name holds no one value.
     written: HashSet<&'a str>,
+    /// The names of `written` some file other than a Go test file (`_test.go`) writes: `go build`
+    /// leaves test files out of the program (`Code::field_written_in`).
+    written_outside_tests: HashSet<&'a str>,
     /// The fields some file writes in the code of their class (`.name@class`, Java and Kotlin),
     /// by class and name.
     written_in: HashSet<(&'a str, &'a str)>,
@@ -944,16 +949,20 @@ impl<'a> Resolver<'a> {
             paths.dedup();
             (2..=TYPE_PARTS).contains(&paths.len())
         });
-        let marks: Vec<&str> = (files.values())
-            .flat_map(|f| f.consts.iter())
-            .filter_map(|c| c.name.strip_prefix('.'))
+        let marks: Vec<(&str, &str)> = (files.iter())
+            .flat_map(|(&path, f)| f.consts.iter().map(move |c| (path, c)))
+            .filter_map(|(path, c)| Some((path, c.name.strip_prefix('.')?)))
             .collect();
         let written = (marks.iter())
-            .filter(|m| !m.contains('@'))
-            .copied()
+            .filter(|(_, m)| !m.contains('@'))
+            .map(|&(_, m)| m)
+            .collect();
+        let written_outside_tests = (marks.iter())
+            .filter(|(path, m)| !m.contains('@') && !path.ends_with("_test.go"))
+            .map(|&(_, m)| m)
             .collect();
         let written_in = (marks.iter())
-            .filter_map(|m| m.split_once('@'))
+            .filter_map(|(_, m)| m.split_once('@'))
             .map(|(name, class)| (class, name))
             .collect();
         // Those of the definition `defs` keeps for each name.
@@ -1104,6 +1113,7 @@ impl<'a> Resolver<'a> {
             arities,
             statics,
             members_in_scope: language.members_in_scope(),
+            drops_external_uses: language.drops_external_uses(),
             assigned_members: language.assigned_members(),
             guesses_constructs: language.guesses_constructs(),
             unordered_globs: language.unordered_globs(),
@@ -1112,6 +1122,7 @@ impl<'a> Resolver<'a> {
             static_imports_inherit: language.static_imports_inherit(),
             namespaced: language.namespaced(),
             written,
+            written_outside_tests,
             written_in,
             consts,
             internal,
@@ -1381,8 +1392,19 @@ impl<'a> Resolver<'a> {
     /// What the reference at `index` of `path` (`Facts::references`) names, exactly: `None` no
     /// row; `Some(None)` a row with no target, for a name a package specifier binds (the package
     /// kind attaches it); `Some(Some((file, name)))` an `exact` edge to that definition or
-    /// declaration symbol. Never a name match: a use is never `inferred` or `ambiguous`.
+    /// declaration symbol. Never a name match: a use is never `inferred` or `ambiguous`. Where
+    /// the pack drops uses of outside names (`LanguagePack::drops_external_uses`), a row with no
+    /// target is no row: the final answer is checked, after `named` walked the name's prefixes.
     pub fn reference(&self, path: &'a str, index: usize) -> Option<Option<(&'a str, &'a str)>> {
+        let found = self.named(path, index)?;
+        match found {
+            None if self.drops_external_uses => None,
+            found => Some(found),
+        }
+    }
+
+    /// `reference`, rows with no target kept.
+    fn named(&self, path: &'a str, index: usize) -> Option<Option<(&'a str, &'a str)>> {
         let r = self.files[path].references.get(index)?;
         let (scope, name) = (r.scope.as_str(), r.name.as_str());
         let bare = |s: &str| !s.starts_with('.') && !s.starts_with('/');
@@ -2471,7 +2493,16 @@ impl<'a> Resolver<'a> {
             // are separate namespaces (`Reading::Read`).
             let read = self.members_in_scope && (!last || reading.read());
             let labels = labels.filter(|_| last);
-            binding = match self.instance(binding, work) {
+            let instance = self.instance(binding, work);
+            // A Go field of an anonymous struct type has no class to be an instance of: the
+            // rest of the chain may be the path to a tagged field of the file defining the
+            // named type (`Facts::env_fields`, class `Config.Kafka.Topics`).
+            if let Binding::Instance(t) = instance
+                && let Some(found) = self.anonymous_field(t, &members[n..])
+            {
+                return found;
+            }
+            binding = match instance {
                 // A class's name (`Type.m()`, `Type.X`) reaches a Kotlin companion's members
                 // before the class's, which only an instance reaches; past the companion, a
                 // nested class or a constant of the class (an enum entry).
@@ -2513,6 +2544,24 @@ impl<'a> Resolver<'a> {
             };
         }
         binding
+    }
+
+    /// The tagged field the members `rest` reach from an instance of `class` through anonymous
+    /// struct types (`Kafka.Topics.Orders` from `Config`): the `Facts::env_fields` entry of the
+    /// file defining `class` whose class is the path to the last member, which only an
+    /// anonymous nesting records (a named type's own fields are `member`'s).
+    fn anonymous_field(&self, class: Target<'a>, rest: &[&str]) -> Option<Binding<'a>> {
+        let (last, inner) = rest.split_last()?;
+        if inner.is_empty() {
+            return None;
+        }
+        let path = std::iter::once(class.name)
+            .chain(inner.iter().copied())
+            .collect::<Vec<_>>()
+            .join(".");
+        let facts: &'a Facts = self.files.get(class.path)?;
+        let found = (facts.env_fields.iter()).find(|e| e.class == path && e.field == *last)?;
+        Some(Binding::Local(class.path, &found.class, &found.field))
     }
 
     /// A written type path without an import, after lexical lookup left its head unbound.
@@ -5162,10 +5211,10 @@ pub struct Code<'a> {
     folded: RefCell<HashMap<&'a str, usize>>,
     /// `folded` and `field_reads` for the work `Code::apart` runs.
     folded_apart: RefCell<HashMap<&'a str, usize>>,
-    field_reads_apart: RefCell<HashMap<Field<'a>, Value>>,
+    field_reads_apart: RefCell<HashMap<(Field<'a>, bool), Value>>,
     /// `folded` and `field_reads` for what a cut cycle adds to a walk (`Code::cut_apart`).
     folded_cuts: RefCell<HashMap<&'a str, usize>>,
-    field_reads_cuts: RefCell<HashMap<Field<'a>, Value>>,
+    field_reads_cuts: RefCell<HashMap<(Field<'a>, bool), Value>>,
     /// Whether a budget refused a charge since this was last cleared.
     refused: Cell<bool>,
     fold_returned_strings: Cell<bool>,
@@ -5176,9 +5225,10 @@ pub struct Code<'a> {
     /// The marker constants of the literals that set each field (`field_values`), by field name
     /// (`*` for a literal by position), built the first time a field is read.
     literals: OnceCell<HashMap<&'a str, BTreeSet<(&'a str, &'a str)>>>,
-    /// The environment read each struct field holds (`Code::field_read`), `Unknown` while it is
-    /// folded, so a field many reads reach is folded once and a field met again folds to nothing.
-    field_reads: RefCell<HashMap<Field<'a>, Value>>,
+    /// The environment read each struct field holds (`Code::field_read`), for a read in a Go
+    /// test file or not, `Unknown` while it is folded, so a field many reads reach is folded once
+    /// and a field met again folds to nothing.
+    field_reads: RefCell<HashMap<(Field<'a>, bool), Value>>,
     /// The last segment of every callee of the repository (`save` of `repo.save`, `C` of
     /// `(opaque).C`), built the first time a parameter is injected (`Code::may_be_called`).
     callees: OnceCell<HashSet<&'a str>>,
@@ -5410,7 +5460,7 @@ impl<'a> Code<'a> {
     fn aside<T>(
         &self,
         folded: &RefCell<HashMap<&'a str, usize>>,
-        field_reads: &RefCell<HashMap<Field<'a>, Value>>,
+        field_reads: &RefCell<HashMap<(Field<'a>, bool), Value>>,
         work: impl FnOnce() -> T,
     ) -> T {
         let swap = || {
@@ -5804,6 +5854,12 @@ impl<'a> Code<'a> {
         self.full(path).map_or(&[], |f| f.private_fields.as_slice())
     }
 
+    /// The private fields of the classes of `path` with every non-null value their class
+    /// assigns them (`Facts::field_writes`).
+    pub fn field_writes(&self, path: &'a str) -> &'a [crate::lang::FieldWrites] {
+        self.full(path).map_or(&[], |f| f.field_writes.as_slice())
+    }
+
     /// Every value `path` assigns to a bare name, and every initializer `bindings` drops
     /// (`Facts::assigned`), in source order: a reader that needs every use of a value reads them.
     pub fn assigned(&self, path: &'a str) -> &'a [Bound] {
@@ -6130,7 +6186,8 @@ impl<'a> Code<'a> {
     /// The values the composite literals of the repository give the field `field` (`T{rc: x}`,
     /// `[]T{{rc: x}}`), each with the file and scope it is written in. `None` when a literal may
     /// set it to a value the source does not tell: one by position, one whose type is not read
-    /// or not known, or one of a type that declares no such field (an alias). The pack writes
+    /// or not known (one by position of a type declared inside a function sets none), or one of
+    /// a type that declares no such field (an alias). The pack writes
     /// each as a marker constant `{name}` (`{*}` by position) holding `New(type, [value])`, the
     /// type `?` when it is not read.
     // ponytail: a literal of an alias or a defined type (`type B = T`, `type B T`) written by
@@ -6181,11 +6238,30 @@ impl<'a> Code<'a> {
                             || (self.resolver.receivers.get(t.path))
                                 .is_some_and(|r| r.contains_key(&(t.name, name))) => {}
                     Binding::External(..) => {}
+                    // A local can shadow a package type outside the literal's block or after
+                    // its initializer. Skip only when the bare name has no outer type to hide.
+                    // ponytail: a function-local alias of the struct (`type L = T; L{a, b}`) or
+                    // a type parameter instantiated with it sets the struct's fields unseen;
+                    // read local type declarations when one matters.
+                    Binding::Hidden
+                        if by_position
+                            && written.chars().all(|c| c.is_alphanumeric() || c == '_')
+                            && !self.go_package_may_name_type(path, written) => {}
                     _ => return None,
                 }
             }
         }
         Some(out)
+    }
+
+    /// Go gives a bare type name the scope of its package and the file's dot imports.
+    fn go_package_may_name_type(&self, path: &str, name: &str) -> bool {
+        let r = self.resolver;
+        r.defs[path].contains_key(name)
+            || r.shared
+                .get(path)
+                .is_some_and(|&g| r.groups[g].tops.contains_key(name))
+            || (name.starts_with(char::is_uppercase) && !r.by_local[path].stars.is_empty())
     }
 
     /// Whether some file of the repository writes the field `field` through a selector
@@ -6195,9 +6271,15 @@ impl<'a> Code<'a> {
     }
 
     /// Whether some file of the repository writes the field `field` of `class` (Java and
-    /// Kotlin): a write in the code of `class`, or one whose class the pack could not tell.
-    pub fn field_written_in(&self, class: &str, field: &str) -> bool {
-        self.field_written(field) || self.resolver.written_in.contains(&(class, field))
+    /// Kotlin): a write in the code of `class`, or one whose class the pack could not tell. For
+    /// a read outside Go test files (`test_read` false), a write in a `_test.go` file does not
+    /// count: `go build` leaves those files out of the program.
+    pub fn field_written_in(&self, class: &str, field: &str, test_read: bool) -> bool {
+        let written = match test_read {
+            true => &self.resolver.written,
+            false => &self.resolver.written_outside_tests,
+        };
+        written.contains(field) || self.resolver.written_in.contains(&(class, field))
     }
 
     /// The environment read the struct field `field` holds: the one every composite literal of
@@ -6207,25 +6289,28 @@ impl<'a> Code<'a> {
     /// when a literal may set it to a value the source does not tell (`Code::field_values`),
     /// when no literal sets it, when two give different values or one gives anything but one
     /// environment read (`Env` or `EnvOr`), when a function whose parameter it takes has no
-    /// exact caller, past `FIELD_DEPTH`, and while it is folded (a field met again). The caller
-    /// checks that no file writes it through a selector (`Code::field_written`).
-    fn field_read(&self, field: Field<'a>, depth: usize, nested: usize) -> Value {
+    /// exact caller, past `FIELD_DEPTH`, and while it is folded (a field met again). `test_read`:
+    /// the read is in a Go `_test.go` file, whose callers then count (`Code::literal_reads`).
+    /// The caller uses `Code::field_written_in` with the same `test_read` to check selector writes.
+    fn field_read(&self, field: Field<'a>, depth: usize, nested: usize, test_read: bool) -> Value {
         let (at, ty, _) = field;
         let struct_field = (self.resolver.defs.get(at).and_then(|d| d.get(ty)))
             .is_some_and(|d| d.kind == Kind::Class);
         if depth >= FIELD_DEPTH || !struct_field {
             return Value::Unknown;
         }
-        if let Some(known) = self.field_reads.borrow().get(&field) {
+        let key = (field, test_read);
+        if let Some(known) = self.field_reads.borrow().get(&key) {
             return known.clone();
         }
-        (self.field_reads.borrow_mut()).insert(field, Value::Unknown);
+        (self.field_reads.borrow_mut()).insert(key, Value::Unknown);
         let mut reads = Vec::new();
         let all = self.field_values(field).is_some_and(|values| {
             !values.is_empty()
                 && (values.into_iter()).all(|(path, scope, value)| {
                     let frames = &mut Vec::new();
-                    self.literal_reads(path, scope, value, frames, (depth, nested), &mut reads)
+                    let at = (depth, nested, test_read);
+                    self.literal_reads(path, scope, value, frames, at, &mut reads)
                 })
         });
         let read = match (all, &reads[..]) {
@@ -6234,7 +6319,7 @@ impl<'a> Code<'a> {
             }
             _ => Value::Unknown,
         };
-        (self.field_reads.borrow_mut()).insert(field, read.clone());
+        (self.field_reads.borrow_mut()).insert(key, read.clone());
         read
     }
 
@@ -6244,7 +6329,8 @@ impl<'a> Code<'a> {
     /// the walk that reads the field. `false` as soon as one is no single environment read, or a
     /// function to climb has no exact caller or a call reaches it by a name match (which may pass
     /// anything), is met again, is `WRAPPER_DEPTH` calls up or its caller's file has spent its
-    /// `EVAL_BUDGET`.
+    /// `EVAL_BUDGET`. A caller in a Go `_test.go` file is skipped unless `test_read`: `go build`
+    /// leaves such files out of the program, so they pass nothing to a read outside them.
     // ponytail: a constructor read as a value (`mk := New; mk(x)`) is not seen, so its exact
     // callers alone give the field; reading every value of the repository for its name would
     // see it.
@@ -6254,7 +6340,7 @@ impl<'a> Code<'a> {
         scope: &'a str,
         value: &'a Value,
         frames: &mut Vec<Frame<'a>>,
-        (depth, nested): (usize, usize),
+        (depth, nested, test_read): (usize, usize, bool),
         reads: &mut Vec<Part>,
     ) -> bool {
         let mut wants = None;
@@ -6281,6 +6367,7 @@ impl<'a> Code<'a> {
             return false;
         }
         let callers: Vec<Caller> = (self.resolver.callers.get(&function).into_iter().flatten())
+            .filter(|c| test_read || !c.path.ends_with("_test.go"))
             .copied()
             .collect();
         !callers.is_empty()
@@ -6294,7 +6381,8 @@ impl<'a> Code<'a> {
                     path: caller.path,
                     index: caller.index,
                 });
-                let read = self.literal_reads(path, scope, value, frames, (depth, nested), reads);
+                let at = (depth, nested, test_read);
+                let read = self.literal_reads(path, scope, value, frames, at, reads);
                 frames.pop();
                 read
             })
@@ -8138,13 +8226,29 @@ impl<'a> Code<'a> {
                 }
                 folded
             }
+            // A field whose tag names a variable (`Facts::env_fields`, in the file defining
+            // the struct) is that read wherever the types reach it: a write by name elsewhere
+            // (a test setting a config field) does not count, one to this struct's field does.
+            Binding::Local(at, class, field)
+                if !self.resolver.written_in.contains(&(class, field))
+                    && let Some(var) = (self.resolver.files[at].env_fields.iter())
+                        .find(|e| e.class == class && e.field == field) =>
+            {
+                Value::Str(vec![Part::Env(var.var.clone())])
+            }
             // A field no file assigns holds what an annotation on it injects, else the
-            // environment read every composite literal that sets it gives it.
-            Binding::Local(at, class, field) if !self.field_written_in(class, field) => {
+            // environment read every composite literal that sets it gives it. A Go test file's
+            // write counts only for a read in a test file.
+            Binding::Local(at, class, field)
+                if !self.field_written_in(class, field, path.ends_with("_test.go")) =>
+            {
                 let marks = |on: &Marked| matches!(on, Marked::Field { class: c, name, .. } if c == class && name == field);
                 let injected = fold.inject.and_then(|i| self.injected(at, marks, i));
                 let field = (at, class, field);
-                injected.unwrap_or_else(|| self.field_read(field, fold.field_depth, fold.nested))
+                let test_read = path.ends_with("_test.go");
+                injected.unwrap_or_else(|| {
+                    self.field_read(field, fold.field_depth, fold.nested, test_read)
+                })
             }
             Binding::External(..) | Binding::Unknown if fold.chain => {
                 // An opaque member of a value is not a package path. On-demand type imports

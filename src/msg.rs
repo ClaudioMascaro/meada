@@ -259,6 +259,11 @@ pub enum Msg<'a> {
     FileMisparsed {
         path: &'a str,
     },
+    /// A Client declaration (`[[channel_client]]`) whose `call` no call of the repository
+    /// resolves to: it makes no side.
+    ChannelClientUnmatched {
+        call: &'a str,
+    },
     /// A Backstage plugin whose `pluginId` Meada cannot read (#615): its routers stay at the root.
     BackstageUnmounted {
         site: &'a str,
@@ -2117,6 +2122,11 @@ impl Msg<'_> {
                 format!("{path}: left out, the grammar misreads it: no symbols or calls"),
                 format!("{path}: deixado de fora, a gramática o lê errado: sem símbolos nem chamadas"),
                 format!("{path}: dejado fuera, la gramática lo lee mal: sin símbolos ni llamadas"),
+            ),
+            Msg::ChannelClientUnmatched { call } => pick(
+                format!("meada.toml channel_client {call}: no call of the repository resolves to it, so it makes no channel side"),
+                format!("meada.toml channel_client {call}: nenhuma chamada do repositório resolve para ele, então ele não faz lado de canal"),
+                format!("meada.toml channel_client {call}: ninguna llamada del repositorio resuelve a él, así que no hace lado de canal"),
             ),
             Msg::BackstageUnmounted { site } => pick(
                 format!("{site}: Backstage plugin whose pluginId is neither a string literal nor a const of its file bound to one: its routes stay at the root, not under /api/<pluginId>"),

@@ -26,6 +26,7 @@ mod rust;
 mod swift;
 mod ts;
 pub(crate) use infrastructure::Prepared;
+pub(crate) use ts::Config as AppConfig;
 #[cfg(test)]
 pub(crate) use ts::app_config_probe;
 pub(crate) use ts::{INCLUDE_DEPTH, INCLUDES, IncludeReason, config_inputs};
@@ -499,6 +500,8 @@ fn provider(site: Site, contract: String) -> Found {
         fragments: Vec::new(),
         shape: None,
         lead: None,
+        cap: None,
+        client: None,
     }
 }
 
@@ -525,6 +528,8 @@ fn consumer_at(site: Site, read: Read, shape: Option<Shape>) -> Found {
         fragments: read.fragments,
         lead: read.lead,
         shape,
+        cap: None,
+        client: None,
     }
 }
 
@@ -911,7 +916,7 @@ impl ContractKind for Http {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
-        _exports: &[IndexExport],
+        exports: &[IndexExport],
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
@@ -923,10 +928,19 @@ impl ContractKind for Http {
         };
         let through = endpoint.map(|e| format!(" through the proxy endpoint {e}"));
         let through = through.as_deref().unwrap_or_default();
+        let var = via.and_then(|v| v.strip_prefix("env:"));
+        // A Base URL declaration settles the module: the routes served under its directory of
+        // this repository, chosen before a code path match elsewhere can drop a gateway match.
+        let dir = var.and_then(|var| from.config.declared_dir(var));
         // A route serves a consumer by its code path, or by its gateway path with the reason
         // for the rewrite. Within one repository a code path match wins over gateway path
         // matches; across repositories both are candidates.
         let mut serving: Vec<_> = (providers.iter())
+            .filter(|(m, p)| {
+                dir.is_none_or(|dir| {
+                    m.identity == from.identity && under(&p.site, &m.identity, dir)
+                })
+            })
             .filter_map(|&(m, p)| {
                 if fits(&p.contract, contract) {
                     return Some((m, p, None));
@@ -935,6 +949,25 @@ impl ContractKind for Http {
                 Some((m, p, Some(reason.to_string())))
             })
             .collect();
+        // A relative URL reaches its own origin: when a route of the consumer's own package
+        // fits, the others (other packages, other repositories) drop.
+        if via.is_none() {
+            let manifests = (exports.iter())
+                .find(|e| e.repository == from.identity)
+                .map_or(&[][..], |e| &e.manifests[..]);
+            let package = |site: &str, identity: &str| {
+                let owner = crate::package::owner_of(manifests, path_of(site, identity)?)?;
+                Some(owner.path.as_str())
+            };
+            if let Some(own) = package(&consumer.site, &from.identity) {
+                let mine = |(m, p, _): &(&Repository, &Provider, Option<String>)| {
+                    m.identity == from.identity && package(&p.site, &m.identity) == Some(own)
+                };
+                if serving.iter().any(mine) {
+                    serving.retain(mine);
+                }
+            }
+        }
         let direct: Vec<&str> = (serving.iter())
             .filter(|(.., gateway)| gateway.is_none())
             .map(|&(m, ..)| m.identity.as_str())
@@ -942,7 +975,6 @@ impl ContractKind for Http {
         serving
             .retain(|(m, _, gateway)| gateway.is_none() || !direct.contains(&m.identity.as_str()));
         let serving = serving.into_iter();
-        let var = via.and_then(|v| v.strip_prefix("env:"));
         let peers: Vec<&str> = var
             .map(|var| from.config.peers_reading(var).collect())
             .unwrap_or_default();
@@ -956,6 +988,14 @@ impl ContractKind for Http {
                 fits,
                 Level::Exact,
                 format!("host {host}{through} is served by"),
+            )
+        } else if let (Some(var), Some(dir)) = (var, dir) {
+            (
+                serving.collect(),
+                Level::Declared,
+                format!(
+                    "base URL from {var}{through}, declared for {dir}/ in meada.toml; served by"
+                ),
             )
         } else if let (Some(var), false) = (var, peers.is_empty()) {
             let fits = serving
@@ -1154,16 +1194,40 @@ impl ContractKind for Http {
     }
 }
 
+/// Whether the site `site` of the repository `identity` (`<identity>::<path>::...`) lies under
+/// the directory `dir` of that repository: `svc` holds `svc/a.go`, never `svc-ui/a.go`.
+fn under(site: &str, identity: &str, dir: &str) -> bool {
+    (path_of(site, identity).and_then(|p| p.strip_prefix(dir)))
+        .is_some_and(|rest| rest.starts_with('/'))
+}
+
+/// The repository path of the site `site` of the repository `identity`
+/// (`<identity>::<path>::...`).
+fn path_of<'s>(site: &'s str, identity: &str) -> Option<&'s str> {
+    let rest = site.strip_prefix(identity)?.strip_prefix("::")?;
+    Some(rest.split_once("::").map_or(rest, |(path, _)| path))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         CallAt, Http, Mounts, PREFIX_DEPTH, fragments, normalize_path, prefixes, route_fits,
-        tail_fits,
+        tail_fits, under,
     };
     use crate::contract::{ContractKind, Role, Search, View};
     use crate::entry::EntryKind;
     use crate::index::{Consumer, Gateway, Provider};
     use crate::lang::{Limit, Part, Value};
+
+    /// A route whose handler names no definition has the whole file for its site
+    /// (`<identity>::<path>`, `Site::File`): a declared directory holds it as it holds a symbol's.
+    #[test]
+    fn a_whole_file_site_lies_under_its_directory() {
+        assert!(under("acme::svc-b/main.go", "acme", "svc-b"));
+        assert!(under("acme::svc-b/routes.go::Routes.run", "acme", "svc-b"));
+        assert!(!under("acme::svc-bx/main.go", "acme", "svc-b"));
+        assert!(!under("other::svc-b/main.go", "acme", "svc-b"));
+    }
 
     /// A base Meada could not read (a hole, a read no kind decided, a limit of value flow), with
     /// a path appended, may hold a path of its own: the consumer is unresolved, and its lead
@@ -1314,6 +1378,8 @@ mod tests {
             hops: Vec::new(),
             root: None,
             lead: None,
+            cap: None,
+            client: None,
         };
         let direct = provider("http::GET::/shop/users");
         let gateway = Provider {

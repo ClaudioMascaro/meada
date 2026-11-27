@@ -7,8 +7,9 @@ use std::rc::Rc;
 use tree_sitter::{Language, Node, Parser};
 
 use super::{
-    Binds, Call, ConfigInput, Const, Declaration, Def, Export, Facts, Field, Import, Imported,
-    Invocation, Kind, LanguagePack, Modules, Param, Part, Ty, Value, children, named, text,
+    Binds, Call, ConfigInput, Const, Declaration, Def, Export, Facts, Field, FieldWrites, Import,
+    Imported, Invocation, Kind, LanguagePack, Modules, Param, Part, Ty, Value, children, named,
+    text,
 };
 use crate::{Result, package, qualify};
 
@@ -101,6 +102,10 @@ impl LanguagePack for TsJs {
         let typescript = path.ends_with(".ts") || path.ends_with(".tsx");
         let mut sealed: Vec<(String, String, Option<Value>)> = Vec::new();
         let mut writes: BTreeMap<(Option<String>, String), Vec<Option<Value>>> = BTreeMap::new();
+        // The private fields by class and name with their initializer (`private_field`), and
+        // each member write's value as a statement of any method (`Stated`, `member_writes`).
+        let mut private: Vec<(String, String, Stated)> = Vec::new();
+        let mut stated: BTreeMap<(Option<String>, String), Vec<Stated>> = BTreeMap::new();
         let mut assigned = HashSet::new();
         let mut query_writes = HashMap::new();
         let mut query_locals = Vec::new();
@@ -237,6 +242,14 @@ impl LanguagePack for TsJs {
                     }
                 }
                 "public_field_definition" if typescript => {
+                    if let Some(name) = private_field(node, src) {
+                        let initial = node.child_by_field_name("value");
+                        private.push((
+                            scope.clone(),
+                            name,
+                            stated_value(initial, src, &scope, &parents),
+                        ));
+                    }
                     if let Some(name) = sealed_field(node, src) {
                         let initial = node.child_by_field_name("value");
                         // A URL whose members `this.f` writes is no longer what it was built
@@ -256,9 +269,10 @@ impl LanguagePack for TsJs {
                 | "update_expression"
                     if typescript =>
                 {
-                    for (name, plain) in member_writes(node, src, &scope, &parents) {
-                        let at = writes.entry((name, scope.clone())).or_default();
+                    for (name, plain, value) in member_writes(node, src, &scope, &parents) {
+                        let at = writes.entry((name.clone(), scope.clone())).or_default();
                         at.push(plain);
+                        stated.entry((name, scope.clone())).or_default().push(value);
                     }
                 }
                 "import_statement" => {
@@ -424,6 +438,7 @@ impl LanguagePack for TsJs {
         // ponytail: a write through an alias of `this` (`const self = this; self.f = v`) or
         // `Object.assign(this, ..)` is not seen, nor a subclass that redeclares a non-private
         // `readonly` field; see `docs/agents/ceilings/language-packs.md`.
+        facts.field_writes = field_writes(private, &stated);
         for (class, name, initial) in sealed {
             let inside = |scope: &str| {
                 (scope.strip_prefix(class.as_str()))
@@ -2311,12 +2326,27 @@ fn this_member(node: Node, src: &[u8], up: &Parents) -> Option<String> {
 /// private names (https://tc39.es/ecma262/#sec-private-names). A `static` or `abstract` field
 /// is no instance's.
 fn sealed_field(node: Node, src: &[u8]) -> Option<String> {
+    let (name, private, readonly) = instance_field(node, src)?;
+    (private || readonly).then_some(name)
+}
+
+/// The name of the instance field `node` (a `public_field_definition`) declares when only its
+/// class may reach it (`private`, `#x`), whatever writes it there (`Facts::field_writes`).
+fn private_field(node: Node, src: &[u8]) -> Option<String> {
+    let (name, private, _) = instance_field(node, src)?;
+    private.then_some(name)
+}
+
+/// The plain name of the instance field `node` declares, whether only its class may reach it
+/// and whether it is `readonly`; `None` for a `static` or `abstract` field or a computed name.
+fn instance_field(node: Node, src: &[u8]) -> Option<(String, bool, bool)> {
     let name = node.child_by_field_name("name")?;
-    let mut sealed = name.kind() == "private_property_identifier";
+    let mut private = name.kind() == "private_property_identifier";
+    let mut readonly = false;
     for child in node.children(&mut node.walk()) {
         match child.kind() {
-            "readonly" => sealed = true,
-            "accessibility_modifier" if text(child, src) == "private" => sealed = true,
+            "readonly" => readonly = true,
+            "accessibility_modifier" if text(child, src) == "private" => private = true,
             "static" | "abstract" => return None,
             _ => {}
         }
@@ -2325,7 +2355,57 @@ fn sealed_field(node: Node, src: &[u8]) -> Option<String> {
         name.kind(),
         "property_identifier" | "private_property_identifier"
     );
-    (sealed && plain).then(|| text(name, src).to_string())
+    plain.then(|| (text(name, src).to_string(), private, readonly))
+}
+
+/// What one write gives a private field (`Facts::field_writes`): `Some(Some(v))` the value of a
+/// plain `this.f = v` statement or an initializer, `Some(None)` a `null` or no initializer,
+/// `None` any other write (an operator, a pattern, an expression that is no statement, a
+/// function).
+type Stated = Option<Option<Value>>;
+
+/// What the right side `right` of a plain write or an initializer gives (`Stated`).
+fn stated_value(right: Option<Node>, src: &[u8], scope: &str, up: &Parents) -> Stated {
+    match right {
+        None => Some(None),
+        Some(v) if v.kind() == "null" => Some(None),
+        Some(v) if FUNCTIONS.contains(&v.kind()) || v.kind() == "class" => None,
+        Some(v) => Some(Some(value(v, src, scope, up))),
+    }
+}
+
+/// The values each private field's class assigns it (`Facts::field_writes`): the writes of a
+/// member so named, or of a computed member of `this`, in scopes from its class down. None for a
+/// field one of them leaves unknown, nor for one only `null` reaches.
+fn field_writes(
+    private: Vec<(String, String, Stated)>,
+    stated: &BTreeMap<(Option<String>, String), Vec<Stated>>,
+) -> Vec<FieldWrites> {
+    let mut out = Vec::new();
+    for (class, name, initial) in private {
+        let inside = |scope: &str| {
+            (scope.strip_prefix(class.as_str())).is_some_and(|r| r.is_empty() || r.starts_with('.'))
+        };
+        let written = [Some(name.clone()), None].into_iter().flat_map(|key| {
+            let (from, to) = (class.clone(), format!("{class}/"));
+            (stated.range((key.clone(), from)..(key, to)))
+                .filter(|((_, scope), _)| inside(scope))
+                .flat_map(|((_, scope), values)| values.iter().map(move |v| (scope, v)))
+        });
+        let (mut values, mut known) = (Vec::new(), true);
+        for (scope, given) in std::iter::once((&class, &initial)).chain(written) {
+            match given {
+                None => known = false,
+                Some(None) => {}
+                Some(Some(value)) => values.push((scope.clone(), value.clone())),
+            }
+        }
+        if known && !values.is_empty() {
+            let name = qualify(&class, &name);
+            out.push(FieldWrites { name, values });
+        }
+    }
+    out
 }
 
 /// The members the write `node` (`=`, `op=`, `++`) assigns: each one's name, `None` for a
@@ -2337,7 +2417,7 @@ fn member_writes(
     src: &[u8],
     scope: &str,
     up: &Parents,
-) -> Vec<(Option<String>, Option<Value>)> {
+) -> Vec<(Option<String>, Option<Value>, Stated)> {
     let target = match node.kind() {
         "update_expression" => node.child_by_field_name("argument"),
         _ => node.child_by_field_name("left"),
@@ -2351,7 +2431,7 @@ fn member_writes(
             "member_expression" => t.child_by_field_name("property").map(|p| text(p, src)),
             "subscript_expression" => match t.child_by_field_name("index") {
                 Some(index) if index.kind() == "string" => {
-                    out.push((Some(unquote(index, src)), None));
+                    out.push((Some(unquote(index, src)), None, None));
                     continue;
                 }
                 _ if on_this => None,
@@ -2377,7 +2457,19 @@ fn member_writes(
                 false => value(v, src, scope, up),
             }
         });
-        out.push((name.map(str::to_string), plain));
+        // As a statement of any method, a write a private field's values hold (`Stated`).
+        let statement = node.kind() == "assignment_expression"
+            && Some(t) == target
+            && on_this
+            && up
+                .of(node)
+                .is_some_and(|s| s.kind() == "expression_statement");
+        // A computed member of `this` may be any field: it leaves each unknown.
+        let stated = match node.child_by_field_name("right") {
+            Some(right) if statement && name.is_some() => stated_value(Some(right), src, scope, up),
+            _ => None,
+        };
+        out.push((name.map(str::to_string), plain, stated));
     }
     out
 }
@@ -3681,5 +3773,42 @@ mod tests {
             assert_eq!(call.args.len(), 1);
             assert_eq!(&source[call.range.clone()], written);
         }
+    }
+
+    /// A private field (`private`, `#x`) keeps each non-null value its class writes it as a plain
+    /// statement or initializer, in the constructor or any method; a public or static field, one
+    /// only `null` reaches, one an operator or a computed member of `this` writes, keeps none.
+    #[test]
+    fn field_writes_keep_what_a_class_writes_its_private_fields() {
+        let src = "class C {\n\
+                   private a: X;\n\
+                   #b: X | null = null;\n\
+                   private c = make();\n\
+                   d: X;\n\
+                   private static e = make();\n\
+                   private f: X | null = null;\n\
+                   private g: X;\n\
+                   constructor(p) { this.a = p.one(); this.g = p; }\n\
+                   open() { this.#b = make(); this.f = null; this.d = make(); }\n\
+                   bump() { this.g += 1; }\n\
+                   }\n\
+                   class D { private a: X; m() { this.a = other(); } }\n\
+                   class E { private a = make(); m(k) { this[k] = 1; } }\n";
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let found: Vec<(&str, Vec<&str>)> = (facts.field_writes.iter())
+            .map(|w| {
+                (
+                    w.name.as_str(),
+                    w.values.iter().map(|(at, _)| at.as_str()).collect(),
+                )
+            })
+            .collect();
+        let expected: [(&str, Vec<&str>); 4] = [
+            ("C.a", vec!["C.constructor"]),
+            ("C.#b", vec!["C.open"]),
+            ("C.c", vec!["C"]),
+            ("D.a", vec!["D.m"]),
+        ];
+        assert_eq!(found, expected);
     }
 }

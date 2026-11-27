@@ -151,7 +151,12 @@ fn directed_uses(export: &Export) -> impl Iterator<Item = (&str, &str, Level)> {
             (
                 p.site.as_str(),
                 p.contract.as_str(),
-                crate::contract::use_level(&p.contract, p.via.as_deref(), p.method.as_deref()),
+                crate::contract::use_level(
+                    &p.contract,
+                    p.cap,
+                    p.via.as_deref(),
+                    p.method.as_deref(),
+                ),
             )
         })
         .chain(export.consumers.iter().filter_map(|c| {
@@ -159,7 +164,7 @@ fn directed_uses(export: &Export) -> impl Iterator<Item = (&str, &str, Level)> {
             Some((
                 c.site.as_str(),
                 contract,
-                crate::contract::use_level(contract, c.via.as_deref(), c.method.as_deref()),
+                crate::contract::use_level(contract, c.cap, c.via.as_deref(), c.method.as_deref()),
             ))
         }))
         .chain(

@@ -21,3 +21,5 @@ example.com/acme/conformance store/helpers.go:3 helper
 example.com/acme/conformance store/store.go:23 open
 example.com/acme/conformance store/sys_unix.go:5 sysOpen
 example.com/acme/conformance store/store.go:16 (unresolved) fmt.Sprintf
+uses:
+example.com/acme/conformance store/store.go:5 Store (type)

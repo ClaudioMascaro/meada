@@ -10,6 +10,10 @@ const Prefix = "store-"
 
 type Store struct{}
 
+type Settings struct {
+	URL string `env:"STORE_URL"`
+}
+
 type Getter interface {
 	Get(key string) string
 }

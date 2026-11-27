@@ -22,10 +22,10 @@ use crate::workspace::Repository;
 pub struct Resource;
 
 /// Both reader families establish SDK origins, through stored provenance or an operation.
-fn sdk_use(via: Option<&str>, operation: Option<&str>) -> bool {
+fn sdk_use(cap: Option<Level>, via: Option<&str>, operation: Option<&str>) -> bool {
     via == Some("sdk:aws")
         || operation.is_some()
-        || crate::contract::environment_reason(via).is_some()
+        || crate::contract::environment_cap(cap, via).is_some()
 }
 
 /// The start of every resource contract identifier.
@@ -169,9 +169,9 @@ impl ContractKind for Resource {
     }
 
     fn use_level(&self, via: Option<&str>, operation: Option<&str>) -> Level {
-        if crate::contract::environment_reason(via).is_some() {
+        if crate::contract::environment_cap(None, via).is_some() {
             Level::Inferred
-        } else if sdk_use(via, operation) {
+        } else if sdk_use(None, via, operation) {
             Level::Exact
         } else {
             Level::Declared
@@ -245,6 +245,8 @@ impl ContractKind for Resource {
                         hops: Vec::new(),
                         root: None,
                         lead: None,
+                        cap: None,
+                        client: None,
                     });
                 }
             }
@@ -312,23 +314,36 @@ impl ContractKind for Resource {
             .filter(|(repo, p)| {
                 p.contract == *contract
                     && (repo.identity != from.identity
-                        || (sdk_use(consumer.via.as_deref(), consumer.method.as_deref())
-                            && sdk_use(p.via.as_deref(), p.method.as_deref())))
+                        || (sdk_use(
+                            consumer.cap,
+                            consumer.via.as_deref(),
+                            consumer.method.as_deref(),
+                        ) && sdk_use(p.cap, p.via.as_deref(), p.method.as_deref())))
             })
             .map(|(_, p)| {
                 let mut link = Link::new(
                     consumer.site.clone(),
                     p.site.clone(),
                     contract.clone(),
-                    self.use_level(consumer.via.as_deref(), consumer.method.as_deref())
-                        .max(self.use_level(p.via.as_deref(), p.method.as_deref())),
+                    crate::contract::use_level(
+                        contract,
+                        consumer.cap,
+                        consumer.via.as_deref(),
+                        consumer.method.as_deref(),
+                    )
+                    .max(crate::contract::use_level(
+                        contract,
+                        p.cap,
+                        p.via.as_deref(),
+                        p.method.as_deref(),
+                    )),
                     contract.clone(),
                     None,
                     None,
                     None,
                 );
-                crate::contract::environment_link(&mut link, consumer.via.as_deref());
-                crate::contract::environment_link(&mut link, p.via.as_deref());
+                crate::contract::environment_link(&mut link, consumer.cap, consumer.via.as_deref());
+                crate::contract::environment_link(&mut link, p.cap, p.via.as_deref());
                 link
             })
             .collect()

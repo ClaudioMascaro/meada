@@ -122,12 +122,11 @@ impl Held {
         }
         let root = self.dir.join(bundle).join("mirror");
         let max = Some(config::GENERATION_CONFIG_MAX);
-        let (own, documents) =
-            match config::read_own_up_to::<config::Config>(&root, "meada.toml", max) {
-                Ok(Some(own)) => (true, own.serve.declared),
-                Ok(None) => (false, entry.blocks.get("serve").is_some()),
-                Err(_) => (true, false),
-            };
+        let (own, documents) = match config::read_config_up_to(&root, max) {
+            Ok(Some(own)) => (true, own.serve.declared),
+            Ok(None) => (false, entry.blocks.get("serve").is_some()),
+            Err(_) => (true, false),
+        };
         Some(meada_core::effective::Facts {
             held: true,
             own,

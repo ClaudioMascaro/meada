@@ -12,7 +12,7 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, FirstResult, Import, Imported, Kind,
-    LanguagePack, Layout, Modules, Param, Receiver, Value, children, named, text,
+    LanguagePack, Layout, Modules, Param, Receiver, Reference, Use, Value, children, named, text,
 };
 use crate::resolve::Code;
 use crate::{Result, parent, qualify};
@@ -49,6 +49,33 @@ const PATH_DEPTH: usize = 256;
 // ponytail: real code nests a few levels; 128 is the depth the other packs allow.
 const DEFINITION_DEPTH: usize = 128;
 
+/// The types the language declares in its universe block: a use of one is no reference, also
+/// where the package declares a type of the same name (`type error struct{}`).
+const PREDECLARED: [&str; 22] = [
+    "any",
+    "bool",
+    "byte",
+    "comparable",
+    "complex64",
+    "complex128",
+    "error",
+    "float32",
+    "float64",
+    "int",
+    "int8",
+    "int16",
+    "int32",
+    "int64",
+    "rune",
+    "string",
+    "uint",
+    "uint8",
+    "uint16",
+    "uint32",
+    "uint64",
+    "uintptr",
+];
+
 pub struct Go;
 
 impl LanguagePack for Go {
@@ -58,6 +85,10 @@ impl LanguagePack for Go {
 
     fn parse(&self, path: &str, src: &[u8]) -> Result<Facts> {
         parse(path, src)
+    }
+
+    fn drops_external_uses(&self) -> bool {
+        true
     }
 
     fn config_files(&self) -> &'static [&'static str] {
@@ -171,6 +202,11 @@ struct Walk<'s> {
     derefs: HashSet<String>,
     /// The second name of each `v, ok := os.LookupEnv(..)`, by the scope and the first name.
     lookups: HashMap<(String, String), String>,
+    /// The type parameters of the top-level declaration being read: a use of one is no
+    /// reference.
+    type_params: BTreeSet<String>,
+    /// The `(scope, name)` of each type reference recorded, so each is recorded once.
+    referenced: HashSet<(String, String)>,
 }
 
 /// A binding of a name: the class the source writes for it, and where it holds.
@@ -538,6 +574,62 @@ impl Walk<'_> {
         }
     }
 
+    /// Records the type `node` names (a `type_identifier` or a `qualified_type`), written in
+    /// `scope`, as a reference of kind `Type`, once per scope and name. A predeclared type, a
+    /// type parameter of the declaration being read and a type declaration's own name are none.
+    fn type_use(&mut self, scope: &str, node: Node) {
+        let src = self.src;
+        let name = match node.kind() {
+            "type_identifier" => {
+                let name = text(node, src);
+                let declared = node.parent().is_some_and(|p| {
+                    matches!(p.kind(), "type_spec" | "type_alias")
+                        && p.child_by_field_name("name") == Some(node)
+                });
+                if declared || PREDECLARED.contains(&name) || self.type_params.contains(name) {
+                    return;
+                }
+                name.to_string()
+            }
+            _ => match type_name(node, src) {
+                Some(name) => name,
+                None => return,
+            },
+        };
+        if self.referenced.insert((scope.to_string(), name.clone())) {
+            self.facts.references.push(Reference {
+                scope: scope.to_string(),
+                name,
+                kind: Use::Type,
+                range: node.byte_range(),
+                from: None,
+            });
+        }
+    }
+
+    /// Starts a top-level spec: its uses (scope "") are held by the spec's own definition, so
+    /// a name another spec of the file already used gives this one its row too.
+    fn new_top_spec(&mut self) {
+        self.referenced.retain(|(scope, _)| !scope.is_empty());
+    }
+
+    /// Records every type use under `node` (`type_use`), written in `scope`: a parameter list,
+    /// a result, a type declaration's type. An explicit stack, so a type nested however deep
+    /// costs its size.
+    fn type_uses(&mut self, scope: &str, node: Option<Node>) {
+        let mut stack: Vec<Node> = node.into_iter().collect();
+        while let Some(n) = stack.pop() {
+            match n.kind() {
+                "type_identifier" | "qualified_type" => self.type_use(scope, n),
+                _ => {
+                    let mut inner: Vec<Node> = named(n).collect();
+                    inner.reverse();
+                    stack.extend(inner);
+                }
+            }
+        }
+    }
+
     /// Records the calls and the bindings under `node`, which belong to `scope`. A function
     /// literal is a `Kind::Inline` definition (`@<offset>` under `scope`) that the index names
     /// or folds into the one around it: its parameters bind in it, and its calls are its own.
@@ -647,6 +739,11 @@ impl Walk<'_> {
                     if let Some(alias) = node.child_by_field_name("alias") {
                         self.bind(scope, alias);
                     }
+                }
+                // A type written in a body: a `var`'s, a literal's, an assertion's, `new(T)`.
+                "type_identifier" | "qualified_type" => {
+                    self.type_use(scope, node);
+                    continue;
                 }
                 "func_literal" if depth < DEFINITION_DEPTH => {
                     let name = self.inline(scope, node);
@@ -891,6 +988,14 @@ impl Walk<'_> {
             let name = text(*name, src).to_string();
             self.std.note(scope, &name, &value);
             self.held.push((scope.to_string(), name, value));
+        }
+    }
+
+    /// Records the type uses of the signature of the function `node`, written in `scope`: its
+    /// type parameters' constraints, its parameters and its results.
+    fn signature_types(&mut self, scope: &str, node: Node) {
+        for field in ["type_parameters", "parameters", "result"] {
+            self.type_uses(scope, node.child_by_field_name(field));
         }
     }
 
@@ -1297,6 +1402,8 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         selected: BTreeSet::new(),
         derefs: HashSet::new(),
         lookups: HashMap::new(),
+        type_params: BTreeSet::new(),
+        referenced: HashSet::new(),
     };
     // Imports come before every other declaration, and the values read the names they give.
     for node in named(tree.root_node()).filter(|n| n.kind() == "import_declaration") {
@@ -1311,6 +1418,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         });
     }
     walk.std = values::Std::new(tree.root_node(), src, &walk.facts.imports);
+    walk.facts.env_fields = values::env_fields(tree.root_node(), src);
     let mut top = Vec::new();
     let mut inits: HashMap<&str, usize> = HashMap::new();
     for node in named(tree.root_node()) {
@@ -1325,8 +1433,12 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 };
                 let body = node.child_by_field_name("body");
                 // A blank function names no symbol: it folds into the file, as a literal does.
+                walk.type_params = (type_params(node).into_iter())
+                    .map(|n| text(n, src).to_string())
+                    .collect();
                 if name == "_" {
                     let inline = walk.inline("", node);
+                    walk.signature_types(&inline, node);
                     body.into_iter().for_each(|b| walk.body(&inline, b));
                     continue;
                 }
@@ -1349,6 +1461,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 walk.typed_params(&name, list, false);
                 walk.typed_params(&name, result_list(node), true);
                 walk.bind_type_params(&name, node);
+                walk.signature_types(&name, node);
                 if let Some(body) = body {
                     walk.body(&name, body);
                 }
@@ -1373,9 +1486,12 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 walk.typed_params(&qualified, list, false);
                 walk.typed_params(&qualified, receiver, true);
                 walk.typed_params(&qualified, result_list(node), true);
-                for type_param in type_params {
+                for type_param in &type_params {
                     walk.local(&qualified, type_param);
                 }
+                walk.type_params = type_params.iter().map(|t| t.to_string()).collect();
+                walk.type_uses(&qualified, receiver);
+                walk.signature_types(&qualified, node);
                 if let Some(body) = node.child_by_field_name("body") {
                     walk.body(&qualified, body);
                 }
@@ -1394,6 +1510,12 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     top.push(name.to_string());
                     walk.bind_type_scope(name, spec);
                     let ty = spec.child_by_field_name("type");
+                    walk.type_params = (type_params(spec).into_iter())
+                        .map(|n| text(n, src).to_string())
+                        .collect();
+                    walk.new_top_spec();
+                    walk.type_uses("", spec.child_by_field_name("type_parameters"));
+                    walk.type_uses("", ty);
                     for field in (ty.filter(|t| t.kind() == "struct_type").into_iter())
                         .flat_map(named)
                         .flat_map(named)
@@ -1433,9 +1555,12 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 {
                     specs = named(*list).collect();
                 }
+                walk.type_params.clear();
                 for spec in specs {
                     let ty = spec.child_by_field_name("type");
                     let value = spec.child_by_field_name("value");
+                    walk.new_top_spec();
+                    walk.type_uses("", ty);
                     walk.assigned("", &names(spec), ty, value, None);
                     // Each name holds the value written at its place, when the names and the
                     // values pair up. A `var` holds it only if nothing assigns it (`finish_values`).
@@ -1517,6 +1642,106 @@ mod tests {
 
     fn facts(src: &str) -> Facts {
         parse("x.go", src.as_bytes()).unwrap()
+    }
+
+    /// The `(scope, name)` of each type reference of `src` (all of kind `Type`), sorted.
+    fn type_refs(src: &str) -> Vec<(String, String)> {
+        let facts = facts(src);
+        assert!(facts.references.iter().all(|r| r.kind == Use::Type));
+        let mut refs: Vec<_> = (facts.references.iter())
+            .map(|r| (r.scope.clone(), r.name.clone()))
+            .collect();
+        refs.sort();
+        refs
+    }
+
+    fn pairs(expected: &[(&str, &str)]) -> Vec<(String, String)> {
+        let mut out: Vec<_> = (expected.iter())
+            .map(|(s, n)| (s.to_string(), n.to_string()))
+            .collect();
+        out.sort();
+        out
+    }
+
+    #[test]
+    fn a_go_type_in_each_position_is_a_type_reference() {
+        let src = "package x\n\
+            import \"example.com/m/svc\"\n\
+            type Local struct{}\n\
+            type Box[T any] struct{ v T }\n\
+            type Outer struct { In svc.Field }\n\
+            type Under svc.Underlying\n\
+            type I interface { M(svc.Method) }\n\
+            var pkgVar svc.Var\n\
+            const pkgConst svc.Const = 1\n\
+            func pVar() { var a svc.Req; _ = a }\n\
+            func pConst() { const c svc.Req = 1 }\n\
+            func pParam(a svc.Req) {}\n\
+            func pResult() *svc.Req { return nil }\n\
+            func pLit() { _ = Local{} }\n\
+            func pAssert(x any) { _ = x.(svc.Req) }\n\
+            func pNew() { _ = new(Local) }\n\
+            func pMake() { _ = make([]svc.Req, 0) }\n\
+            func pGeneric() { var b Box[Local]; _ = b }\n\
+            func pConv() { _ = (*Local)(nil) }\n\
+            func (l Local) Method(a svc.Req) {}\n\
+            func pClosure() { _ = func(a svc.Req) {} }\n";
+        let closure = format!("pClosure.@{}", src.find("func(a svc.Req)").unwrap());
+        let mut expected = pairs(&[
+            ("", "svc.Field"),
+            ("", "svc.Underlying"),
+            ("", "svc.Method"),
+            ("", "svc.Var"),
+            ("", "svc.Const"),
+            ("pVar", "svc.Req"),
+            ("pConst", "svc.Req"),
+            ("pParam", "svc.Req"),
+            ("pResult", "svc.Req"),
+            ("pLit", "Local"),
+            ("pAssert", "svc.Req"),
+            ("pNew", "Local"),
+            ("pMake", "svc.Req"),
+            ("pGeneric", "Box"),
+            ("pGeneric", "Local"),
+            ("Local.Method", "Local"),
+            ("Local.Method", "svc.Req"),
+        ]);
+        // A conversion is an expression the grammar reads as a call (`Local(x)`, a call row of
+        // its own) or, parenthesized, as a dereference (`(*Local)(nil)`): no type reference.
+        expected.push((closure, "svc.Req".into()));
+        expected.sort();
+        assert_eq!(type_refs(src), expected);
+    }
+
+    #[test]
+    fn composite_go_types_reference_their_named_type() {
+        let src = "package x\n\
+            import \"example.com/m/svc\"\n\
+            type Box[T any] struct{ v T }\n\
+            func c1(a []*svc.A) {}\n\
+            func c2(a map[string]svc.B) {}\n\
+            func c3(a chan svc.C) {}\n\
+            func c4(a func(svc.D) error) {}\n\
+            func c5(a Box[svc.E]) {}\n\
+            func c6(a [3]svc.F) {}\n";
+        let expected = pairs(&[
+            ("c1", "svc.A"),
+            ("c2", "svc.B"),
+            ("c3", "svc.C"),
+            ("c4", "svc.D"),
+            ("c5", "Box"),
+            ("c5", "svc.E"),
+            ("c6", "svc.F"),
+        ]);
+        assert_eq!(type_refs(src), expected);
+    }
+
+    #[test]
+    fn predeclared_types_and_type_parameters_are_no_reference() {
+        let src = "package x\n\
+            type G[T comparable] struct { v T; n int; b []byte }\n\
+            func F[T any](x T, s string, e error, a any) T { var y T; _ = map[string]rune{}; return y }\n";
+        assert_eq!(type_refs(src), Vec::<(String, String)>::new());
     }
 
     #[test]

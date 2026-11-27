@@ -476,3 +476,106 @@ fn one_name_taken_off_two_imports_in_one_scope_keeps_two_rows() {
     };
     assert_eq!(sites, [at(0, "@scope/a"), at(1, "@scope/b")]);
 }
+
+/// `tests/fixtures/go-type-uses`, as `example.com/go/types`.
+fn go_types(case: &str) -> PathBuf {
+    fixture_repo(
+        case,
+        "go-type-uses",
+        Some("https://example.com/go/types.git"),
+    )
+}
+
+/// The export's `calls` rows of kind `type`, as (caller, target, level, holder), sorted, with
+/// the identity cut off.
+fn go_type_rows(repo: &Path) -> Vec<(String, String, String, String)> {
+    let json = export(repo);
+    let cut = |v: &serde_json::Value| {
+        let s = v.as_str().unwrap_or_default();
+        s.strip_prefix("example.com/go/types::")
+            .unwrap_or(s)
+            .to_string()
+    };
+    let mut rows: Vec<_> = (json["calls"].as_array().into_iter().flatten())
+        .filter(|c| c["kind"] == "type")
+        .map(|c| {
+            (
+                cut(&c["caller"]),
+                cut(&c["target"]),
+                cut(&c["level"]),
+                cut(&c["holder"]),
+            )
+        })
+        .collect();
+    rows.sort();
+    rows
+}
+
+#[test]
+fn a_go_handler_uses_the_request_struct_it_declares() {
+    let rows = go_type_rows(&go_types("uses_go_handler"));
+    let row = (
+        "api/handler.go::Handler".to_string(),
+        "svc/types.go::Req".to_string(),
+        "exact".to_string(),
+        String::new(),
+    );
+    assert!(rows.contains(&row), "{rows:#?}");
+}
+
+#[test]
+fn a_struct_field_type_is_held_by_its_struct() {
+    let rows = go_type_rows(&go_types("uses_go_field"));
+    let row = (
+        "svc/types.go".to_string(),
+        "svc/types.go::Inner".to_string(),
+        "exact".to_string(),
+        "svc/types.go::Outer".to_string(),
+    );
+    assert!(rows.contains(&row), "{rows:#?}");
+    let second = (
+        row.0.clone(),
+        row.1.clone(),
+        row.2.clone(),
+        "svc/types.go::Second".into(),
+    );
+    assert!(rows.contains(&second), "{rows:#?}");
+}
+
+#[test]
+fn an_external_go_type_gives_no_row() {
+    let json = export(&go_types("uses_go_external"));
+    let external = (json["calls"].as_array().into_iter().flatten())
+        .filter(|c| c["kind"] == "type")
+        .filter(|c| {
+            c["target"]
+                .as_str()
+                .is_none_or(|t| !t.starts_with("example.com/go/types::"))
+        })
+        .count();
+    assert_eq!(external, 0, "{:#?}", json["calls"]);
+}
+
+#[test]
+fn a_go_type_change_affects_its_users() {
+    let repo = go_types("uses_go_affected");
+    let file = repo.join("svc/types.go");
+    let text = fs::read_to_string(&file).unwrap();
+    fs::write(
+        &file,
+        text.replace("\tName string\n", "\tName  string `json:\"name\"`\n"),
+    )
+    .unwrap();
+    common::git(&repo, &["add", "-A"]);
+    common::git(&repo, &["commit", "-q", "-m", "edit"]);
+    let changes = meada::engine::Changes::Range {
+        base: "HEAD~1",
+        head: "HEAD",
+    };
+    let answer = Engine::open(&repo).unwrap().affected(changes).unwrap();
+    let answer = serde_json::to_value(answer).unwrap();
+    let handler =
+        (answer["files"].as_array().into_iter().flatten()).find(|f| f["path"] == "api/handler.go");
+    let handler = handler.unwrap_or_else(|| panic!("{answer:#}"));
+    assert_eq!(handler["level"], "exact", "{handler}");
+}

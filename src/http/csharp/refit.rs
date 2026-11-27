@@ -280,6 +280,7 @@ mod tests {
             files: &[],
             configs,
             symlinks: &[],
+            channel_clients: &[],
         };
         consumers(&code, &indexed)
     }

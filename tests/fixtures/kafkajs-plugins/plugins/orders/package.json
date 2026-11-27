@@ -1,0 +1,5 @@
+{
+  "name": "@acme/plugin-orders",
+  "version": "0.1.0",
+  "dependencies": { "@backstage/config": "^1.0.0", "kafkajs": "^2.2.4" }
+}
