@@ -422,7 +422,7 @@ fn literal_writes(case: &str, write: &str) -> Value {
     serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap()
 }
 
-fn literal_use<'a>(json: &'a Value, suffix: &str) -> &'a Value {
+fn row_ending_with<'a>(json: &'a Value, suffix: &str) -> &'a Value {
     let rows: Vec<_> = json["calls"]
         .as_array()
         .unwrap()
@@ -434,7 +434,7 @@ fn literal_use<'a>(json: &'a Value, suffix: &str) -> &'a Value {
 }
 
 fn exact_list(json: &Value, suffix: &str) {
-    let row = literal_use(json, suffix);
+    let row = row_ending_with(json, suffix);
     assert_eq!(row["level"], "exact", "{row}");
     assert!(
         row["target"]
@@ -470,7 +470,7 @@ fn a_computed_write_on_the_called_literal_keeps_the_base_answer() {
         let json = literal_writes(case, write);
         exact_list(&json, "::call::api.list#0");
         exact_list(&json, "::read::(member)api.list#0");
-        let imported = literal_use(&json, "::imported::api.list#0");
+        let imported = row_ending_with(&json, "::imported::api.list#0");
         assert!(
             ["level", "target", "candidates"]
                 .iter()
@@ -478,4 +478,20 @@ fn a_computed_write_on_the_called_literal_keeps_the_base_answer() {
             "{imported}"
         );
     }
+}
+
+#[test]
+fn an_heir_with_a_function_valued_field_keeps_inferred_base_dispatch() {
+    let repo = fixture_repo("ts_heir_field", "ts-heir-field", None);
+    let json = serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap();
+    let row = row_ending_with(&json, "::api.ts::run::b.send#0");
+    assert!(
+        row["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("::api.ts::Base.send"),
+        "{row}"
+    );
+    assert!(row["candidates"].is_null(), "{row}");
+    assert_eq!(row["level"], "inferred", "{row}");
 }
