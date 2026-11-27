@@ -633,6 +633,8 @@ fn a_python_decorator_of_the_function_or_its_class_leaves_the_base_open() {
         "ViaDecoratedBase",
         "Changed.ViaChangedClass",
         "Registered.ViaRegisteredClass",
+        "InheritingChild.ViaInheritedClass",
+        "ViaChildInstance",
     ];
     for name in rebound {
         let open = rows(name);
@@ -646,7 +648,9 @@ fn a_python_decorator_of_the_function_or_its_class_leaves_the_base_open() {
     let kept = [
         "Ordinary.ViaOrdinaryClass",
         "Settings.ViaDataclass",
+        "ModuleSettings.ViaModuleDataclass",
         "ViaCachedBase",
+        "ViaBareCachedBase",
     ];
     for name in kept {
         let linked = rows(name);

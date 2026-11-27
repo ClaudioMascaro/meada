@@ -486,4 +486,10 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   (`config.URL`) whose tail matches a tagged path reads as `X` too; the key prefixes of the
   libraries (`env-prefix`, `envPrefix`, envconfig's `Process("app")`) are not applied; nesting past
   64 levels is not read (#618).
+- Python return folding (`Code::py_decorated`, #949, #962): a function is not folded when it, its
+  class, or a repository class whose family holds its class carries a decorator, called or bare,
+  outside `PY_KEEPS_BODY` (`staticmethod`, `classmethod`, `dataclass`, `lru_cache`, with their
+  `dataclasses.` and `functools.` spellings). A decorated heir stops the fold of its base's method
+  for every receiver. The list matches the decorator's written name, so an alias
+  (`from mylib import swap as lru_cache`) passes as the listed decorator.
 - pydantic-settings reads (#619, `settings_consts` in `lang/python.rs`): a field of a `BaseSettings` subclass is read as `<env_prefix><FIELD>` uppercased or its literal `alias` / `validation_alias`, with `env_prefix` a literal of `model_config = SettingsConfigDict(...)` or an inner `class Config`. A base class defined in another file, inherited settings, an instance a function returns (`@lru_cache def get_settings(): return Settings()`), `AliasChoices`, `case_sensitive` and `env_nested_delimiter` leave the base unresolved or read the unprefixed name.

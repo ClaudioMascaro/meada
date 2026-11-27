@@ -1,6 +1,8 @@
+import dataclasses
 import functools
 import os
 from dataclasses import dataclass
+from functools import lru_cache
 
 import requests
 
@@ -203,3 +205,42 @@ def cached_base():
 
 def ViaCachedBase():
     return requests.get(cached_base() + "/api/orders")
+
+
+@lru_cache
+def bare_cached_base():
+    return os.getenv("API_URL")
+
+
+def ViaBareCachedBase():
+    return requests.get(bare_cached_base() + "/api/orders")
+
+
+@dataclasses.dataclass
+class ModuleSettings:
+    def module_settings_origin(self):
+        return os.getenv("API_URL")
+
+    def ViaModuleDataclass(self):
+        return requests.get(self.module_settings_origin() + "/api/orders")
+
+
+# #962 through inheritance: a decorated heir may replace what its base defines.
+def install_inherited(cls):
+    cls.inherited_origin = lambda self: "https://other.example"
+    return cls
+
+
+class OriginBase:
+    def inherited_origin(self):
+        return os.getenv("API_URL")
+
+
+@install_inherited
+class InheritingChild(OriginBase):
+    def ViaInheritedClass(self):
+        return requests.get(self.inherited_origin() + "/api/orders")
+
+
+def ViaChildInstance():
+    return requests.get(InheritingChild().inherited_origin() + "/api/orders")

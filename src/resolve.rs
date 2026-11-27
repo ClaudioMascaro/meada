@@ -5474,6 +5474,9 @@ pub struct Code<'a> {
     /// The definitions a call that is no exact caller may reach, and how many definitions have
     /// each last name segment (`Code::name_matched`).
     matched: OnceCell<(HashSet<Target<'a>>, HashMap<&'a str, usize>)>,
+    /// The Python definitions, by file and name, that carry a decorator outside `PY_KEEPS_BODY`
+    /// (`Code::py_decorated`).
+    py_rebinding: OnceCell<HashSet<(&'a str, &'a str)>>,
     mutations: RefCell<HashMap<usize, mutations::Index<'a>>>,
     pack: &'static dyn LanguagePack,
 }
@@ -5651,6 +5654,7 @@ impl<'a> Code<'a> {
             field_reads: RefCell::new(HashMap::new()),
             callees: OnceCell::new(),
             matched: OnceCell::new(),
+            py_rebinding: OnceCell::new(),
             mutations: RefCell::new(HashMap::new()),
             pack,
         }
@@ -8298,21 +8302,42 @@ impl<'a> Code<'a> {
         result
     }
 
-    /// Whether the Python `function`, or the class it is a method of, carries a decorator that
-    /// may rebind it, so its body is not what a call runs: a decorator call (`@use_host(..)`,
-    /// #949) or a bare name, on the function or on its class (`@install class C` may replace
-    /// `C.m`, #962), outside `PY_KEEPS_BODY`.
+    /// Whether the Python `function` may not be what a call of it runs: it, its class, or a class
+    /// whose family holds its class (an heir may replace the method for its instances, whatever
+    /// the receiver) carries a decorator outside `PY_KEEPS_BODY`, called (`@use_host(..)`, #949)
+    /// or bare (`@install class C`, #962).
     fn py_decorated(&self, function: Target<'a>) -> bool {
-        let calls = &self.resolver.files[function.path].calls;
-        let rebinds = |name: &str| !PY_KEEPS_BODY.contains(&name);
-        [function.name, crate::parent(function.name)]
-            .into_iter()
-            .filter(|name| !name.is_empty())
-            .any(|name| {
-                (calls.iter()).any(|c| c.decorates.as_deref() == Some(name) && rebinds(&c.callee))
-                    || (self.def(function.path, name))
-                        .is_some_and(|def| def.decorators.iter().any(|d| rebinds(d)))
-            })
+        let rebinding = self.py_rebinding.get_or_init(|| {
+            let rebinds = |name: &str| !PY_KEEPS_BODY.contains(&name);
+            let mut out = HashSet::new();
+            for (&path, facts) in self.resolver.files {
+                let calls = facts.calls.iter().filter(|c| rebinds(&c.callee));
+                out.extend(calls.filter_map(|c| Some((path, c.decorates.as_deref()?))));
+                let defs = facts
+                    .defs
+                    .iter()
+                    .filter(|d| d.decorators.iter().any(|d| rebinds(d)));
+                out.extend(defs.map(|d| (path, d.name.as_str())));
+            }
+            out
+        });
+        if rebinding.contains(&(function.path, function.name)) {
+            return true;
+        }
+        let class = crate::parent(function.name);
+        if class.is_empty() {
+            return false;
+        }
+        let class = Ancestor::Class(Target {
+            path: function.path,
+            name: class,
+        });
+        rebinding.iter().any(|&(path, name)| {
+            let heir = Target { path, name };
+            Ancestor::Class(heir) == class
+                || (self.resolver.families.get(&heir))
+                    .is_some_and(|family| family.as_ref().is_some_and(|f| f.contains(&class)))
+        })
     }
 
     /// The string returned by an exact call under its argument frame. HTTP also folds
