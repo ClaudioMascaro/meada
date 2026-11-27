@@ -19,6 +19,7 @@ import argparse
 import collections
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -41,6 +42,9 @@ ORPHAN_TYPES = ("appeared", "vanished", "level moved")
 CALL_TYPES = ("new", "vanished", "raised", "dropped", "retargeted", "candidates removed", "candidates gained",
               "certain lost")
 CERTAIN = ("exact", "declared")
+# What a judge reads of the changed calls rows: at most SAMPLE of each group, the same for the same captures.
+GROUPS = ("new exact", "raised to exact", "lost a candidate", "certain lost")
+SEED, SAMPLE = 852, 20
 
 
 def rank(level):
@@ -216,13 +220,16 @@ def call_changes(base, head):
         if types:
             out.append({"key": key, "use": (new or old).get("kind") or "call", "types": types, "level": label,
                         "removed": removed, "gained": gained, "base": kept(old), "head": kept(new)})
-    # The target's declaration, from the symbols of the export whose row is shown.
+    # The declaration of the target a sample names (the head row's, else the one the base row held), from the
+    # symbols of the export whose row is shown.
     for side, export in (("head", head), ("base", base)):
-        shown = [c for c in out if ("head" if c["head"] else "base") == side]
-        wanted = {c[side]["target"] for c in shown}
+        shown = {c["key"]: c[side]["target"] or (c["base"] or {}).get("target")
+                 for c in out if ("head" if c["head"] else "base") == side}
+        wanted = set(shown.values())
         spans = {s["id"]: s.get("span") for s in export.get("symbols") or [] if s.get("id") in wanted}
-        for c in shown:
-            c["target_span"] = spans.get(c[side]["target"])
+        for c in out:
+            if c["key"] in shown:
+                c["target_span"] = spans.get(shown[c["key"]])
     return out
 
 
@@ -237,6 +244,91 @@ def call_tally(changes):
         row["candidates gained n"] += len(c["gained"])
         pairs[c["use"], c["level"]].update(c["types"])
     return entries, pairs
+
+
+def entry_calls(run):
+    """The changed calls rows of every entry both sides exported, one entry's two exports at a time."""
+    out = []
+    for folder in sorted(p for p in (run / "base").iterdir() if (p / "status.txt").is_file()):
+        other = run / "head" / folder.name
+        if not (other / "status.txt").is_file():
+            continue
+        for path in sorted(folder.glob("*.export.json")):
+            if (other / path.name).is_file():
+                entry = path.name.removesuffix(".export.json")
+                changes = call_changes(json.loads(path.read_text()), json.loads((other / path.name).read_text()))
+                out += [{**c, "workspace": folder.name, "entry": entry} for c in changes]
+    return sorted(out, key=row_order)
+
+
+def row_order(change):
+    return change["workspace"], change["entry"], change["key"]
+
+
+def in_group(group, change):
+    types = change["types"]
+    raised_exact = "raised" in types and change["head"]["level"] == "exact"
+    if group == "new exact":
+        return "new" in types and change["head"]["level"] == "exact"
+    if group == "raised to exact":
+        return raised_exact
+    if group == "lost a candidate":  # a raise to exact is judged in its own group, dropped ones with it
+        return "candidates removed" in types and not raised_exact
+    return "certain lost" in types
+
+
+def call_samples(changes, k=SAMPLE, seed=SEED):
+    out = {}
+    for group in GROUPS:
+        pool = sorted((c for c in changes if in_group(group, c)), key=row_order)
+        out[group] = sorted(random.Random(seed).sample(pool, min(k, len(pool))), key=row_order)
+    return out
+
+
+def sample_line(change, run):
+    """One sampled row with the source line of its site and of its target; `?` without the work copies."""
+    side = "head" if change["head"] else "base"
+    row = change[side]
+    repo = run / "work" / side / change["workspace"] / change["entry"]
+
+    def place(span):
+        if not span:
+            return "?:? ``"
+        line, text = prove.line_of(repo, span["path"], span.get("start", 0))
+        return f"{span['path']}:{line} `{text}`"
+
+    target, was = row["target"], (change["base"] or {}).get("target")
+    at = f" at {place(change['target_span'])}"
+    if target:
+        names = f"`{target}`{at}" + (f", was `{was}`" if was and was != target else "")
+    else:
+        names = "no target" + (f", was `{was}`{at}" if was else "")
+    out = f"- {change['workspace']}/{change['entry']} {place(row['span'])} [{change['level']}] -> {names}"
+    if in_group("lost a candidate", change):
+        out += f", removed `{change['removed'][0]}`, {len(row['candidates'])} left"
+    return out
+
+
+def calls_section(changes, run, k=SAMPLE):
+    lines = ["## Calls", ""]
+    if not changes:
+        return lines + ["No call row changed."]
+    entries, pairs = call_tally(changes)
+    lines += ["| Entry | New | Vanished | Raised | Dropped | Retargeted | Candidates removed (rows / candidates) | "
+              "Candidates gained (rows / candidates) | Certain lost |", "|---|" + "---:|" * len(CALL_TYPES)]
+    for (ws, entry), n in sorted(entries.items()):
+        cells = [f"{n[t]} / {n[t + ' n']}" if t.startswith("candidates") else str(n[t]) for t in CALL_TYPES]
+        lines.append(f"| {ws}/{entry} | " + " | ".join(cells) + " |")
+    moves = [t for t in CALL_TYPES if not t.startswith("candidates")]
+    lines += ["", "| Use | Level | " + " | ".join(t.capitalize() for t in moves) + " |", "|---|---|" + "---:|" * len(moves)]
+    lines += [f"| {use} | {level} | " + " | ".join(str(n[t]) for t in moves) + " |"
+              for (use, level), n in sorted(pairs.items()) if any(n[t] for t in moves)]
+    for group, picked in call_samples(changes, k).items():
+        if picked:
+            total = sum(in_group(group, c) for c in changes)
+            lines += ["", f"### Sample (seed {SEED}): {group}, {len(picked)} of {total}", ""]
+            lines += [sample_line(c, run) for c in picked]
+    return lines + ["", "Every changed call row is in calls.json of the artifact."]
 
 
 def tally(changes):
@@ -337,6 +429,38 @@ def selftest_calls():
     entries, pairs = call_tally([{**c, "workspace": "w", "entry": "e"} for c in got.values()])
     assert entries["w", "e"]["certain lost"] == 3 and entries["w", "e"]["candidates removed n"] == 3
     assert pairs["type", "exact"]["new"] == 1 and pairs["call", "ambiguous -> exact"]["raised"] == 1
+    return base, head
+
+
+def selftest_samples(tmp, base, head):
+    for side, export in (("base", base), ("head", head)):
+        (tmp / side / "w").mkdir(parents=True)
+        (tmp / side / "w" / "status.txt").write_text("")
+        (tmp / side / "w" / "a.export.json").write_text(json.dumps(export))
+    (tmp / "work" / "head" / "w" / "a").mkdir(parents=True)
+    (tmp / "work" / "head" / "w" / "a" / "a.ts").write_text("x = f()\n")
+    changes = entry_calls(tmp)
+    assert {c["entry"] for c in changes} == {"a"} and all(c["workspace"] == "w" for c in changes)
+    many = [{"workspace": "w", "entry": f"e{i % 50}", "key": f"k{i}", "types": ["new"], "use": "type",
+             "level": "exact", "removed": [], "gained": [], "base": None,
+             "head": {"level": "exact", "target": "r::b.ts::f", "candidates": [], "span": {"path": "a.ts", "start": 0}},
+             "target_span": None} for i in range(30000)]
+    picked = call_samples(many, k=20)
+    assert len(picked["new exact"]) == 20 and picked == call_samples(list(reversed(many)), k=20)
+    assert all(len(v) == 0 for g, v in picked.items() if g != "new exact")
+    lines = calls_section(many, tmp, k=20)
+    assert sum(l.startswith("- w/") for l in lines) == 20 and sum(l.startswith("| w/") for l in lines) == 50
+    line = sample_line({**many[0], "entry": "a"}, tmp)
+    assert "a.ts:1 `x = f()`" in line and "at ?:? ``" in line, line      # target span unknown
+    assert ":? ``" in sample_line(many[0], tmp / "absent")              # a replay without work copies
+    assert calls_section([], tmp) == ["## Calls", "", "No call row changed."]
+    # A certain row lost to an ambiguous or another target still names the target it held.
+    got = {c["key"]: c for c in changes}
+    lost = {**got["moved"], "head": {**got["moved"]["head"], "level": "ambiguous", "target": None}}
+    assert "no target, was `r::b.ts::f`" in sample_line(lost, tmp), sample_line(lost, tmp)
+    assert "`r::b.ts::h`" in sample_line(got["moved"], tmp) and "was `r::b.ts::f`" in sample_line(got["moved"], tmp)
+    assert "removed `r`, 2 left" in sample_line(got["trim"], tmp)
+    assert [c["key"] for c in call_samples(changes)["lost a candidate"]] == ["trim"], "a raise to exact is judged once"
 
 
 def selftest():
@@ -393,7 +517,9 @@ def selftest():
     assert set(chosen) == {"code", "infra", "ci"} and "meada" in chosen["code"], chosen
     assert all(not table()[n][1].startswith("probe:") for names in chosen.values() for n in names), chosen
     assert identity("meada") == "github.com/claudiomascaro/meada" and identity("a7-iac") == "github.com/zz-prove/a7-iac"
-    selftest_calls()
+    with tempfile.TemporaryDirectory(prefix="release-diff-selftest-") as tmp:
+        base_export, head_export = selftest_calls()
+        selftest_samples(Path(tmp) / "samples", base_export, head_export)
     print("release-diff selftest: equal sides give no diff; one planted change of each type is counted right")
 
 
