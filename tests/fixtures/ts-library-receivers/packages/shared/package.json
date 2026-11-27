@@ -1,0 +1,1 @@
+{"name":"@acme/shared","main":"index.ts","exports":{".":"./index.ts","./log":"./log.ts"}}

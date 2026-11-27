@@ -93,6 +93,7 @@ mod swiftpkg;
 mod test_routes;
 mod test_services;
 mod trace;
+mod ts_library_receivers;
 mod ts_receivers;
 mod ui;
 mod urls;

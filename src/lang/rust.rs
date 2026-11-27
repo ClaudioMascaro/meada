@@ -2810,6 +2810,9 @@ mod tests {
                     Class::Returned(n) | Class::Called(n) => format!("{n}()"),
                     Class::Result(n) => format!("#{n}()"),
                     Class::Imported => "imported".into(),
+                    Class::TsGlobalValue | Class::TsGlobalType(_) | Class::TsGeneric(_) => {
+                        unreachable!("TypeScript receiver in Rust")
+                    }
                     Class::Unknown => "?".into(),
                 };
                 format!("{} {} = {class}", r.scope, r.name)

@@ -1390,6 +1390,12 @@ fn refresh_attempt(
         let group = lang::resolver_of(packs[path]);
         groups.entry(group).or_default().insert(path, facts);
     }
+    let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
+    let ts_packages: BTreeSet<String> = manifests
+        .iter()
+        .filter(|m| m.path.rsplit('/').next() == Some("package.json"))
+        .filter_map(|m| m.summary.name.clone())
+        .collect();
     // What each pack makes of the whole repository, once (`LanguagePack::layout`).
     let mut layouts = BTreeMap::new();
     for (&pack, files) in &mut groups {
@@ -1437,7 +1443,7 @@ fn refresh_attempt(
     };
     let mut resolvers: BTreeMap<usize, Resolver> = BTreeMap::new();
     for &pack in groups.keys().filter(|g| !candidates.contains(g)) {
-        resolvers.insert(pack, resolver(pack, &groups, &mut layouts));
+        resolvers.insert(pack, resolver(pack, &groups, &mut layouts, &ts_packages));
     }
     // A group nothing of which changed exports what it did (`Resolver::exported` reads its own
     // files and its pack's configs alone): its stored rows stand for its resolver's.
@@ -1462,7 +1468,7 @@ fn refresh_attempt(
         true => candidates,
         false => {
             for &pack in &candidates {
-                resolvers.insert(pack, resolver(pack, &groups, &mut layouts));
+                resolvers.insert(pack, resolver(pack, &groups, &mut layouts, &ts_packages));
             }
             exported = resolvers.values().flat_map(Resolver::exported).collect();
             BTreeSet::new()
@@ -1472,7 +1478,7 @@ fn refresh_attempt(
     let kept_files: HashSet<&str> = (kept_groups.iter())
         .flat_map(|g| groups[g].keys().copied())
         .collect();
-    let (manifests, tsconfigs) = read_manifests(manifest_rows)?;
+
     let files: Vec<&str> = all.keys().copied().collect();
     forget_rows_outside(&tx, "flexible", &kept_files)?;
     for f in resolvers.values().flat_map(Resolver::flexible) {
@@ -2107,9 +2113,15 @@ fn resolver<'a>(
     pack: usize,
     groups: &'a BTreeMap<usize, BTreeMap<&'a str, &'a Facts>>,
     layouts: &mut BTreeMap<usize, lang::Layout>,
+    packages: &BTreeSet<String>,
 ) -> Resolver<'a> {
     let layout = layouts.remove(&pack).expect("a layout per pack");
-    Resolver::with_layout(&groups[&pack], layout, lang::pack(pack))
+    let language = lang::pack(pack);
+    if language.extensions().contains(&"ts") {
+        Resolver::with_layout_and_packages(&groups[&pack], layout, language, packages.clone())
+    } else {
+        Resolver::with_layout(&groups[&pack], layout, language)
+    }
 }
 
 /// The `exports` rows, in the order they were written.

@@ -398,6 +398,7 @@ pub struct Resolver<'a> {
     ts: bool,
     ts_site: Cell<Option<(usize, usize, bool)>>,
     ts_locals: HashMap<&'a str, ts::FileLocals<'a>>,
+    ts_packages: BTreeSet<String>,
     ts_heirs: HashMap<String, Vec<Target<'a>>>,
     ts_writes: Option<ts::Writes<'a>>,
     ts_overrides: RefCell<HashMap<String, HashMap<String, bool>>>,
@@ -521,6 +522,8 @@ pub struct Resolver<'a> {
     /// Name inference candidates, sorted: methods by their last name (`true`), top-level
     /// functions and classes, and those of modules written in place, by their name (`false`).
     by_name: HashMap<(bool, &'a str), Vec<Target<'a>>>,
+    /// Literal functions are structural candidates only for an outside TS annotation.
+    ts_literal_candidates: HashMap<&'a str, Vec<Target<'a>>>,
     modules: Modules,
     /// The blocks that add members to each class (`Facts::impls`), the inherent ones first.
     impls: HashMap<Target<'a>, Vec<Block<'a>>>,
@@ -811,7 +814,7 @@ impl<'a> Resolver<'a> {
         shared: Vec<Vec<String>>,
         language: &dyn LanguagePack,
     ) -> Self {
-        Self::built(files, modules, shared, language, None)
+        Self::built(files, modules, shared, language, None, BTreeSet::new())
     }
 
     /// The resolver of the files of a pack, under what its `layout` makes of them: the shared
@@ -821,12 +824,22 @@ impl<'a> Resolver<'a> {
         layout: crate::lang::Layout,
         language: &dyn LanguagePack,
     ) -> Self {
+        Self::with_layout_and_packages(files, layout, language, BTreeSet::new())
+    }
+
+    pub(crate) fn with_layout_and_packages(
+        files: &'a BTreeMap<&'a str, &'a Facts>,
+        layout: crate::lang::Layout,
+        language: &dyn LanguagePack,
+        packages: BTreeSet<String>,
+    ) -> Self {
         let resolver = Self::built(
             files,
             layout.modules,
             layout.shared,
             language,
             layout.reaches,
+            packages,
         );
         resolver.publishing(layout.published)
     }
@@ -841,6 +854,7 @@ impl<'a> Resolver<'a> {
         shared: Vec<Vec<String>>,
         language: &dyn LanguagePack,
         reaches: Option<Reaches>,
+        packages: BTreeSet<String>,
     ) -> Self {
         let defs: HashMap<&str, HashMap<&str, &Def>> = files
             .iter()
@@ -1051,6 +1065,7 @@ impl<'a> Resolver<'a> {
             .map(|(path, facts)| (*path, facts.star.taker()))
             .collect();
         let mut by_name: HashMap<_, Vec<Target>> = HashMap::new();
+        let mut ts_literal_candidates: HashMap<_, Vec<Target>> = HashMap::new();
         for (path, facts) in files {
             let names: &HashMap<&str, &Def> = &defs[path];
             // Whether `scope` is the top level or modules written in place, all the way up.
@@ -1067,6 +1082,18 @@ impl<'a> Resolver<'a> {
                 let name = def.name.as_str();
                 if arities.contains_key(&Target { path, name }) {
                     continue;
+                }
+                if def.kind == Kind::Function
+                    && let Some((owner, member)) = name.rsplit_once('.')
+                    && facts
+                        .ts_literal_methods
+                        .get(owner)
+                        .is_some_and(|methods| methods.contains_key(member))
+                {
+                    ts_literal_candidates
+                        .entry(member)
+                        .or_default()
+                        .push(Target { path, name });
                 }
                 let key = match (def.kind, name.rsplit_once('.')) {
                     (Kind::Method, Some((_, last))) => (true, last),
@@ -1126,6 +1153,7 @@ impl<'a> Resolver<'a> {
         let ts = language.extensions().contains(&"ts");
         let mut resolver = Self {
             ts,
+            ts_packages: packages,
             ts_heirs: HashMap::new(),
             ts_writes: None,
             ts_site: Cell::new(None),
@@ -1187,6 +1215,7 @@ impl<'a> Resolver<'a> {
             built_final: false,
             extension_callers: HashMap::new(),
             by_name,
+            ts_literal_candidates,
             modules,
             impls: HashMap::new(),
             blocks: HashMap::new(),
@@ -1591,6 +1620,11 @@ impl<'a> Resolver<'a> {
             return Resolution::Unresolved;
         }
         let (scope, callee) = (call.scope.as_str(), call.callee.as_str());
+        if self.ts
+            && let Some(answer) = self.ts_library_call(path, call, matching, work)
+        {
+            return answer;
+        }
         let seen = &mut self.seen(path, scope);
         // The result of the call this one is made on, read once: the name match below reads it
         // too, and reading it twice per call would double the work at every call of a chain.
@@ -2030,6 +2064,8 @@ impl<'a> Resolver<'a> {
         let class = match (&def.output, through.awaited, through.tried) {
             (Some(_), true, true) => &None,
             (Some(_), true, false) => &def.output,
+            // Only the global Promise's declared output types an awaited TS value.
+            (None, true, false) if self.ts => &None,
             (_, _, true) => &def.unwrapped,
             _ => &def.result,
         };
@@ -2796,7 +2832,12 @@ impl<'a> Resolver<'a> {
                     work,
                 )
             }
-            Class::Imported | Class::Member(_) | Class::Unknown => Binding::Unknown,
+            Class::TsGlobalValue
+            | Class::TsGlobalType(_)
+            | Class::TsGeneric(_)
+            | Class::Imported
+            | Class::Member(_)
+            | Class::Unknown => Binding::Unknown,
         };
         self.leave(work);
         match found {

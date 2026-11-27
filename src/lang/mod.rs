@@ -519,6 +519,12 @@ pub struct Facts {
     /// Lexical visibility of TS bindings of names with a receiver, indexed by qualified name.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub ts_locals: BTreeMap<String, Vec<TsLocal>>,
+    /// Member calls on a namespace proven global, identified by their full call span.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub ts_global_calls: BTreeSet<(usize, usize)>,
+    /// Reads written as this.field.method in a scope with a different this.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub ts_rebound_this: BTreeSet<(usize, usize)>,
     /// TypeScript class members which affect dispatch without defining a method.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub ts_classes: BTreeMap<String, TsClass>,
@@ -1005,6 +1011,12 @@ pub struct TsFieldParameter {
 pub enum Class {
     /// An instance of the class whose body encloses the scope, or that class: `self`, `cls`.
     Enclosing,
+    /// A local constructed by a global or holding the awaited global fetch result.
+    TsGlobalValue,
+    /// A built-in type written at an annotation or return site without a shadowing binding.
+    TsGlobalType(String),
+    /// A generic annotation may filter library candidates, but gives no exact class.
+    TsGeneric(String),
     /// What this callee-like name (`Circle`, `shapes.Circle`), resolved from the scope, gives
     /// an instance of: a constructor call or an annotation. A function's result is unknown.
     Named(String),

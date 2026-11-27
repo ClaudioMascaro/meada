@@ -1,4 +1,4 @@
-use super::{Parents, callee, children, named, text, types};
+use super::{Parents, callee, children, globals, named, text, types};
 use crate::lang::{Class, Facts, Kind, Receiver, TsClass, TsFieldParameter, TsLocal, Ty};
 use std::collections::HashMap;
 use tree_sitter::Node;
@@ -6,13 +6,30 @@ use tree_sitter::Node;
 /// Only a named type gives a receiver. The type reader rejects a shadowing type parameter.
 fn annotation(node: Node, src: &[u8], up: &Parents) -> Option<Class> {
     let ty = named(node).find(|n| n.kind() != "comment")?;
-    if ty.kind() != "type_identifier" {
+    let generic = ty.kind() == "generic_type";
+    let head = if generic {
+        ty.child_by_field_name("name")?
+    } else {
+        ty
+    };
+    if head.kind() != "type_identifier" {
         return None;
     }
-    match types::ty(ty, src, up, &mut 0) {
-        Ty::Named(name) => Some(Class::Type(name)),
-        _ => None,
+    let Ty::Named(name) = types::ty(head, src, up, &mut 0) else {
+        return None;
+    };
+    if (globals::constructor(&name) || globals::namespace(&name))
+        && up.global(&name, head.start_byte())
+    {
+        return Some(Class::TsGlobalType(name));
     }
+    if generic {
+        return up
+            .imported_types
+            .contains(&name)
+            .then_some(Class::TsGeneric(name));
+    }
+    Some(Class::Type(name))
 }
 
 fn put(facts: &mut Facts, scope: &str, name: &str, class: Class) {
@@ -59,20 +76,36 @@ pub(super) fn local(
     let index = facts.receivers.len();
     let class = match node.child_by_field_name("type") {
         Some(ty) => annotation(ty, src, up),
-        None => constructed(value, src).or_else(|| {
-            let mut call = super::unwrapped(value);
-            if call.kind() == "await_expression" {
-                call = super::unwrapped(named(call).find(|n| n.kind() != "comment")?);
-            }
-            if call.kind() != "call_expression"
-                || callee(super::callee_node(call)?, src).starts_with('(')
-            {
-                return None;
-            }
-            // The call's visit fills in its final index, after the declarator's visit.
-            results.insert(call.id(), index);
-            Some(Class::Unknown)
-        }),
+        None => constructed(value, src)
+            .map(|class| match &class {
+                Class::Named(name)
+                    if globals::constructor(name) && up.global(name, value.start_byte()) =>
+                {
+                    Class::TsGlobalValue
+                }
+                _ => class,
+            })
+            .or_else(|| {
+                let mut call = super::unwrapped(value);
+                if call.kind() == "await_expression" {
+                    call = super::unwrapped(named(call).find(|n| n.kind() != "comment")?);
+                }
+                if call.kind() != "call_expression"
+                    || callee(super::callee_node(call)?, src).starts_with('(')
+                {
+                    return None;
+                }
+                if super::unwrapped(value).kind() == "await_expression"
+                    && super::callee_node(call)
+                        .is_some_and(|n| n.kind() == "identifier" && text(n, src) == "fetch")
+                    && up.global("fetch", call.start_byte())
+                {
+                    return Some(Class::TsGlobalValue);
+                }
+                // The call's visit fills in its final index, after the declarator's visit.
+                results.insert(call.id(), index);
+                Some(Class::Unknown)
+            }),
     };
     put(facts, scope, name, class?);
     Some(index)
@@ -304,19 +337,21 @@ pub(super) fn definition(node: Node, src: &[u8], scope: &str, up: &Parents, fact
 }
 
 /// Preserve the written call id while resolving parentheses or await around a named receiver.
-pub(super) fn wrapped(function: Node, src: &[u8]) -> Option<String> {
+pub(super) fn wrapped(function: Node, src: &[u8]) -> Option<(String, bool)> {
     let mut object = function.child_by_field_name("object")?;
     if object.kind() != "parenthesized_expression" {
         return None;
     }
+    let mut awaited = false;
     for _ in 0..super::FOLD_DEPTH {
+        awaited |= object.kind() == "await_expression";
         object = match object.kind() {
             "parenthesized_expression" | "await_expression" => {
                 named(object).find(|n| n.kind() != "comment")?
             }
             "identifier" | "member_expression" | "this" => {
                 let name = callee(object, src);
-                return (!name.starts_with('(')).then_some(name);
+                return (!name.starts_with('(')).then_some((name, awaited));
             }
             _ => return None,
         };

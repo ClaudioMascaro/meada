@@ -73,6 +73,13 @@ const SEND: &[&str] = &[
     "b/src/remote.ts::Remote.send",
 ];
 
+const LITERAL_SEND: &[&str] = &[
+    "a/src/service.ts::after.send",
+    "a/src/service.ts::before.send",
+    "a/src/service.ts::computed.send",
+    "a/src/service.ts::written.send",
+];
+
 fn both_clients(caller: &str) {
     for plugin in ["a", "b"] {
         exact(
@@ -182,7 +189,6 @@ fn uncertain_receivers_keep_todays_answer() {
         "structural",
         "union",
         "anyType",
-        "outside",
         "wrappedImport",
         "partial",
         "abstractMethod",
@@ -190,6 +196,8 @@ fn uncertain_receivers_keep_todays_answer() {
     ] {
         by_name(call("a", "guards", caller, "send"), SEND);
     }
+    // The import names an outside type that only the literal candidates might satisfy.
+    by_name(call("a", "guards", "outside", "send"), LITERAL_SEND);
     by_name(
         call("a", "guards", "generic", "generic"),
         &[
@@ -351,8 +359,8 @@ fn a_generic_result_keeps_todays_answer() {
     by_name(call("a", "results", "fromGeneric", "send"), SEND);
 }
 #[test]
-fn a_result_typed_by_an_outside_class_keeps_todays_answer() {
-    by_name(call("a", "results", "fromOutside", "send"), SEND);
+fn a_result_typed_by_an_outside_class_follows_the_annotation_rule() {
+    by_name(call("a", "results", "fromOutside", "send"), LITERAL_SEND);
 }
 
 #[test]

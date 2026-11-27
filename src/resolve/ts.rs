@@ -204,3 +204,135 @@ impl<'a> Resolver<'a> {
         answer
     }
 }
+
+impl<'a> Resolver<'a> {
+    fn ts_repository_specifier(&self, path: &str, source: &str) -> bool {
+        source.starts_with('.')
+            || source.starts_with('/')
+            || source.starts_with('#')
+            || crate::package::npm::split(source)
+                .is_some_and(|(name, _)| self.ts_packages.contains(name))
+            || self.module(path, source).is_some()
+    }
+
+    fn ts_annotation(&self, path: &'a str, scope: &str, class: &'a Class) -> Option<&'a str> {
+        let name = match class {
+            Class::TsGlobalType(name) => return Some(name),
+            Class::Type(name) | Class::TsGeneric(name) => name,
+            _ => return None,
+        };
+        let import = &self.files[path].imports[*self.by_local[path].of(name).last()?];
+        if self.ts_repository_specifier(path, &import.source) {
+            return None;
+        }
+        let mut s = scope;
+        loop {
+            let local = crate::qualify(s, name);
+            if self.defs[path].contains_key(local.as_str())
+                || self.consts[path].contains(local.as_str())
+            {
+                return None;
+            }
+            if s.is_empty() {
+                break;
+            }
+            s = crate::parent(s);
+        }
+        match &import.name {
+            crate::lang::Imported::Name(n) if n != "default" => Some(n),
+            crate::lang::Imported::Name(_) => Some(name),
+            _ => None,
+        }
+    }
+
+    /// A value of a known global has no repository members; an outside annotation still
+    /// admits literal methods, test doubles and classes whose heritage names that type.
+    pub(super) fn ts_library_call(
+        &self,
+        path: &'a str,
+        call: &'a crate::lang::Call,
+        matching: bool,
+        work: &mut super::Work<'a>,
+    ) -> Option<super::Resolution<'a>> {
+        use super::{Binding, Busy, Resolution, Through};
+        let (head, _) = call.callee.rsplit_once('.')?;
+        let span = (call.range.start, call.range.end);
+        if self.files[path].ts_global_calls.contains(&span) {
+            return Some(Resolution::Unresolved);
+        }
+        // Await may unwrap the annotated receiver to an unrelated value.
+        if call.awaits {
+            return None;
+        }
+        let head = call.root.as_deref().unwrap_or(head);
+        let (p, s, n) = if let Some(field) = head.strip_prefix("this.") {
+            if self.files[path].ts_rebound_this.contains(&span) {
+                return None;
+            }
+            let Binding::Def(class) = self.class(path, &call.scope) else {
+                return None;
+            };
+            (class.path, class.name, field)
+        } else {
+            if head.contains('.') || head.starts_with('(') {
+                return None;
+            }
+            self.holder(&self.lexical(path, &call.scope, head, &mut self.seen(path, &call.scope)))?
+        };
+        let class = self.receiver_class(p, s, n)?;
+        let ty = match class {
+            Class::TsGlobalValue => return Some(Resolution::Unresolved),
+            // Only the by-name answer can change for an outside result. The exact lookup
+            // of a factory must not recursively repeat the candidate checks for its inputs.
+            Class::Result(_) if !matching => return None,
+            Class::Result(i) => {
+                let made = self.files[p].calls.get(*i)?;
+                if !self.enter(Busy::Call(p, *i), work) {
+                    return None;
+                }
+                let target = self.resolved(p, made, false, work);
+                self.leave(work);
+                let Resolution::Exact(target) = target else {
+                    return None;
+                };
+                let result = self.written_result(
+                    target,
+                    Through {
+                        awaited: made.awaited,
+                        ..Through::default()
+                    },
+                )?;
+                self.ts_annotation(target.path, target.name, result)?
+            }
+            _ => self.ts_annotation(p, s, class)?,
+        };
+        if !matching {
+            return Some(Resolution::Unresolved);
+        }
+        let mut all = self.candidates(path, &call.callee, call.by_path, None, false, &|| false);
+        let mut heirs = HashSet::new();
+        self.ts_any_heir(ty, |heir| {
+            heirs.insert(heir);
+            false
+        });
+        all.retain(|candidate| {
+            if crate::http::is_test_file(candidate.path) {
+                return true;
+            }
+            let owner = Target {
+                path: candidate.path,
+                name: crate::parent(candidate.name),
+            };
+            !self.defs[owner.path]
+                .get(owner.name)
+                .is_some_and(|d| d.kind == Kind::Class)
+                || heirs.contains(&owner)
+        });
+        if let Some(literals) = self.ts_literal_candidates.get(own_name(&call.callee)) {
+            all.extend_from_slice(literals);
+            all.sort_unstable();
+            all.dedup();
+        }
+        Some(super::one_of(all))
+    }
+}

@@ -13,6 +13,7 @@ use super::{
 };
 use crate::{Result, package, qualify};
 
+mod globals;
 mod receivers;
 mod references;
 mod types;
@@ -197,13 +198,33 @@ impl LanguagePack for TsJs {
                         } else {
                             node.start_byte()
                         };
+                        if function.kind() == "member_expression"
+                            && let Some(head) =
+                                function.child_by_field_name("object").map(unwrapped)
+                            && head.kind() == "identifier"
+                            && globals::namespace(text(head, src))
+                            && parents.global(text(head, src), head.start_byte())
+                        {
+                            facts.ts_global_calls.insert((start, node.end_byte()));
+                        }
+                        let callee = callee(function, src);
+                        let (root, awaits) = receivers::wrapped(function, src)
+                            .map_or((None, false), |(name, awaited)| (Some(name), awaited));
+                        let head = root
+                            .as_deref()
+                            .or_else(|| callee.rsplit_once('.').map(|(h, _)| h));
+                        if head.is_some_and(|h| h.starts_with("this."))
+                            && !instance_context(function, &parents)
+                        {
+                            facts.ts_rebound_this.insert((start, node.end_byte()));
+                        }
                         facts.calls.push(Call {
                             arity: None,
                             labels: None,
                             awaited: receivers::awaited(node, &parents),
                             constructs: node.kind() == "new_expression",
                             scope: scope.clone(),
-                            callee: callee(function, src),
+                            callee,
                             range: start..node.end_byte(),
                             args: arguments
                                 .map(|a| {
@@ -215,10 +236,10 @@ impl LanguagePack for TsJs {
                             kwargs: Vec::new(),
                             decorates: None,
                             by_path: false,
-                            root: receivers::wrapped(function, src),
+                            root,
                             on: None,
                             unwraps: false,
-                            awaits: false,
+                            awaits,
                             receiver: (function.kind() == "member_expression")
                                 .then(|| function.child_by_field_name("object"))
                                 .flatten()
@@ -927,6 +948,8 @@ struct Parents<'t> {
     /// Whether the file binds or assigns `require` anywhere: a `require(..)` is then no load.
     // ponytail: per file, not per scope; a file that shadows `require` once records none.
     require_declared: bool,
+    global_shadows: HashMap<String, Vec<Range<usize>>>,
+    imported_types: HashSet<String>,
     promise_shadows: Vec<Range<usize>>,
     /// Merged lexical scopes that hide the runtime String conversion.
     string_shadows: Vec<Range<usize>>,
@@ -947,6 +970,7 @@ impl<'t> Parents<'t> {
         let mut url_required = false;
         let mut require_declared = false;
         let mut arrow_parameters = Vec::new();
+        let mut globals = globals::Bindings::default();
         let mut promise_bindings = Vec::new();
         let mut string_bindings = Vec::new();
         let mut string_writes = Vec::new();
@@ -984,6 +1008,7 @@ impl<'t> Parents<'t> {
             {
                 arrow_parameters.push(left.start_byte());
             }
+            globals.visit(node, src);
             if declares_promise(node, src) {
                 promise_bindings.push(node);
             }
@@ -1001,6 +1026,9 @@ impl<'t> Parents<'t> {
             members_written(node, src, &mut written);
             let target = written_name_target(node);
             let names = target.map(|t| bound(t, src)).unwrap_or_default();
+            for name in &names {
+                globals.write(name, node.start_byte());
+            }
             if names.iter().any(|name| name == "String") {
                 string_writes.push(node.start_byte());
             }
@@ -1022,17 +1050,26 @@ impl<'t> Parents<'t> {
             assigned,
             written,
             url_declared,
+            global_shadows: HashMap::new(),
+            imported_types: std::mem::take(&mut globals.imported_types),
             promise_shadows: Vec::new(),
             string_shadows: Vec::new(),
             process_shadows: Vec::new(),
             strict_scopes,
             arrow_parameters,
         };
+        parents.global_shadows = globals.scopes(&parents, root, src);
         parents.promise_shadows = parents.runtime_shadows(promise_bindings, Vec::new(), root, src);
         parents.string_shadows = parents.runtime_shadows(string_bindings, string_writes, root, src);
         parents.process_shadows =
             parents.runtime_shadows(process_bindings, process_writes, root, src);
         parents
+    }
+
+    fn global(&self, name: &str, at: usize) -> bool {
+        self.global_shadows
+            .get(name)
+            .is_none_or(|scopes| !runtime_hidden(scopes, at))
     }
 
     fn runtime_shadows(
