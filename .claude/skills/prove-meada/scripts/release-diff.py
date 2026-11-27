@@ -317,7 +317,10 @@ def sample_line(change, run):
         if not span:
             return "?:? ``"
         line, text = prove.line_of(repo, span["path"], span.get("start", 0))
-        return f"{span['path']}:{line} `{text}`"
+        # A Markdown code span ends at a run of backticks as long as the one that opened it.
+        fence = "`" * (1 + max(map(len, re.findall("`+", text)), default=0))
+        pad = " " if "`" in text else ""
+        return f"{span['path']}:{line} {fence}{pad}{text}{pad}{fence}"
 
     target, was = row["target"], (change["base"] or {}).get("target")
     at = f" at {place(change['target_span'])}"
@@ -522,6 +525,9 @@ def selftest_samples(tmp, base, head):
     assert sum(l.startswith("- w/") for l in lines) == 20 and sum(l.startswith("| w/") for l in lines) == 50
     line = sample_line({**many[0], "entry": "a"}, tmp)
     assert "a.ts:1 `x = f()`" in line and "at ?:? ``" in line, line      # target span unknown
+    (tmp / "work" / "head" / "w" / "a" / "a.ts").write_text('S string `json:"s"`\n')  # a Go struct tag
+    tagged = sample_line({**many[0], "entry": "a"}, tmp)
+    assert 'a.ts:1 `` S string `json:"s"` ``' in tagged, tagged          # the code span holds its backticks
     assert ":? ``" in sample_line(many[0], tmp / "absent")              # a replay without work copies
     assert calls_section([], tmp) == ["## Calls", "", "No call row changed."]
     # A certain row lost to an ambiguous or another target still names the target it held.
