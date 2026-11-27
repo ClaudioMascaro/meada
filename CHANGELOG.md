@@ -94,6 +94,15 @@ branch from the merge of this release. Release notes in
 
 ### Fixed
 
+- A Go function whose `defer` may write its named result (directly or through a field, element
+  or pointee, by a function literal, its address, or a deferred method call on it) no longer folds
+  to the value its `return` gives: the HTTP consumer stays open instead of linking the wrong peer
+  (#948).
+- A Python function or method that it, its class or a subclass decorates with anything besides
+  `staticmethod`, `classmethod`, `dataclass` and `lru_cache` no longer folds its original body's
+  return into an HTTP base (#949, #962).
+- A private Java or Kotlin method folds its returned base even when another class spells the same
+  method name, restoring the links its callers lost (#810).
 - A call in a Go test file no longer gives a value to a field read in production code (#973),
   and no caller in a test file supplies a value to production code in any language (#975).
 - A Go `select` case's `:=` shadows a package-level format constant, so it no longer gives an
