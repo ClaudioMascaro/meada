@@ -43,7 +43,8 @@ states:
 | certain lost | the base's certain target was wrong, or was never certain | it was right and certain |
 
 A `lost a candidate` line names one removed candidate of possibly several: take the row's candidates
-of both sides from `calls.json` and judge every one the candidate side dropped.
+of both sides from `calls.json` and judge every one the candidate side dropped, its target apart (a
+candidate that became the target was chosen, not lost).
 
 `unsure` is a verdict: spend about three tool calls per row on average and write `unsure` with what
 is missing instead of digging further. An export can be hundreds of MB: never load one whole.

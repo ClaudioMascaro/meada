@@ -287,6 +287,11 @@ def row_order(change):
     return change["workspace"], change["entry"], change["key"]
 
 
+def lost_candidates(change):
+    """The removed candidates the head row does not hold as its target either."""
+    return [c for c in change["removed"] if not change["head"] or c != change["head"]["target"]]
+
+
 def in_group(group, change):
     types = change["types"]
     raised_exact = "raised" in types and change["head"]["level"] == "exact"
@@ -295,7 +300,7 @@ def in_group(group, change):
     if group == "raised to exact":
         return raised_exact
     if group == "lost a candidate":  # a raise to exact is judged in its own group, dropped ones with it
-        return "candidates removed" in types and not raised_exact
+        return bool(lost_candidates(change)) and not raised_exact
     return "certain lost" in types
 
 
@@ -330,7 +335,7 @@ def sample_line(change, run):
         names = "no target" + (f", was `{was}`{at}" if was else "")
     out = f"- {change['workspace']}/{change['entry']} {place(row['span'])} [{change['level']}] -> {names}"
     if in_group("lost a candidate", change):
-        out += f", removed `{change['removed'][0]}`, {len(row['candidates'])} left"
+        out += f", removed `{lost_candidates(change)[0]}`, {len(row['candidates'])} left"
     return out
 
 
@@ -537,6 +542,14 @@ def selftest_samples(tmp, base, head):
     assert "`r::b.ts::h`" in sample_line(got["moved"], tmp) and "was `r::b.ts::f`" in sample_line(got["moved"], tmp)
     assert "removed `r`, 2 left" in sample_line(got["trim"], tmp)
     assert [c["key"] for c in call_samples(changes)["lost a candidate"]] == ["trim"], "a raise to exact is judged once"
+    # A candidate the head row now names as its target is chosen, not lost.
+    def narrowed(*candidates):
+        return call_changes({"calls": [{"id": "k", "level": "ambiguous", "candidates": list(candidates),
+                                        "span": {"path": "a.ts", "start": 0}}]},
+                            {"calls": [{"id": "k", "level": "inferred", "target": "a",
+                                        "span": {"path": "a.ts", "start": 0}}]})[0] | {"workspace": "w", "entry": "a"}
+    assert "removed `b`, 0 left" in sample_line(narrowed("a", "b"), tmp), sample_line(narrowed("a", "b"), tmp)
+    assert not call_samples([narrowed("a")])["lost a candidate"] and "removed `" not in sample_line(narrowed("a"), tmp)
 
 
 def selftest_write(tmp, base, head):

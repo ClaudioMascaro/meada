@@ -55,7 +55,8 @@ and now absent, weaker or on another target). The summary counts them per entry 
 
 It then samples at most 20 rows of each of four groups, pooled over all entries, with seed 852, so
 the same captures give the same sample: **new exact**, **raised to exact**, **lost a candidate**
-(without the raises to `exact`, judged in their own group) and **certain lost**. Each line gives the
+(without the raises to `exact`, judged in their own group, and without counting a candidate that
+became the row's target) and **certain lost**. Each line gives the
 source of the call site and of its target; `?` where the target is in another repository, or when
 the diff runs again without the work copies. `--sample N` changes the 20.
 
