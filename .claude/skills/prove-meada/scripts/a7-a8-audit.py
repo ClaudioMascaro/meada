@@ -212,6 +212,9 @@ def baseline(args):
                   'meada-pre-image': PRE_IMAGE, 'meada-pre-extensions': PRE_EXTENSIONS}
     for label, revision in historical.items():
         worktree = run / ('source-' + label)
+        # A base no branch holds any more (e6d27d0) is fetched by its SHA, as build.sh does.
+        if subprocess.run(['git', '-C', str(ROOT), 'cat-file', '-e', revision + '^{commit}']).returncode:
+            subprocess.run(['git', '-C', str(ROOT), 'fetch', '--no-tags', 'origin', revision], check=True)
         subprocess.run(['git', '-C', str(ROOT), 'worktree', 'add', '--detach', str(worktree), revision], check=True)
         try:
             build(worktree, run / 'bin' / label, run / (label + '-build'))
