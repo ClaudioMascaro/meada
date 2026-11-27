@@ -527,6 +527,9 @@ pub struct Facts {
     /// Lexical visibility of TS bindings of names with a receiver, indexed by qualified name.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub ts_locals: BTreeMap<String, Vec<TsLocal>>,
+    /// Member writes on a fresh, lexically visible local object, by receiver and write offset.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub ts_local_literal_writes: BTreeMap<String, BTreeSet<usize>>,
     /// Additional lexical bindings for computed TS record keys, kept with the values.
     #[serde(default, skip_serializing_if = "lean_or_empty")]
     pub ts_record_locals: BTreeMap<String, Vec<TsLocal>>,

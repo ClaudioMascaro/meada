@@ -413,3 +413,69 @@ fn a_repository_write_of_the_member_keeps_the_by_name_answer() {
     by_name(call("a", "service", "localWritten", "send"), SEND);
     by_name(call("a", "importer", "importedWritten", "send"), SEND);
 }
+
+fn literal_writes(case: &str, write: &str) -> Value {
+    let repo = fixture_repo(case, "ts-literal-writes", None);
+    let path = repo.join("api.mjs");
+    let source = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(path, source.replace("values[key] = 'a';", write)).unwrap();
+    serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap()
+}
+
+fn literal_use<'a>(json: &'a Value, suffix: &str) -> &'a Value {
+    let rows: Vec<_> = json["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|r| r["id"].as_str().is_some_and(|id| id.ends_with(suffix)))
+        .collect();
+    assert_eq!(rows.len(), 1, "{suffix}: {rows:?}");
+    rows[0]
+}
+
+fn exact_list(json: &Value, suffix: &str) {
+    let row = literal_use(json, suffix);
+    assert_eq!(row["level"], "exact", "{row}");
+    assert!(
+        row["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("::api.mjs::api.list"),
+        "{row}"
+    );
+}
+
+#[test]
+fn a_fresh_literals_computed_write_preserves_the_call_and_read() {
+    let json = literal_writes("ts_fresh_literal_owner", "values[key] = 'a';");
+    exact_list(&json, "::call::api.list#0");
+    exact_list(&json, "::read::(member)api.list#0");
+    // The imported call needs the fresh owner to prove that api is still intact.
+    exact_list(&json, "::imported::api.list#0");
+}
+
+#[test]
+fn a_computed_write_on_the_called_literal_keeps_the_base_answer() {
+    for (case, write) in [
+        ("ts_own_literal_write", "api[key] = 'a';"),
+        (
+            "ts_unknown_literal_write",
+            "const alias = api; alias[key] = 'a';",
+        ),
+        (
+            "ts_shadowed_literal_write",
+            "{ const values = api; values[key] = 'a'; }",
+        ),
+    ] {
+        let json = literal_writes(case, write);
+        exact_list(&json, "::call::api.list#0");
+        exact_list(&json, "::read::(member)api.list#0");
+        let imported = literal_use(&json, "::imported::api.list#0");
+        assert!(
+            ["level", "target", "candidates"]
+                .iter()
+                .all(|k| imported[*k].is_null()),
+            "{imported}"
+        );
+    }
+}

@@ -269,9 +269,7 @@ impl LanguagePack for TsJs {
                 "object" => {
                     if let Some(owner) = literal_name(node, src, &parents) {
                         let methods = literal_methods(node, src);
-                        if !methods.is_empty() {
-                            facts.ts_literal_methods.insert(owner, methods);
-                        }
+                        facts.ts_literal_methods.insert(owner, methods);
                     }
                 }
                 "interface_declaration" | "type_alias_declaration" => {
@@ -954,6 +952,7 @@ struct Parents<'t> {
     /// Whether the file binds or assigns `require` anywhere: a `require(..)` is then no load.
     // ponytail: per file, not per scope; a file that shadows `require` once records none.
     require_declared: bool,
+    local_literals: HashMap<String, HashMap<usize, Option<usize>>>,
     global_shadows: HashMap<String, Vec<Range<usize>>>,
     imported_types: HashSet<String>,
     promise_shadows: Vec<Range<usize>>,
@@ -977,6 +976,7 @@ impl<'t> Parents<'t> {
         let mut require_declared = false;
         let mut arrow_parameters = Vec::new();
         let mut globals = globals::Bindings::default();
+        let mut bindings = HashMap::<String, Vec<Node>>::new();
         let mut promise_bindings = Vec::new();
         let mut string_bindings = Vec::new();
         let mut string_writes = Vec::new();
@@ -1014,7 +1014,9 @@ impl<'t> Parents<'t> {
             {
                 arrow_parameters.push(left.start_byte());
             }
-            globals.visit(node, src);
+            globals.visit(node, src, |name| {
+                bindings.entry(name.into()).or_default().push(node);
+            });
             if declares_promise(node, src) {
                 promise_bindings.push(node);
             }
@@ -1056,6 +1058,7 @@ impl<'t> Parents<'t> {
             assigned,
             written,
             url_declared,
+            local_literals: HashMap::new(),
             global_shadows: HashMap::new(),
             imported_types: std::mem::take(&mut globals.imported_types),
             promise_shadows: Vec::new(),
@@ -1064,6 +1067,36 @@ impl<'t> Parents<'t> {
             strict_scopes,
             arrow_parameters,
         };
+        for (name, nodes) in bindings {
+            // Record shadowing declarations too, including parameters of anonymous functions.
+            let fresh = |node: Node<'t>| {
+                let declaration = parents.of(node)?;
+                (node.kind() == "variable_declarator"
+                    && node.child_by_field_name("name")?.kind() == "identifier"
+                    && declaration
+                        .child_by_field_name("kind")
+                        .is_some_and(|k| text(k, src) == "const")
+                    && unwrapped(node.child_by_field_name("value")?).kind() == "object"
+                    && literal_name(unwrapped(node.child_by_field_name("value")?), src, &parents)
+                        .is_none())
+                .then_some(node.end_byte())
+            };
+            if !nodes.iter().any(|n| fresh(*n).is_some()) {
+                continue;
+            }
+            let mut scopes = HashMap::new();
+            for node in nodes {
+                let Some(scope) = parents.binding_scope(node, src) else {
+                    scopes.clear();
+                    break;
+                };
+                scopes
+                    .entry(scope.id())
+                    .and_modify(|v| *v = None)
+                    .or_insert_with(|| fresh(node));
+            }
+            parents.local_literals.insert(name, scopes);
+        }
         parents.global_shadows = globals.scopes(&parents, root, src);
         parents.promise_shadows = parents.runtime_shadows(promise_bindings, Vec::new(), root, src);
         parents.string_shadows = parents.runtime_shadows(string_bindings, string_writes, root, src);
@@ -1115,26 +1148,52 @@ impl<'t> Parents<'t> {
         runtime_hidden(&self.string_shadows, at)
     }
 
+    fn local_literal(&self, object: Node<'t>, src: &[u8]) -> bool {
+        let object = unwrapped(object);
+        if object.kind() != "identifier" {
+            return false;
+        }
+        let Some(scopes) = self.local_literals.get(text(object, src)) else {
+            return false;
+        };
+        let mut scope = Some(object);
+        for _ in 0..FOLD_DEPTH {
+            let Some(node) = scope else { break };
+            if node.kind() == "with_statement" {
+                return false;
+            }
+            if let Some(declaration) = scopes.get(&node.id()) {
+                return declaration.is_some_and(|end| end <= object.start_byte());
+            }
+            scope = self.of(node);
+        }
+        false
+    }
+
     /// Parameters and expression names belong to their own function; declarations belong
     /// to their enclosing lexical scope, or function for var. A bounded lookup that cannot
     /// establish the scope conservatively hides the runtime throughout the file.
     fn runtime_scope(&self, node: Node<'t>, src: &[u8], root: Node<'t>) -> Range<usize> {
+        self.binding_scope(node, src).unwrap_or(root).byte_range()
+    }
+
+    fn binding_scope(&self, node: Node<'t>, src: &[u8]) -> Option<Node<'t>> {
         match node.kind() {
             "formal_parameters" => {
-                return self.of(node).unwrap_or(root).byte_range();
+                return self.of(node);
             }
             "catch_clause"
             | "arrow_function"
             | "function_expression"
             | "function"
             | "generator_function"
-            | "class" => return node.byte_range(),
+            | "class" => return Some(node),
             "for_in_statement"
                 if node
                     .child_by_field_name("kind")
                     .is_none_or(|kind| text(kind, src) != "var") =>
             {
-                return node.byte_range();
+                return Some(node);
             }
             _ => {}
         }
@@ -1158,11 +1217,11 @@ impl<'t> Parents<'t> {
                         "statement_block" | "for_statement" | "for_in_statement" | "switch_body"
                     ))
             {
-                return parent.byte_range();
+                return Some(parent);
             }
             at = self.of(parent);
         }
-        root.byte_range()
+        None
     }
 
     fn enclosing_strict(&self, node: Node) -> bool {
@@ -1516,6 +1575,13 @@ fn selector_writes(
                             .filter(|n| n.kind() == "string")
                             .map(|n| unquote(n, src))
                     });
+                if up.local_literal(receiver, src) {
+                    facts
+                        .ts_local_literal_writes
+                        .entry(owner(receiver))
+                        .or_default()
+                        .insert(node.start_byte());
+                }
                 let write = super::MemberWrite {
                     scope: scope.into(),
                     object: owner(receiver),
@@ -1530,6 +1596,13 @@ fn selector_writes(
                 }
                 facts.ts_record_writes.push(write);
                 inner = unwrapped(receiver);
+            }
+            if up.local_literal(object, src) {
+                facts
+                    .ts_local_literal_writes
+                    .entry(owner(object))
+                    .or_default()
+                    .insert(node.start_byte());
             }
             let object = owner(object);
             facts.member_write(

@@ -2575,7 +2575,7 @@ impl<'a> Resolver<'a> {
                 if self.ts
                     && s.is_empty()
                     && let Some((object, member)) = name.split_once('.')
-                    && let Some(found) = self.ts_literal_method(path, object, member)
+                    && let Some(found) = self.ts_literal_method(path, object, member, true)
                 {
                     return Some(found);
                 }
@@ -2617,7 +2617,7 @@ impl<'a> Resolver<'a> {
             let typed_ts = self.ts && self.holder(&binding).is_some();
             if self.ts
                 && let Binding::Const(p, name) = binding
-                && let Some(found) = self.ts_literal_method(p, name, member)
+                && let Some(found) = self.ts_literal_method(p, name, member, false)
             {
                 binding = found;
                 continue;

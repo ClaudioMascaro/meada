@@ -45,8 +45,9 @@ pub(super) struct Bindings<'t> {
 }
 
 impl<'t> Bindings<'t> {
-    pub(super) fn visit(&mut self, node: Node<'t>, src: &[u8]) {
+    pub(super) fn visit(&mut self, node: Node<'t>, src: &[u8], mut binding: impl FnMut(&str)) {
         let mut add = |name: &str| {
+            binding(name);
             if tracked(name) {
                 self.names.entry(name.to_owned()).or_default().0.push(node);
             }

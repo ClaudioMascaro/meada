@@ -39,6 +39,13 @@ impl<'a> Writes<'a> {
                 .map(|w| (w, false))
                 .chain(facts.ts_record_writes.iter().map(|w| (w, true)))
             {
+                if facts
+                    .ts_local_literal_writes
+                    .get(&w.object)
+                    .is_some_and(|sites| sites.contains(&w.range.start))
+                {
+                    continue;
+                }
                 let marks = if contents {
                     &mut result.contents[index]
                 } else if test {
@@ -96,20 +103,23 @@ impl<'a> Resolver<'a> {
         path: &'a str,
         name: &'a str,
         member: &str,
+        assigned: bool,
     ) -> Option<Binding<'a>> {
         let &overwritten = self.files[path].ts_literal_methods.get(name)?.get(member)?;
         let owner = Owner::Literal(Target { path, name });
-        let written = self.ts_writes.as_ref().is_none_or(|writes| {
+        let written = self.ts_writes.as_ref().map_or(!assigned, |writes| {
             [
                 (&writes.program, writes.incomplete[0]),
                 (&writes.tests, writes.incomplete[1]),
             ]
             .into_iter()
             .any(|(marks, incomplete)| {
-                incomplete
-                    || [owner, Owner::Unknown].into_iter().any(|o| {
-                        marks.contains_key(&(o, Some(member))) || marks.contains_key(&(o, None))
-                    })
+                marks.contains_key(&(owner, Some(member)))
+                    || (!assigned
+                        && (incomplete
+                            || marks.contains_key(&(owner, None))
+                            || marks.contains_key(&(Owner::Unknown, Some(member)))
+                            || marks.contains_key(&(Owner::Unknown, None))))
             })
         });
         Some(if overwritten || written {
