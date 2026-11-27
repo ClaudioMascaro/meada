@@ -74,6 +74,9 @@ branch from the merge of this release. Release notes in
   repository writes elsewhere, links by name instead of `exact`: the later entry may replace it.
   A request whose path is only an unknown base (an environment variable with no literal path)
   links no route and stays an open item (#975).
+- The agent skill `skills/meada/SKILL.md` covers 1.6.0: `meada trace` on the command line with
+  `--affected`, `--batch` and changed lockfiles, `used by:` and `uses:` in `context`, TypeScript
+  receivers, the level order, and `[[base_url]]`, `[[channel_client]]` and `[[helm_env]]` (#975).
 - `meada decide --list` prints the decision kind and summarizes candidates. To see the full
   list, use `--list --item <id>`. Numbers at the prompt can differ from 1.3 when a dynamic URL's
   literal fragments fit shorter paths (#803, #804).
