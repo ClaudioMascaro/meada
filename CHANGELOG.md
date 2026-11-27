@@ -10,8 +10,9 @@ All notable changes to Meada are recorded here. The format follows
 
 A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md)
 that makes the affected set of a change usable by a merge queue: `meada trace` on the command line,
-`--affected` with the evidence of each file, changed lockfiles, declared base URLs and Kafka topics
-read from deployment configuration. It is minor for the CLI, the MCP server and the export (format
+`--affected` with the evidence of each file, changed lockfiles, declared base URLs, Kafka topics
+read from deployment configuration and TypeScript method calls resolved by the receiver's type.
+It is minor for the CLI, the MCP server and the export (format
 1): it adds commands, `meada.toml` tables, export fields and values, and removes nothing. The
 public crate takes a major, `meada-core` 2.0.0, and keeps its own version from now on: its
 exhaustive enums gained variants (`export::Cause`: `wrong-kind`, `unknown-repository`,
@@ -46,6 +47,17 @@ branch from the merge of this release. Release notes in
   held in private class fields are recognized, and a topic read from Backstage's app-config names
   its values; `trace --affected` carries a producer's change to its consumers across repositories
   (#974).
+- TypeScript method calls resolve by the receiver's written type: a receiver annotated with a
+  repository class, built with `new`, returned by a method with a written return type, held in a
+  constructor parameter or a field written once, or bound to an object literal, links `exact` to
+  its class's method or the one it inherits through `extends`; an imported object literal's
+  methods resolve as they do in its own file. A receiver typed by a platform or library type
+  (`Map`, `URL`, a `fetch` response) drops the repository's same-named methods from its
+  candidates, and a receiver Meada cannot pin keeps today's candidates (#975).
+- A `[[channel_client]]` can name a TypeScript class method, and a value a constructor receives
+  and holds in a field reaches channel and HTTP links. TS HTTP bases are read from a method's
+  return, a record entry and a `.replace` that strips trailing slashes. Go reads an explicitly
+  named embedded field in an environment-tagged configuration chain (#975).
 
 ### Changed
 
@@ -57,7 +69,11 @@ branch from the merge of this release. Release notes in
   top-level constants and types are symbols, an import of a name another workspace package
   re-exports links to the original, and `startTestBackend`'s features link their default (#969).
 - The extraction revision and the stored schema move: the first `meada index` after the upgrade
-  rebuilds every index (#947, #967).
+  rebuilds every index (#947, #967, #975).
+- A method of an object literal followed by a spread or a computed key, or whose member the
+  repository writes elsewhere, links by name instead of `exact`: the later entry may replace it.
+  A request whose path is only an unknown base (an environment variable with no literal path)
+  links no route and stays an open item (#975).
 - `meada decide --list` prints the decision kind and summarizes candidates. To see the full
   list, use `--list --item <id>`. Numbers at the prompt can differ from 1.3 when a dynamic URL's
   literal fragments fit shorter paths (#803, #804).
@@ -75,7 +91,11 @@ branch from the merge of this release. Release notes in
 
 ### Fixed
 
-- A call in a Go test file no longer gives a value to a field read in production code (#973).
+- A call in a Go test file no longer gives a value to a field read in production code (#973),
+  and no caller in a test file supplies a value to production code in any language (#975).
+- A Go `select` case's `:=` shadows a package-level format constant, so it no longer gives an
+  HTTP link a path the code never builds. `trace --affected` no longer reads a lockfile folder
+  `apps/a` as covering `apps/ab/...` (#975).
 - Rebuild indexes written before the Go literal-key extraction fix on the next local index
   open or on `meada index --workspace` (#946).
 - Check linked decisions before reading their target in saving modes and identify the repository
