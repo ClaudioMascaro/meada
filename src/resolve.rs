@@ -5277,6 +5277,18 @@ pub(crate) const EVAL_BUDGET: usize = 1 << 16;
 // constants from overflowing the stack.
 pub(crate) const EVAL_DEPTH: usize = 256;
 
+/// Python decorators that leave the body a call runs (`Code::py_decorated`): `staticmethod` and
+/// `classmethod` bind it, `dataclass` adds only methods the class does not write, and
+/// `lru_cache` returns what the function returns. Any other decorator may rebind the name.
+const PY_KEEPS_BODY: [&str; 6] = [
+    "staticmethod",
+    "classmethod",
+    "dataclass",
+    "dataclasses.dataclass",
+    "lru_cache",
+    "functools.lru_cache",
+];
+
 /// How many wrapper calls `Code::expand` climbs from a call; at the limit, the site is read
 /// where the climb stops, its parameters unknown.
 // ponytail: real clients are wrapped a few levels deep; the limit keeps a crafted chain of
@@ -8284,6 +8296,23 @@ impl<'a> Code<'a> {
         result
     }
 
+    /// Whether the Python `function`, or the class it is a method of, carries a decorator that
+    /// may rebind it, so its body is not what a call runs: a decorator call (`@use_host(..)`,
+    /// #949) or a bare name, on the function or on its class (`@install class C` may replace
+    /// `C.m`, #962), outside `PY_KEEPS_BODY`.
+    fn py_decorated(&self, function: Target<'a>) -> bool {
+        let calls = &self.resolver.files[function.path].calls;
+        let rebinds = |name: &str| !PY_KEEPS_BODY.contains(&name);
+        [function.name, crate::parent(function.name)]
+            .into_iter()
+            .filter(|name| !name.is_empty())
+            .any(|name| {
+                (calls.iter()).any(|c| c.decorates.as_deref() == Some(name) && rebinds(&c.callee))
+                    || (self.def(function.path, name))
+                        .is_some_and(|def| def.decorators.iter().any(|d| rebinds(d)))
+            })
+    }
+
     /// The string returned by an exact call under its argument frame. HTTP also folds
     /// functions with multiple agreeing returns. A recursive return is unknown.
     #[expect(clippy::too_many_arguments)]
@@ -8339,11 +8368,7 @@ impl<'a> Code<'a> {
                 || !(same_method || self.runs_alone(function))
                 || (def.asynchronous && !(awaited || stored.awaited))
                 || (javascript && !def.terminal_return)
-                || (self.pack.extensions().contains(&"py")
-                    && def
-                        .decorators
-                        .iter()
-                        .any(|name| !matches!(name.as_str(), "staticmethod" | "classmethod")))
+                || (self.pack.extensions().contains(&"py") && self.py_decorated(function))
             {
                 return None;
             }

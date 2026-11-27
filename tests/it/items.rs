@@ -618,6 +618,47 @@ fn a_go_deferred_write_of_the_named_result_leaves_the_base_open() {
 }
 
 #[test]
+fn a_python_decorator_of_the_function_or_its_class_leaves_the_base_open() {
+    // #949: a decorator call rebinds the function; #962: a class decorator may replace the method.
+    let export = http_value_flow("http_value_flow_decorated");
+    let consumers = export["consumers"].as_array().unwrap();
+    let links = export["links"].as_array().unwrap();
+    let rows = |name: &str| -> Vec<&serde_json::Value> {
+        let at = format!("::client.py::{name}::");
+        (consumers.iter())
+            .filter(|c| c["site"].as_str().unwrap().contains(&at))
+            .collect()
+    };
+    let rebound = [
+        "ViaDecoratedBase",
+        "Changed.ViaChangedClass",
+        "Registered.ViaRegisteredClass",
+    ];
+    for name in rebound {
+        let open = rows(name);
+        assert!(
+            matches!(open.as_slice(), [row] if row["contract"].is_null() && row["via"].is_null()
+                && !links.iter().any(|l| l["consumer"] == row["site"])),
+            "{name}: {open:?}"
+        );
+    }
+    // No decorator, or one that keeps the body a call runs (`dataclass`, `lru_cache`).
+    let kept = [
+        "Ordinary.ViaOrdinaryClass",
+        "Settings.ViaDataclass",
+        "ViaCachedBase",
+    ];
+    for name in kept {
+        let linked = rows(name);
+        assert!(
+            matches!(linked.as_slice(), [row] if row["contract"] == "http::GET::/api/orders"
+                && row["via"] == "env:API_URL"),
+            "{name}: {linked:?}"
+        );
+    }
+}
+
+#[test]
 fn an_environment_key_needs_a_reader_bound_to_the_runtime() {
     let export = http_value_flow("http_value_flow_env_reader");
     let consumers = export["consumers"].as_array().unwrap();
