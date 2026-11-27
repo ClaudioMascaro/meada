@@ -1,4 +1,4 @@
-extraction revision 9
+extraction revision 10
 
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -1971,6 +1971,7 @@ sample.java
         "end": 451
       },
       "params": [],
+      "private": true,
       "hash": "3001d812e93de91045c564d8299adb118a7e7347157dc0c7c04ce371a0e4b383"
     },
     {

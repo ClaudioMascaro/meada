@@ -30,7 +30,8 @@
   nothing for its inline entries either. A parameter is followed in Go alone, where its function
   writes it twice: `row` then judges each expanded site (`Params::Bound`, the site's frames),
   taking the argument of the frame's call (`Code::param_values`) when that call runs the function
-  alone (`Code::runs_alone`: a function, or a method of a name no other definition spells) with
+  alone (`Code::runs_alone`: a function, a `private` Java or Kotlin method, or a method of a name no
+  other definition spells) with
   one argument per parameter. The rows of a transaction run inside `Code::apart` and trace their clients
   with an `Origins` of their own, so what they fold is charged to a second per-file budget and
   the other calls of the file keep theirs. Each row of one call starts from what the call found

@@ -41,7 +41,7 @@ mod values;
 /// Bump when extraction or resolution changes the rows an unchanged checkout should produce
 /// without changing their stored shape. The schema golden pins the revision alongside the shape.
 #[cfg(test)]
-const EXTRACTION_REVISION: u32 = 9;
+const EXTRACTION_REVISION: u32 = 10;
 
 /// The stored format's version, derived from its golden (`tests/golden/schema.txt`, kept by the
 /// unit test `the_stored_format_matches_its_golden`): re-blessing it after a change to `SCHEMA`,

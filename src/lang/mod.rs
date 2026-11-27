@@ -1284,6 +1284,10 @@ pub struct Def {
     /// The call produces an async result; its written return values require an awaited call.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub asynchronous: bool,
+    /// A method no other definition can override (Java's and Kotlin's `private`): an exact call
+    /// runs it, whatever other classes of the repository spell (#810).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub private: bool,
     /// The BLAKE3 of the exact bytes of `range`, in hex; empty until `hash_spans` fills it.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub hash: String,
@@ -1310,6 +1314,7 @@ impl Def {
             output: None,
             suspends: false,
             asynchronous: false,
+            private: false,
             hash: Default::default(),
         }
     }

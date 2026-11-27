@@ -7922,14 +7922,16 @@ impl<'a> Code<'a> {
         method && self.matched().1.get(own_name(function.name)) > Some(&1)
     }
 
-    /// Whether an exact call of `function` runs it and no other definition: a function, or a
-    /// method whose own name no other definition of the repository spells, so that the
-    /// receiver's type has nothing to choose between. A function literal is held in a name that
+    /// Whether an exact call of `function` runs it and no other definition: a function, a
+    /// method nothing can override (`Def::private`), or a method whose own name no other
+    /// definition of the repository spells, so that the receiver's type has nothing to choose
+    /// between. A function literal is held in a name that
     /// can be set again.
     pub fn runs_alone(&self, function: Target<'a>) -> bool {
-        match self.resolver.defs[function.path][function.name].kind {
+        let def = &self.resolver.defs[function.path][function.name];
+        match def.kind {
             Kind::Function => true,
-            Kind::Method => !self.shares_name(function),
+            Kind::Method => def.private || !self.shares_name(function),
             _ => false,
         }
     }

@@ -659,6 +659,32 @@ fn a_python_decorator_of_the_function_or_its_class_leaves_the_base_open() {
 }
 
 #[test]
+fn a_private_jvm_method_runs_alone_whatever_other_classes_spell() {
+    // #810: a private method of the same name in a Java and a Kotlin class still folds; a method
+    // a subclass overrides does not.
+    let export = http_value_flow("http_value_flow_private");
+    let consumers = export["consumers"].as_array().unwrap();
+    let rows = |at: &str| -> Vec<&serde_json::Value> {
+        (consumers.iter())
+            .filter(|c| c["site"].as_str().unwrap().contains(at))
+            .collect()
+    };
+    for path in ["Client.java", "Client.kt"] {
+        let twin = rows(&format!("::{path}::Client.ViaPrivateTwin"));
+        assert!(
+            matches!(twin.as_slice(), [row] if row["contract"] == "http::GET::/api/orders"
+                && row["via"] == "env:API_URL"),
+            "{path}: {twin:?}"
+        );
+    }
+    let overridable = rows("::Client.java::Client.ViaOverridable");
+    assert!(
+        matches!(overridable.as_slice(), [row] if row["contract"].is_null() && row["via"].is_null()),
+        "{overridable:?}"
+    );
+}
+
+#[test]
 fn an_environment_key_needs_a_reader_bound_to_the_runtime() {
     let export = http_value_flow("http_value_flow_env_reader");
     let consumers = export["consumers"].as_array().unwrap();
