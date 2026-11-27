@@ -155,6 +155,14 @@ fn ts() -> Vec<Case> {
         t("members", x(format!("a{}", ".b".repeat(5 * LONG)))),
         t("method-chain", x(format!("a{}", ".m(1)".repeat(5 * LONG)))),
         t(
+            "receiver-annotations",
+            format!(
+                "class Client<T> {{ send() {{}} }}\ntype Cycle = Cycle;\nfunction f(a: {}, b: {}, c: Cycle) {{ a.send(); b.send(); c.send(); }}",
+                nest("Client<", "string", ">", 200),
+                vec!["Client<string>"; 10_000].join(" | "),
+            ),
+        ),
+        t(
             "blocks",
             format!("export function f() {{ {} }}\n", nest("{", "", "}", DEEP)),
         ),

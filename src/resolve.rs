@@ -18,6 +18,7 @@ use crate::lang::{
 };
 
 mod mutations;
+mod ts;
 pub(crate) use mutations::MemberEffect;
 pub(crate) type CallWrites = for<'a> fn(&Code<'a>, &'a str, usize) -> Option<Vec<MemberEffect<'a>>>;
 
@@ -394,6 +395,14 @@ impl<'a> Binders<'a> {
 
 /// The files of one language pack, resolved together.
 pub struct Resolver<'a> {
+    ts: bool,
+    ts_site: Cell<Option<(usize, usize, bool)>>,
+    ts_key_read: Cell<bool>,
+    ts_locals: HashMap<&'a str, ts::FileLocals<'a>>,
+    ts_packages: BTreeSet<String>,
+    ts_heirs: HashMap<String, Vec<Target<'a>>>,
+    ts_writes: Option<ts::Writes<'a>>,
+    ts_overrides: RefCell<HashMap<String, HashMap<String, bool>>>,
     files: &'a BTreeMap<&'a str, &'a Facts>,
     defs: HashMap<&'a str, HashMap<&'a str, &'a Def>>,
     overloads: HashMap<&'a str, HashMap<&'a str, Vec<Target<'a>>>>,
@@ -499,6 +508,10 @@ pub struct Resolver<'a> {
     /// reach another function: it is not kept, so a wrapper or a parameter is never climbed
     /// through it.
     callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
+    /// Test calls to production definitions, consulted only for a field read in a test.
+    test_callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
+    /// Exact constructions eligible to supply fields read in the class's file.
+    ts_constructions: HashMap<Target<'a>, Vec<Caller<'a>>>,
     /// What each call resolved to when the resolver was built, by file and position
     /// (`resolved_at`).
     built: HashMap<&'a str, Vec<Resolution<'a>>>,
@@ -512,6 +525,8 @@ pub struct Resolver<'a> {
     /// Name inference candidates, sorted: methods by their last name (`true`), top-level
     /// functions and classes, and those of modules written in place, by their name (`false`).
     by_name: HashMap<(bool, &'a str), Vec<Target<'a>>>,
+    /// Literal functions are structural candidates only for an outside TS annotation.
+    ts_literal_candidates: HashMap<&'a str, Vec<Target<'a>>>,
     modules: Modules,
     /// The blocks that add members to each class (`Facts::impls`), the inherent ones first.
     impls: HashMap<Target<'a>, Vec<Block<'a>>>,
@@ -802,7 +817,7 @@ impl<'a> Resolver<'a> {
         shared: Vec<Vec<String>>,
         language: &dyn LanguagePack,
     ) -> Self {
-        Self::built(files, modules, shared, language, None)
+        Self::built(files, modules, shared, language, None, BTreeSet::new())
     }
 
     /// The resolver of the files of a pack, under what its `layout` makes of them: the shared
@@ -812,12 +827,22 @@ impl<'a> Resolver<'a> {
         layout: crate::lang::Layout,
         language: &dyn LanguagePack,
     ) -> Self {
+        Self::with_layout_and_packages(files, layout, language, BTreeSet::new())
+    }
+
+    pub(crate) fn with_layout_and_packages(
+        files: &'a BTreeMap<&'a str, &'a Facts>,
+        layout: crate::lang::Layout,
+        language: &dyn LanguagePack,
+        packages: BTreeSet<String>,
+    ) -> Self {
         let resolver = Self::built(
             files,
             layout.modules,
             layout.shared,
             language,
             layout.reaches,
+            packages,
         );
         resolver.publishing(layout.published)
     }
@@ -832,6 +857,7 @@ impl<'a> Resolver<'a> {
         shared: Vec<Vec<String>>,
         language: &dyn LanguagePack,
         reaches: Option<Reaches>,
+        packages: BTreeSet<String>,
     ) -> Self {
         let defs: HashMap<&str, HashMap<&str, &Def>> = files
             .iter()
@@ -1009,8 +1035,18 @@ impl<'a> Resolver<'a> {
         let receivers = files
             .iter()
             .map(|(path, facts)| {
-                let names = (facts.receivers.iter())
-                    .map(|l| ((l.scope.as_str(), l.name.as_str()), &l.class))
+                let scoped: HashSet<_> = facts
+                    .ts_locals
+                    .values()
+                    .flatten()
+                    .filter_map(|b| b.receiver)
+                    .collect();
+                let names = facts
+                    .receivers
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| !scoped.contains(index))
+                    .map(|(_, l)| ((l.scope.as_str(), l.name.as_str()), &l.class))
                     .collect();
                 (*path, names)
             })
@@ -1032,6 +1068,7 @@ impl<'a> Resolver<'a> {
             .map(|(path, facts)| (*path, facts.star.taker()))
             .collect();
         let mut by_name: HashMap<_, Vec<Target>> = HashMap::new();
+        let mut ts_literal_candidates: HashMap<_, Vec<Target>> = HashMap::new();
         for (path, facts) in files {
             let names: &HashMap<&str, &Def> = &defs[path];
             // Whether `scope` is the top level or modules written in place, all the way up.
@@ -1048,6 +1085,18 @@ impl<'a> Resolver<'a> {
                 let name = def.name.as_str();
                 if arities.contains_key(&Target { path, name }) {
                     continue;
+                }
+                if def.kind == Kind::Function
+                    && let Some((owner, member)) = name.rsplit_once('.')
+                    && facts
+                        .ts_literal_methods
+                        .get(owner)
+                        .is_some_and(|methods| methods.contains_key(member))
+                {
+                    ts_literal_candidates
+                        .entry(member)
+                        .or_default()
+                        .push(Target { path, name });
                 }
                 let key = match (def.kind, name.rsplit_once('.')) {
                     (Kind::Method, Some((_, last))) => (true, last),
@@ -1104,7 +1153,20 @@ impl<'a> Resolver<'a> {
                 (path, names.collect())
             })
             .collect();
+        let ts = language.extensions().contains(&"ts");
         let mut resolver = Self {
+            ts,
+            ts_packages: packages,
+            ts_heirs: HashMap::new(),
+            ts_writes: None,
+            ts_site: Cell::new(None),
+            ts_key_read: Cell::new(false),
+            ts_locals: if ts {
+                ts::locals(files)
+            } else {
+                HashMap::new()
+            },
+            ts_overrides: RefCell::default(),
             files,
             declared,
             defs,
@@ -1152,10 +1214,13 @@ impl<'a> Resolver<'a> {
             known: crate::lang::known_outside(language),
             globals: language.globals(),
             callers: HashMap::new(),
+            test_callers: HashMap::new(),
+            ts_constructions: HashMap::new(),
             built: HashMap::new(),
             built_final: false,
             extension_callers: HashMap::new(),
             by_name,
+            ts_literal_candidates,
             modules,
             impls: HashMap::new(),
             blocks: HashMap::new(),
@@ -1178,6 +1243,9 @@ impl<'a> Resolver<'a> {
             parts,
             actuals,
         };
+        if resolver.ts {
+            resolver.ts_heirs = resolver.index_ts_heirs();
+        }
         let mut work = Work::default();
         for (path, facts) in files {
             for def in facts.defs.iter().filter(|d| d.kind == Kind::Class) {
@@ -1312,22 +1380,46 @@ impl<'a> Resolver<'a> {
             resolver.reaches = reaches.take();
             resolver.built_final = true;
         }
+        if resolver.ts {
+            resolver.ts_writes = Some(ts::Writes::index(&resolver));
+        }
         let mut callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         let mut extension_callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         let mut built = HashMap::new();
         for (path, facts) in files {
+            let test = crate::http::is_test_file(path);
+            let supplies = |target: Target| !test || crate::http::is_test_file(target.path);
             let built: &mut Vec<Resolution> = built.entry(*path).or_default();
             for (index, call) in facts.calls.iter().enumerate() {
                 let resolution = resolver.call(path, call);
                 built.push(resolution.clone());
                 match resolution {
                     Resolution::Exact(target) => {
+                        if !supplies(target) {
+                            if path.ends_with(".go") {
+                                resolver
+                                    .test_callers
+                                    .entry(target)
+                                    .or_default()
+                                    .push(Caller { path, index });
+                            }
+                            continue;
+                        }
                         callers
                             .entry(target)
                             .or_default()
                             .push(Caller { path, index });
+                        if resolver.ts && call.constructs {
+                            resolver
+                                .ts_constructions
+                                .entry(target)
+                                .or_default()
+                                .push(Caller { path, index });
+                        }
                     }
-                    Resolution::Inferred(target) if resolver.extension_call(path, call, target) => {
+                    Resolution::Inferred(target)
+                        if supplies(target) && resolver.extension_call(path, call, target) =>
+                    {
                         (extension_callers.entry(target).or_default()).push(Caller { path, index });
                     }
                     _ => {}
@@ -1508,6 +1600,12 @@ impl<'a> Resolver<'a> {
         matching: bool,
         work: &mut Work<'a>,
     ) -> Resolution<'a> {
+        if self.ts {
+            return self.at_ts_site(path, call.range.start, || {
+                // A TS construction calls the class itself.
+                self.resolved_as(path, call, false, matching, work)
+            });
+        }
         let found = self.resolved_as(path, call, call.constructs, matching, work);
         if !(self.guesses_constructs && call.constructs) || matches!(found, Resolution::Exact(_)) {
             return found;
@@ -1537,12 +1635,34 @@ impl<'a> Resolver<'a> {
             return Resolution::Unresolved;
         }
         let (scope, callee) = (call.scope.as_str(), call.callee.as_str());
+        if self.ts
+            && let Some(answer) = self.ts_library_call(path, call, matching, work)
+        {
+            return answer;
+        }
         let seen = &mut self.seen(path, scope);
         // The result of the call this one is made on, read once: the name match below reads it
         // too, and reading it twice per call would double the work at every call of a chain.
         let mut on = None;
         let labels = call.labels.as_deref();
         let binding = match (call.on, constructs, call.by_path) {
+            (None, false, false)
+                if self.ts
+                    && let Some(root) = call.root.as_deref() =>
+            {
+                let receiver = self.read_member(path, scope, root);
+                let members = own_name(callee);
+                if root == "this"
+                    && let Binding::Def(class) = receiver
+                    && !self.ts_override(class, members)
+                {
+                    self.member(class, members, false, labels, work)
+                } else if self.holder(&receiver).is_some() {
+                    self.walk(receiver, members, seen, work, Reading::Value, labels)
+                } else {
+                    Binding::Unknown
+                }
+            }
             (Some(inner), false, _) => {
                 let members = callee.split_once('.').map_or("", |(_, m)| m);
                 match self.on_result(path, call, inner, work) {
@@ -1959,6 +2079,8 @@ impl<'a> Resolver<'a> {
         let class = match (&def.output, through.awaited, through.tried) {
             (Some(_), true, true) => &None,
             (Some(_), true, false) => &def.output,
+            // Only the global Promise's declared output types an awaited TS value.
+            (None, true, false) if self.ts => &None,
             (_, _, true) => &def.unwrapped,
             _ => &def.result,
         };
@@ -2251,6 +2373,10 @@ impl<'a> Resolver<'a> {
     /// last method, to something outside it, as a direct `client.send()` does. Such a call
     /// resolves to nothing, never to a repository method of the same name.
     fn owned_outside(&self, path: &'a str, call: &'a Call) -> bool {
+        // A TS root unwraps the receiver for class lookup. Its by-name fallback stays open.
+        if self.ts {
+            return false;
+        }
         let Some((head, last)) = call.callee.rsplit_once('.') else {
             return false;
         };
@@ -2459,6 +2585,13 @@ impl<'a> Resolver<'a> {
             if let Some((name, def)) = self.defs[path].get_key_value(candidate.as_str())
                 && def.kind != Kind::Method
             {
+                if self.ts
+                    && s.is_empty()
+                    && let Some((object, member)) = name.split_once('.')
+                    && let Some(found) = self.ts_literal_method(path, object, member, true)
+                {
+                    return Some(found);
+                }
                 return Some(Binding::Def(Target { path, name }));
             }
             let held = crate::qualify(s, head);
@@ -2493,6 +2626,15 @@ impl<'a> Resolver<'a> {
             // are separate namespaces (`Reading::Read`).
             let read = self.members_in_scope && (!last || reading.read());
             let labels = labels.filter(|_| last);
+            let direct_instance = n == 0 && matches!(binding, Binding::Instance(_));
+            let typed_ts = self.ts && self.holder(&binding).is_some();
+            if self.ts
+                && let Binding::Const(p, name) = binding
+                && let Some(found) = self.ts_literal_method(p, name, member, false)
+            {
+                binding = found;
+                continue;
+            }
             let instance = self.instance(binding, work);
             // A Go field of an anonymous struct type has no class to be an instance of: the
             // rest of the chain may be the path to a tagged field of the file defining the
@@ -2503,6 +2645,22 @@ impl<'a> Resolver<'a> {
                 return found;
             }
             binding = match instance {
+                Binding::External(..) if typed_ts => Binding::Unknown,
+                Binding::Instance(class) if self.ts => {
+                    let found = self.member(class, member, read, labels, work);
+                    match found {
+                        Binding::Def(t)
+                            if self.defs[t.path][t.name].kind == Kind::Method
+                                && !(direct_instance
+                                    && t.path == class.path
+                                    && crate::parent(t.name) == class.name)
+                                && self.ts_override(class, member) =>
+                        {
+                            Binding::Unknown
+                        }
+                        _ => found,
+                    }
+                }
                 // A class's name (`Type.m()`, `Type.X`) reaches a Kotlin companion's members
                 // before the class's, which only an instance reaches; past the companion, a
                 // nested class or a constant of the class (an enum entry).
@@ -2652,7 +2810,7 @@ impl<'a> Resolver<'a> {
         let Some((path, scope, name)) = self.holder(&binding) else {
             return binding;
         };
-        let Some(class) = self.receivers[path].get(&(scope, name)) else {
+        let Some(class) = self.receiver_class(path, scope, name) else {
             return Binding::Unknown;
         };
         if let Class::Imported = class {
@@ -2663,6 +2821,7 @@ impl<'a> Resolver<'a> {
         }
         let found = match class {
             Class::Enclosing => self.class(path, scope),
+            Class::Named(class) if self.ts => self.ts_construction(path, scope, name, class, work),
             Class::Named(class) => {
                 self.resolve(path, scope, class, &mut self.seen(path, scope), work)
             }
@@ -2672,8 +2831,28 @@ impl<'a> Resolver<'a> {
             }
             Class::Returned(callee) => self.returned(path, scope, callee, false, work),
             Class::Called(callee) => self.returned(path, scope, callee, true, work),
-            Class::Result(index) => self.result_of(path, *index, Through::default(), work),
-            Class::Imported | Class::Member(_) | Class::Unknown => Binding::Unknown,
+            Class::Result(index) => {
+                let awaited = self.ts
+                    && self.files[path]
+                        .calls
+                        .get(*index)
+                        .is_some_and(|c| c.awaited);
+                self.result_of(
+                    path,
+                    *index,
+                    Through {
+                        awaited,
+                        ..Through::default()
+                    },
+                    work,
+                )
+            }
+            Class::TsGlobalValue
+            | Class::TsGlobalType(_)
+            | Class::TsGeneric(_)
+            | Class::Imported
+            | Class::Member(_)
+            | Class::Unknown => Binding::Unknown,
         };
         self.leave(work);
         match found {
@@ -2792,6 +2971,9 @@ impl<'a> Resolver<'a> {
             if self.receivers[c.path].contains_key(&(c.name, member)) {
                 return Binding::Local(c.path, c.name, member);
             }
+            if self.ts && self.ts_field(c, member) {
+                return Binding::Unknown;
+            }
         }
         match self.companion(class, work) {
             Some(companion) => self.member(companion, member, read, labels, work),
@@ -2901,7 +3083,7 @@ impl<'a> Resolver<'a> {
         &self,
         path: &'a str,
         scope: &str,
-        member: &str,
+        member: &'a str,
         work: &mut Work<'a>,
         labels: Option<&[String]>,
     ) -> Binding<'a> {
@@ -2909,6 +3091,12 @@ impl<'a> Resolver<'a> {
             return Binding::Unknown;
         };
         let family = self.family(class, work).unwrap_or_default();
+        if self.ts {
+            return match family.get(1) {
+                Some(Ancestor::Class(base)) => self.member(*base, member, false, labels, work),
+                _ => Binding::Unknown,
+            };
+        }
         (family.get(1..))
             .and_then(|bases| self.overloaded(bases, member, labels))
             .unwrap_or(Binding::Unknown)
@@ -3592,7 +3780,29 @@ impl<'a> Resolver<'a> {
             // A `let`, a `catch` binding, a destructured name: what it holds is not known, and
             // it hides every name it spells, outer ones and those of its own definition (a
             // definition, constant or parameter it may shadow in a block alike).
-            if self.locals[path].contains(candidate.as_str()) {
+            let local = self.ts_local(path, s, name);
+            if let Some(Some(local)) = local {
+                if self
+                    .ts_site
+                    .get()
+                    .is_some_and(|(_, at, _)| at < local.declared)
+                {
+                    return Binding::Hidden;
+                }
+                if local.receiver.is_some() {
+                    if let Some(Class::Result(_)) = self.receiver_class(path, s, name)
+                        && let Some(constant) = self.consts[path].get(candidate.as_str())
+                    {
+                        return Binding::Const(path, constant);
+                    }
+                    return Binding::Local(path, s, name);
+                }
+                if let Some(constant) = self.consts[path].get(candidate.as_str()) {
+                    return Binding::Const(path, constant);
+                }
+                return Binding::Hidden;
+            }
+            if local.is_none() && self.locals[path].contains(candidate.as_str()) {
                 return Binding::Hidden;
             }
             if let Some((name, def)) = defs.get_key_value(candidate.as_str())
@@ -3618,7 +3828,17 @@ impl<'a> Resolver<'a> {
             {
                 return found;
             }
-            if let Some(constant) = self.consts[path].get(candidate.as_str()) {
+            // Class fields in TypeScript require an explicit receiver, including in initializers.
+            let field = self.ts
+                && self.files[path].ts_classes.get(s).is_some_and(|c| {
+                    c.fields.iter().any(|f| f == name) || c.constructed.contains_key(name)
+                });
+            if field {
+                continue;
+            }
+            if local.is_none()
+                && let Some(constant) = self.consts[path].get(candidate.as_str())
+            {
                 return Binding::Const(path, constant);
             }
             if let Some(&(n, field)) = self.params[path].get(&(s, name)) {
@@ -5033,6 +5253,8 @@ struct Written<'a, 'i> {
     /// What the kind reads off annotated fields and parameters (`Code::expand_with`).
     inject: Option<&'i Inject<'a, 'i>>,
     external_value: Option<&'i ExternalValue<'a, 'i>>,
+    /// A reader may also keep a route it already knows before a caller supplies its arguments.
+    retain_site: Option<fn(&[Value]) -> bool>,
     /// The calls that write a member (`Code::expand_written`).
     writes: Option<CallWrites>,
 }
@@ -5076,6 +5298,7 @@ pub(crate) const FIELD_DEPTH: usize = 16;
 #[derive(Default)]
 struct Fold<'a, 'i> {
     held: Vec<(&'a str, &'a str)>,
+    record_site: Option<(&'a str, usize)>,
     nested: usize,
     chain: bool,
     /// Preserve verified constructor type names for selected SDK identity arguments.
@@ -5085,7 +5308,11 @@ struct Fold<'a, 'i> {
     inject: Option<&'i Inject<'a, 'i>>,
     external_value: Option<&'i ExternalValue<'a, 'i>>,
     returning: Vec<(&'a str, usize)>,
+    independent: Option<Target<'a>>,
     foreign: usize,
+    /// Constructions and their factory callers supply fields independently of a method's callers.
+    field_frames: Option<&'i [Frame<'a>]>,
+    field_wants: Option<Target<'a>>,
     /// How many struct fields deep the value is folded (`Code::field_read`).
     field_depth: usize,
 }
@@ -6137,7 +6364,7 @@ impl<'a> Code<'a> {
         let r = self.resolver;
         let binding = r.read_member(path, scope, name);
         let (at, within, held) = r.holder(&binding)?;
-        match r.receivers[at].get(&(within, held))? {
+        match r.receiver_class(at, within, held)? {
             Class::Type(written) => {
                 let outside = self.outside_written(at, within, written);
                 // A type of the repository is an answer with no spelling.
@@ -6193,7 +6420,11 @@ impl<'a> Code<'a> {
     // ponytail: a literal of an alias or a defined type (`type B = T`, `type B T`) written by
     // position, and a conversion from another struct type (`T(other)`), are not seen as setting
     // the fields of `T`.
-    pub fn field_values(&self, field: Field<'a>) -> Option<Vec<(&'a str, &'a str, &'a Value)>> {
+    pub fn field_values(
+        &self,
+        field: Field<'a>,
+        test_read: bool,
+    ) -> Option<Vec<(&'a str, &'a str, &'a Value)>> {
         let (at, ty, name) = field;
         let index = self.literals.get_or_init(|| {
             let mut index: HashMap<&'a str, BTreeSet<(&'a str, &'a str)>> = HashMap::new();
@@ -6211,6 +6442,9 @@ impl<'a> Code<'a> {
         let mut out = Vec::new();
         let markers = [index.get(name), index.get("*")];
         for &(path, marker) in markers.into_iter().flatten().flatten() {
+            if !test_read && crate::http::is_test_file(path) {
+                continue;
+            }
             let by_position = marker.ends_with("{*}");
             let scope = scope_of(marker);
             for &literal in self.consts(path, marker) {
@@ -6270,11 +6504,20 @@ impl<'a> Code<'a> {
         self.resolver.written.contains(field)
     }
 
-    /// Whether some file of the repository writes the field `field` of `class` (Java and
-    /// Kotlin): a write in the code of `class`, or one whose class the pack could not tell. For
-    /// a read outside Go test files (`test_read` false), a write in a `_test.go` file does not
-    /// count: `go build` leaves those files out of the program.
+    /// A selector write to a field of this class, including one on an unknown receiver.
+    /// TypeScript also considers overrides in subclasses and the scope of private names.
+    /// A production read excludes writes in test files for Go and TypeScript.
     pub fn field_written_in(&self, class: &str, field: &str, test_read: bool) -> bool {
+        if self.resolver.ts {
+            return self.resolver.defs.iter().any(|(&path, defs)| {
+                defs.get_key_value(class).is_some_and(|(&name, def)| {
+                    def.kind == Kind::Class
+                        && self
+                            .resolver
+                            .ts_field_written(Target { path, name }, field, test_read)
+                })
+            });
+        }
         let written = match test_read {
             true => &self.resolver.written,
             false => &self.resolver.written_outside_tests,
@@ -6305,7 +6548,7 @@ impl<'a> Code<'a> {
         }
         (self.field_reads.borrow_mut()).insert(key, Value::Unknown);
         let mut reads = Vec::new();
-        let all = self.field_values(field).is_some_and(|values| {
+        let all = self.field_values(field, test_read).is_some_and(|values| {
             !values.is_empty()
                 && (values.into_iter()).all(|(path, scope, value)| {
                     let frames = &mut Vec::new();
@@ -6367,7 +6610,14 @@ impl<'a> Code<'a> {
             return false;
         }
         let callers: Vec<Caller> = (self.resolver.callers.get(&function).into_iter().flatten())
-            .filter(|c| test_read || !c.path.ends_with("_test.go"))
+            .chain(
+                self.resolver
+                    .test_callers
+                    .get(&function)
+                    .into_iter()
+                    .flatten()
+                    .filter(|_| test_read),
+            )
             .copied()
             .collect();
         !callers.is_empty()
@@ -6770,7 +7020,7 @@ impl<'a> Code<'a> {
     ) -> Option<(&'a str, &'a str, &'a str)> {
         let r = self.resolver;
         let (at, within, held) = r.holder(&r.read_member(path, scope, name))?;
-        match r.receivers[at].get(&(within, held))? {
+        match r.receiver_class(at, within, held)? {
             Class::Type(written) => Some((at, within, written)),
             _ => None,
         }
@@ -7257,16 +7507,17 @@ impl<'a> Code<'a> {
         inject: Option<&Inject<'a, '_>>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
     ) -> Vec<Expanded<'a, R>> {
-        self.expand_using(from, inject, None, read)
+        self.expand_using(from, inject, None, None, read)
     }
 
     pub(crate) fn expand_with_call<R>(
         &self,
         from: Expand<'a>,
         external_value: &ExternalValue<'a, '_>,
+        retain_site: fn(&[Value]) -> bool,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
     ) -> Vec<Expanded<'a, R>> {
-        self.expand_using(from, None, Some(external_value), read)
+        self.expand_using(from, None, Some(external_value), Some(retain_site), read)
     }
 
     fn expand_using<R>(
@@ -7274,6 +7525,7 @@ impl<'a> Code<'a> {
         from: Expand<'a>,
         inject: Option<&Inject<'a, '_>>,
         external_value: Option<&ExternalValue<'a, '_>>,
+        retain_site: Option<fn(&[Value]) -> bool>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
     ) -> Vec<Expanded<'a, R>> {
         let mut out = Vec::new();
@@ -7292,9 +7544,17 @@ impl<'a> Code<'a> {
                     chain: None,
                     inject,
                     external_value,
+                    retain_site,
                     writes: None,
                 };
-                self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
+                self.walk(
+                    &written,
+                    &mut Vec::new(),
+                    &mut Vec::new(),
+                    read,
+                    &mut out,
+                    &mut Vec::new(),
+                );
             }
             Expand::Chain(path, index) => {
                 let Some(call) = self.call(path, index) else {
@@ -7309,9 +7569,17 @@ impl<'a> Code<'a> {
                     chain: Some(call),
                     inject,
                     external_value,
+                    retain_site,
                     writes: None,
                 };
-                self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
+                self.walk(
+                    &written,
+                    &mut Vec::new(),
+                    &mut Vec::new(),
+                    read,
+                    &mut out,
+                    &mut Vec::new(),
+                );
             }
             Expand::Constructed {
                 held: (file, constant),
@@ -7329,9 +7597,17 @@ impl<'a> Code<'a> {
                     chain: None,
                     inject,
                     external_value,
+                    retain_site,
                     writes: None,
                 };
-                self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
+                self.walk(
+                    &written,
+                    &mut Vec::new(),
+                    &mut Vec::new(),
+                    read,
+                    &mut out,
+                    &mut Vec::new(),
+                );
             }
         }
         out
@@ -7360,9 +7636,17 @@ impl<'a> Code<'a> {
             chain: None,
             inject: None,
             external_value: None,
+            retain_site: None,
             writes: Some(writes),
         };
-        self.walk(&written, &mut Vec::new(), read, &mut out, &mut Vec::new());
+        self.walk(
+            &written,
+            &mut Vec::new(),
+            &mut Vec::new(),
+            read,
+            &mut out,
+            &mut Vec::new(),
+        );
         out
     }
 
@@ -7372,6 +7656,7 @@ impl<'a> Code<'a> {
         &self,
         written: &Written<'a, '_>,
         frames: &mut Vec<Frame<'a>>,
+        fields: &mut Vec<Frame<'a>>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
         out: &mut Vec<Expanded<'a, R>>,
         cuts: &mut Vec<usize>,
@@ -7381,7 +7666,7 @@ impl<'a> Code<'a> {
             return;
         }
         let chain = written.chain.is_some();
-        let ((values, kwargs), wants) = self.folded(written, frames);
+        let ((values, kwargs), wants, field) = self.folded(written, frames, fields);
         if let Some(found) = read(&values, &kwargs) {
             out.push(Expanded {
                 site: (site, at),
@@ -7390,7 +7675,30 @@ impl<'a> Code<'a> {
             });
             return;
         }
+        if let Some(def) = field
+            && fields.len() + frames.len() < WRAPPER_DEPTH
+            && !fields.iter().any(|f| f.def == def)
+        {
+            for caller in self.field_callers(def) {
+                fields.push(Frame {
+                    def,
+                    path: caller.path,
+                    index: caller.index,
+                });
+                self.walk(written, frames, fields, read, out, cuts);
+                fields.pop();
+            }
+            return;
+        }
         let Some(wrapper) = wants else {
+            if field.is_some() {
+                let (values, kwargs) = unbound((values, kwargs), chain, &[]);
+                out.extend(read(&values, &kwargs).map(|found| Expanded {
+                    site: (site, at),
+                    frames: frames.clone(),
+                    found,
+                }));
+            }
             return;
         };
         // A wrapper reached again closes a cycle: another turn of it is climbed no further.
@@ -7398,7 +7706,8 @@ impl<'a> Code<'a> {
             // A value the check could not fold for its budget is not one the cycle changed.
             let more = || {
                 self.refused.set(false);
-                self.cycle_sends_more(written, frames, first, wrapper, read) && !self.refused.get()
+                self.cycle_sends_more(written, frames, fields, first, wrapper, read)
+                    && !self.refused.get()
             };
             if self.cut_apart(more) {
                 cuts.push(first);
@@ -7410,11 +7719,13 @@ impl<'a> Code<'a> {
         // ponytail: so a wrapper reached only by a name match (a method on a receiver whose
         // class Meada cannot tell, a bare name no import binds) is read where it stands, its
         // parameters unknown.
-        let callers: Vec<Caller> = (self.resolver.callers.get(&wrapper).into_iter().flatten())
-            .copied()
-            .collect();
+        let callers = self
+            .resolver
+            .callers
+            .get(&wrapper)
+            .map_or(&[][..], Vec::as_slice);
         // A wrapper `WRAPPER_DEPTH` calls up is read where it stands too.
-        if callers.is_empty() || frames.len() >= WRAPPER_DEPTH {
+        if callers.is_empty() || frames.len() + fields.len() >= WRAPPER_DEPTH {
             let (values, kwargs) = unbound((values, kwargs), chain, &[]);
             out.extend(read(&values, &kwargs).map(|found| Expanded {
                 site: (site, at),
@@ -7423,6 +7734,14 @@ impl<'a> Code<'a> {
             }));
             return;
         }
+        if written.retain_site.is_some_and(|keep| keep(&values)) {
+            let (args, keywords) = unbound((values.clone(), kwargs.clone()), chain, &[]);
+            out.extend(read(&args, &keywords).map(|found| Expanded {
+                site: (site, at),
+                frames: frames.clone(),
+                found,
+            }));
+        }
         let (under, climbed) = (frames.len(), out.len());
         for caller in callers {
             frames.push(Frame {
@@ -7430,7 +7749,7 @@ impl<'a> Code<'a> {
                 path: caller.path,
                 index: caller.index,
             });
-            self.walk(written, frames, read, out, cuts);
+            self.walk(written, frames, fields, read, out, cuts);
             frames.pop();
         }
         if !cuts.contains(&under) {
@@ -7467,7 +7786,8 @@ impl<'a> Code<'a> {
         &self,
         written: &Written<'a, '_>,
         frames: &[Frame<'a>],
-    ) -> (Folded, Option<Target<'a>>) {
+        fields: &[Frame<'a>],
+    ) -> (Folded, Option<Target<'a>>, Option<Target<'a>>) {
         let &Written {
             path,
             scope,
@@ -7476,9 +7796,11 @@ impl<'a> Code<'a> {
             ..
         } = written;
         let mut wants = None;
+        let mut field = None;
         let chain = written.chain.is_some();
         let mut eval = |v: &'a Value| {
             let fold = &mut Fold {
+                field_frames: Some(fields),
                 chain,
                 inject: written.inject,
                 external_value: written.external_value,
@@ -7488,7 +7810,9 @@ impl<'a> Code<'a> {
                 }),
                 ..Fold::default()
             };
-            self.eval(path, scope, v, frames, 0, fold, &mut wants)
+            let value = self.eval(path, scope, v, frames, 0, fold, &mut wants);
+            field = field.or(fold.field_wants);
+            value
         };
         let folded = match written.chain {
             Some(call) => {
@@ -7508,7 +7832,7 @@ impl<'a> Code<'a> {
                 (kwargs.iter()).map(|(k, v)| (k.clone(), eval(v))).collect(),
             ),
         };
-        (folded, wants)
+        (folded, wants, field)
     }
 
     /// Whether a turn of the cycle `frames[first..]` closes on `wrapper` sends what the first
@@ -7519,6 +7843,7 @@ impl<'a> Code<'a> {
         &self,
         written: &Written<'a, '_>,
         frames: &[Frame<'a>],
+        fields: &[Frame<'a>],
         first: usize,
         wrapper: Target<'a>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
@@ -7545,7 +7870,7 @@ impl<'a> Code<'a> {
         }
         // What the first turn read, with those parameters alone left as names: `read` answers
         // `None` when it needs one of them.
-        let (first_turn, _) = self.folded(written, &frames[..first]);
+        let (first_turn, _, _) = self.folded(written, &frames[..first], fields);
         let (values, kwargs) = unbound(first_turn, chain, &changed);
         read(&values, &kwargs).is_none()
     }
@@ -7701,8 +8026,36 @@ impl<'a> Code<'a> {
         wants: &mut Option<Target<'a>>,
     ) -> Value {
         let mut out = Vec::new();
+        let mut records = Vec::new();
         for part in parts {
             let value = match part {
+                Part::RecordStart {
+                    at,
+                    field,
+                    property,
+                } => {
+                    records.push((out.len(), *at, field, property));
+                    continue;
+                }
+                Part::RecordEnd if let Some((at, _, field, property)) = records.pop() => {
+                    let key = out.split_off(at);
+                    self.ts_record(
+                        (path, scope),
+                        (field, property),
+                        key,
+                        frames,
+                        depth,
+                        fold,
+                        wants,
+                    )
+                    .unwrap_or(Value::Unknown)
+                }
+                Part::Ref(name) if let Some((_, at, _, _)) = records.last() => {
+                    let previous = fold.record_site.replace((path, *at));
+                    let value = self.name(path, scope, name, frames, depth, fold, wants);
+                    fold.record_site = previous;
+                    value
+                }
                 Part::Ref(name) => self.name(path, scope, name, frames, depth, fold, wants),
                 Part::EnvKey { name, reader } => {
                     if reader.as_deref().is_some_and(|reader| {
@@ -7776,7 +8129,7 @@ impl<'a> Code<'a> {
                 other => out.push(Part::unread(&other)),
             }
         }
-        Value::Str(out)
+        Value::Str(crate::lang::fold_strips(out))
     }
 
     #[expect(clippy::too_many_arguments)]
@@ -7975,9 +8328,15 @@ impl<'a> Code<'a> {
         };
         let def = self.def(function.path, function.name)?;
         let (first, rest) = def.return_values.split_first()?;
+        let same_method = extended && javascript && self.args(path, index).is_some_and(<[_]>::is_empty)
+            && stored.callee.strip_prefix("this.").is_some_and(|member| {
+                matches!(self.resolver.class(path, &stored.scope), Binding::Def(class)
+                    if class.path == function.path && class.name == crate::parent(function.name)
+                        && member == own_name(function.name) && !self.resolver.ts_override(class, member))
+            });
         if extended {
             if stored.constructs
-                || !self.runs_alone(function)
+                || !(same_method || self.runs_alone(function))
                 || (def.asynchronous && !(awaited || stored.awaited))
                 || (javascript && !def.terminal_return)
                 || (self.pack.extensions().contains(&"py")
@@ -8014,6 +8373,8 @@ impl<'a> Code<'a> {
                         | Part::Env(_)
                         | Part::EnvOr(..)
                         | Part::EnvKey { .. }
+                        | Part::StripStart
+                        | Part::StripEnd(_)
                         | Part::QuerySuffix
                         | Part::Read { .. }
                 )
@@ -8022,6 +8383,10 @@ impl<'a> Code<'a> {
             _ => false,
         };
         let mut pending = None;
+        let independent = fold.independent;
+        if same_method {
+            fold.independent = Some(function);
+        }
         fold.returning.push(site);
         let mut returned = |value| {
             self.eval(
@@ -8042,6 +8407,7 @@ impl<'a> Code<'a> {
                 _ => false,
             });
         fold.returning.pop();
+        fold.independent = independent;
         if agrees {
             if let Some(pending) = pending {
                 wants.get_or_insert(pending);
@@ -8063,13 +8429,55 @@ impl<'a> Code<'a> {
         fold: &mut Fold<'a, '_>,
         wants: &mut Option<Target<'a>>,
     ) -> Value {
-        match self.resolver.read(path, scope, name) {
+        if self.resolver.ts
+            && let Some(field) = name.strip_prefix("this.")
+            && let Some(value) = self.ts_field_argument(path, scope, field, fold)
+        {
+            return value;
+        }
+        let (binding, local) = match fold.record_site {
+            Some((file, at)) if file == path => {
+                let Some(facts) = self.full(path) else {
+                    return Value::Unknown;
+                };
+                self.resolver.record_binding(path, scope, name, at, facts)
+            }
+            Some(_) => return Value::Unknown,
+            None => (self.resolver.read(path, scope, name), None),
+        };
+        match binding {
             Binding::Const(at, constant) => {
                 // `const a = b; const b = a;` folds to nothing.
                 if fold.held.contains(&(at, constant)) || self.resolver.redeclared(at, constant) {
                     return Value::Unknown;
                 }
-                let Some((value, within)) = self.held(at, constant) else {
+                // An imported key continues at the exported initializer, in its own file.
+                let local = if fold.record_site.is_some() && at != path {
+                    let Some(facts) = self.full(at) else {
+                        return Value::Unknown;
+                    };
+                    match facts
+                        .ts_locals
+                        .get(constant)
+                        .or_else(|| facts.ts_record_locals.get(constant))
+                        .map(Vec::as_slice)
+                    {
+                        Some([binding]) => Some(binding),
+                        Some(_) => return Value::Unknown,
+                        None => None,
+                    }
+                } else {
+                    local
+                };
+                let held = match local {
+                    Some(binding) => binding
+                        .constant
+                        .and_then(|i| self.full(at)?.consts.get(i))
+                        .filter(|c| c.name == constant)
+                        .map(|c| (&c.value, scope_of(constant))),
+                    None => self.held(at, constant),
+                };
+                let Some((value, within)) = held else {
                     return Value::Unknown;
                 };
                 let foreign = usize::from(within != scope_of(constant));
@@ -8082,7 +8490,12 @@ impl<'a> Code<'a> {
                     fold.objects.push(object);
                 }
                 fold.foreign += foreign;
+                let previous = fold.record_site;
+                if let Some(binding) = local {
+                    fold.record_site = Some((at, binding.declared.saturating_sub(1)));
+                }
                 let folded = self.eval(at, within, value, frames, depth, fold, wants);
+                fold.record_site = previous;
                 fold.foreign -= foreign;
                 fold.held.pop();
                 if object.is_some() {
@@ -8090,6 +8503,7 @@ impl<'a> Code<'a> {
                 }
                 folded
             }
+            Binding::Param(function, _, _) if fold.independent == Some(function) => Value::Unknown,
             Binding::Param(function, _, _)
                 if !self.follow_request_parameters.get()
                     && !self.unchanged_parameter(function, name) =>
@@ -8114,15 +8528,23 @@ impl<'a> Code<'a> {
                     let arg = self.arg(frame.path, frame.index, function, n);
                     let param = self.param(function, n);
                     let bound = match (arg, param.and_then(|p| p.default.as_ref())) {
-                        (Some(arg), _) => self.argument_value(
-                            frame.path,
-                            &call.scope,
-                            arg,
-                            frames,
-                            depth + 1,
-                            fold,
-                            wants,
-                        ),
+                        (Some(arg), _) => {
+                            let previous = fold.record_site;
+                            if previous.is_some() {
+                                fold.record_site = Some((frame.path, call.range.start));
+                            }
+                            let value = self.argument_value(
+                                frame.path,
+                                &call.scope,
+                                arg,
+                                frames,
+                                depth + 1,
+                                fold,
+                                wants,
+                            );
+                            fold.record_site = previous;
+                            value
+                        }
                         // A left-out argument takes the parameter's default.
                         (None, Some(default)) => self.argument_value(
                             function.path,
@@ -8245,7 +8667,7 @@ impl<'a> Code<'a> {
                 let marks = |on: &Marked| matches!(on, Marked::Field { class: c, name, .. } if c == class && name == field);
                 let injected = fold.inject.and_then(|i| self.injected(at, marks, i));
                 let field = (at, class, field);
-                let test_read = path.ends_with("_test.go");
+                let test_read = crate::http::is_test_file(path);
                 injected.unwrap_or_else(|| {
                     self.field_read(field, fold.field_depth, fold.nested, test_read)
                 })
@@ -8337,6 +8759,17 @@ fn unbind(value: Value, chain: bool, keep: &[&str]) -> Value {
                 .into_iter()
                 .map(|p| {
                     // What remains a name is a parameter no call site binds (#801).
+                    if let Part::RecordValues {
+                        key: Some(name),
+                        values,
+                    } = &p
+                        && !keep.contains(&name.as_str())
+                    {
+                        return Part::RecordValues {
+                            key: None,
+                            values: values.clone(),
+                        };
+                    }
                     if let Some(name) = p.parameter().filter(|name| !keep.contains(name)) {
                         Part::Limit(crate::lang::Limit::Parameter(name.to_owned()))
                     } else {
@@ -8633,6 +9066,31 @@ mod tests {
         let mut sources = vec![(format!("f0.{ext}"), define.to_string())];
         sources.extend((1..n).map(|i| (format!("f{i}.{ext}"), link(i - 1))));
         sources
+    }
+
+    #[test]
+    fn an_import_through_export_star_binds_the_literal() {
+        use crate::lang::ts::TsJs;
+        let source = TsJs
+            .parse("service.ts", b"export const svc = { go() {} };")
+            .unwrap();
+        let barrel = TsJs
+            .parse("barrel.ts", b"export * from './service';")
+            .unwrap();
+        let main = TsJs.parse("main.ts", b"import { svc as direct } from './service'; import { svc as shared } from './barrel';").unwrap();
+        let files = BTreeMap::from([
+            ("main.ts", &main),
+            ("barrel.ts", &barrel),
+            ("service.ts", &source),
+        ]);
+        let resolver = Resolver::new(&files, TsJs.modules(&[], &files).unwrap(), &TsJs);
+        for name in ["direct", "shared"] {
+            let found = resolver.read_member("main.ts", "", name);
+            assert!(
+                matches!(found, Binding::Const("service.ts", "svc")),
+                "{name}"
+            );
+        }
     }
 
     /// The file defining the target of the call of `callee` in `main`, when it is exact.
@@ -11233,6 +11691,31 @@ mod tests {
             alone
         });
         assert_eq!(alone, ["A.own", "holder", "plain"]);
+    }
+
+    #[test]
+    fn test_arguments_do_not_supply_production_parameters_or_origins() {
+        let sources = [
+            ("a.py", "def wrap(r):\n    return r\nwrap(Alpha())\n"),
+            ("test_a.py", "from a import wrap\nwrap(Beta())\n"),
+        ];
+        assert_eq!(held_by(py(), &sources, "a.py", "wrap", "r"), ["a.py Alpha"]);
+        over(py(), &sources, |code| {
+            let function = Target {
+                path: "a.py",
+                name: "wrap",
+            };
+            let paths = |args: Vec<(&str, &str, &Value)>| {
+                args.into_iter()
+                    .map(|(path, _, _)| path.to_string())
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(paths(code.param_args(function, 0)), ["a.py"]);
+            assert_eq!(
+                paths(code.param_values(function, 0, None).unwrap()),
+                ["a.py"]
+            );
+        });
     }
 
     #[test]

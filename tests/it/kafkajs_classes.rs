@@ -1,7 +1,4 @@
-//! kafkajs clients held in private class fields, and topics read from app-config (front 6,
-//! Task 6). Each topic reaches the kafkajs call through calls that resolve `exact` (a method of
-//! the class called on `this`); a call of a method several classes define is `ambiguous`, and
-//! its topic does not lift (`a_shared_name_wrapper_call_is_an_expected_miss`).
+//! Kafka topics from app-config reach the private producer through each exact caller of its wrapper.
 
 use std::path::{Path, PathBuf};
 
@@ -43,20 +40,29 @@ fn sides(export: &Value, role: &str, at: &str) -> Vec<String> {
     found
 }
 
-/// The levels of the links of `contract`, sorted.
-fn levels(export: &Value, contract: &str) -> Vec<String> {
+const METHOD: &str =
+    "::plugins/orders/src/KafkaClient.ts::KafkaClient.publishApproved::this.send#0";
+const ROUTE: &str = "::plugins/orders/src/publish.ts::publishFromRoute::client.send#0";
+
+/// Sorted link levels for one provider site and topic.
+fn levels(export: &Value, contract: &str, provider: &str) -> Vec<String> {
     let mut found: Vec<String> = (export["links"].as_array().unwrap().iter())
-        .filter(|l| l["contract"] == contract)
+        .filter(|l| {
+            l["contract"] == contract && l["provider"].as_str().unwrap().ends_with(provider)
+        })
         .map(|l| l["level"].as_str().unwrap().to_string())
         .collect();
     found.sort();
     found
 }
 
+/// The private producer receives the topic from both the method and the typed route caller.
 #[test]
 fn a_kafkajs_client_in_a_class_field_makes_sides() {
     let export = export("kafkajs_sides", |_| {});
-    assert_eq!(sides(&export, "providers", "::plugins/orders/"), [APPROVED]);
+    for caller in [METHOD, ROUTE] {
+        assert_eq!(sides(&export, "providers", caller), [APPROVED]);
+    }
     assert_eq!(sides(&export, "consumers", APPROVALS), [APPROVED, SHIPPED]);
 }
 
@@ -80,12 +86,16 @@ fn a_hash_private_field_is_a_client() {
     assert_eq!(consumers, [APPROVED, SHIPPED]);
 }
 
+/// A single app-config value yields an exact link at each exact caller of send.
 #[test]
 fn a_topic_from_app_config_is_exact() {
     let export = export("kafkajs_app_config", |_| {});
-    assert_eq!(levels(&export, APPROVED), ["exact"]);
+    for caller in [METHOD, ROUTE] {
+        assert_eq!(levels(&export, APPROVED, caller), ["exact"]);
+    }
 }
 
+/// Both exact callers of send contribute a separate inferred link for each configured topic.
 #[test]
 fn two_app_config_values_give_one_inferred_side_each() {
     let export = export("kafkajs_two_values", |repo| {
@@ -93,16 +103,16 @@ fn two_app_config_values_give_one_inferred_side_each() {
         std::fs::write(repo.join("app-config.production.yaml"), production).unwrap();
     });
     let v2 = "channel::kafka::orders.v2";
-    assert_eq!(
-        sides(&export, "providers", "::plugins/orders/"),
-        [APPROVED, v2]
-    );
+    for caller in [METHOD, ROUTE] {
+        assert_eq!(sides(&export, "providers", caller), [APPROVED, v2]);
+        for topic in [APPROVED, v2] {
+            assert_eq!(levels(&export, topic, caller), ["inferred"]);
+        }
+    }
     assert_eq!(
         sides(&export, "consumers", APPROVALS),
         [APPROVED, SHIPPED, v2]
     );
-    assert_eq!(levels(&export, APPROVED), ["inferred"]);
-    assert_eq!(levels(&export, v2), ["inferred"]);
 }
 
 #[test]
@@ -112,18 +122,24 @@ fn a_topic_from_a_runtime_input_has_no_name() {
     assert_eq!(action, ["channel::kafka"]);
 }
 
-/// `publishFromRoute` calls `client.send(config.getString(..))` on a `KafkaClient`, but three
-/// classes define `send`: the call is `ambiguous`, so `expand` (exact callers only) does not lift
-/// the topic to it, and the route has no side. Receiver-type method resolution is a front of its
-/// own.
+/// The route constructs the local client, so its call of send carries the topic to the producer.
 #[test]
-fn a_shared_name_wrapper_call_is_an_expected_miss() {
+fn a_shared_name_wrapper_lifts_the_topic_from_its_typed_caller() {
     let export = export("kafkajs_shared_name", |_| {});
-    let route = "::plugins/orders/src/publish.ts::publishFromRoute";
-    let send = (export["calls"].as_array().unwrap().iter())
-        .find(|c| c["caller"].as_str().unwrap().ends_with(route) && c["level"] == "ambiguous");
-    assert!(send.is_some(), "no ambiguous call from {route}");
-    assert!(sides(&export, "providers", "::plugins/orders/src/publish.ts::").is_empty());
+    let send = export["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"].as_str().unwrap().ends_with(ROUTE))
+        .unwrap();
+    assert_eq!(send["level"], "exact");
+    assert!(
+        send["target"]
+            .as_str()
+            .unwrap()
+            .ends_with("::plugins/orders/src/KafkaClient.ts::KafkaClient.send")
+    );
+    assert_eq!(sides(&export, "providers", ROUTE), [APPROVED]);
 }
 
 #[test]

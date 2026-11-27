@@ -1,0 +1,14 @@
+[[helm_env]]
+key = "lib-chart.envs"
+
+[[channel_client]]
+call = "consumer.go::consume"
+role = "consumer"
+broker = "kafka"
+topic = "0"
+
+[[channel_client]]
+call = "producer.go::publish"
+role = "producer"
+broker = "kafka"
+topic = "0"

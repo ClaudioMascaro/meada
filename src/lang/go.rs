@@ -1523,7 +1523,14 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     {
                         let class = field.child_by_field_name("type");
                         let class = class.and_then(|t| type_name(t, src)).map(Class::Type);
-                        for field in names(field) {
+                        let fields = names(field);
+                        if fields.is_empty()
+                            && let Some(Class::Type(ty)) = &class
+                        {
+                            let embedded = ty.rsplit('.').next().unwrap_or(ty);
+                            walk.bind_as(name, embedded, class.clone(), false, None);
+                        }
+                        for field in fields {
                             walk.bind_as(name, text(field, src), class.clone(), false, None);
                         }
                     }
@@ -1901,6 +1908,7 @@ mod tests {
         assert_eq!(
             receivers(src),
             [
+                "T C = C",
                 "T a = p.A",
                 "T b = p.A",
                 "T.M err = error",

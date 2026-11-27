@@ -1532,7 +1532,7 @@
       "id": "example.com/acme/conformance::src/app.ts::main::Circle.unit#0",
       "caller": "example.com/acme/conformance::src/app.ts::main",
       "target": "example.com/acme/conformance::src/shapes/shape.ts::Shape.unit",
-      "level": "inferred",
+      "level": "exact",
       "span": {
         "path": "src/app.ts",
         "start": 418,
@@ -1661,7 +1661,7 @@
       "id": "example.com/acme/conformance::src/app.ts::main::shape.describe#0",
       "caller": "example.com/acme/conformance::src/app.ts::main",
       "target": "example.com/acme/conformance::src/shapes/shape.ts::Shape.describe",
-      "level": "inferred",
+      "level": "exact",
       "span": {
         "path": "src/app.ts",
         "start": 435,
@@ -5544,7 +5544,7 @@
         {
           "depth": 1,
           "repository": "example.com/acme/conformance",
-          "level": "inferred",
+          "level": "exact",
           "via": "call",
           "node": "example.com/acme/conformance::src/shapes/shape.ts::Shape.describe"
         },

@@ -111,7 +111,7 @@ struct Clients<'c, 'a> {
     walked: RefCell<HashMap<(bool, CallAt<'a>), Vec<Client<'a>>>>,
     /// The clients each struct field holds, `None` when no literal sets it, so a field many
     /// requests read is followed once.
-    fields: RefCell<HashMap<(bool, Field<'a>), Held<'a>>>,
+    fields: RefCell<HashMap<(bool, bool, Field<'a>), Held<'a>>>,
 }
 
 impl<'c, 'a> Clients<'c, 'a> {
@@ -167,7 +167,7 @@ impl<'c, 'a> Clients<'c, 'a> {
     ) -> Vec<Client<'a>> {
         if let Value::Ref(name) = value
             && let Some(field) = self.code.field(path, scope, name)
-            && let Some(held) = self.held(field, depth, request)
+            && let Some(held) = self.held(field, depth, request, crate::http::is_test_file(path))
         {
             return held;
         }
@@ -236,17 +236,18 @@ impl<'c, 'a> Clients<'c, 'a> {
     /// before it) holds a request only through a traced one or a value written as resty's
     /// `Request`: untraced there is a repository, a cache or a Kubernetes client, not "maybe
     /// resty", so those cases hold nothing (the cycle and depth guards stay Unknown).
-    fn held(&self, field: Field<'a>, depth: usize, request: bool) -> Held<'a> {
+    fn held(&self, field: Field<'a>, depth: usize, request: bool, test_read: bool) -> Held<'a> {
         if depth >= CLIENT_DEPTH {
             return Some(vec![Client::Unknown]);
         }
-        if let Some(known) = self.fields.borrow().get(&(request, field)) {
+        let key = (request, test_read, field);
+        if let Some(known) = self.fields.borrow().get(&key) {
             return known.clone();
         }
-        (self.fields.borrow_mut()).insert((request, field), Some(vec![Client::Unknown]));
+        (self.fields.borrow_mut()).insert(key, Some(vec![Client::Unknown]));
         let values = match self.code.field_written(field.2) {
             true => None,
-            false => self.code.field_values(field),
+            false => self.code.field_values(field, test_read),
         };
         let found = match values {
             None if request => Some(Vec::new()),
@@ -272,7 +273,7 @@ impl<'c, 'a> Clients<'c, 'a> {
                 Some(out)
             }
         };
-        (self.fields.borrow_mut()).insert((request, field), found.clone());
+        (self.fields.borrow_mut()).insert(key, found.clone());
         found
     }
 

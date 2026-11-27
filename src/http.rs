@@ -48,34 +48,29 @@ const METHODS: &[&str] = &["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPT
 /// What one `fetch` call gives: its contract (`None` when the URL or the method cannot be read),
 /// how it names the provider's repository, and, for an unresolved one, what could still be
 /// read: its method (`None` when unknown) and the literal fragments of its path.
+#[derive(Default)]
 struct Read {
     contract: Option<String>,
     via: Option<String>,
     method: Option<String>,
     fragments: Vec<String>,
     lead: Option<Lead>,
+    bare_env: bool,
 }
 
 /// What `fetch(url, init)` reads, or `None` when the URL or the method depends on a parameter.
 fn fetch(args: &[Value]) -> Option<Read> {
-    let (contract, via, lead) = locate(args)?;
-    let (mut method, mut texts) = (None, Vec::new());
-    if contract.is_none() {
-        method = self::method(args.get(1))
+    let mut read = locate(args)?;
+    if read.contract.is_none() {
+        read.method = self::method(args.get(1))
             .ok()
             .flatten()
             .map(|m| m.to_uppercase());
         if let Some(Value::Str(parts)) = args.first() {
-            texts = fragments(parts);
+            read.fragments = fragments(parts);
         }
     }
-    Some(Read {
-        contract,
-        via,
-        method,
-        fragments: texts,
-        lead,
-    })
+    Some(read)
 }
 
 /// `fetch`, with a URL whose base is an environment read with a default (`Part::EnvOr`, Spring's
@@ -335,14 +330,23 @@ fn tail_fits(contract: &str, method: Option<&str>, known: &str) -> bool {
 /// The contract and `via` of `fetch(url, init)`, or `None` when the URL or the method
 /// depends on a parameter; the contract is `None` when the URL or the method cannot be read,
 /// and when the URL starts with a part Meada could not read, which its `Lead` names (#801).
-fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead>)> {
+fn locate(args: &[Value]) -> Option<Read> {
     let method = method(args.get(1)).ok()?;
     let parts = match args.first() {
         Some(Value::Str(parts)) if parts.iter().any(|p| p.parameter().is_some()) => return None,
         Some(Value::Str(parts)) => parts,
         Some(Value::Ref(_)) => return None,
-        _ => return Some((None, None, None)),
+        _ => return Some(Read::default()),
     };
+    // A strip around a still-composite receiver can change its last path segment.
+    if parts.iter().any(|p| {
+        matches!(
+            p,
+            Part::StripStart | Part::StripEnd(_) | Part::RecordValues { .. }
+        )
+    }) {
+        return Some(Read::default());
+    }
     // Only a terminal optional query is irrelevant. If path text follows it, that text
     // can be either part of the path or part of the query.
     let end = parts.iter().rposition(|p| {
@@ -350,11 +354,21 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead
     });
     let path_parts = end.map_or(&[][..], |end| &parts[..=end]);
     if path_parts.is_empty() || path_parts.iter().any(|p| matches!(p, Part::QuerySuffix)) {
-        return Some((None, None, None));
+        return Some(Read::default());
     }
     let (via, path, lead) = match path_parts.split_first() {
         Some((Part::Env(var) | Part::EnvOr(var, _), rest)) => {
-            (Some(format!("env:{var}")), Some(render(rest)), None)
+            let via = Some(format!("env:{var}"));
+            let path = render(rest);
+            // A variable can hold the whole endpoint. Its workload value supplies the path.
+            if path.is_empty() || path.starts_with(['?', '#']) {
+                return Some(Read {
+                    via,
+                    bare_env: true,
+                    ..Read::default()
+                });
+            }
+            (via, Some(path), None)
         }
         _ => {
             let url = render(path_parts);
@@ -391,9 +405,13 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead
     };
     // A path that does not start at the root, such as `${base}${path}`, is not read.
     let path = path.filter(|p| p.is_empty() || p.starts_with(['/', '?', '#']));
-    Some(match (method, path) {
-        (Some(method), Some(path)) => (Some(contract(&method, &path)), via, None),
-        _ => (None, via, lead),
+    Some(Read {
+        contract: method
+            .zip(path)
+            .map(|(method, path)| contract(&method, &path)),
+        via,
+        lead,
+        ..Read::default()
     })
 }
 
@@ -519,7 +537,12 @@ fn consumer(path: &str, index: usize, read: Read, shape: Option<Shape>) -> Found
 /// client, which has no call of its own).
 fn consumer_at(site: Site, read: Read, shape: Option<Shape>) -> Found {
     Found {
-        identity: None,
+        identity: read
+            .bare_env
+            .then(|| crate::contract::ReceiverIdentity::HttpBase {
+                strips: Vec::new(),
+                suffix: String::new(),
+            }),
         role: Role::Consumer,
         site,
         contract: read.contract,
@@ -544,6 +567,11 @@ fn render(parts: &[Part]) -> String {
             | Part::Read { .. }
             | Part::Invoke { .. }
             | Part::EnvKey { .. }
+            | Part::RecordStart { .. }
+            | Part::RecordEnd
+            | Part::RecordValues { .. }
+            | Part::StripStart
+            | Part::StripEnd(_)
             | Part::QuerySuffix
             | Part::Ref(_)
             | Part::Limit(_)
@@ -1055,7 +1083,7 @@ impl ContractKind for Http {
                     consumer.site.clone(),
                     provider.site.clone(),
                     contract.clone(),
-                    level,
+                    consumer.cap.map_or(level, |cap| level.max(cap)),
                     reason,
                     None,
                     None,

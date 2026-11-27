@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 use super::message::{
     Handler, Message, Side, bind, channel_name as name, env_of, publish, queue_name,
 };
+use crate::config::ChannelClient;
 use crate::contract::Level;
 use crate::http::AppConfig;
 use crate::index::Indexed;
@@ -87,6 +88,16 @@ pub(super) fn messages(code: &Code, indexed: &Indexed) -> Vec<Message> {
     if !code.pack().extensions().contains(&"js") {
         return Vec::new();
     }
+    let mut declarations = BTreeMap::<_, BTreeMap<_, _>>::new();
+    for client in indexed.channel_clients {
+        if let Some((file, name)) = client.definition() {
+            declarations
+                .entry(name.rsplit('.').next().unwrap_or(name))
+                .or_default()
+                .entry((file, name))
+                .or_insert(client);
+        }
+    }
     // Parsed the first time a kafkajs topic is a read of it.
     let config = AppConfig::new(indexed);
     let mut out = Vec::new();
@@ -97,6 +108,13 @@ pub(super) fn messages(code: &Code, indexed: &Indexed) -> Vec<Message> {
     for (&path, facts) in code.files() {
         for (n, call) in facts.calls.iter().enumerate() {
             let (receiver, method) = (call.callee.rsplit_once('.')).unwrap_or(("", &call.callee));
+            if let Some(named) = declarations.get(method)
+                && let Some(target) = code.reaches(path, n)
+                && let Some(client) = named.get(&(target.path, target.name))
+            {
+                out.extend(declared_sides(code, path, n, client, &config));
+                continue;
+            }
             // A library form is a method of a client, or a class or function called itself.
             let chain = match method {
                 "send" | "subscribe" | "run" | "publish" | "add" | "xadd" | "xAdd"
@@ -285,6 +303,44 @@ type Found<'a> = Vec<Expanded<'a, Named>>;
 /// read from, and the weakest level a link of the sides may take.
 type Named = (Vec<Option<String>>, Option<String>, Option<Level>);
 
+/// Read a declared call's topic argument or object field at each exact caller.
+fn declared_sides<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    n: usize,
+    client: &ChannelClient,
+    config: &AppConfig,
+) -> Vec<Message> {
+    let read = |args: &[Value], _: &_| {
+        let args = args.get(client.topic.arg..).unwrap_or_default();
+        let value = match &client.topic.field {
+            None => args.first(),
+            Some(key) => match options(args)? {
+                Some(fields) => property(fields, key).ok()?,
+                None => None,
+            },
+        }
+        .unwrap_or(&Value::Undefined);
+        Some(configured_topic(
+            config,
+            Some(value),
+            vec![super::message::topic(value)?],
+            env_of(value),
+        ))
+    };
+    let mut sides = producers(
+        client.broker.name(),
+        code.expand(Expand::Call(path, n), &read),
+    );
+    for side in &mut sides {
+        side.client = Some(client.call.clone());
+        if client.role == meada_core::manifest::ClientRole::Consumer {
+            side.role = Side::Consumer(enclosing(code, &side.path, side.call));
+        }
+    }
+    sides
+}
+
 /// A producer per name read at each site an expansion found.
 fn producers(broker: &'static str, found: Found) -> Vec<Message> {
     (found.into_iter())
@@ -402,8 +458,17 @@ fn topics(config: &AppConfig, args: &[Value], keys: &[&str]) -> Option<Named> {
     let (names, environment) = names_env(args, keys)?;
     let given = (options(args).flatten())
         .and_then(|o| keys.iter().find_map(|key| property(o, key).ok().flatten()));
+    Some(configured_topic(config, given, names, environment))
+}
+
+fn configured_topic(
+    config: &AppConfig,
+    given: Option<&Value>,
+    names: Vec<Option<String>>,
+    environment: Option<String>,
+) -> Named {
     let Some(key) = given.and_then(config_key) else {
-        return Some((names, environment, None));
+        return (names, environment, None);
     };
     let values = config.literals(key);
     let mut names: Vec<Option<String>> = (values.iter())
@@ -413,11 +478,11 @@ fn topics(config: &AppConfig, args: &[Value], keys: &[&str]) -> Option<Named> {
     if names.is_empty() {
         names.push(None);
     }
-    Some((
+    (
         names,
         environment,
         (values.len() > 1 || !config.whole()).then_some(Level::Inferred),
-    ))
+    )
 }
 
 /// The key a value reads of Backstage's configuration when it is that read alone.

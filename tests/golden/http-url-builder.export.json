@@ -1988,8 +1988,8 @@
     {
       "id": "example.com/acme/vets-web::src/whatwg.ts::vetsQuery::u.toString#0",
       "caller": "example.com/acme/vets-web::src/whatwg.ts::vetsQuery",
-      "target": "example.com/acme/vets-web::src/own.ts::URL.toString",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "src/whatwg.ts",
         "start": 855,
@@ -2067,8 +2067,8 @@
     {
       "id": "example.com/acme/vets-web::src/written.ts::vets::u.toString#0",
       "caller": "example.com/acme/vets-web::src/written.ts::vets",
-      "target": "example.com/acme/vets-web::src/own.ts::URL.toString",
-      "level": "inferred",
+      "target": null,
+      "level": null,
       "span": {
         "path": "src/written.ts",
         "start": 211,

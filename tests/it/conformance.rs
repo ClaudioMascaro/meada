@@ -5890,16 +5890,15 @@ fn typescript_and_javascript() {
             ),
             // A package outside the repository stays unresolved.
             ("src/app.ts::main::useState#0", None, &[]),
-            // Only a unique name match finds these: an inherited static method, a method on
-            // a parameter, a function no import names.
+            // The base supplies the static method and the typed parameter supplies its class.
             (
                 "src/app.ts::main::Circle.unit#0",
-                INFERRED,
+                EXACT,
                 &["src/shapes/shape.ts::Shape.unit"],
             ),
             (
                 "src/app.ts::main::shape.describe#0",
-                INFERRED,
+                EXACT,
                 &["src/shapes/shape.ts::Shape.describe"],
             ),
             (

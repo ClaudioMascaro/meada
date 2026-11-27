@@ -93,3 +93,51 @@ fn without_a_workload_the_side_stays_unresolved() {
         "channel::kafka"
     );
 }
+
+fn embedded(case: &str, config: &str) -> Value {
+    let repo = fixture_repo(case, "go-embedded-config", None);
+    let file = repo.join("consumer.go");
+    let src = std::fs::read_to_string(&file).unwrap();
+    std::fs::write(
+        file,
+        src.replace("*config.Config", &format!("*config.{config}")),
+    )
+    .unwrap();
+    serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap()
+}
+
+fn assert_orders(export: &Value) {
+    let consumer = side(export, "consumers", "consumer.go");
+    assert_eq!(consumer["contract"], "channel::kafka::orders.created");
+    assert!(
+        consumer["via"]
+            .as_str()
+            .unwrap()
+            .contains("env:ORDERS_TOPIC")
+    );
+    assert_eq!(
+        link(export, "producer.go", "consumer.go")["level"],
+        "declared"
+    );
+}
+
+#[test]
+fn an_embedded_config_field_names_the_consumers_variable() {
+    assert_orders(&embedded("embedded_named", "Named"));
+    assert_orders(&embedded("embedded_config", "Config"));
+}
+
+#[test]
+fn an_embedded_pointer_or_qualified_type_names_the_field() {
+    assert_orders(&embedded("embedded_pointer", "Pointer"));
+    assert_orders(&embedded("embedded_qualified", "Qualified"));
+}
+
+#[test]
+fn a_promoted_read_has_no_topic() {
+    let export = embedded("embedded_promoted", "Config");
+    assert_eq!(
+        side(&export, "consumers", "promoted.go")["contract"],
+        "channel::kafka"
+    );
+}

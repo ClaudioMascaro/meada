@@ -408,6 +408,14 @@ fn lean<T>(_: &T) -> bool {
     !VALUES.get()
 }
 
+fn lean_or_empty<K, V>(map: &BTreeMap<K, V>) -> bool {
+    lean(map) || map.is_empty()
+}
+
+fn lean_or_absent<T>(value: &Option<T>) -> bool {
+    lean(value) || value.is_none()
+}
+
 /// Runs `f` with `Facts` serializing their values too, for the values cache (ADR 0027): what
 /// `LanguagePack::parse_with` gives, whole. What `LanguagePack::join` sets stays out.
 pub fn with_values<T>(f: impl FnOnce() -> T) -> T {
@@ -516,6 +524,30 @@ pub struct Facts {
     /// Names bound in a scope whose class the syntax may tell, one per scope and name: what a
     /// method call on the name reaches. Each also hides an outer binding of its name.
     pub receivers: Vec<Receiver>,
+    /// Lexical visibility of TS bindings of names with a receiver, indexed by qualified name.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub ts_locals: BTreeMap<String, Vec<TsLocal>>,
+    /// Member writes on a fresh, lexically visible local object, by receiver and write offset.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub ts_local_literal_writes: BTreeMap<String, BTreeSet<usize>>,
+    /// Additional lexical bindings for computed TS record keys, kept with the values.
+    #[serde(default, skip_serializing_if = "lean_or_empty")]
+    pub ts_record_locals: BTreeMap<String, Vec<TsLocal>>,
+    /// Declaration offsets of annotated receivers initialized with an object literal.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub ts_annotated_literals: BTreeSet<usize>,
+    /// Member calls on a namespace proven global, identified by their full call span.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub ts_global_calls: BTreeSet<(usize, usize)>,
+    /// Reads written as this.field.method in a scope with a different this.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub ts_rebound_this: BTreeSet<(usize, usize)>,
+    /// TypeScript class members which affect dispatch without defining a method.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub ts_classes: BTreeMap<String, TsClass>,
+    /// Top-level TS/JS const literal methods, true when a later key may replace the method.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub ts_literal_methods: BTreeMap<String, BTreeMap<String, bool>>,
     /// The program entry points of the file (spec #31), set by `parse`, which sees the path and
     /// the source: the qualified names (`Def::name`) of the definitions that start a program,
     /// such as `func main` in package `main`, `fn main` in `src/main.rs`. Where the entry point
@@ -662,6 +694,11 @@ pub struct Facts {
     /// parse does not establish complete write knowledge; no literal values are retained.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub member_writes: Option<Vec<MemberWrite>>,
+    /// Fields traversed by a TS selector write. Their records can change independently of the field binding.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ts_record_writes: Vec<MemberWrite>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub ts_record_writes_incomplete: bool,
     /// The byte ranges of the outermost loops, in source order: a member write inside one may
     /// come before a read it follows in the source (`resolve/mutations.rs`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -882,16 +919,19 @@ pub struct MemberWrite {
     pub range: Range<usize>,
 }
 
+impl MemberWrite {
+    pub(crate) fn bytes(&self) -> usize {
+        std::mem::size_of::<Self>()
+            + self.scope.len()
+            + self.object.len()
+            + self.field.as_ref().map_or(0, String::len)
+    }
+}
+
 impl Facts {
-    /// Retained selector evidence shares the existing source byte ceiling. Losing that
-    /// knowledge is explicit, never a truncated empty list that could prove immutability.
+    /// Retained selector evidence shares the source byte ceiling.
     pub(crate) fn member_write(&mut self, write: MemberWrite, spent: &mut usize) {
-        *spent = spent.saturating_add(
-            std::mem::size_of::<MemberWrite>()
-                + write.scope.len()
-                + write.object.len()
-                + write.field.as_ref().map_or(0, String::len),
-        );
+        *spent = spent.saturating_add(write.bytes());
         if *spent > MAX_BYTES {
             self.member_writes = None;
             self.budget.get_or_insert(MAX_BYTES);
@@ -956,12 +996,60 @@ pub struct Receiver {
     pub class: Class,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct TsLocal {
+    pub block: Range<usize>,
+    pub declared: usize,
+    /// Index into receivers, absent for a binding with no known class.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receiver: Option<usize>,
+    /// Initializer in Facts::consts, for record keys in this file.
+    #[serde(default, skip_serializing_if = "lean_or_absent")]
+    pub constant: Option<usize>,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+pub struct TsClass {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub implements: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fields: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub private: Vec<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub initialized: BTreeMap<String, usize>,
+    /// Constructor assignments that supply a receiver if no other write reaches the field.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub constructed: BTreeMap<String, usize>,
+    /// A constructor parameter held in the field; the position distinguishes an explicit write.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub parameters: BTreeMap<String, TsFieldParameter>,
+    /// Object records assigned directly in the constructor, with their initialization site.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub records: BTreeMap<String, (usize, Value)>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TsFieldParameter {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignment: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip: Option<SlashStrip>,
+}
+
 /// What the syntax says a name holds. It is read as written: the shared side decides whether
 /// the name it gives is a class, and no type is inferred beyond that.
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum Class {
     /// An instance of the class whose body encloses the scope, or that class: `self`, `cls`.
     Enclosing,
+    /// A local constructed by a global or holding the awaited global fetch result.
+    TsGlobalValue,
+    /// A built-in type written at an annotation or return site without a shadowing binding.
+    TsGlobalType(String),
+    /// A generic annotation may filter library candidates, but gives no exact class.
+    TsGeneric(String),
     /// What this callee-like name (`Circle`, `shapes.Circle`), resolved from the scope, gives
     /// an instance of: a constructor call or an annotation. A function's result is unknown.
     Named(String),
@@ -1498,7 +1586,7 @@ pub struct Call {
     /// The name a method call on a call chain starts at (`client` in `client.get(u).send()`,
     /// whose callee is `(call_expression).send`), when it is a plain name or a member chain of
     /// them. An outside type owns the whole chain, so the resolver reads the call as one on
-    /// that name.
+    /// that name. TS also records a named receiver inside parentheses or await for class lookup.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root: Option<String>,
     /// The value a method is called on (`Router::new()` in `Router::new().route(..)`), when
@@ -1718,8 +1806,79 @@ pub fn literal(parts: &[Part]) -> Option<String> {
         .collect()
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
+pub enum SlashStrip {
+    One,
+    All,
+}
+
+impl SlashStrip {
+    pub(crate) fn apply(self, text: &str) -> &str {
+        match self {
+            Self::One => text.strip_suffix('/').unwrap_or(text),
+            Self::All => text.trim_end_matches('/'),
+        }
+    }
+
+    pub(crate) fn wrap(self, mut parts: Vec<Part>) -> Vec<Part> {
+        self.finish(&mut parts, 0);
+        parts
+    }
+
+    // Only a run reaching the unknown part needs to wait for another substitution.
+    fn finish(self, parts: &mut Vec<Part>, start: usize) {
+        while parts.len() > start {
+            let Some(Part::Text(last)) = parts.last_mut() else {
+                parts.insert(start, Part::StripStart);
+                parts.push(Part::StripEnd(self));
+                return;
+            };
+            let len = self.apply(last).len();
+            let done = len > 0 || (self == Self::One && !last.is_empty());
+            last.truncate(len);
+            if done {
+                return;
+            }
+            parts.pop();
+        }
+    }
+}
+
+/// Reapply pending replacements after their receivers have been substituted.
+pub(crate) fn fold_strips(parts: Vec<Part>) -> Vec<Part> {
+    if !parts.iter().any(|p| matches!(p, Part::StripStart)) {
+        return parts;
+    }
+    let mut out = Vec::new();
+    let mut starts = Vec::new();
+    for part in parts {
+        match part {
+            Part::StripStart => starts.push(out.len()),
+            Part::StripEnd(strip) if let Some(start) = starts.pop() => {
+                strip.finish(&mut out, start)
+            }
+            other => out.push(other),
+        }
+    }
+    out
+}
+
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub enum Part {
+    StripStart,
+    StripEnd(SlashStrip),
+    /// A field record lookup around the parts of its computed key.
+    RecordStart {
+        at: usize,
+        field: String,
+        property: String,
+    },
+    RecordEnd,
+    /// Folded alternatives of an index still unknown. A wrapper may yet supply its key.
+    RecordValues {
+        key: Option<String>,
+        values: Vec<Vec<Part>>,
+    },
     Text(String),
     /// A name inside a string, folded like `Value::Ref`.
     Ref(String),
@@ -1793,7 +1952,11 @@ impl Part {
 
     pub(crate) fn parameter(&self) -> Option<&str> {
         match self {
-            Self::Ref(name) | Self::EnvKey { name, .. } => Some(name),
+            Self::Ref(name)
+            | Self::EnvKey { name, .. }
+            | Self::RecordValues {
+                key: Some(name), ..
+            } => Some(name),
             Self::Read {
                 key,
                 parameter: true,

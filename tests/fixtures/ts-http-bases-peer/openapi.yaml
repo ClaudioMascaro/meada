@@ -1,0 +1,12 @@
+openapi: 3.0.3
+info: { title: Orders, version: '1' }
+paths:
+  /v2//orders:
+    get:
+      responses: { '200': { description: Orders } }
+  /:
+    post:
+      responses: { '200': { description: OK } }
+  /orders:
+    post:
+      responses: { '200': { description: OK } }

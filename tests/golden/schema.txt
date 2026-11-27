@@ -1,4 +1,4 @@
-extraction revision 8
+extraction revision 9
 
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -399,6 +399,7 @@ sample.ts
     {
       "scope": "",
       "callee": "SNSClient",
+      "constructs": true,
       "range": {
         "start": 1125,
         "end": 1142
@@ -415,6 +416,7 @@ sample.ts
     {
       "scope": "publishAws",
       "callee": "PublishCommand",
+      "constructs": true,
       "range": {
         "start": 1179,
         "end": 1228
@@ -671,7 +673,44 @@ sample.ts
     "serve.item",
     "serve.error"
   ],
-  "receivers": [],
+  "receivers": [
+    {
+      "scope": "",
+      "name": "app",
+      "class": {
+        "Result": 0
+      }
+    },
+    {
+      "scope": "",
+      "name": "sdk",
+      "class": {
+        "Named": "SNSClient"
+      }
+    }
+  ],
+  "ts_locals": {
+    "app": [
+      {
+        "block": {
+          "start": 0,
+          "end": 1233
+        },
+        "declared": 370,
+        "receiver": 0
+      }
+    ],
+    "sdk": [
+      {
+        "block": {
+          "start": 0,
+          "end": 1233
+        },
+        "declared": 1142,
+        "receiver": 1
+      }
+    ]
+  },
   "member_writes": [],
   "loops": [
     {
@@ -3348,6 +3387,9 @@ sample.tsx
         "end": 222
       },
       "params": [],
+      "bases": [
+        "Base"
+      ],
       "hash": "a2feefd823768a4791f10402389d9d823cf94d26fa280ce9ebab6fa6e1ae8479"
     },
     {
@@ -3429,6 +3471,7 @@ sample.tsx
     {
       "scope": "load",
       "callee": "(import)",
+      "awaited": true,
       "range": {
         "start": 282,
         "end": 306
@@ -3519,7 +3562,15 @@ sample.tsx
   "locals": [
     "load.Widget"
   ],
-  "receivers": [],
+  "receivers": [
+    {
+      "scope": "Page",
+      "name": "t",
+      "class": {
+        "Type": "Theme"
+      }
+    }
+  ],
   "member_writes": []
 }
 

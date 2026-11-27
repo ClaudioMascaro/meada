@@ -479,11 +479,9 @@ fn wrapper_expansion_climbs_only_calls_that_resolved_exactly() {
         .filter_map(|c| c["contract"].as_str())
         .collect();
     consumers.sort();
-    // `this.get("/orders")` is exact; `store.get("/reports")` (receiver of unknown class),
-    // `api.get("/list")` (a `new Api()` constant, still a name match) and `fetchJson("/bare")`
-    // (no import binds it) are name matches, so none names a path (the wrappers read where they
-    // stand have no readable contract).
-    assert_eq!(consumers, ["http::GET::/orders"]);
+    // Both this.get and api.get on new Api() resolve to their wrappers. The unknown store.get
+    // and the unimported fetchJson stay by name, so their /reports and /bare paths stay absent.
+    assert_eq!(consumers, ["http::GET::/list", "http::GET::/orders"]);
 }
 
 #[test]
