@@ -4,7 +4,8 @@
 remain #642/#676, the child flow issues, #683/#684, and base ADRs 0025/0026. The executable
 plan is [a7-a8-mutations.json](../scripts/a7-a8-mutations.json): eight plausible A7 bugs across
 values, IaC nodes, provisioners, workload environments, Service DNS, alert routing, AWS direct
-code and GCP subscription identities; five separate rounds cover all five original A8 controls.
+code and GCP subscription identities; five separate rounds cover all five original A8 controls,
+and a sixth (A8-06) drops g9's Go receiver type uses, which #973's rows in the g9 key catch.
 The two inline config controls exercise different mapping layers. Additional A8 controls
 remain regressions. SDK/route flows added later retain their own receipts and Scope rows;
 this bounded mix does not claim to mutate every child flow.
