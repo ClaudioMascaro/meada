@@ -112,6 +112,8 @@ published in aggregates only.
 - The explanation is written per group of changes of one cause, by an agent that did not make
   the changes, and the maintainer samples it.
 - A new link and a raised level enter the report of their pair.
+- The `calls` rows and the cost of both sides are reported with the release diff and judged by
+  sample. They hold nothing: the rules above are about links and orphan lines.
 
 ### The gate
 
