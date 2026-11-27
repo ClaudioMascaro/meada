@@ -84,6 +84,12 @@ through `/create-prove-it`, and adds its paths to its Scope row ([scope.md](scop
   The four unmapped proxy cases retain the trusted inline base control's complete context
   and trace (substituting only the neutral workspace identity). Their link/trace routing
   reason remains required; a context explanation is required only for declared env peers.
+- g9's Go `type` rows (#973) come from its generated source, at each type's first mention in the
+  definition (#973 names no position), and only where the base does not write them already. While
+  the base predates #973 they change g9's calls, so its communities are checked by
+  `a8-communities.jq` (members, exact names, connected groups over the expected calls), not byte
+  for byte: a regrouping that keeps every group connected passes, even all singletons or one
+  group. Once the base holds #973 the calls equal the base's and communities compare whole again.
 - The peers (`api`, `other`, `inventory`) are not exported on their own: they reach the check
   through the consumers' providers and links.
 - `pending` passes on 1.2.0's value, so a pending case proves only that nothing moved it. A ticket

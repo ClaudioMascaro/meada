@@ -1,7 +1,8 @@
 # Workload images (#662)
 
 ```bash
-python3 $S/images.py --base-bin "$RUN/bin/meada-base" --head-bin "$RUN/bin/meada-head" \
+python3 $S/images.py --historical-bin "$RUN/bin/meada-pre-image" --pr-base-bin "$RUN/bin/meada-base" \
+  --head-bin "$RUN/bin/meada-head" \
   --run "$RUN/images" --http --public \
   --ui-bin "$RUN/bin/meada-head-ui" --ui-dir ui/dist
 ```
@@ -39,7 +40,8 @@ the Kustomize base do not match short names by guess. Busybox init containers re
 The chart's plural `images.repository` is not the singular Helm key, and its templates are not
 rendered. The driver retains a full-field JSON delta and unified export diff against the exact
 base, checks every existing provider/consumer/link row, and checks complete unchanged fields
-outside the new image model. The checker audits every remaining delta against the source and
+outside the new image model against the PR base (`--pr-base-bin`; later releases move
+symbols, calls, communities and open items, so `eae2a56` no longer keys them). The checker audits every remaining delta against the source and
 spec, including newly exported workload nodes and optional direct `executions`.
 
 With both UI options, console query text and errors are compared to stdio in the same scope,

@@ -3433,6 +3433,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/fields.go::Billing.Items::(type)Billing#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Billing.Items",
+      "target": "example.com/acme/conformance::client/fields.go::Billing",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 316,
+        "end": 323
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/fields.go::Billing.Items::b.rc.R#0",
       "caller": "example.com/acme/conformance::client/fields.go::Billing.Items",
       "target": null,
@@ -3458,6 +3470,18 @@
         "start": 568,
         "end": 593
       }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Ledger.Entries::(type)Ledger#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Ledger.Entries",
+      "target": "example.com/acme/conformance::client/fields.go::Ledger",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 547,
+        "end": 553
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Ledger.Entries::l.api.R#0",
@@ -3487,6 +3511,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/fields.go::Mirror.Sync::(type)Mirror#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Mirror.Sync",
+      "target": "example.com/acme/conformance::client/fields.go::Mirror",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 920,
+        "end": 926
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/fields.go::Mirror.Sync::m.conn.R#0",
       "caller": "example.com/acme/conformance::client/fields.go::Mirror.Sync",
       "target": null,
@@ -3496,6 +3532,18 @@
         "start": 938,
         "end": 948
       }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewBilling::(type)Billing#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewBilling",
+      "target": "example.com/acme/conformance::client/fields.go::Billing",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 205,
+        "end": 212
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::NewBilling::rc.SetBaseURL#0",
@@ -3531,6 +3579,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/fields.go::NewLedger::(type)Ledger#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewLedger",
+      "target": "example.com/acme/conformance::client/fields.go::Ledger",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 471,
+        "end": 477
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/fields.go::NewLedger::resty.New#0",
       "caller": "example.com/acme/conformance::client/fields.go::NewLedger",
       "target": null,
@@ -3551,6 +3611,18 @@
         "start": 2152,
         "end": 2202
       }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewPair::(type)Pair#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewPair",
+      "target": "example.com/acme/conformance::client/fields.go::Pair",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2126,
+        "end": 2130
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::NewPair::resty.New#0",
@@ -3575,6 +3647,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/fields.go::NewPool::(type)Pool#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewPool",
+      "target": "example.com/acme/conformance::client/fields.go::Pool",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2437,
+        "end": 2441
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/fields.go::NewPool::resty.New#0",
       "caller": "example.com/acme/conformance::client/fields.go::NewPool",
       "target": null,
@@ -3586,6 +3670,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/fields.go::NewProxy::(type)Proxy#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewProxy",
+      "target": "example.com/acme/conformance::client/fields.go::Proxy",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1110,
+        "end": 1115
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/fields.go::NewQueue::(call_expression).SetBaseURL#0",
       "caller": "example.com/acme/conformance::client/fields.go::NewQueue",
       "target": null,
@@ -3595,6 +3691,18 @@
         "start": 1784,
         "end": 1834
       }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewQueue::(type)Queue#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewQueue",
+      "target": "example.com/acme/conformance::client/fields.go::Queue",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1755,
+        "end": 1760
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::NewQueue::resty.New#0",
@@ -3617,6 +3725,18 @@
         "start": 1466,
         "end": 1517
       }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::NewRelay::(type)Relay#0",
+      "caller": "example.com/acme/conformance::client/fields.go::NewRelay",
+      "target": "example.com/acme/conformance::client/fields.go::Relay",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1438,
+        "end": 1443
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::NewRelay::resty.New#0",
@@ -3646,6 +3766,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/fields.go::Pair.Left::(type)Pair#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Pair.Left",
+      "target": "example.com/acme/conformance::client/fields.go::Pair",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2282,
+        "end": 2286
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/fields.go::Pair.Left::p.left.R#0",
       "caller": "example.com/acme/conformance::client/fields.go::Pair.Left",
       "target": null,
@@ -3671,6 +3803,18 @@
         "start": 2610,
         "end": 2635
       }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Pool.Lease::(type)Pool#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Pool.Lease",
+      "target": "example.com/acme/conformance::client/fields.go::Pool",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2593,
+        "end": 2597
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Pool.Lease::p.member.R#0",
@@ -3700,6 +3844,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/fields.go::Proxy.Forward::(type)Proxy#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Proxy.Forward",
+      "target": "example.com/acme/conformance::client/fields.go::Proxy",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1266,
+        "end": 1271
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/fields.go::Proxy.Forward::p.upstream.R#0",
       "caller": "example.com/acme/conformance::client/fields.go::Proxy.Forward",
       "target": null,
@@ -3722,6 +3878,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/fields.go::Queue.Push::(type)Queue#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Queue.Push",
+      "target": "example.com/acme/conformance::client/fields.go::Queue",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1933,
+        "end": 1938
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/fields.go::Queue.Push::q.jobs.R#0",
       "caller": "example.com/acme/conformance::client/fields.go::Queue.Push",
       "target": null,
@@ -3731,6 +3899,18 @@
         "start": 1950,
         "end": 1960
       }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Queue.Retarget::(type)Queue#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Queue.Retarget",
+      "target": "example.com/acme/conformance::client/fields.go::Queue",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1848,
+        "end": 1853
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Queue.Retarget::q.jobs.SetBaseURL#0",
@@ -3755,6 +3935,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/fields.go::Relay.Send::(type)Relay#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Relay.Send",
+      "target": "example.com/acme/conformance::client/fields.go::Relay",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1585,
+        "end": 1590
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/fields.go::Relay.Send::r.out.R#0",
       "caller": "example.com/acme/conformance::client/fields.go::Relay.Send",
       "target": null,
@@ -3764,6 +3956,18 @@
         "start": 1602,
         "end": 1611
       }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Relay.Swap::(type)Relay#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Relay.Swap",
+      "target": "example.com/acme/conformance::client/fields.go::Relay",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1531,
+        "end": 1536
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Unset.Idle::(call_expression).Get#0",
@@ -3780,6 +3984,18 @@
         "start": 2780,
         "end": 2803
       }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::Unset.Idle::(type)Unset#0",
+      "caller": "example.com/acme/conformance::client/fields.go::Unset.Idle",
+      "target": "example.com/acme/conformance::client/fields.go::Unset",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2763,
+        "end": 2768
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::Unset.Idle::u.idle.R#0",
@@ -3804,6 +4020,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/fields.go::plainProxy::(type)Proxy#0",
+      "caller": "example.com/acme/conformance::client/fields.go::plainProxy",
+      "target": "example.com/acme/conformance::client/fields.go::Proxy",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 1168,
+        "end": 1173
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/fields.go::plainProxy::resty.New#0",
       "caller": "example.com/acme/conformance::client/fields.go::plainProxy",
       "target": null,
@@ -3815,6 +4043,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/fields.go::pools::(type)Pool#0",
+      "caller": "example.com/acme/conformance::client/fields.go::pools",
+      "target": "example.com/acme/conformance::client/fields.go::Pool",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2536,
+        "end": 2540
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/fields.go::pools::resty.New#0",
       "caller": "example.com/acme/conformance::client/fields.go::pools",
       "target": null,
@@ -3824,6 +4064,18 @@
         "start": 2567,
         "end": 2578
       }
+    },
+    {
+      "id": "example.com/acme/conformance::client/fields.go::positional::(type)Pair#0",
+      "caller": "example.com/acme/conformance::client/fields.go::positional",
+      "target": "example.com/acme/conformance::client/fields.go::Pair",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 2225,
+        "end": 2229
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::client/fields.go::positional::resty.New#0",
@@ -3859,6 +4111,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/fields.go::primary::(type)Mirror#0",
+      "caller": "example.com/acme/conformance::client/fields.go::primary",
+      "target": "example.com/acme/conformance::client/fields.go::Mirror",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 727,
+        "end": 733
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/fields.go::primary::resty.New#0",
       "caller": "example.com/acme/conformance::client/fields.go::primary",
       "target": null,
@@ -3881,6 +4145,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/fields.go::secondary::(type)Mirror#0",
+      "caller": "example.com/acme/conformance::client/fields.go::secondary",
+      "target": "example.com/acme/conformance::client/fields.go::Mirror",
+      "level": "exact",
+      "span": {
+        "path": "client/fields.go",
+        "start": 828,
+        "end": 834
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/fields.go::secondary::resty.New#0",
       "caller": "example.com/acme/conformance::client/fields.go::secondary",
       "target": null,
@@ -3901,6 +4177,18 @@
         "start": 342,
         "end": 394
       }
+    },
+    {
+      "id": "example.com/acme/conformance::client/net.go::Cache.Get::(type)Cache#0",
+      "caller": "example.com/acme/conformance::client/net.go::Cache.Get",
+      "target": "example.com/acme/conformance::client/net.go::Cache",
+      "level": "exact",
+      "span": {
+        "path": "client/net.go",
+        "start": 3198,
+        "end": 3203
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::Clients::c.Get#0",
@@ -4093,6 +4381,18 @@
         "start": 2372,
         "end": 2394
       }
+    },
+    {
+      "id": "example.com/acme/conformance::client/net.go::Lookup::(type)Cache#0",
+      "caller": "example.com/acme/conformance::client/net.go::Lookup",
+      "target": "example.com/acme/conformance::client/net.go::Cache",
+      "level": "exact",
+      "span": {
+        "path": "client/net.go",
+        "start": 2355,
+        "end": 2360
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::client/net.go::Lookup::r.Header.Get#0",
@@ -4572,6 +4872,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::client/rest.go::Gateway.Items::(type)Gateway#0",
+      "caller": "example.com/acme/conformance::client/rest.go::Gateway.Items",
+      "target": "example.com/acme/conformance::client/rest.go::Gateway",
+      "level": "exact",
+      "span": {
+        "path": "client/rest.go",
+        "start": 1240,
+        "end": 1247
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::client/rest.go::Gateway.Items::g.plain.Get#0",
       "caller": "example.com/acme/conformance::client/rest.go::Gateway.Items",
       "target": null,
@@ -4652,6 +4964,18 @@
         "start": 1829,
         "end": 1856
       }
+    },
+    {
+      "id": "example.com/acme/conformance::client/rest.go::Other::(type)Cache#0",
+      "caller": "example.com/acme/conformance::client/rest.go::Other",
+      "target": "example.com/acme/conformance::client/net.go::Cache",
+      "level": "exact",
+      "span": {
+        "path": "client/rest.go",
+        "start": 1819,
+        "end": 1824
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::client/rest.go::Other::store.R#0",
@@ -5523,6 +5847,43 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::internal/shapes/shapes.go::(type)ID#0",
+      "caller": "example.com/acme/conformance::internal/shapes/shapes.go",
+      "target": "example.com/acme/conformance::internal/shapes/shapes.go::ID",
+      "level": "exact",
+      "span": {
+        "path": "internal/shapes/shapes.go",
+        "start": 202,
+        "end": 204
+      },
+      "kind": "type",
+      "holder": "example.com/acme/conformance::internal/shapes/shapes.go::Label"
+    },
+    {
+      "id": "example.com/acme/conformance::internal/shapes/shapes.go::Circle.Area::(type)Circle#0",
+      "caller": "example.com/acme/conformance::internal/shapes/shapes.go::Circle.Area",
+      "target": "example.com/acme/conformance::internal/shapes/shapes.go::Circle",
+      "level": "exact",
+      "span": {
+        "path": "internal/shapes/shapes.go",
+        "start": 287,
+        "end": 293
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::internal/shapes/shapes.go::Circle.Perimeter::(type)Circle#0",
+      "caller": "example.com/acme/conformance::internal/shapes/shapes.go::Circle.Perimeter",
+      "target": "example.com/acme/conformance::internal/shapes/shapes.go::Circle",
+      "level": "exact",
+      "span": {
+        "path": "internal/shapes/shapes.go",
+        "start": 362,
+        "end": 368
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::Each::(func_literal)#0",
       "caller": "example.com/acme/conformance::internal/shapes/shapes.go::Each",
       "target": null,
@@ -5532,6 +5893,18 @@
         "start": 660,
         "end": 684
       }
+    },
+    {
+      "id": "example.com/acme/conformance::internal/shapes/shapes.go::Each::(type)Shape#0",
+      "caller": "example.com/acme/conformance::internal/shapes/shapes.go::Each",
+      "target": "example.com/acme/conformance::internal/shapes/shapes.go::Shape",
+      "level": "exact",
+      "span": {
+        "path": "internal/shapes/shapes.go",
+        "start": 516,
+        "end": 521
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::Each::clamp#0",
@@ -5554,6 +5927,18 @@
         "start": 574,
         "end": 582
       }
+    },
+    {
+      "id": "example.com/acme/conformance::internal/shapes/shapes.go::NewCircle::(type)Circle#0",
+      "caller": "example.com/acme/conformance::internal/shapes/shapes.go::NewCircle",
+      "target": "example.com/acme/conformance::internal/shapes/shapes.go::Circle",
+      "level": "exact",
+      "span": {
+        "path": "internal/shapes/shapes.go",
+        "start": 233,
+        "end": 239
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::internal/shapes/shapes.go::NewCircle::clamp#0",
@@ -6117,6 +6502,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/sarama.go::SaramaGroup::(type)orderHandler#0",
+      "caller": "example.com/acme/conformance::messages/sarama.go::SaramaGroup",
+      "target": "example.com/acme/conformance::messages/sarama.go::orderHandler",
+      "level": "exact",
+      "span": {
+        "path": "messages/sarama.go",
+        "start": 1281,
+        "end": 1293
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::messages/sarama.go::SaramaGroup::group.Consume#0",
       "caller": "example.com/acme/conformance::messages/sarama.go::SaramaGroup",
       "target": null,
@@ -6227,6 +6624,30 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/sarama.go::orderHandler.Cleanup::(type)orderHandler#0",
+      "caller": "example.com/acme/conformance::messages/sarama.go::orderHandler.Cleanup",
+      "target": "example.com/acme/conformance::messages/sarama.go::orderHandler",
+      "level": "exact",
+      "span": {
+        "path": "messages/sarama.go",
+        "start": 876,
+        "end": 888
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::messages/sarama.go::orderHandler.ConsumeClaim::(type)orderHandler#0",
+      "caller": "example.com/acme/conformance::messages/sarama.go::orderHandler.ConsumeClaim",
+      "target": "example.com/acme/conformance::messages/sarama.go::orderHandler",
+      "level": "exact",
+      "span": {
+        "path": "messages/sarama.go",
+        "start": 954,
+        "end": 966
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::messages/sarama.go::orderHandler.ConsumeClaim::claim.Messages#0",
       "caller": "example.com/acme/conformance::messages/sarama.go::orderHandler.ConsumeClaim",
       "target": null,
@@ -6247,6 +6668,18 @@
         "start": 1102,
         "end": 1134
       }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/sarama.go::orderHandler.Setup::(type)orderHandler#0",
+      "caller": "example.com/acme/conformance::messages/sarama.go::orderHandler.Setup",
+      "target": "example.com/acme/conformance::messages/sarama.go::orderHandler",
+      "level": "exact",
+      "span": {
+        "path": "messages/sarama.go",
+        "start": 798,
+        "end": 810
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::ConsumeOrders::kafka.NewReader#0",
@@ -6315,6 +6748,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/segmentio.go::NewWriter::(type)WriterConfig#0",
+      "caller": "example.com/acme/conformance::messages/segmentio.go::NewWriter",
+      "target": "example.com/acme/conformance::messages/segmentio.go::WriterConfig",
+      "level": "exact",
+      "span": {
+        "path": "messages/segmentio.go",
+        "start": 2263,
+        "end": 2275
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::messages/segmentio.go::ProduceAll::kafka.TCP#0",
       "caller": "example.com/acme/conformance::messages/segmentio.go::ProduceAll",
       "target": null,
@@ -6346,6 +6791,18 @@
         "start": 387,
         "end": 449
       }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike::(type)WriterConfig#0",
+      "caller": "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike",
+      "target": "example.com/acme/conformance::messages/segmentio.go::WriterConfig",
+      "level": "exact",
+      "span": {
+        "path": "messages/segmentio.go",
+        "start": 2405,
+        "end": 2417
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike::NewWriter#0",
@@ -6447,6 +6904,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/segmentio.go::Publisher.Send::(type)Publisher#0",
+      "caller": "example.com/acme/conformance::messages/segmentio.go::Publisher.Send",
+      "target": "example.com/acme/conformance::messages/segmentio.go::Publisher",
+      "level": "exact",
+      "span": {
+        "path": "messages/segmentio.go",
+        "start": 2629,
+        "end": 2638
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::messages/segmentio.go::Publisher.Send::p.w.WriteMessages#0",
       "caller": "example.com/acme/conformance::messages/segmentio.go::Publisher.Send",
       "target": null,
@@ -6491,6 +6960,67 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/shadowed.go::(type)Sink#0",
+      "caller": "example.com/acme/conformance::messages/shadowed.go",
+      "target": "example.com/acme/conformance::messages/shadowed.go::Sink",
+      "level": "exact",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 1280,
+        "end": 1284
+      },
+      "kind": "type",
+      "holder": "example.com/acme/conformance::messages/shadowed.go::Service"
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::Outbox.Publish::(type)Outbox#0",
+      "caller": "example.com/acme/conformance::messages/shadowed.go::Outbox.Publish",
+      "target": "example.com/acme/conformance::messages/shadowed.go::Outbox",
+      "level": "exact",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 297,
+        "end": 303
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::Outbox.WriteMessages::(type)Outbox#0",
+      "caller": "example.com/acme/conformance::messages/shadowed.go::Outbox.WriteMessages",
+      "target": "example.com/acme/conformance::messages/shadowed.go::Outbox",
+      "level": "exact",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 231,
+        "end": 237
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::Outbox.XAdd::(type)Outbox#0",
+      "caller": "example.com/acme/conformance::messages/shadowed.go::Outbox.XAdd",
+      "target": "example.com/acme/conformance::messages/shadowed.go::Outbox",
+      "level": "exact",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 363,
+        "end": 369
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::Service.Run::(type)Service#0",
+      "caller": "example.com/acme/conformance::messages/shadowed.go::Service.Run",
+      "target": "example.com/acme/conformance::messages/shadowed.go::Service",
+      "level": "exact",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 1297,
+        "end": 1304
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::messages/shadowed.go::Service.Run::s.sink.WriteMessages#0",
       "caller": "example.com/acme/conformance::messages/shadowed.go::Service.Run",
       "target": "example.com/acme/conformance::messages/shadowed.go::Sink.WriteMessages",
@@ -6500,6 +7030,18 @@
         "start": 1334,
         "end": 1374
       }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::Shadowed::(type)Outbox#0",
+      "caller": "example.com/acme/conformance::messages/shadowed.go::Shadowed",
+      "target": "example.com/acme/conformance::messages/shadowed.go::Outbox",
+      "level": "exact",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 441,
+        "end": 447
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::Shadowed::o.Publish#0",
@@ -6535,6 +7077,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock::(type)Outbox#0",
+      "caller": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock",
+      "target": "example.com/acme/conformance::messages/shadowed.go::Outbox",
+      "level": "exact",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 877,
+        "end": 883
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock::w.WriteMessages#0",
       "caller": "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock",
       "target": null,
@@ -6565,6 +7119,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedImport::(type)Outbox#0",
+      "caller": "example.com/acme/conformance::messages/shadowed.go::ShadowedImport",
+      "target": "example.com/acme/conformance::messages/shadowed.go::Outbox",
+      "level": "exact",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 669,
+        "end": 675
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedImport::nats.Publish#0",
       "caller": "example.com/acme/conformance::messages/shadowed.go::ShadowedImport",
       "target": "example.com/acme/conformance::messages/shadowed.go::Outbox.Publish",
@@ -6574,6 +7140,18 @@
         "start": 680,
         "end": 708
       }
+    },
+    {
+      "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedRange::(type)Outbox#0",
+      "caller": "example.com/acme/conformance::messages/shadowed.go::ShadowedRange",
+      "target": "example.com/acme/conformance::messages/shadowed.go::Outbox",
+      "level": "exact",
+      "span": {
+        "path": "messages/shadowed.go",
+        "start": 1048,
+        "end": 1054
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::messages/shadowed.go::ShadowedRange::w.WriteMessages#0",
@@ -6668,6 +7246,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/subjects.go::NatsSubscribe::(type)auditor#0",
+      "caller": "example.com/acme/conformance::messages/subjects.go::NatsSubscribe",
+      "target": "example.com/acme/conformance::messages/subjects.go::auditor",
+      "level": "exact",
+      "span": {
+        "path": "messages/subjects.go",
+        "start": 456,
+        "end": 463
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::messages/subjects.go::NatsSubscribe::nats.Connect#0",
       "caller": "example.com/acme/conformance::messages/subjects.go::NatsSubscribe",
       "target": null,
@@ -6712,6 +7302,30 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::messages/subjects.go::auditor.onAudit::(type)auditor#0",
+      "caller": "example.com/acme/conformance::messages/subjects.go::auditor.onAudit",
+      "target": "example.com/acme/conformance::messages/subjects.go::auditor",
+      "level": "exact",
+      "span": {
+        "path": "messages/subjects.go",
+        "start": 89,
+        "end": 96
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::AfterBlock::(type)Gauge#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::AfterBlock",
+      "target": "example.com/acme/conformance::methods/types.go::Gauge",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2566,
+        "end": 2571
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::AfterBlock::cur.Add#0",
       "caller": "example.com/acme/conformance::methods/calls.go::AfterBlock",
       "target": null,
@@ -6740,6 +7354,30 @@
         "start": 2594,
         "end": 2608
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::Capture::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::Capture",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2081,
+        "end": 2088
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::Capture::(type)Log#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::Capture",
+      "target": "example.com/acme/conformance::methods/types.go::Log",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2112,
+        "end": 2115
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::Capture::c.Add#0",
@@ -6775,6 +7413,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::ForInitShadow::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::ForInitShadow",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2887,
+        "end": 2894
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::ForInitShadow::c.Add#0",
       "caller": "example.com/acme/conformance::methods/calls.go::ForInitShadow",
       "target": null,
@@ -6799,6 +7449,30 @@
         "start": 2908,
         "end": 2916
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::FromClosure::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::FromClosure",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 1246,
+        "end": 1253
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::FromClosure::(type)Log#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::FromClosure",
+      "target": "example.com/acme/conformance::methods/types.go::Log",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 1303,
+        "end": 1306
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromClosure::c.Add#0",
@@ -6845,6 +7519,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::FromInterface::(type)Sink#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::FromInterface",
+      "target": "example.com/acme/conformance::methods/types.go::Sink",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 1080,
+        "end": 1084
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::FromInterface::s.Flush#0",
       "caller": "example.com/acme/conformance::methods/calls.go::FromInterface",
       "target": "example.com/acme/conformance::methods/types.go::Sink.Flush",
@@ -6856,6 +7542,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::FromInterfaceAsShape::(type)shapes.Shape#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::FromInterfaceAsShape",
+      "target": "example.com/acme/conformance::internal/shapes/shapes.go::Shape",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 1130,
+        "end": 1142
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::FromInterfaceAsShape::s.Area#0",
       "caller": "example.com/acme/conformance::methods/calls.go::FromInterfaceAsShape",
       "target": "example.com/acme/conformance::internal/shapes/shapes.go::Shape.Area",
@@ -6865,6 +7563,18 @@
         "start": 1147,
         "end": 1155
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::FromLiteral::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::FromLiteral",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 345,
+        "end": 352
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromLiteral::c.Bump#0",
@@ -6887,6 +7597,18 @@
         "start": 383,
         "end": 391
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::FromMethodResult::(type)Holder#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::FromMethodResult",
+      "target": "example.com/acme/conformance::methods/types.go::Holder",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 798,
+        "end": 804
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromMethodResult::c.Bump#0",
@@ -6933,6 +7655,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::FromParam::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::FromParam",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 177,
+        "end": 184
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::FromParam::c.Bump#0",
       "caller": "example.com/acme/conformance::methods/calls.go::FromParam",
       "target": "example.com/acme/conformance::methods/types.go::Counter.Bump",
@@ -6942,6 +7676,18 @@
         "start": 189,
         "end": 197
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::FromQualifiedType::(type)shapes.Circle#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::FromQualifiedType",
+      "target": "example.com/acme/conformance::internal/shapes/shapes.go::Circle",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 865,
+        "end": 878
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromQualifiedType::c.Area#0",
@@ -7069,6 +7815,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::FromSibling::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::FromSibling",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 915,
+        "end": 922
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::FromSibling::c.Reset#0",
       "caller": "example.com/acme/conformance::methods/calls.go::FromSibling",
       "target": "example.com/acme/conformance::methods/reset.go::Counter.Reset",
@@ -7080,6 +7838,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::FromValueParam::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::FromValueParam",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 223,
+        "end": 230
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::FromValueParam::c.Bump#0",
       "caller": "example.com/acme/conformance::methods/calls.go::FromValueParam",
       "target": "example.com/acme/conformance::methods/types.go::Counter.Bump",
@@ -7089,6 +7859,18 @@
         "start": 235,
         "end": 243
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::FromVar::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::FromVar",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 271,
+        "end": 278
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::FromVar::c.Bump#0",
@@ -7113,6 +7895,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::FromVarLiteral::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::FromVarLiteral",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 428,
+        "end": 435
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::FromVarLiteral::c.Bump#0",
       "caller": "example.com/acme/conformance::methods/calls.go::FromVarLiteral",
       "target": "example.com/acme/conformance::methods/types.go::Counter.Bump",
@@ -7122,6 +7916,18 @@
         "start": 439,
         "end": 447
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::IfInitShadow::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::IfInitShadow",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2715,
+        "end": 2722
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::IfInitShadow::c.Add#0",
@@ -7150,6 +7956,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::LocalType::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::LocalType",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 1943,
+        "end": 1950
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::LocalType::c.Bump#0",
       "caller": "example.com/acme/conformance::methods/calls.go::LocalType",
       "target": "example.com/acme/conformance::methods/types.go::Counter.Bump",
@@ -7161,6 +7979,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::NotWritten::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::NotWritten",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 1443,
+        "end": 1450
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::NotWritten::c.Bump#0",
       "caller": "example.com/acme/conformance::methods/calls.go::NotWritten",
       "target": "example.com/acme/conformance::methods/types.go::Counter.Bump",
@@ -7170,6 +8000,18 @@
         "start": 1481,
         "end": 1489
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::NotWrittenMany::(type)Log#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::NotWrittenMany",
+      "target": "example.com/acme/conformance::methods/types.go::Log",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 1578,
+        "end": 1581
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::NotWrittenMany::l.Add#0",
@@ -7187,6 +8029,30 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::RangeShadow::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::RangeShadow",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 3066,
+        "end": 3073
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::RangeShadow::(type)Log#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::RangeShadow",
+      "target": "example.com/acme/conformance::methods/types.go::Log",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 3081,
+        "end": 3084
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::RangeShadow::c.Add#0",
       "caller": "example.com/acme/conformance::methods/calls.go::RangeShadow",
       "target": null,
@@ -7200,6 +8066,30 @@
         "start": 3115,
         "end": 3125
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::Rebound::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::Rebound",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 1723,
+        "end": 1730
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::Rebound::(type)Log#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::Rebound",
+      "target": "example.com/acme/conformance::methods/types.go::Log",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 1743,
+        "end": 1746
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::Rebound::c.Add#0",
@@ -7228,6 +8118,30 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::ReboundByParam::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::ReboundByParam",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 1801,
+        "end": 1808
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::ReboundByParam::(type)Log#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::ReboundByParam",
+      "target": "example.com/acme/conformance::methods/types.go::Log",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 1822,
+        "end": 1825
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::ReboundByParam::c.Add#0",
       "caller": "example.com/acme/conformance::methods/calls.go::ReboundByParam",
       "target": null,
@@ -7252,6 +8166,18 @@
         "start": 1845,
         "end": 1853
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::SwitchInitShadow::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::SwitchInitShadow",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2800,
+        "end": 2807
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::SwitchInitShadow::c.Add#0",
@@ -7280,6 +8206,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::TypeParam::(type)Sink#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::TypeParam",
+      "target": "example.com/acme/conformance::methods/types.go::Sink",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2031,
+        "end": 2035
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::TypeParam::s.Flush#0",
       "caller": "example.com/acme/conformance::methods/calls.go::TypeParam",
       "target": null,
@@ -7294,6 +8232,30 @@
         "start": 2045,
         "end": 2054
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::TypeSwitchShadow::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::TypeSwitchShadow",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2974,
+        "end": 2981
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::TypeSwitchShadow::(type)Log#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::TypeSwitchShadow",
+      "target": "example.com/acme/conformance::methods/types.go::Log",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 3022,
+        "end": 3025
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::TypeSwitchShadow::c.Add#0",
@@ -7311,6 +8273,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/calls.go::UseBefore::(type)Gauge#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::UseBefore",
+      "target": "example.com/acme/conformance::methods/types.go::Gauge",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2372,
+        "end": 2377
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/calls.go::UseBefore::cur.Add#0",
       "caller": "example.com/acme/conformance::methods/calls.go::UseBefore",
       "target": null,
@@ -7324,6 +8298,30 @@
         "start": 2351,
         "end": 2363
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure::(type)Gauge#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure",
+      "target": "example.com/acme/conformance::methods/types.go::Gauge",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2466,
+        "end": 2471
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure::(type)Log#0",
+      "caller": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure",
+      "target": "example.com/acme/conformance::methods/types.go::Log",
+      "level": "exact",
+      "span": {
+        "path": "methods/calls.go",
+        "start": 2426,
+        "end": 2429
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure::c.Add#0",
@@ -7352,6 +8350,130 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/reset.go::Counter.Reset::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/reset.go::Counter.Reset",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/reset.go",
+        "start": 89,
+        "end": 96
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/types.go",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 760,
+        "end": 767
+      },
+      "kind": "type",
+      "holder": "example.com/acme/conformance::methods/types.go::Holder"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::(type)Counter#1",
+      "caller": "example.com/acme/conformance::methods/types.go",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1237,
+        "end": 1244
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::(type)Counter#2",
+      "caller": "example.com/acme/conformance::methods/types.go",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1259,
+        "end": 1266
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::(type)Log#0",
+      "caller": "example.com/acme/conformance::methods/types.go",
+      "target": "example.com/acme/conformance::methods/types.go::Log",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 777,
+        "end": 780
+      },
+      "kind": "type",
+      "holder": "example.com/acme/conformance::methods/types.go::Holder"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::(type)Log#1",
+      "caller": "example.com/acme/conformance::methods/types.go",
+      "target": "example.com/acme/conformance::methods/types.go::Log",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1278,
+        "end": 1281
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::(type)Sink#0",
+      "caller": "example.com/acme/conformance::methods/types.go",
+      "target": "example.com/acme/conformance::methods/types.go::Sink",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 790,
+        "end": 794
+      },
+      "kind": "type",
+      "holder": "example.com/acme/conformance::methods/types.go::Holder"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::(type)shapes.Circle#0",
+      "caller": "example.com/acme/conformance::methods/types.go",
+      "target": "example.com/acme/conformance::internal/shapes/shapes.go::Circle",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 805,
+        "end": 818
+      },
+      "kind": "type",
+      "holder": "example.com/acme/conformance::methods/types.go::Holder"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Box.M::(type)Box#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Box.M",
+      "target": "example.com/acme/conformance::methods/types.go::Box",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1516,
+        "end": 1519
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Box.M::(type)T#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Box.M",
+      "target": "example.com/acme/conformance::methods/types.go::T",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1529,
+        "end": 1530
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/types.go::Box.M::b.v.Ping#0",
       "caller": "example.com/acme/conformance::methods/types.go::Box.M",
       "target": "example.com/acme/conformance::methods/types.go::T.Ping",
@@ -7374,6 +8496,30 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/types.go::Counter.Bump::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Counter.Bump",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 223,
+        "end": 230
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Counter.Twice::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Counter.Twice",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 328,
+        "end": 335
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/types.go::Counter.Twice::c.Bump#0",
       "caller": "example.com/acme/conformance::methods/types.go::Counter.Twice",
       "target": "example.com/acme/conformance::methods/types.go::Counter.Bump",
@@ -7394,6 +8540,66 @@
         "start": 358,
         "end": 366
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Disk.Flush::(type)Disk#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Disk.Flush",
+      "target": "example.com/acme/conformance::methods/types.go::Disk",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 593,
+        "end": 597
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Gauge.Add::(type)Gauge#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Gauge.Add",
+      "target": "example.com/acme/conformance::methods/types.go::Gauge",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 452,
+        "end": 457
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Holder.Counter::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Holder.Counter",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 965,
+        "end": 972
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Holder.Counter::(type)Holder#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Holder.Counter",
+      "target": "example.com/acme/conformance::methods/types.go::Holder",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 946,
+        "end": 952
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Holder.Run::(type)Holder#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Holder.Run",
+      "target": "example.com/acme/conformance::methods/types.go::Holder",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 849,
+        "end": 855
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::methods/types.go::Holder.Run::h.circle.Area#0",
@@ -7440,6 +8646,54 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::methods/types.go::Log.Add::(type)Log#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Log.Add",
+      "target": "example.com/acme/conformance::methods/types.go::Log",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 398,
+        "end": 401
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Mem.Flush::(type)Mem#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Mem.Flush",
+      "target": "example.com/acme/conformance::methods/types.go::Mem",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 654,
+        "end": 657
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::NewCounter::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/types.go::NewCounter",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1015,
+        "end": 1022
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Open::(type)Counter#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Open",
+      "target": "example.com/acme/conformance::methods/types.go::Counter",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1123,
+        "end": 1130
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::methods/types.go::Open::NewCounter#0",
       "caller": "example.com/acme/conformance::methods/types.go::Open",
       "target": "example.com/acme/conformance::methods/types.go::NewCounter",
@@ -7449,6 +8703,42 @@
         "start": 1149,
         "end": 1161
       }
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Pair::(type)Gauge#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Pair",
+      "target": "example.com/acme/conformance::methods/types.go::Gauge",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1188,
+        "end": 1193
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::Pair::(type)Log#0",
+      "caller": "example.com/acme/conformance::methods/types.go::Pair",
+      "target": "example.com/acme/conformance::methods/types.go::Log",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1183,
+        "end": 1186
+      },
+      "kind": "type"
+    },
+    {
+      "id": "example.com/acme/conformance::methods/types.go::T.Ping::(type)T#0",
+      "caller": "example.com/acme/conformance::methods/types.go::T.Ping",
+      "target": "example.com/acme/conformance::methods/types.go::T",
+      "level": "exact",
+      "span": {
+        "path": "methods/types.go",
+        "start": 1308,
+        "end": 1309
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::report.go::report::invoice.Total#0",
@@ -7528,6 +8818,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::scopes/scopes.go::Box.Get::(type)Box#0",
+      "caller": "example.com/acme/conformance::scopes/scopes.go::Box.Get",
+      "target": "example.com/acme/conformance::scopes/scopes.go::Box",
+      "level": "exact",
+      "span": {
+        "path": "scopes/scopes.go",
+        "start": 1375,
+        "end": 1378
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::scopes/scopes.go::Box.Get::outer#0",
       "caller": "example.com/acme/conformance::scopes/scopes.go::Box.Get",
       "target": "example.com/acme/conformance::scopes/scopes.go::outer",
@@ -7603,6 +8905,18 @@
         "start": 1258,
         "end": 1266
       }
+    },
+    {
+      "id": "example.com/acme/conformance::scopes/scopes.go::H.Serve::(type)H#0",
+      "caller": "example.com/acme/conformance::scopes/scopes.go::H.Serve",
+      "target": "example.com/acme/conformance::scopes/scopes.go::H",
+      "level": "exact",
+      "span": {
+        "path": "scopes/scopes.go",
+        "start": 1494,
+        "end": 1495
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::scopes/scopes.go::H.Serve::outer#0",
@@ -7902,6 +9216,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::store/store.go::New::(type)Store#0",
+      "caller": "example.com/acme/conformance::store/store.go::New",
+      "target": "example.com/acme/conformance::store/store.go::Store",
+      "level": "exact",
+      "span": {
+        "path": "store/store.go",
+        "start": 77,
+        "end": 82
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::store/store.go::New::encode#0",
       "caller": "example.com/acme/conformance::store/store.go::New",
       "target": "example.com/acme/conformance::store/codec_pure.go::encode",
@@ -7957,6 +9283,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::store/store.go::Store.Get::(type)Store#0",
+      "caller": "example.com/acme/conformance::store/store.go::Store.Get",
+      "target": "example.com/acme/conformance::store/store.go::Store",
+      "level": "exact",
+      "span": {
+        "path": "store/store.go",
+        "start": 274,
+        "end": 279
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::store/store.go::init#2::helper#0",
       "caller": "example.com/acme/conformance::store/store.go::init#2",
       "target": "example.com/acme/conformance::store/helpers.go::helper",
@@ -8010,6 +9348,18 @@
         "start": 70,
         "end": 78
       }
+    },
+    {
+      "id": "example.com/acme/conformance::tools/runner.go::Runner.main::(type)Runner#0",
+      "caller": "example.com/acme/conformance::tools/runner.go::Runner.main",
+      "target": "example.com/acme/conformance::tools/runner.go::Runner",
+      "level": "exact",
+      "span": {
+        "path": "tools/runner.go",
+        "start": 82,
+        "end": 88
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/acme/conformance::web/chi.go::ChiAudit::r.Get#0",
@@ -10850,6 +12200,18 @@
       }
     },
     {
+      "id": "example.com/acme/conformance::web/stdlib.go::Server.Routes::(type)Server#0",
+      "caller": "example.com/acme/conformance::web/stdlib.go::Server.Routes",
+      "target": "example.com/acme/conformance::web/stdlib.go::Server",
+      "level": "exact",
+      "span": {
+        "path": "web/stdlib.go",
+        "start": 3154,
+        "end": 3160
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/acme/conformance::web/stdlib.go::Server.Routes::api.HandleFunc#0",
       "caller": "example.com/acme/conformance::web/stdlib.go::Server.Routes",
       "target": null,
@@ -12187,23 +13549,6 @@
   ],
   "communities": [
     {
-      "name": ".",
-      "members": [
-        "example.com/acme/conformance::forks/billing/invoice/invoice.go::Total",
-        "example.com/acme/conformance::forks/billing/invoice/invoice.go::round",
-        "example.com/acme/conformance::internal/shapes/shapes.go::Each",
-        "example.com/acme/conformance::internal/shapes/shapes.go::NewCircle",
-        "example.com/acme/conformance::internal/shapes/shapes.go::clamp",
-        "example.com/acme/conformance::internal/units/units.go::Meters",
-        "example.com/acme/conformance::main.go::main",
-        "example.com/acme/conformance::main.go::run",
-        "example.com/acme/conformance::report.go::report",
-        "example.com/acme/conformance::store/helpers.go::Exported",
-        "example.com/acme/conformance::store/store.go::init",
-        "example.com/acme/conformance::store/store.go::open"
-      ]
-    },
-    {
       "name": "billing/invoice",
       "members": [
         "example.com/acme/conformance::billing/invoice/invoice.go::Total",
@@ -12213,12 +13558,22 @@
     {
       "name": "client",
       "members": [
-        "example.com/acme/conformance::client/net.go::Cache.Get",
-        "example.com/acme/conformance::client/net.go::Lookup"
+        "example.com/acme/conformance::client/fields.go::Billing",
+        "example.com/acme/conformance::client/fields.go::Billing.Items",
+        "example.com/acme/conformance::client/fields.go::NewBilling"
       ]
     },
     {
-      "name": "client#2",
+      "name": "client#10",
+      "members": [
+        "example.com/acme/conformance::client/net.go::Cache",
+        "example.com/acme/conformance::client/net.go::Cache.Get",
+        "example.com/acme/conformance::client/net.go::Lookup",
+        "example.com/acme/conformance::client/rest.go::Other"
+      ]
+    },
+    {
+      "name": "client#11",
       "members": [
         "example.com/acme/conformance::client/net.go::Unresolved",
         "example.com/acme/conformance::client/net.go::lookup",
@@ -12229,35 +13584,42 @@
       ]
     },
     {
-      "name": "client#3",
+      "name": "client#12",
       "members": [
         "example.com/acme/conformance::client/rest.go::Factory",
         "example.com/acme/conformance::client/rest.go::plainClient"
       ]
     },
     {
-      "name": "client#4",
+      "name": "client#13",
+      "members": [
+        "example.com/acme/conformance::client/rest.go::Gateway",
+        "example.com/acme/conformance::client/rest.go::Gateway.Items"
+      ]
+    },
+    {
+      "name": "client#14",
       "members": [
         "example.com/acme/conformance::client/rest.go::Mixed",
         "example.com/acme/conformance::client/rest.go::fetchBase"
       ]
     },
     {
-      "name": "client#5",
+      "name": "client#15",
       "members": [
         "example.com/acme/conformance::client/rest.go::Returned",
         "example.com/acme/conformance::client/rest.go::newClient"
       ]
     },
     {
-      "name": "client#6",
+      "name": "client#16",
       "members": [
         "example.com/acme/conformance::client/rest.go::Wrapper",
         "example.com/acme/conformance::client/rest.go::fetchJSON"
       ]
     },
     {
-      "name": "client#7",
+      "name": "client#17",
       "members": [
         "example.com/acme/conformance::client/wrappers.go::Cycle",
         "example.com/acme/conformance::client/wrappers.go::ping",
@@ -12265,10 +13627,79 @@
       ]
     },
     {
+      "name": "client#2",
+      "members": [
+        "example.com/acme/conformance::client/fields.go::Ledger",
+        "example.com/acme/conformance::client/fields.go::Ledger.Entries",
+        "example.com/acme/conformance::client/fields.go::NewLedger"
+      ]
+    },
+    {
+      "name": "client#3",
+      "members": [
+        "example.com/acme/conformance::client/fields.go::Mirror",
+        "example.com/acme/conformance::client/fields.go::Mirror.Sync",
+        "example.com/acme/conformance::client/fields.go::primary",
+        "example.com/acme/conformance::client/fields.go::secondary"
+      ]
+    },
+    {
+      "name": "client#4",
+      "members": [
+        "example.com/acme/conformance::client/fields.go::NewPair",
+        "example.com/acme/conformance::client/fields.go::Pair",
+        "example.com/acme/conformance::client/fields.go::Pair.Left",
+        "example.com/acme/conformance::client/fields.go::positional"
+      ]
+    },
+    {
+      "name": "client#5",
+      "members": [
+        "example.com/acme/conformance::client/fields.go::NewPool",
+        "example.com/acme/conformance::client/fields.go::Pool",
+        "example.com/acme/conformance::client/fields.go::Pool.Lease",
+        "example.com/acme/conformance::client/fields.go::pools"
+      ]
+    },
+    {
+      "name": "client#6",
+      "members": [
+        "example.com/acme/conformance::client/fields.go::NewProxy",
+        "example.com/acme/conformance::client/fields.go::Proxy",
+        "example.com/acme/conformance::client/fields.go::Proxy.Forward",
+        "example.com/acme/conformance::client/fields.go::plainProxy"
+      ]
+    },
+    {
+      "name": "client#7",
+      "members": [
+        "example.com/acme/conformance::client/fields.go::NewQueue",
+        "example.com/acme/conformance::client/fields.go::Queue",
+        "example.com/acme/conformance::client/fields.go::Queue.Push",
+        "example.com/acme/conformance::client/fields.go::Queue.Retarget"
+      ]
+    },
+    {
+      "name": "client#8",
+      "members": [
+        "example.com/acme/conformance::client/fields.go::NewRelay",
+        "example.com/acme/conformance::client/fields.go::Relay",
+        "example.com/acme/conformance::client/fields.go::Relay.Send",
+        "example.com/acme/conformance::client/fields.go::Relay.Swap"
+      ]
+    },
+    {
+      "name": "client#9",
+      "members": [
+        "example.com/acme/conformance::client/fields.go::Unset",
+        "example.com/acme/conformance::client/fields.go::Unset.Idle"
+      ]
+    },
+    {
       "name": "internal/shapes",
       "members": [
-        "example.com/acme/conformance::internal/shapes/shapes.go::Shape.Area",
-        "example.com/acme/conformance::methods/calls.go::FromInterfaceAsShape"
+        "example.com/acme/conformance::internal/shapes/shapes.go::ID",
+        "example.com/acme/conformance::internal/shapes/shapes.go::Label"
       ]
     },
     {
@@ -12291,111 +13722,164 @@
     {
       "name": "messages#2",
       "members": [
-        "example.com/acme/conformance::messages/segmentio.go::EmitRefund",
-        "example.com/acme/conformance::messages/segmentio.go::emit"
+        "example.com/acme/conformance::messages/sarama.go::SaramaGroup",
+        "example.com/acme/conformance::messages/sarama.go::orderHandler",
+        "example.com/acme/conformance::messages/sarama.go::orderHandler.Cleanup",
+        "example.com/acme/conformance::messages/sarama.go::orderHandler.ConsumeClaim",
+        "example.com/acme/conformance::messages/sarama.go::orderHandler.Setup"
       ]
     },
     {
       "name": "messages#3",
       "members": [
-        "example.com/acme/conformance::messages/segmentio.go::NewWriter",
-        "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike"
+        "example.com/acme/conformance::messages/segmentio.go::EmitRefund",
+        "example.com/acme/conformance::messages/segmentio.go::emit"
       ]
     },
     {
       "name": "messages#4",
+      "members": [
+        "example.com/acme/conformance::messages/segmentio.go::NewWriter",
+        "example.com/acme/conformance::messages/segmentio.go::ProduceLookalike",
+        "example.com/acme/conformance::messages/segmentio.go::WriterConfig"
+      ]
+    },
+    {
+      "name": "messages#5",
       "members": [
         "example.com/acme/conformance::messages/segmentio.go::ProduceMade",
         "example.com/acme/conformance::messages/segmentio.go::newWriter"
       ]
     },
     {
-      "name": "messages#5",
+      "name": "messages#6",
       "members": [
+        "example.com/acme/conformance::messages/segmentio.go::Publisher",
+        "example.com/acme/conformance::messages/segmentio.go::Publisher.Send"
+      ]
+    },
+    {
+      "name": "messages#7",
+      "members": [
+        "example.com/acme/conformance::messages/shadowed.go::Outbox",
         "example.com/acme/conformance::messages/shadowed.go::Outbox.Publish",
         "example.com/acme/conformance::messages/shadowed.go::Outbox.WriteMessages",
         "example.com/acme/conformance::messages/shadowed.go::Outbox.XAdd",
         "example.com/acme/conformance::messages/shadowed.go::Shadowed",
-        "example.com/acme/conformance::messages/shadowed.go::ShadowedImport"
+        "example.com/acme/conformance::messages/shadowed.go::ShadowedBlock",
+        "example.com/acme/conformance::messages/shadowed.go::ShadowedImport",
+        "example.com/acme/conformance::messages/shadowed.go::ShadowedRange"
       ]
     },
     {
-      "name": "messages#6",
+      "name": "messages#8",
       "members": [
+        "example.com/acme/conformance::messages/shadowed.go::Service",
         "example.com/acme/conformance::messages/shadowed.go::Service.Run",
+        "example.com/acme/conformance::messages/shadowed.go::Sink",
         "example.com/acme/conformance::messages/shadowed.go::Sink.WriteMessages"
+      ]
+    },
+    {
+      "name": "messages#9",
+      "members": [
+        "example.com/acme/conformance::messages/subjects.go::NatsSubscribe",
+        "example.com/acme/conformance::messages/subjects.go::auditor",
+        "example.com/acme/conformance::messages/subjects.go::auditor.onAudit"
       ]
     },
     {
       "name": "methods",
       "members": [
+        "example.com/acme/conformance::internal/shapes/shapes.go::Circle",
         "example.com/acme/conformance::internal/shapes/shapes.go::Circle.Area",
-        "example.com/acme/conformance::methods/calls.go::Capture",
-        "example.com/acme/conformance::methods/calls.go::FromClosure",
+        "example.com/acme/conformance::internal/shapes/shapes.go::Circle.Perimeter",
         "example.com/acme/conformance::methods/calls.go::FromInterface",
+        "example.com/acme/conformance::methods/calls.go::FromMethodResult",
         "example.com/acme/conformance::methods/calls.go::FromQualifiedType",
-        "example.com/acme/conformance::methods/calls.go::FromSecondResult",
-        "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure",
-        "example.com/acme/conformance::methods/calls.go::run",
+        "example.com/acme/conformance::methods/calls.go::TypeParam",
+        "example.com/acme/conformance::methods/types.go::Holder",
+        "example.com/acme/conformance::methods/types.go::Holder.Counter",
         "example.com/acme/conformance::methods/types.go::Holder.Run",
-        "example.com/acme/conformance::methods/types.go::Log.Add",
-        "example.com/acme/conformance::methods/types.go::Pair",
+        "example.com/acme/conformance::methods/types.go::Sink",
         "example.com/acme/conformance::methods/types.go::Sink.Flush"
       ]
     },
     {
       "name": "methods#2",
       "members": [
+        "example.com/acme/conformance::methods/calls.go::AfterBlock",
+        "example.com/acme/conformance::methods/calls.go::Capture",
         "example.com/acme/conformance::methods/calls.go::ForInitShadow",
+        "example.com/acme/conformance::methods/calls.go::FromClosure",
+        "example.com/acme/conformance::methods/calls.go::FromLiteral",
+        "example.com/acme/conformance::methods/calls.go::FromPackageVar",
+        "example.com/acme/conformance::methods/calls.go::FromParam",
+        "example.com/acme/conformance::methods/calls.go::FromResult",
+        "example.com/acme/conformance::methods/calls.go::FromSecondResult",
+        "example.com/acme/conformance::methods/calls.go::FromSibling",
+        "example.com/acme/conformance::methods/calls.go::FromValueParam",
+        "example.com/acme/conformance::methods/calls.go::FromVar",
+        "example.com/acme/conformance::methods/calls.go::FromVarLiteral",
         "example.com/acme/conformance::methods/calls.go::IfInitShadow",
+        "example.com/acme/conformance::methods/calls.go::LocalType",
+        "example.com/acme/conformance::methods/calls.go::NotWritten",
+        "example.com/acme/conformance::methods/calls.go::NotWrittenMany",
+        "example.com/acme/conformance::methods/calls.go::RangeShadow",
+        "example.com/acme/conformance::methods/calls.go::Rebound",
+        "example.com/acme/conformance::methods/calls.go::ReboundByParam",
         "example.com/acme/conformance::methods/calls.go::SwitchInitShadow",
-        "example.com/acme/conformance::methods/calls.go::opaque"
+        "example.com/acme/conformance::methods/calls.go::TypeSwitchShadow",
+        "example.com/acme/conformance::methods/calls.go::UseBefore",
+        "example.com/acme/conformance::methods/calls.go::UseBeforeInClosure",
+        "example.com/acme/conformance::methods/calls.go::opaque",
+        "example.com/acme/conformance::methods/calls.go::run",
+        "example.com/acme/conformance::methods/reset.go::Counter.Reset",
+        "example.com/acme/conformance::methods/types.go::Counter",
+        "example.com/acme/conformance::methods/types.go::Counter.Bump",
+        "example.com/acme/conformance::methods/types.go::Counter.Twice",
+        "example.com/acme/conformance::methods/types.go::Gauge",
+        "example.com/acme/conformance::methods/types.go::Gauge.Add",
+        "example.com/acme/conformance::methods/types.go::Log",
+        "example.com/acme/conformance::methods/types.go::Log.Add",
+        "example.com/acme/conformance::methods/types.go::NewCounter",
+        "example.com/acme/conformance::methods/types.go::Open",
+        "example.com/acme/conformance::methods/types.go::Pair"
       ]
     },
     {
       "name": "methods#3",
       "members": [
-        "example.com/acme/conformance::methods/calls.go::FromLiteral",
-        "example.com/acme/conformance::methods/calls.go::FromMethodResult",
-        "example.com/acme/conformance::methods/calls.go::FromPackageVar",
-        "example.com/acme/conformance::methods/calls.go::FromParam",
-        "example.com/acme/conformance::methods/calls.go::FromResult",
-        "example.com/acme/conformance::methods/calls.go::FromValueParam",
-        "example.com/acme/conformance::methods/calls.go::FromVar",
-        "example.com/acme/conformance::methods/calls.go::FromVarLiteral",
-        "example.com/acme/conformance::methods/calls.go::LocalType",
-        "example.com/acme/conformance::methods/calls.go::NotWritten",
-        "example.com/acme/conformance::methods/calls.go::Rebound",
-        "example.com/acme/conformance::methods/calls.go::ReboundByParam",
-        "example.com/acme/conformance::methods/types.go::Counter.Bump",
-        "example.com/acme/conformance::methods/types.go::Counter.Twice",
-        "example.com/acme/conformance::methods/types.go::Holder.Counter",
-        "example.com/acme/conformance::methods/types.go::NewCounter",
-        "example.com/acme/conformance::methods/types.go::Open"
+        "example.com/acme/conformance::methods/types.go::Box",
+        "example.com/acme/conformance::methods/types.go::Box.M",
+        "example.com/acme/conformance::methods/types.go::T",
+        "example.com/acme/conformance::methods/types.go::T.Ping"
       ]
     },
     {
       "name": "methods#4",
       "members": [
-        "example.com/acme/conformance::methods/calls.go::FromSibling",
-        "example.com/acme/conformance::methods/reset.go::Counter.Reset"
+        "example.com/acme/conformance::methods/types.go::Disk",
+        "example.com/acme/conformance::methods/types.go::Disk.Flush"
       ]
     },
     {
       "name": "methods#5",
       "members": [
-        "example.com/acme/conformance::methods/types.go::Box.M",
-        "example.com/acme/conformance::methods/types.go::T.Ping"
+        "example.com/acme/conformance::methods/types.go::Mem",
+        "example.com/acme/conformance::methods/types.go::Mem.Flush"
       ]
     },
     {
       "name": "scopes",
       "members": [
         "example.com/acme/conformance::scopes/other.go::Other",
+        "example.com/acme/conformance::scopes/scopes.go::Box",
         "example.com/acme/conformance::scopes/scopes.go::Box.Get",
         "example.com/acme/conformance::scopes/scopes.go::Capture",
         "example.com/acme/conformance::scopes/scopes.go::ForInit",
         "example.com/acme/conformance::scopes/scopes.go::Generic",
+        "example.com/acme/conformance::scopes/scopes.go::H",
         "example.com/acme/conformance::scopes/scopes.go::H.Serve",
         "example.com/acme/conformance::scopes/scopes.go::IfInit",
         "example.com/acme/conformance::scopes/scopes.go::Import",
@@ -12418,16 +13902,40 @@
     {
       "name": "store",
       "members": [
+        "example.com/acme/conformance::forks/billing/invoice/invoice.go::Total",
+        "example.com/acme/conformance::forks/billing/invoice/invoice.go::round",
+        "example.com/acme/conformance::internal/shapes/shapes.go::Each",
+        "example.com/acme/conformance::internal/shapes/shapes.go::NewCircle",
+        "example.com/acme/conformance::internal/shapes/shapes.go::Shape",
+        "example.com/acme/conformance::internal/shapes/shapes.go::Shape.Area",
+        "example.com/acme/conformance::internal/shapes/shapes.go::clamp",
+        "example.com/acme/conformance::internal/units/units.go::Meters",
+        "example.com/acme/conformance::main.go::main",
+        "example.com/acme/conformance::main.go::run",
+        "example.com/acme/conformance::methods/calls.go::FromInterfaceAsShape",
+        "example.com/acme/conformance::report.go::report",
         "example.com/acme/conformance::scopes/scopes.go::Plain",
         "example.com/acme/conformance::store/client_test.go::TestClient",
         "example.com/acme/conformance::store/client_test.go::helper",
         "example.com/acme/conformance::store/codec_pure.go::encode",
         "example.com/acme/conformance::store/disk_linux.go::onLinux",
+        "example.com/acme/conformance::store/helpers.go::Exported",
         "example.com/acme/conformance::store/helpers.go::helper",
         "example.com/acme/conformance::store/store.go::New",
+        "example.com/acme/conformance::store/store.go::Store",
+        "example.com/acme/conformance::store/store.go::Store.Get",
+        "example.com/acme/conformance::store/store.go::init",
         "example.com/acme/conformance::store/store.go::init#2",
+        "example.com/acme/conformance::store/store.go::open",
         "example.com/acme/conformance::store/store_test.go::TestNew",
         "example.com/acme/conformance::store/sys_unix.go::sysOpen"
+      ]
+    },
+    {
+      "name": "tools",
+      "members": [
+        "example.com/acme/conformance::tools/runner.go::Runner",
+        "example.com/acme/conformance::tools/runner.go::Runner.main"
       ]
     },
     {
@@ -12459,6 +13967,13 @@
       "members": [
         "example.com/acme/conformance::web/stdlib.go::Mux",
         "example.com/acme/conformance::web/stdlib.go::Register"
+      ]
+    },
+    {
+      "name": "web#13",
+      "members": [
+        "example.com/acme/conformance::web/stdlib.go::Server",
+        "example.com/acme/conformance::web/stdlib.go::Server.Routes"
       ]
     },
     {

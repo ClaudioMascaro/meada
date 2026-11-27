@@ -212,6 +212,9 @@ def baseline(args):
                   'meada-pre-image': PRE_IMAGE, 'meada-pre-extensions': PRE_EXTENSIONS}
     for label, revision in historical.items():
         worktree = run / ('source-' + label)
+        # A base no branch holds any more (e6d27d0) is fetched by its SHA, as build.sh does.
+        if subprocess.run(['git', '-C', str(ROOT), 'cat-file', '-e', revision + '^{commit}']).returncode:
+            subprocess.run(['git', '-C', str(ROOT), 'fetch', '--no-tags', 'origin', revision], check=True)
         subprocess.run(['git', '-C', str(ROOT), 'worktree', 'add', '--detach', str(worktree), revision], check=True)
         try:
             build(worktree, run / 'bin' / label, run / (label + '-build'))
@@ -382,6 +385,7 @@ def ui_check(args):
         'config-uses': [py, str(HERE / 'config_uses.py'), '--head-bin', str(binary),
             '--base-bin', str(packet / 'bin/meada-pre-config'), '--http', '--ui-dir', str(ui), '--run', str(run / 'config-uses')],
         'images': [py, str(HERE / 'images.py'), '--head-bin', str(binary), '--base-bin', str(packet / 'bin/meada-pre-image'),
+            '--pr-base-bin', str(packet / 'bin/meada-base'),
             '--http', '--public', '--ui-bin', str(binary), '--ui-dir', str(ui), '--run', str(run / 'images')],
     }
     receipt = {'source_commit': manifest['source_commit'], 'source_tree': manifest['source_tree'],
@@ -645,11 +649,11 @@ def report(args):
 
 def validate_plan():
     cases = json.loads(PLAN.read_text())
-    assert len(cases) == 13 and len({c['id'] for c in cases}) == 13
+    assert len(cases) == 14 and len({c['id'] for c in cases}) == 14
     for case in cases:
         assert (ROOT / case['file']).read_text().count(case['before']) == 1, case['id']
         assert case['before'] != case['after'] and case['check'] in ALL
-    print('13 unique, single-anchor source mutations validated; no mutation planted.')
+    print('14 unique, single-anchor source mutations validated; no mutation planted.')
 
 
 def main():

@@ -1206,6 +1206,18 @@
       }
     },
     {
+      "id": "local/aws-sdk-origins::origins.go::LocalFactory.makeClient::(type)LocalFactory#0",
+      "caller": "local/aws-sdk-origins::origins.go::LocalFactory.makeClient",
+      "target": "local/aws-sdk-origins::origins.go::LocalFactory",
+      "level": "exact",
+      "span": {
+        "path": "origins.go",
+        "start": 536,
+        "end": 548
+      },
+      "kind": "type"
+    },
+    {
       "id": "local/aws-sdk-origins::origins.go::LocalFactory.makeClient::sns.NewFromConfig#0",
       "caller": "local/aws-sdk-origins::origins.go::LocalFactory.makeClient",
       "target": null,
@@ -1462,6 +1474,7 @@
     {
       "name": ".#7",
       "members": [
+        "local/aws-sdk-origins::origins.go::LocalFactory",
         "local/aws-sdk-origins::origins.go::LocalFactory.makeClient",
         "local/aws-sdk-origins::origins.go::guessed"
       ]

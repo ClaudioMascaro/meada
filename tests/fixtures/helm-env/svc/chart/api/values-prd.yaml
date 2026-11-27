@@ -1,0 +1,3 @@
+lib-chart:
+  envs:
+    ORDERS_TOPIC: orders.created

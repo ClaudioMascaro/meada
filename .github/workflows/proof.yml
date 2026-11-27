@@ -23,7 +23,7 @@ on:
         description: 'UI/scope run bound to the exact baseline manifest (defaults to baseline_run)'
         type: string
       mutation:
-        description: 'Auditor only: one A7-01..A7-08 or A8-01..A8-05 ID'
+        description: 'Auditor only: one A7-01..A7-08 or A8-01..A8-06 ID'
         type: string
       baseline_attestation:
         description: 'Fresh checker JSON: verdict, checker, receipt, baseline_manifest_sha256'

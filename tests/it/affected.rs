@@ -9,7 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use common::fixture_repo;
+use common::{affected, commit_all, edited, fixture_repo, in_repo, of_files};
 use meada::engine::{Changes, Engine};
 use serde_json::{Value, json};
 
@@ -19,18 +19,6 @@ fn affected_repo(case: &str) -> PathBuf {
         "trace-affected",
         Some("https://example.com/scope/mono.git"),
     )
-}
-
-/// The affected answer of `changes` in `repo`, as JSON.
-fn affected(repo: &Path, changes: Changes) -> Value {
-    let answer = Engine::open(repo).unwrap().affected(changes).unwrap();
-    serde_json::to_value(answer).unwrap()
-}
-
-/// The answer of whole files `paths`.
-fn of_files(repo: &Path, paths: &[&str]) -> Value {
-    let files: Vec<String> = paths.iter().map(|p| p.to_string()).collect();
-    affected(repo, Changes::Files(&files))
 }
 
 /// The `path` of each entry of the list `key`.
@@ -45,36 +33,11 @@ fn file<'a>(answer: &'a Value, path: &str) -> Option<&'a Value> {
     in_repo(answer, "example.com/scope/mono", path)
 }
 
-/// The `files` entry of `path` in the repository `repo`.
-fn in_repo<'a>(answer: &'a Value, repo: &str, path: &str) -> Option<&'a Value> {
-    (answer["files"].as_array().into_iter().flatten())
-        .find(|f| f["repo"] == repo && f["path"] == path)
-}
-
 /// The ids of the `iac` list.
 fn iac(answer: &Value) -> Vec<String> {
     (answer["iac"].as_array().into_iter().flatten())
         .map(|e| e["id"].as_str().unwrap().to_string())
         .collect()
-}
-
-/// The answer of a commit that replaces `old` with `new` in `path`, as a range.
-fn edited(repo: &Path, path: &str, old: &str, new: &str) -> Value {
-    let file = repo.join(path);
-    let text = fs::read_to_string(&file).unwrap();
-    assert!(text.contains(old), "{path}: {old}");
-    fs::write(&file, text.replace(old, new)).unwrap();
-    commit_all(repo, "edit");
-    let range = Changes::Range {
-        base: "HEAD~1",
-        head: "HEAD",
-    };
-    affected(repo, range)
-}
-
-fn commit_all(repo: &Path, message: &str) {
-    common::git(repo, &["add", "-A"]);
-    common::git(repo, &["commit", "-q", "-m", message]);
 }
 
 const OPENED: [&str; 6] = [

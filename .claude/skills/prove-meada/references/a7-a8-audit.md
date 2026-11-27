@@ -4,7 +4,8 @@
 remain #642/#676, the child flow issues, #683/#684, and base ADRs 0025/0026. The executable
 plan is [a7-a8-mutations.json](../scripts/a7-a8-mutations.json): eight plausible A7 bugs across
 values, IaC nodes, provisioners, workload environments, Service DNS, alert routing, AWS direct
-code and GCP subscription identities; five separate rounds cover all five original A8 controls.
+code and GCP subscription identities; five separate rounds cover all five original A8 controls,
+and a sixth (A8-06) drops g9's Go receiver type uses, which #973's rows in the g9 key catch.
 The two inline config controls exercise different mapping layers. Additional A8 controls
 remain regressions. SDK/route flows added later retain their own receipts and Scope rows;
 this bounded mix does not claim to mutate every child flow.
@@ -54,7 +55,7 @@ tools and UI binary. `ui-check` drives the full `aws-sdk.py`, `config_uses.py` a
 `images.py --public` flows with their required bases and UI flags, beside the existing #675 graph check. `a7-a8-ui` retains its immutable
 `bin/meada-ui`, `frontend/` bytes, raw captures and a receipt bound to the actual source/tree, complete verifier
 digest, baseline manifest, UI binary and frontend bytes. This is clean final-source evidence,
-not coverage of a native mutant. None of the 13 required mutations needs a UI candidate.
+not coverage of a native mutant. None of the 14 required mutations needs a UI candidate.
 
 `scope-check` uses the existing corpus loader's seven repositories (eight language packs),
 then compares UI-feature stdio to the native captures before one-entry console API checks
@@ -127,7 +128,7 @@ When the user requires inline execution or fresh agents are unavailable, use the
 fallback in `audit-prove-it`: record `checker_mode: "inline"` in the actual baseline, round
 and final judgments, and `fresh_blind_checker: false` in every round. The same agent still
 judges the complete source/spec, native, UI and scope evidence. Run `report --not-blind`
-only for that mode. It requires all 13 named script detections, BROKEN symptom judgments,
+only for that mode. It requires all 14 named script detections, BROKEN symptom judgments,
 exact restoration and the final clean bound judgment, and reports `COMPLETE_NOT_BLIND`.
 Blind rounds remain incomplete and the fresh/blind counts remain zero. Omitting this flag
 keeps the independent completion requirements; an inline judgment never supplies independence.
@@ -171,7 +172,7 @@ the required source/spec and receipt judgments are retained.
    afresh. `report --baseline DIR --rounds SCORE... --final checks.json --final-judgment FILE
    --ui-receipt UI/receipt.json --scope-receipt SCOPE/receipt.json --output report.json`
    retains chronological attempts, pending rounds, both catch counts,
-   blind counts and final false alarms. Its COMPLETE state requires all 13 current rounds,
+   blind counts and final false alarms. Its COMPLETE state requires all 14 current rounds,
    fresh blind judgments and an actual final clean PROVED receipt for that manifest. It is
    still a bounded audit, not whole-app acceptance.
 

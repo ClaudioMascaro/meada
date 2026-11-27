@@ -197,7 +197,10 @@ mod tests {
                 "main.tf",
                 b"",
                 Path::new("."),
-                &ConfigFacts { nodes: &[&node] }
+                &ConfigFacts {
+                    nodes: &[&node],
+                    ..Default::default()
+                }
             )
             .is_null()
         );

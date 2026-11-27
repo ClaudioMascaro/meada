@@ -1,4 +1,9 @@
+import dataclasses
+import functools
 import os
+from dataclasses import dataclass
+from functools import lru_cache
+
 import requests
 
 
@@ -118,3 +123,138 @@ def Conditional(flag):
 
 def Intact():
     return intact("https://service/api/orders")
+
+
+# #949: a decorator call binds the name to what the factory returns, not to the body below.
+def use_host(host):
+    def decorate(original):
+        def replacement():
+            return host
+
+        return replacement
+
+    return decorate
+
+
+@use_host("https://other.example")
+def decorated_base():
+    return os.getenv("API_URL")
+
+
+def ViaDecoratedBase():
+    return requests.get(decorated_base() + "/api/orders")
+
+
+# #962: a class decorator may replace a method before the class is published.
+def install(cls):
+    def replacement(self):
+        return "https://other.example"
+
+    cls.changed_origin = replacement
+    return cls
+
+
+@install
+class Changed:
+    def changed_origin(self):
+        return os.getenv("API_URL")
+
+    def ViaChangedClass(self):
+        return requests.get(self.changed_origin() + "/api/orders")
+
+
+class Ordinary:
+    def ordinary_origin(self):
+        return os.getenv("API_URL")
+
+    def ViaOrdinaryClass(self):
+        return requests.get(self.ordinary_origin() + "/api/orders")
+
+
+def register(name):
+    def install_named(cls):
+        cls.registered_origin = lambda self: "https://" + name + ".example"
+        return cls
+
+    return install_named
+
+
+@register("other")
+class Registered:
+    def registered_origin(self):
+        return os.getenv("API_URL")
+
+    def ViaRegisteredClass(self):
+        return requests.get(self.registered_origin() + "/api/orders")
+
+
+# Decorators that keep the body a call runs.
+@dataclass
+class Settings:
+    def settings_origin(self):
+        return os.getenv("API_URL")
+
+    def ViaDataclass(self):
+        return requests.get(self.settings_origin() + "/api/orders")
+
+
+@functools.lru_cache(maxsize=None)
+def cached_base():
+    return os.getenv("API_URL")
+
+
+def ViaCachedBase():
+    return requests.get(cached_base() + "/api/orders")
+
+
+@lru_cache
+def bare_cached_base():
+    return os.getenv("API_URL")
+
+
+def ViaBareCachedBase():
+    return requests.get(bare_cached_base() + "/api/orders")
+
+
+@dataclasses.dataclass
+class ModuleSettings:
+    def module_settings_origin(self):
+        return os.getenv("API_URL")
+
+    def ViaModuleDataclass(self):
+        return requests.get(self.module_settings_origin() + "/api/orders")
+
+
+# #962 through inheritance: a decorated heir may replace what its base defines.
+def install_inherited(cls):
+    cls.inherited_origin = lambda self: "https://other.example"
+    return cls
+
+
+class OriginBase:
+    def inherited_origin(self):
+        return os.getenv("API_URL")
+
+
+@install_inherited
+class InheritingChild(OriginBase):
+    def ViaInheritedClass(self):
+        return requests.get(self.inherited_origin() + "/api/orders")
+
+
+def ViaChildInstance():
+    return requests.get(InheritingChild().inherited_origin() + "/api/orders")
+
+
+# A decorated ancestor does not rebind what a plain heir defines.
+@register("base")
+class DecoratedBase:
+    pass
+
+
+class PlainChild(DecoratedBase):
+    def child_origin(self):
+        return os.getenv("API_URL")
+
+    def ViaPlainChild(self):
+        return requests.get(self.child_origin() + "/api/orders")

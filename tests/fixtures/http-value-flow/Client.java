@@ -32,4 +32,15 @@ class Client {
     void QueryConditional(boolean flag) {
         rest.getForObject(System.getenv("API_URL") + "/api/orders" + (flag ? "?x=1" : ""), String.class);
     }
+    // #810: Client.kt spells a private `jvmBase` too; neither can be overridden.
+    private String jvmBase() { return System.getenv("API_URL"); }
+    void ViaPrivateTwin() { rest.getForObject(jvmBase() + "/api/orders", String.class); }
+    // A method a subclass overrides: the exact call may run the override.
+    String jvmOverridable() { return System.getenv("API_URL"); }
+    void ViaOverridable() { rest.getForObject(jvmOverridable() + "/api/orders", String.class); }
+}
+
+class SubClient extends Client {
+    @Override
+    String jvmOverridable() { return "https://other.example"; }
 }

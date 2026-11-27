@@ -178,6 +178,18 @@
       }
     },
     {
+      "id": "example.com/gopkg/web::main.go::localKit.Greet::(type)localKit#0",
+      "caller": "example.com/gopkg/web::main.go::localKit.Greet",
+      "target": "example.com/gopkg/web::main.go::localKit",
+      "level": "exact",
+      "span": {
+        "path": "main.go",
+        "start": 832,
+        "end": 840
+      },
+      "kind": "type"
+    },
+    {
       "id": "example.com/gopkg/web::main.go::main::fmt.Println#0",
       "caller": "example.com/gopkg/web::main.go::main",
       "target": null,
@@ -220,6 +232,18 @@
         "start": 371,
         "end": 386
       }
+    },
+    {
+      "id": "example.com/gopkg/web::main.go::shadowed::(type)localKit#0",
+      "caller": "example.com/gopkg/web::main.go::shadowed",
+      "target": "example.com/gopkg/web::main.go::localKit",
+      "level": "exact",
+      "span": {
+        "path": "main.go",
+        "start": 767,
+        "end": 775
+      },
+      "kind": "type"
     },
     {
       "id": "example.com/gopkg/web::main.go::shadowed::k.Greet#0",
@@ -372,6 +396,7 @@
     {
       "name": ".",
       "members": [
+        "example.com/gopkg/web::main.go::localKit",
         "example.com/gopkg/web::main.go::localKit.Greet",
         "example.com/gopkg/web::main.go::shadowed"
       ]

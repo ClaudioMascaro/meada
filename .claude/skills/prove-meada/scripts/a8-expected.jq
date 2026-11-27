@@ -1,6 +1,8 @@
 # #683/#684: start with the complete trusted base export, then apply only the specified
-# resolutions. The inline controls supply existing link/reason behavior. Never read
-# the head export here: unexpected fields, locations and process metadata must survive comparison.
+# resolutions, and #973's Go `type` rows in g9. The inline controls supply existing link/reason
+# behavior. Never read the head export here: unexpected fields, locations and process metadata
+# must survive comparison. Communities stay the base's; where the calls change they are checked
+# by `a8-communities.jq` instead (`compare_exports`).
 def function_name: split("::")[2];
 def consumers($doc; $fn): [$doc.consumers[] | select((.site | function_name) == $fn)];
 def links($doc; $fn): [$doc.links[] | select((.consumer | function_name) == $fn)];
@@ -51,6 +53,28 @@ def terminal_steps($doc; $consumer; $links):
       + (if $consumer.contract == null then {} else {contract: $consumer.contract} end)]
   end;
 
+# #973: "calls: a `type` row from each function, method, type or variable to each type it names",
+# exact, once per pair. g9's Go file (`gen_g9`) names repository types only in these definitions;
+# the row's span is the type's first mention in the definition (the spec names no position). Read
+# from the generated source, never from the head export.
+def g9_type_uses($repo):
+  [["OrdersInline", "func OrdersInline()", "Config"],
+   ["New", "func New(", "Client"],
+   ["FromTag", "func FromTag()", "Client"],
+   ["FromTag", "func FromTag()", "Config"],
+   ["FromGetenv", "func FromGetenv()", "Client"],
+   ["Client.send", "func (c *Client) send(", "Client"],
+   ["Client.OrdersDirect", "func (c *Client) OrdersDirect(", "Client"],
+   ["Client.Orders", "func (c *Client) Orders(", "Client"]][]
+  | . as [$caller, $header, $type]
+  | ($gosrc | indices($header)) as $at
+  | if ($at | length) != 1 then error("g9 source: expected one " + $header) else $at[0] end
+  | (. + ($gosrc[.:] | index($type))) as $start
+  | ($repo + "::gocli/client.go::") as $file
+  | {caller: ($file + $caller), id: ($file + $caller + "::(type)" + $type + "#0"), kind: "type",
+     level: "exact", span: {end: ($start + ($type | length)), path: "gocli/client.go", start: $start},
+     target: ($file + $type)};
+
 . as $base
 | ($cases | split("\n") | map(select(length > 0 and (startswith("#") | not)) | split("\t"))
     | map(select(.[0] == $workspace and .[4] == "landed"))) as $rows
@@ -72,6 +96,11 @@ def terminal_steps($doc; $consumer; $links):
         | .steps = ([.steps[] | select(.via != "link" and (has("mark") | not))]
             + terminal_steps($base; $consumer[0]; $links))
       end)
+# A base that already writes them (1.6.0 and later) keeps its calls, so its communities compare whole.
+| ([.calls[].id] | INDEX(.)) as $have
+| if $workspace == "g9"
+  then .calls = ((.calls + [g9_type_uses($base.repository) | select($have[.id] == null)]) | sort_by(.id))
+  else . end
 | .consumers |= sort_by(.site)
 | .links |= sort_by(.consumer, .provider, .contract)
 | del(.commit, .dirty)

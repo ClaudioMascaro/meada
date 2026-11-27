@@ -444,6 +444,7 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 facts.defs.push(Def {
                     result,
                     return_values: function_returns(node, src),
+                    private: kind == Kind::Method && own_access(node, src) == Access::Private,
                     ..definition(&inner, kind, node.byte_range(), params)
                 });
                 let family = qualify(&scope, &base);

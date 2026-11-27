@@ -1,0 +1,4 @@
+lib-chart:
+  envs:
+    ORDERS_TOPIC: orders.created
+    EVENTS_TOPIC: events.published

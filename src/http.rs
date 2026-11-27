@@ -26,6 +26,7 @@ mod rust;
 mod swift;
 mod ts;
 pub(crate) use infrastructure::Prepared;
+pub(crate) use ts::Config as AppConfig;
 #[cfg(test)]
 pub(crate) use ts::app_config_probe;
 pub(crate) use ts::{INCLUDE_DEPTH, INCLUDES, IncludeReason, config_inputs};
@@ -47,34 +48,29 @@ const METHODS: &[&str] = &["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPT
 /// What one `fetch` call gives: its contract (`None` when the URL or the method cannot be read),
 /// how it names the provider's repository, and, for an unresolved one, what could still be
 /// read: its method (`None` when unknown) and the literal fragments of its path.
+#[derive(Default)]
 struct Read {
     contract: Option<String>,
     via: Option<String>,
     method: Option<String>,
     fragments: Vec<String>,
     lead: Option<Lead>,
+    bare_env: bool,
 }
 
 /// What `fetch(url, init)` reads, or `None` when the URL or the method depends on a parameter.
 fn fetch(args: &[Value]) -> Option<Read> {
-    let (contract, via, lead) = locate(args)?;
-    let (mut method, mut texts) = (None, Vec::new());
-    if contract.is_none() {
-        method = self::method(args.get(1))
+    let mut read = locate(args)?;
+    if read.contract.is_none() {
+        read.method = self::method(args.get(1))
             .ok()
             .flatten()
             .map(|m| m.to_uppercase());
         if let Some(Value::Str(parts)) = args.first() {
-            texts = fragments(parts);
+            read.fragments = fragments(parts);
         }
     }
-    Some(Read {
-        contract,
-        via,
-        method,
-        fragments: texts,
-        lead,
-    })
+    Some(read)
 }
 
 /// `fetch`, with a URL whose base is an environment read with a default (`Part::EnvOr`, Spring's
@@ -334,14 +330,23 @@ fn tail_fits(contract: &str, method: Option<&str>, known: &str) -> bool {
 /// The contract and `via` of `fetch(url, init)`, or `None` when the URL or the method
 /// depends on a parameter; the contract is `None` when the URL or the method cannot be read,
 /// and when the URL starts with a part Meada could not read, which its `Lead` names (#801).
-fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead>)> {
+fn locate(args: &[Value]) -> Option<Read> {
     let method = method(args.get(1)).ok()?;
     let parts = match args.first() {
         Some(Value::Str(parts)) if parts.iter().any(|p| p.parameter().is_some()) => return None,
         Some(Value::Str(parts)) => parts,
         Some(Value::Ref(_)) => return None,
-        _ => return Some((None, None, None)),
+        _ => return Some(Read::default()),
     };
+    // A strip around a still-composite receiver can change its last path segment.
+    if parts.iter().any(|p| {
+        matches!(
+            p,
+            Part::StripStart | Part::StripEnd(_) | Part::RecordValues { .. }
+        )
+    }) {
+        return Some(Read::default());
+    }
     // Only a terminal optional query is irrelevant. If path text follows it, that text
     // can be either part of the path or part of the query.
     let end = parts.iter().rposition(|p| {
@@ -349,11 +354,21 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead
     });
     let path_parts = end.map_or(&[][..], |end| &parts[..=end]);
     if path_parts.is_empty() || path_parts.iter().any(|p| matches!(p, Part::QuerySuffix)) {
-        return Some((None, None, None));
+        return Some(Read::default());
     }
     let (via, path, lead) = match path_parts.split_first() {
         Some((Part::Env(var) | Part::EnvOr(var, _), rest)) => {
-            (Some(format!("env:{var}")), Some(render(rest)), None)
+            let via = Some(format!("env:{var}"));
+            let path = render(rest);
+            // A variable can hold the whole endpoint. Its workload value supplies the path.
+            if path.is_empty() || path.starts_with(['?', '#']) {
+                return Some(Read {
+                    via,
+                    bare_env: true,
+                    ..Read::default()
+                });
+            }
+            (via, Some(path), None)
         }
         _ => {
             let url = render(path_parts);
@@ -390,9 +405,13 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead
     };
     // A path that does not start at the root, such as `${base}${path}`, is not read.
     let path = path.filter(|p| p.is_empty() || p.starts_with(['/', '?', '#']));
-    Some(match (method, path) {
-        (Some(method), Some(path)) => (Some(contract(&method, &path)), via, None),
-        _ => (None, via, lead),
+    Some(Read {
+        contract: method
+            .zip(path)
+            .map(|(method, path)| contract(&method, &path)),
+        via,
+        lead,
+        ..Read::default()
     })
 }
 
@@ -499,6 +518,8 @@ fn provider(site: Site, contract: String) -> Found {
         fragments: Vec::new(),
         shape: None,
         lead: None,
+        cap: None,
+        client: None,
     }
 }
 
@@ -516,7 +537,12 @@ fn consumer(path: &str, index: usize, read: Read, shape: Option<Shape>) -> Found
 /// client, which has no call of its own).
 fn consumer_at(site: Site, read: Read, shape: Option<Shape>) -> Found {
     Found {
-        identity: None,
+        identity: read
+            .bare_env
+            .then(|| crate::contract::ReceiverIdentity::HttpBase {
+                strips: Vec::new(),
+                suffix: String::new(),
+            }),
         role: Role::Consumer,
         site,
         contract: read.contract,
@@ -525,6 +551,8 @@ fn consumer_at(site: Site, read: Read, shape: Option<Shape>) -> Found {
         fragments: read.fragments,
         lead: read.lead,
         shape,
+        cap: None,
+        client: None,
     }
 }
 
@@ -539,6 +567,11 @@ fn render(parts: &[Part]) -> String {
             | Part::Read { .. }
             | Part::Invoke { .. }
             | Part::EnvKey { .. }
+            | Part::RecordStart { .. }
+            | Part::RecordEnd
+            | Part::RecordValues { .. }
+            | Part::StripStart
+            | Part::StripEnd(_)
             | Part::QuerySuffix
             | Part::Ref(_)
             | Part::Limit(_)
@@ -911,7 +944,7 @@ impl ContractKind for Http {
         consumer: &Consumer,
         from: &Repository,
         providers: &[(&Repository, &Provider)],
-        _exports: &[IndexExport],
+        exports: &[IndexExport],
     ) -> Vec<Link> {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
@@ -923,10 +956,19 @@ impl ContractKind for Http {
         };
         let through = endpoint.map(|e| format!(" through the proxy endpoint {e}"));
         let through = through.as_deref().unwrap_or_default();
+        let var = via.and_then(|v| v.strip_prefix("env:"));
+        // A Base URL declaration settles the module: the routes served under its directory of
+        // this repository, chosen before a code path match elsewhere can drop a gateway match.
+        let dir = var.and_then(|var| from.config.declared_dir(var));
         // A route serves a consumer by its code path, or by its gateway path with the reason
         // for the rewrite. Within one repository a code path match wins over gateway path
         // matches; across repositories both are candidates.
         let mut serving: Vec<_> = (providers.iter())
+            .filter(|(m, p)| {
+                dir.is_none_or(|dir| {
+                    m.identity == from.identity && under(&p.site, &m.identity, dir)
+                })
+            })
             .filter_map(|&(m, p)| {
                 if fits(&p.contract, contract) {
                     return Some((m, p, None));
@@ -935,6 +977,25 @@ impl ContractKind for Http {
                 Some((m, p, Some(reason.to_string())))
             })
             .collect();
+        // A relative URL reaches its own origin: when a route of the consumer's own package
+        // fits, the others (other packages, other repositories) drop.
+        if via.is_none() {
+            let manifests = (exports.iter())
+                .find(|e| e.repository == from.identity)
+                .map_or(&[][..], |e| &e.manifests[..]);
+            let package = |site: &str, identity: &str| {
+                let owner = crate::package::owner_of(manifests, path_of(site, identity)?)?;
+                Some(owner.path.as_str())
+            };
+            if let Some(own) = package(&consumer.site, &from.identity) {
+                let mine = |(m, p, _): &(&Repository, &Provider, Option<String>)| {
+                    m.identity == from.identity && package(&p.site, &m.identity) == Some(own)
+                };
+                if serving.iter().any(mine) {
+                    serving.retain(mine);
+                }
+            }
+        }
         let direct: Vec<&str> = (serving.iter())
             .filter(|(.., gateway)| gateway.is_none())
             .map(|&(m, ..)| m.identity.as_str())
@@ -942,7 +1003,6 @@ impl ContractKind for Http {
         serving
             .retain(|(m, _, gateway)| gateway.is_none() || !direct.contains(&m.identity.as_str()));
         let serving = serving.into_iter();
-        let var = via.and_then(|v| v.strip_prefix("env:"));
         let peers: Vec<&str> = var
             .map(|var| from.config.peers_reading(var).collect())
             .unwrap_or_default();
@@ -956,6 +1016,14 @@ impl ContractKind for Http {
                 fits,
                 Level::Exact,
                 format!("host {host}{through} is served by"),
+            )
+        } else if let (Some(var), Some(dir)) = (var, dir) {
+            (
+                serving.collect(),
+                Level::Declared,
+                format!(
+                    "base URL from {var}{through}, declared for {dir}/ in meada.toml; served by"
+                ),
             )
         } else if let (Some(var), false) = (var, peers.is_empty()) {
             let fits = serving
@@ -1015,7 +1083,7 @@ impl ContractKind for Http {
                     consumer.site.clone(),
                     provider.site.clone(),
                     contract.clone(),
-                    level,
+                    consumer.cap.map_or(level, |cap| level.max(cap)),
                     reason,
                     None,
                     None,
@@ -1154,16 +1222,40 @@ impl ContractKind for Http {
     }
 }
 
+/// Whether the site `site` of the repository `identity` (`<identity>::<path>::...`) lies under
+/// the directory `dir` of that repository: `svc` holds `svc/a.go`, never `svc-ui/a.go`.
+fn under(site: &str, identity: &str, dir: &str) -> bool {
+    (path_of(site, identity).and_then(|p| p.strip_prefix(dir)))
+        .is_some_and(|rest| rest.starts_with('/'))
+}
+
+/// The repository path of the site `site` of the repository `identity`
+/// (`<identity>::<path>::...`).
+fn path_of<'s>(site: &'s str, identity: &str) -> Option<&'s str> {
+    let rest = site.strip_prefix(identity)?.strip_prefix("::")?;
+    Some(rest.split_once("::").map_or(rest, |(path, _)| path))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         CallAt, Http, Mounts, PREFIX_DEPTH, fragments, normalize_path, prefixes, route_fits,
-        tail_fits,
+        tail_fits, under,
     };
     use crate::contract::{ContractKind, Role, Search, View};
     use crate::entry::EntryKind;
     use crate::index::{Consumer, Gateway, Provider};
     use crate::lang::{Limit, Part, Value};
+
+    /// A route whose handler names no definition has the whole file for its site
+    /// (`<identity>::<path>`, `Site::File`): a declared directory holds it as it holds a symbol's.
+    #[test]
+    fn a_whole_file_site_lies_under_its_directory() {
+        assert!(under("acme::svc-b/main.go", "acme", "svc-b"));
+        assert!(under("acme::svc-b/routes.go::Routes.run", "acme", "svc-b"));
+        assert!(!under("acme::svc-bx/main.go", "acme", "svc-b"));
+        assert!(!under("other::svc-b/main.go", "acme", "svc-b"));
+    }
 
     /// A base Meada could not read (a hole, a read no kind decided, a limit of value flow), with
     /// a path appended, may hold a path of its own: the consumer is unresolved, and its lead
@@ -1314,6 +1406,8 @@ mod tests {
             hops: Vec::new(),
             root: None,
             lead: None,
+            cap: None,
+            client: None,
         };
         let direct = provider("http::GET::/shop/users");
         let gateway = Provider {

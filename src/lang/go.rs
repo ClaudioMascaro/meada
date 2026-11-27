@@ -12,7 +12,7 @@ use tree_sitter::{Node, Parser};
 
 use super::{
     Binds, Call, Class, Const, Def, Export, Facts, FirstResult, Import, Imported, Kind,
-    LanguagePack, Layout, Modules, Param, Receiver, Value, children, named, text,
+    LanguagePack, Layout, Modules, Param, Receiver, Reference, Use, Value, children, named, text,
 };
 use crate::resolve::Code;
 use crate::{Result, parent, qualify};
@@ -49,6 +49,33 @@ const PATH_DEPTH: usize = 256;
 // ponytail: real code nests a few levels; 128 is the depth the other packs allow.
 const DEFINITION_DEPTH: usize = 128;
 
+/// The types the language declares in its universe block: a use of one is no reference, also
+/// where the package declares a type of the same name (`type error struct{}`).
+const PREDECLARED: [&str; 22] = [
+    "any",
+    "bool",
+    "byte",
+    "comparable",
+    "complex64",
+    "complex128",
+    "error",
+    "float32",
+    "float64",
+    "int",
+    "int8",
+    "int16",
+    "int32",
+    "int64",
+    "rune",
+    "string",
+    "uint",
+    "uint8",
+    "uint16",
+    "uint32",
+    "uint64",
+    "uintptr",
+];
+
 pub struct Go;
 
 impl LanguagePack for Go {
@@ -58,6 +85,10 @@ impl LanguagePack for Go {
 
     fn parse(&self, path: &str, src: &[u8]) -> Result<Facts> {
         parse(path, src)
+    }
+
+    fn drops_external_uses(&self) -> bool {
+        true
     }
 
     fn config_files(&self) -> &'static [&'static str] {
@@ -159,6 +190,8 @@ struct Walk<'s> {
     assigned: Vec<(String, String, Keep)>,
     /// The single value each `return` of a definition gives.
     returns: HashMap<String, Vec<Value>>,
+    /// The functions (by node id) whose body a `defer` already had read (`deferred_write`).
+    deferring: HashSet<usize>,
     /// The standard-library packages whose calls and constants the values fold.
     std: values::Std,
     /// The package-level `var`s, which hold their value only if nothing assigns them.
@@ -171,6 +204,11 @@ struct Walk<'s> {
     derefs: HashSet<String>,
     /// The second name of each `v, ok := os.LookupEnv(..)`, by the scope and the first name.
     lookups: HashMap<(String, String), String>,
+    /// The type parameters of the top-level declaration being read: a use of one is no
+    /// reference.
+    type_params: BTreeSet<String>,
+    /// The `(scope, name)` of each type reference recorded, so each is recorded once.
+    referenced: HashSet<(String, String)>,
 }
 
 /// A binding of a name: the class the source writes for it, and where it holds.
@@ -538,6 +576,62 @@ impl Walk<'_> {
         }
     }
 
+    /// Records the type `node` names (a `type_identifier` or a `qualified_type`), written in
+    /// `scope`, as a reference of kind `Type`, once per scope and name. A predeclared type, a
+    /// type parameter of the declaration being read and a type declaration's own name are none.
+    fn type_use(&mut self, scope: &str, node: Node) {
+        let src = self.src;
+        let name = match node.kind() {
+            "type_identifier" => {
+                let name = text(node, src);
+                let declared = node.parent().is_some_and(|p| {
+                    matches!(p.kind(), "type_spec" | "type_alias")
+                        && p.child_by_field_name("name") == Some(node)
+                });
+                if declared || PREDECLARED.contains(&name) || self.type_params.contains(name) {
+                    return;
+                }
+                name.to_string()
+            }
+            _ => match type_name(node, src) {
+                Some(name) => name,
+                None => return,
+            },
+        };
+        if self.referenced.insert((scope.to_string(), name.clone())) {
+            self.facts.references.push(Reference {
+                scope: scope.to_string(),
+                name,
+                kind: Use::Type,
+                range: node.byte_range(),
+                from: None,
+            });
+        }
+    }
+
+    /// Starts a top-level spec: its uses (scope "") are held by the spec's own definition, so
+    /// a name another spec of the file already used gives this one its row too.
+    fn new_top_spec(&mut self) {
+        self.referenced.retain(|(scope, _)| !scope.is_empty());
+    }
+
+    /// Records every type use under `node` (`type_use`), written in `scope`: a parameter list,
+    /// a result, a type declaration's type. An explicit stack, so a type nested however deep
+    /// costs its size.
+    fn type_uses(&mut self, scope: &str, node: Option<Node>) {
+        let mut stack: Vec<Node> = node.into_iter().collect();
+        while let Some(n) = stack.pop() {
+            match n.kind() {
+                "type_identifier" | "qualified_type" => self.type_use(scope, n),
+                _ => {
+                    let mut inner: Vec<Node> = named(n).collect();
+                    inner.reverse();
+                    stack.extend(inner);
+                }
+            }
+        }
+    }
+
     /// Records the calls and the bindings under `node`, which belong to `scope`. A function
     /// literal is a `Kind::Inline` definition (`@<offset>` under `scope`) that the index names
     /// or folds into the one around it: its parameters bind in it, and its calls are its own.
@@ -566,6 +660,9 @@ impl Walk<'_> {
                         let value = values::value(result, src, &self.std, scope, depth);
                         (self.returns.entry(scope.to_string()).or_default()).push(value);
                     }
+                }
+                "defer_statement" if self.deferred_write(node) => {
+                    (self.returns.entry(scope.to_string()).or_default()).push(Value::Unknown);
                 }
                 "short_var_declaration" => {
                     if let Some(left) = node.child_by_field_name("left") {
@@ -648,6 +745,11 @@ impl Walk<'_> {
                         self.bind(scope, alias);
                     }
                 }
+                // A type written in a body: a `var`'s, a literal's, an assertion's, `new(T)`.
+                "type_identifier" | "qualified_type" => {
+                    self.type_use(scope, node);
+                    continue;
+                }
                 "func_literal" if depth < DEFINITION_DEPTH => {
                     let name = self.inline(scope, node);
                     (inner_scope, inner_depth) = (name.into(), depth + 1);
@@ -663,6 +765,25 @@ impl Walk<'_> {
             inner.reverse();
             stack.extend((inner.into_iter()).map(|n| (n, Rc::clone(&inner_scope), inner_depth)));
         }
+    }
+
+    /// Whether the `defer_statement` `node` may write the one named result of the function around
+    /// it: it runs after `return` has set the result, so the value the function returns may be its
+    /// own (Go spec, "Defer statements"; #948). The deferred call itself may be a method of the
+    /// result (`defer u.fix()`); the rest is the body's (`body_writes_result`), read once per
+    /// function.
+    fn deferred_write(&mut self, node: Node) -> bool {
+        let src = self.src;
+        let Some((function, result)) = one_named_result(node) else {
+            return false;
+        };
+        let name = text(result, src);
+        if named(node).next().is_some_and(|call| {
+            call.kind() == "call_expression" && calls_method_of(call, name, src)
+        }) {
+            return true;
+        }
+        self.deferring.insert(function.id()) && body_writes_result(function, name, src)
     }
 
     /// Turns the names whose every binding writes one class into receivers, and drops the written
@@ -894,6 +1015,14 @@ impl Walk<'_> {
         }
     }
 
+    /// Records the type uses of the signature of the function `node`, written in `scope`: its
+    /// type parameters' constraints, its parameters and its results.
+    fn signature_types(&mut self, scope: &str, node: Node) {
+        for field in ["type_parameters", "parameters", "result"] {
+            self.type_uses(scope, node.child_by_field_name(field));
+        }
+    }
+
     /// The `Kind::Inline` definition of the function `node` (a literal, or a blank `func _`)
     /// written in `scope`, with its parameters, and the names its results bind: its name.
     fn inline(&mut self, scope: &str, node: Node) -> String {
@@ -1053,6 +1182,95 @@ fn result_class(node: Node, src: &[u8]) -> Option<Class> {
 fn result_list(node: Node) -> Option<Node> {
     node.child_by_field_name("result")
         .filter(|r| r.kind() == "parameter_list")
+}
+
+/// The function around `node` and its one named result, if it names exactly one: several
+/// results keep no return value to fold.
+fn one_named_result(node: Node) -> Option<(Node, Node)> {
+    let function = std::iter::successors(node.parent(), |n| n.parent()).find(|n| {
+        matches!(
+            n.kind(),
+            "function_declaration" | "method_declaration" | "func_literal"
+        )
+    })?;
+    let results: Vec<Node> = (declarations(result_list(function)).into_iter())
+        .flat_map(|(names, _)| names)
+        .collect();
+    match results[..] {
+        [result] => Some((function, result)),
+        _ => None,
+    }
+}
+
+/// Whether `call` (a `call_expression`) calls a method of `name` (`u.fix()`): a pointer
+/// receiver may write it.
+fn calls_method_of(call: Node, name: &str, src: &[u8]) -> bool {
+    (call.child_by_field_name("function"))
+        .filter(|f| f.kind() == "selector_expression")
+        .and_then(|f| f.child_by_field_name("operand"))
+        .is_some_and(|o| is_name(written_base(o), name, src))
+}
+
+/// The name a write to `node` writes: through a field, an element, a pointee or an address
+/// (`u.Host`, `m[k]`, `*p`, `&u.Host`) and parentheses.
+fn written_base(mut node: Node) -> Node {
+    for _ in 0..PATH_DEPTH {
+        let next = match node.kind() {
+            "selector_expression" | "index_expression" | "unary_expression" => {
+                node.child_by_field_name("operand")
+            }
+            "parenthesized_expression" => named(node).next(),
+            _ => None,
+        };
+        match next {
+            Some(inner) => node = inner,
+            None => break,
+        }
+    }
+    node
+}
+
+/// Whether `node` is the identifier `name`.
+fn is_name(node: Node, name: &str, src: &[u8]) -> bool {
+    node.kind() == "identifier" && text(node, src) == name
+}
+
+/// Whether the body of `function` lets a deferred call write `name`, its named result: a
+/// function literal in it assigns, increments, decrements or calls a method of it or of a field,
+/// element or pointee of it (`written_base`), or the body takes its address (`&base`,
+/// `&u.Host`). A name a literal declares again counts as the result, and so does a literal that
+/// is never deferred (the safe side).
+fn body_writes_result(function: Node, name: &str, src: &[u8]) -> bool {
+    let mut stack: Vec<(Node, bool)> = function
+        .child_by_field_name("body")
+        .map(|b| (b, false))
+        .into_iter()
+        .collect();
+    while let Some((n, in_literal)) = stack.pop() {
+        let targets: Vec<Node> = match n.kind() {
+            "assignment_statement" if in_literal => match n.child_by_field_name("left") {
+                Some(left) if left.kind() == "expression_list" => named(left).collect(),
+                left => left.into_iter().collect(),
+            },
+            "inc_statement" | "dec_statement" if in_literal => named(n).collect(),
+            "call_expression" if in_literal && calls_method_of(n, name, src) => return true,
+            "unary_expression" => (n.child_by_field_name("operator"))
+                .filter(|o| text(*o, src) == "&")
+                .and_then(|_| n.child_by_field_name("operand"))
+                .into_iter()
+                .collect(),
+            _ => Vec::new(),
+        };
+        if targets
+            .into_iter()
+            .any(|t| is_name(written_base(t), name, src))
+        {
+            return true;
+        }
+        let inner = in_literal || n.kind() == "func_literal";
+        stack.extend(named(n).map(|c| (c, inner)));
+    }
+    false
 }
 
 fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
@@ -1292,11 +1510,14 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         first_results: Vec::new(),
         assigned: Vec::new(),
         returns: HashMap::new(),
+        deferring: HashSet::new(),
         std: values::Std::default(),
         vars: BTreeSet::new(),
         selected: BTreeSet::new(),
         derefs: HashSet::new(),
         lookups: HashMap::new(),
+        type_params: BTreeSet::new(),
+        referenced: HashSet::new(),
     };
     // Imports come before every other declaration, and the values read the names they give.
     for node in named(tree.root_node()).filter(|n| n.kind() == "import_declaration") {
@@ -1311,6 +1532,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         });
     }
     walk.std = values::Std::new(tree.root_node(), src, &walk.facts.imports);
+    walk.facts.env_fields = values::env_fields(tree.root_node(), src);
     let mut top = Vec::new();
     let mut inits: HashMap<&str, usize> = HashMap::new();
     for node in named(tree.root_node()) {
@@ -1325,8 +1547,12 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 };
                 let body = node.child_by_field_name("body");
                 // A blank function names no symbol: it folds into the file, as a literal does.
+                walk.type_params = (type_params(node).into_iter())
+                    .map(|n| text(n, src).to_string())
+                    .collect();
                 if name == "_" {
                     let inline = walk.inline("", node);
+                    walk.signature_types(&inline, node);
                     body.into_iter().for_each(|b| walk.body(&inline, b));
                     continue;
                 }
@@ -1349,6 +1575,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 walk.typed_params(&name, list, false);
                 walk.typed_params(&name, result_list(node), true);
                 walk.bind_type_params(&name, node);
+                walk.signature_types(&name, node);
                 if let Some(body) = body {
                     walk.body(&name, body);
                 }
@@ -1373,9 +1600,12 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 walk.typed_params(&qualified, list, false);
                 walk.typed_params(&qualified, receiver, true);
                 walk.typed_params(&qualified, result_list(node), true);
-                for type_param in type_params {
+                for type_param in &type_params {
                     walk.local(&qualified, type_param);
                 }
+                walk.type_params = type_params.iter().map(|t| t.to_string()).collect();
+                walk.type_uses(&qualified, receiver);
+                walk.signature_types(&qualified, node);
                 if let Some(body) = node.child_by_field_name("body") {
                     walk.body(&qualified, body);
                 }
@@ -1394,6 +1624,12 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     top.push(name.to_string());
                     walk.bind_type_scope(name, spec);
                     let ty = spec.child_by_field_name("type");
+                    walk.type_params = (type_params(spec).into_iter())
+                        .map(|n| text(n, src).to_string())
+                        .collect();
+                    walk.new_top_spec();
+                    walk.type_uses("", spec.child_by_field_name("type_parameters"));
+                    walk.type_uses("", ty);
                     for field in (ty.filter(|t| t.kind() == "struct_type").into_iter())
                         .flat_map(named)
                         .flat_map(named)
@@ -1401,7 +1637,14 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     {
                         let class = field.child_by_field_name("type");
                         let class = class.and_then(|t| type_name(t, src)).map(Class::Type);
-                        for field in names(field) {
+                        let fields = names(field);
+                        if fields.is_empty()
+                            && let Some(Class::Type(ty)) = &class
+                        {
+                            let embedded = ty.rsplit('.').next().unwrap_or(ty);
+                            walk.bind_as(name, embedded, class.clone(), false, None);
+                        }
+                        for field in fields {
                             walk.bind_as(name, text(field, src), class.clone(), false, None);
                         }
                     }
@@ -1433,9 +1676,12 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 {
                     specs = named(*list).collect();
                 }
+                walk.type_params.clear();
                 for spec in specs {
                     let ty = spec.child_by_field_name("type");
                     let value = spec.child_by_field_name("value");
+                    walk.new_top_spec();
+                    walk.type_uses("", ty);
                     walk.assigned("", &names(spec), ty, value, None);
                     // Each name holds the value written at its place, when the names and the
                     // values pair up. A `var` holds it only if nothing assigns it (`finish_values`).
@@ -1517,6 +1763,106 @@ mod tests {
 
     fn facts(src: &str) -> Facts {
         parse("x.go", src.as_bytes()).unwrap()
+    }
+
+    /// The `(scope, name)` of each type reference of `src` (all of kind `Type`), sorted.
+    fn type_refs(src: &str) -> Vec<(String, String)> {
+        let facts = facts(src);
+        assert!(facts.references.iter().all(|r| r.kind == Use::Type));
+        let mut refs: Vec<_> = (facts.references.iter())
+            .map(|r| (r.scope.clone(), r.name.clone()))
+            .collect();
+        refs.sort();
+        refs
+    }
+
+    fn pairs(expected: &[(&str, &str)]) -> Vec<(String, String)> {
+        let mut out: Vec<_> = (expected.iter())
+            .map(|(s, n)| (s.to_string(), n.to_string()))
+            .collect();
+        out.sort();
+        out
+    }
+
+    #[test]
+    fn a_go_type_in_each_position_is_a_type_reference() {
+        let src = "package x\n\
+            import \"example.com/m/svc\"\n\
+            type Local struct{}\n\
+            type Box[T any] struct{ v T }\n\
+            type Outer struct { In svc.Field }\n\
+            type Under svc.Underlying\n\
+            type I interface { M(svc.Method) }\n\
+            var pkgVar svc.Var\n\
+            const pkgConst svc.Const = 1\n\
+            func pVar() { var a svc.Req; _ = a }\n\
+            func pConst() { const c svc.Req = 1 }\n\
+            func pParam(a svc.Req) {}\n\
+            func pResult() *svc.Req { return nil }\n\
+            func pLit() { _ = Local{} }\n\
+            func pAssert(x any) { _ = x.(svc.Req) }\n\
+            func pNew() { _ = new(Local) }\n\
+            func pMake() { _ = make([]svc.Req, 0) }\n\
+            func pGeneric() { var b Box[Local]; _ = b }\n\
+            func pConv() { _ = (*Local)(nil) }\n\
+            func (l Local) Method(a svc.Req) {}\n\
+            func pClosure() { _ = func(a svc.Req) {} }\n";
+        let closure = format!("pClosure.@{}", src.find("func(a svc.Req)").unwrap());
+        let mut expected = pairs(&[
+            ("", "svc.Field"),
+            ("", "svc.Underlying"),
+            ("", "svc.Method"),
+            ("", "svc.Var"),
+            ("", "svc.Const"),
+            ("pVar", "svc.Req"),
+            ("pConst", "svc.Req"),
+            ("pParam", "svc.Req"),
+            ("pResult", "svc.Req"),
+            ("pLit", "Local"),
+            ("pAssert", "svc.Req"),
+            ("pNew", "Local"),
+            ("pMake", "svc.Req"),
+            ("pGeneric", "Box"),
+            ("pGeneric", "Local"),
+            ("Local.Method", "Local"),
+            ("Local.Method", "svc.Req"),
+        ]);
+        // A conversion is an expression the grammar reads as a call (`Local(x)`, a call row of
+        // its own) or, parenthesized, as a dereference (`(*Local)(nil)`): no type reference.
+        expected.push((closure, "svc.Req".into()));
+        expected.sort();
+        assert_eq!(type_refs(src), expected);
+    }
+
+    #[test]
+    fn composite_go_types_reference_their_named_type() {
+        let src = "package x\n\
+            import \"example.com/m/svc\"\n\
+            type Box[T any] struct{ v T }\n\
+            func c1(a []*svc.A) {}\n\
+            func c2(a map[string]svc.B) {}\n\
+            func c3(a chan svc.C) {}\n\
+            func c4(a func(svc.D) error) {}\n\
+            func c5(a Box[svc.E]) {}\n\
+            func c6(a [3]svc.F) {}\n";
+        let expected = pairs(&[
+            ("c1", "svc.A"),
+            ("c2", "svc.B"),
+            ("c3", "svc.C"),
+            ("c4", "svc.D"),
+            ("c5", "Box"),
+            ("c5", "svc.E"),
+            ("c6", "svc.F"),
+        ]);
+        assert_eq!(type_refs(src), expected);
+    }
+
+    #[test]
+    fn predeclared_types_and_type_parameters_are_no_reference() {
+        let src = "package x\n\
+            type G[T comparable] struct { v T; n int; b []byte }\n\
+            func F[T any](x T, s string, e error, a any) T { var y T; _ = map[string]rune{}; return y }\n";
+        assert_eq!(type_refs(src), Vec::<(String, String)>::new());
     }
 
     #[test]
@@ -1676,6 +2022,7 @@ mod tests {
         assert_eq!(
             receivers(src),
             [
+                "T C = C",
                 "T a = p.A",
                 "T b = p.A",
                 "T.M err = error",
@@ -1907,6 +2254,92 @@ mod tests {
         );
         assert_eq!(returns("func f() (*T, error) { return mk(), nil }"), 0);
         assert_eq!(returns("func f() (r *T) { return }"), 0);
+    }
+
+    #[test]
+    fn a_deferred_write_of_a_named_result_is_an_unknown_return() {
+        let unknown = |src: &str| -> bool {
+            let facts = facts(&format!("package x\n\n{src}\n"));
+            let f = (facts.defs.iter())
+                .find(|d| d.name == "f" || d.name == "C.f")
+                .unwrap();
+            f.return_values.iter().any(|v| matches!(v, Value::Unknown))
+        };
+        // The deferred function runs after `return` sets `base` and writes it again (#948).
+        let ret = r#"return os.Getenv("U") }"#;
+        assert!(unknown(&format!(
+            r#"func f() (base string) {{ defer func() {{ base = "x" }}(); {ret}"#
+        )));
+        assert!(unknown(
+            "func f() (err error) { defer func() { if r := recover(); r != nil { err = e } }(); return g() }"
+        ));
+        assert!(unknown(&format!(
+            "func f() (n int) {{ defer func() {{ n++ }}(); {ret}"
+        )));
+        assert!(unknown(&format!(
+            "func (c C) f() (n int) {{ defer func() {{ n-- }}(); {ret}"
+        )));
+        assert!(unknown(&format!(
+            r#"func f() (base string) {{ defer (func() {{ base = "x" }})(); {ret}"#
+        )));
+        // Its address handed to the deferred call lets that call write it.
+        assert!(unknown(&format!(
+            "func f() (base string) {{ defer fill(&base); {ret}"
+        )));
+        // A deferred local bound to a literal that writes it, its address taken anywhere in the
+        // function, and a deferred method of it (a pointer receiver may write it).
+        assert!(unknown(&format!(
+            r#"func f() (base string) {{ restore := func() {{ base = "x" }}; defer restore(); {ret}"#
+        )));
+        assert!(unknown(&format!(
+            r#"func f() (base string) {{ p := &base; defer func() {{ *p = "x" }}(); {ret}"#
+        )));
+        assert!(unknown(&format!(
+            "func f() (base string) {{ p := &base; defer set(p); {ret}"
+        )));
+        assert!(unknown(
+            "func f() (u URL) { defer u.fix(); return parse() }"
+        ));
+        // A write to a field, an element or the pointee of the result writes the result too.
+        assert!(unknown(
+            r#"func f() (u URL) { defer func() { u.Host = "y" }(); return parse() }"#
+        ));
+        assert!(unknown(
+            r#"func f() (m M) { defer func() { m["k"] = "y" }(); return parse() }"#
+        ));
+        assert!(unknown(
+            "func f() (u *URL) { defer func() { *u = URL{} }(); return parse() }"
+        ));
+        assert!(unknown(
+            "func f() (u URL) { defer func() { u.n++ }(); return parse() }"
+        ));
+        assert!(unknown(
+            "func f() (u URL) { defer fill(&u.Host); return parse() }"
+        ));
+        // Another name's address, or a method of another value, leaves the returns alone.
+        assert!(!unknown(&format!(
+            "func f() (base string) {{ x := 1; p := &x; defer set(p); {ret}"
+        )));
+        assert!(!unknown(&format!(
+            "func f() (base string) {{ defer mu.Unlock(); {ret}"
+        )));
+        // An empty deferred function, one writing only its own names, a named function deferred,
+        // unnamed results and several results (no return value is kept) leave the returns alone.
+        assert!(!unknown(
+            "func f() (n int, err error) { defer func() { err = e }(); return 1, nil }"
+        ));
+        assert!(!unknown(&format!(
+            "func f() (base string) {{ defer func() {{}}(); {ret}"
+        )));
+        assert!(!unknown(&format!(
+            "func f() (base string) {{ defer func() {{ x := 1; x = 2 }}(); {ret}"
+        )));
+        assert!(!unknown(&format!(
+            "func f() (base string) {{ defer close(); {ret}"
+        )));
+        assert!(!unknown(&format!(
+            "func f() string {{ base := \"\"; defer func() {{ base = \"x\" }}(); {ret}"
+        )));
     }
 
     #[test]

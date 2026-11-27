@@ -36,6 +36,167 @@ pub struct Serve {
     pub declared: bool,
 }
 
+/// A `[[base_url]]` entry of `meada.toml` (a Base URL declaration): a consumer whose base URL
+/// comes from one of `env` calls the routes served under `dir`, a directory of the same
+/// repository.
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct BaseUrl {
+    #[serde(deserialize_with = "variables")]
+    pub env: Vec<String>,
+    /// Repository-relative, `/` separated, without a trailing `/`.
+    #[serde(deserialize_with = "repo_dir")]
+    pub dir: String,
+}
+
+/// A `[[helm_env]]` entry of `meada.toml` (a Chart environment declaration): in every Helm values
+/// file of the repository that has the dotted path `key`, the mapping at it is the container's
+/// environment, when the chart's templates (a library subchart's) are not in the repository.
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct HelmEnv {
+    #[serde(deserialize_with = "dotted_key")]
+    pub key: String,
+}
+
+/// A path of keys written `a.b`: no segment empty or holding `*`.
+fn dotted_key<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let key = String::deserialize(d)?;
+    match key.split('.').any(|s| s.is_empty() || s.contains('*')) {
+        true => Err(D::Error::custom(Msg::NotDottedKey.text())),
+        false => Ok(key),
+    }
+}
+
+/// A `[[channel_client]]` entry of `meada.toml` (a Client declaration): a call that resolves to
+/// `call` produces to or consumes from a channel of `broker`, named by the value at `topic`.
+#[derive(Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct ChannelClient {
+    /// An external function by its import path and name (`example.com/acme/flow.NewProducer`),
+    /// or a definition of the repository by its file and qualified name
+    /// (`svc/kafka/client.go::Client.Consume`).
+    #[serde(deserialize_with = "client_call")]
+    pub call: String,
+    pub role: ClientRole,
+    pub broker: Broker,
+    pub topic: TopicAt,
+}
+
+impl ChannelClient {
+    /// The definition of the repository `call` names: its file and qualified name.
+    pub fn definition(&self) -> Option<(&str, &str)> {
+        self.call.split_once("::")
+    }
+
+    /// The external function `call` names: its import path and name.
+    pub fn external(&self) -> Option<(&str, &str)> {
+        external_call(&self.call)
+    }
+}
+
+/// `<import path>.<Name>`: the path holds a `/`, the name none and is not empty.
+fn external_call(call: &str) -> Option<(&str, &str)> {
+    let (path, name) = call.rsplit_once('.')?;
+    (path.contains('/') && !name.is_empty() && !name.contains('/') && !call.contains("::"))
+        .then_some((path, name))
+}
+
+/// A `call` in one of its two forms; a bare `Type.method` names no package and is refused.
+fn client_call<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let call = String::deserialize(d)?;
+    let defined = call
+        .split_once("::")
+        .is_some_and(|(file, name)| !file.is_empty() && !name.is_empty());
+    match defined || external_call(&call).is_some() {
+        true => Ok(call),
+        false => Err(D::Error::custom(Msg::NotClientCall.text())),
+    }
+}
+
+#[derive(Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum ClientRole {
+    Producer,
+    Consumer,
+}
+
+#[derive(Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum Broker {
+    Kafka,
+}
+
+impl Broker {
+    /// The broker kind as a channel contract names it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Broker::Kafka => "kafka",
+        }
+    }
+}
+
+/// Where a declared call holds its topic: argument `arg`, or its field `field` when the
+/// argument is a composite literal. Written `"<n>"` or `"<n>.<Field>"`.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct TopicAt {
+    pub arg: usize,
+    pub field: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for TopicAt {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let written = String::deserialize(d)?;
+        let (arg, field) = match written.split_once('.') {
+            Some((arg, field)) => (arg, Some(field)),
+            None => (written.as_str(), None),
+        };
+        let identifier = |f: &str| {
+            let mut chars = f.chars();
+            chars
+                .next()
+                .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+                && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+        };
+        let arg = (!arg.is_empty() && arg.bytes().all(|b| b.is_ascii_digit()))
+            .then(|| arg.parse::<usize>().ok())
+            .flatten();
+        match (arg, field) {
+            (Some(arg), None) => Ok(TopicAt { arg, field: None }),
+            (Some(arg), Some(field)) if identifier(field) => Ok(TopicAt {
+                arg,
+                field: Some(field.into()),
+            }),
+            _ => Err(D::Error::custom(Msg::NotTopicPosition.text())),
+        }
+    }
+}
+
+/// One or more variable names.
+fn variables<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
+    let names = Vec::<String>::deserialize(d)?;
+    match names.is_empty() || names.iter().any(String::is_empty) {
+        true => Err(D::Error::custom(Msg::Empty.text())),
+        false => Ok(names),
+    }
+}
+
+/// A directory of the repository written as `a/b`: one trailing `/` is dropped; empty, `.`,
+/// `..` or empty segments, a leading `/` and `\` are refused (`.` alone would be the whole
+/// repository, which `[serve]` covers).
+fn repo_dir<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let written = String::deserialize(d)?;
+    let dir = written.strip_suffix('/').unwrap_or(&written);
+    if dir.is_empty() {
+        return Err(D::Error::custom(Msg::Empty.text()));
+    }
+    let loose = |s: &str| matches!(s, "" | "." | "..");
+    match dir.starts_with('/') || dir.contains('\\') || dir.split('/').any(loose) {
+        true => Err(D::Error::custom(Msg::NotRepoDir.text())),
+        false => Ok(dir.into()),
+    }
+}
+
 /// A `[serve]` table that is present: `declared` is set.
 pub fn declared<'de, D: Deserializer<'de>>(d: D) -> Result<Serve, D::Error> {
     let serve = Serve::deserialize(d)?;

@@ -333,6 +333,8 @@ pub(crate) fn extract<'a>(
                                 fragments: Vec::new(),
                                 shape: None,
                                 lead: None,
+                                cap: None,
+                                client: None,
                             });
                         }
                     }

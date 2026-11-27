@@ -1,0 +1,9 @@
+[[peer]]
+repo = "example.com/acme/peer"
+base_url_env = ["A_URL"]
+
+[[channel_client]]
+call = "src/topic.ts::KafkaClient.send"
+role = "producer"
+broker = "kafka"
+topic = "0"

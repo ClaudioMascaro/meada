@@ -17,8 +17,24 @@ pub(super) struct Summary {
     pub runners: Vec<Runner>,
     #[serde(default)]
     pub code: Vec<super::code::Code>,
+    /// What each Chart environment declaration gives this values file when it is one of its
+    /// chart's environments (`helm_env`, `chart_envs`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub envs: Vec<ChartEnv>,
+    /// The values files that are its chart's environments, when `envs` holds any.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chart: Vec<String>,
     #[serde(skip)]
     bytes: usize,
+}
+
+/// The environment a declared key gives one chart environment: its scalar entries, name to
+/// YAML text, the file laid over the chart's `values.yaml`.
+#[derive(Serialize, Deserialize)]
+pub(super) struct ChartEnv {
+    pub key: String,
+    pub line: usize,
+    pub entries: Vec<(String, String)>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -112,15 +128,32 @@ pub(super) fn read(
         return out;
     }
     let mut image_line = 1;
+    let mut key_lines = std::collections::BTreeMap::new();
+    let prefixes = prefixes(facts.helm_env);
+    let longest = facts.helm_env.iter().map(String::len).max().unwrap_or(0);
     let Ok(docs) = events::read(Syntax::of(path), src, |s| {
         if s.document == 0
             && matches!(s.path, [Step::Key(a), Step::Key(b)] if a == "image" && b == "repository")
         {
             image_line = s.line;
         }
+        if s.document == 0 && !prefixes.is_empty() {
+            key_line((&prefixes, longest), s.path, s.line, &mut key_lines);
+        }
     }) else {
         return out;
     };
+    // An empty or comment-only file holds no document: Helm reads it as an empty map.
+    let empty = Value::Object(Default::default());
+    let lines = &key_lines;
+    chart_envs(
+        path,
+        docs.first().unwrap_or(&empty),
+        root,
+        facts.helm_env,
+        lines,
+        &mut out,
+    );
     let Some(doc) = docs.first() else {
         return out;
     };
@@ -181,6 +214,186 @@ pub(super) fn read(
         }
     }
     out
+}
+
+/// Every dotted prefix of the declared keys, each with whether it is a key itself.
+fn prefixes(keys: &[String]) -> std::collections::HashMap<&str, bool> {
+    let mut out = std::collections::HashMap::new();
+    for key in keys {
+        for (at, _) in key.match_indices('.') {
+            out.entry(&key[..at]).or_insert(false);
+        }
+        out.insert(key.as_str(), true);
+    }
+    out
+}
+
+/// Records `line` for each declared key the scalar at `steps` lies inside, first seen first.
+/// The walk stops at the first prefix no key has, so its cost is a key's length, whatever the
+/// keys or the file.
+fn key_line(
+    (prefixes, longest): (&std::collections::HashMap<&str, bool>, usize),
+    steps: &[Step],
+    line: usize,
+    lines: &mut std::collections::BTreeMap<String, usize>,
+) {
+    let mut prefix = String::new();
+    for step in &steps[..steps.len().saturating_sub(1)] {
+        let Step::Key(key) = step else {
+            return;
+        };
+        if !prefix.is_empty() {
+            prefix.push('.');
+        }
+        if prefix.len() + key.len() > longest {
+            return;
+        }
+        prefix.push_str(key);
+        match prefixes.get(prefix.as_str()) {
+            None => return,
+            Some(true) => {
+                lines.entry(prefix.clone()).or_insert(line);
+            }
+            Some(false) => {}
+        }
+    }
+}
+
+/// The values file `name`'s environment, when it is a chart's: `values-<env>.yaml` (or `.yml`),
+/// or `values.yaml` itself (`None` for the environment name then).
+fn environment(name: &str) -> Option<Option<&str>> {
+    let stem = name
+        .strip_suffix(".yaml")
+        .or_else(|| name.strip_suffix(".yml"))?;
+    match stem.strip_prefix("values-") {
+        Some(env) if !env.is_empty() => Some(Some(env)),
+        Some(_) => None,
+        None => (stem == "values").then_some(None),
+    }
+}
+
+/// Goal 2 of the Chart environment declaration: a chart is the directory of a `Chart.yaml`, its
+/// environments its `values-<env>.yaml` files, each laid over the chart's `values.yaml`, or
+/// `values.yaml` alone when it has no other. When the values file at `path` (document `doc`) is
+/// one, each declared key holding a mapping gives its scalar entries, and the summary lists the
+/// chart's environments. The directory listing and the base file are inputs of the summary, so
+/// a sibling that comes or goes, or a base edit, summarizes it again.
+fn chart_envs(
+    path: &str,
+    doc: &Value,
+    root: &Path,
+    keys: &[String],
+    lines: &std::collections::BTreeMap<String, usize>,
+    out: &mut Summary,
+) {
+    let (dir, name) = path.rsplit_once('/').unwrap_or(("", path));
+    if keys.is_empty() || environment(name).is_none() {
+        return;
+    }
+    let Some(listed) = crate::contract::list(root, dir) else {
+        return;
+    };
+    let file = |n: &str| (listed.iter()).any(|(f, k)| f == n && *k == crate::contract::Probe::File);
+    if !file("Chart.yaml") {
+        return;
+    }
+    let at = |n: &str| match dir {
+        "" => n.to_string(),
+        dir => format!("{dir}/{n}"),
+    };
+    let files = (listed.iter()).filter(|(_, k)| *k == crate::contract::Probe::File);
+    let mut chart: Vec<String> = (files.clone())
+        .filter(|(n, _)| environment(n).is_some_and(|env| env.is_some()))
+        .map(|(n, _)| at(n))
+        .collect();
+    let base = files
+        .filter(|(n, _)| environment(n) == Some(None))
+        .map(|(n, _)| at(n))
+        .next();
+    if chart.is_empty() {
+        chart.extend(base.clone());
+    }
+    if !chart.iter().any(|c| c == path) {
+        return;
+    }
+    // A chart whose base does not read cannot be rendered; it gives no environment.
+    let base = match base.filter(|b| b != path) {
+        None => None,
+        Some(base) => {
+            let read = crate::contract::read(root, &base)
+                .and_then(|src| events::read(Syntax::of(&base), &src, |_| {}).ok());
+            let Some(docs) = read else {
+                return;
+            };
+            // An empty or comment-only base is Helm's empty map.
+            Some(
+                docs.into_iter()
+                    .next()
+                    .unwrap_or(Value::Object(Default::default())),
+            )
+        }
+    };
+    let (mut envs, mut bytes) = (Vec::new(), out.bytes);
+    for key in keys {
+        let Some(entries) = laid(base.as_ref(), doc, key) else {
+            continue;
+        };
+        let cost: usize = (entries.iter())
+            .map(|(name, value)| name.len() + value.len() + 8)
+            .sum::<usize>()
+            + key.len();
+        bytes = bytes.saturating_add(cost);
+        // All or nothing: an environment missing one key would agree vacuously with the others.
+        if bytes > IMAGE_STORED_MAX {
+            return;
+        }
+        envs.push(ChartEnv {
+            key: key.clone(),
+            line: lines.get(key).copied().unwrap_or(1),
+            entries,
+        });
+    }
+    if !envs.is_empty() {
+        (out.bytes, out.envs, out.chart) = (bytes, envs, chart);
+    }
+}
+
+/// The scalar entries of the mapping at the dotted `key` in `over` laid on `base` as Helm
+/// merges values files: an absent key keeps the base's, a null removes it, anything else
+/// replaces it, and mappings merge by key. A key through a list or a scalar holds nothing; a
+/// nested mapping or a list at a name is skipped.
+fn laid(base: Option<&Value>, over: &Value, key: &str) -> Option<Vec<(String, String)>> {
+    let (mut base, mut over) = (base, Some(over));
+    for step in key.split('.') {
+        match over {
+            // The file replaced what would hold the key with a scalar, a list or a null.
+            Some(value) if !value.is_object() => return None,
+            Some(value) => over = value.get(step),
+            None => {}
+        }
+        base = base.and_then(|b| b.get(step));
+    }
+    // Where the file does not reach the key, the base stands.
+    let held = over.or(base)?.as_object()?;
+    let mut merged = std::collections::BTreeMap::<&str, &Value>::new();
+    let base = base
+        .and_then(Value::as_object)
+        .filter(|_| over.is_none_or(Value::is_object));
+    for map in [base, Some(held)].into_iter().flatten() {
+        merged.extend(map.iter().map(|(name, value)| (name.as_str(), value)));
+    }
+    let text = |value: &Value| match value {
+        Value::String(s) => Some(s.clone()),
+        Value::Number(n) => Some(n.to_string()),
+        Value::Bool(b) => Some(b.to_string()),
+        _ => None,
+    };
+    Some(
+        merged
+            .into_iter()
+            .filter_map(|(name, value)| Some((name.to_string(), text(value)?)))
+            .collect(),
+    )
 }
 
 fn workflow(path: &str, doc: &Value, out: &mut Summary) {
@@ -358,6 +571,29 @@ fn maven(path: &str, src: &[u8], out: &mut Summary) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A chart environment is stored whole or not at all: one missing a key past the ceiling
+    /// would agree vacuously with the environments that set it.
+    #[test]
+    fn a_chart_environment_past_the_storage_ceiling_is_dropped_whole() {
+        let root = Path::new("tests/fixtures/helm-env");
+        let doc = serde_json::json!({
+            "a": { "envs": { "T": "orders.created" } },
+            "b": { "envs": { "U": "x".repeat(64) } },
+        });
+        let keys = ["a.envs".to_string(), "b.envs".to_string()];
+        let stored = |bytes: usize| {
+            let mut out = Summary {
+                bytes,
+                ..Default::default()
+            };
+            let path = "svc/chart/api/values-stg.yaml";
+            chart_envs(path, &doc, root, &keys, &Default::default(), &mut out);
+            (out.envs.len(), out.chart.len())
+        };
+        assert_eq!(stored(0), (2, 2));
+        assert_eq!(stored(IMAGE_STORED_MAX - 40), (0, 0));
+    }
 
     #[test]
     fn repeated_long_builder_locations_stop_at_the_image_storage_ceiling() {

@@ -1,0 +1,7 @@
+app:
+  title: acme
+acme:
+  orders: { $include: ./partials/orders.yaml }
+  approvals:
+    topics:
+      shipped: orders.shipped

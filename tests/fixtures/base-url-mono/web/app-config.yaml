@@ -1,0 +1,4 @@
+proxy:
+  endpoints:
+    '/b':
+      target: ${B_URL}

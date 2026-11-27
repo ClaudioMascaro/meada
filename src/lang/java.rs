@@ -426,6 +426,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     Some(Class::Type(ty)) if !constructor => Some(Class::Type(ty)),
                     _ => None,
                 },
+                private: kind == Kind::Method && modifiers.contains(&"private"),
                 ..Def::new(inner.as_ref().clone(), kind, node.byte_range())
             });
             // `public static void main(String[])` (or `String...`) starts a program.

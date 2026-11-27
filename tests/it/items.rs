@@ -592,6 +592,104 @@ fn unknown_returns_and_path_changes_remain_unresolved() {
 }
 
 #[test]
+fn a_go_deferred_write_of_the_named_result_leaves_the_base_open() {
+    // #948: the deferred function writes `base` after `return` set it; the empty one does not.
+    let export = http_value_flow("http_value_flow_deferred");
+    let consumers = export["consumers"].as_array().unwrap();
+    let links = export["links"].as_array().unwrap();
+    let rows = |name: &str| -> Vec<&serde_json::Value> {
+        let at = format!("::client.go::{name}::");
+        (consumers.iter())
+            .filter(|c| c["site"].as_str().unwrap().contains(&at))
+            .collect()
+    };
+    let deferred = rows("ViaDeferredBase");
+    assert!(
+        matches!(deferred.as_slice(), [row] if row["contract"].is_null() && row["via"].is_null()
+            && !links.iter().any(|l| l["consumer"] == row["site"])),
+        "{deferred:?}"
+    );
+    let benign = rows("ViaBenignDefer");
+    assert!(
+        matches!(benign.as_slice(), [row] if row["contract"] == "http::GET::/api/orders"
+            && row["via"] == "env:API_URL"),
+        "{benign:?}"
+    );
+}
+
+#[test]
+fn a_python_decorator_of_the_function_or_its_class_leaves_the_base_open() {
+    // #949: a decorator call rebinds the function; #962: a class decorator may replace the method.
+    let export = http_value_flow("http_value_flow_decorated");
+    let consumers = export["consumers"].as_array().unwrap();
+    let links = export["links"].as_array().unwrap();
+    let rows = |name: &str| -> Vec<&serde_json::Value> {
+        let at = format!("::client.py::{name}::");
+        (consumers.iter())
+            .filter(|c| c["site"].as_str().unwrap().contains(&at))
+            .collect()
+    };
+    let rebound = [
+        "ViaDecoratedBase",
+        "Changed.ViaChangedClass",
+        "Registered.ViaRegisteredClass",
+        "InheritingChild.ViaInheritedClass",
+        "ViaChildInstance",
+    ];
+    for name in rebound {
+        let open = rows(name);
+        assert!(
+            matches!(open.as_slice(), [row] if row["contract"].is_null() && row["via"].is_null()
+                && !links.iter().any(|l| l["consumer"] == row["site"])),
+            "{name}: {open:?}"
+        );
+    }
+    // No decorator, or one that keeps the body a call runs (`dataclass`, `lru_cache`).
+    let kept = [
+        "Ordinary.ViaOrdinaryClass",
+        "Settings.ViaDataclass",
+        "ModuleSettings.ViaModuleDataclass",
+        "ViaCachedBase",
+        "ViaBareCachedBase",
+        "PlainChild.ViaPlainChild",
+    ];
+    for name in kept {
+        let linked = rows(name);
+        assert!(
+            matches!(linked.as_slice(), [row] if row["contract"] == "http::GET::/api/orders"
+                && row["via"] == "env:API_URL"),
+            "{name}: {linked:?}"
+        );
+    }
+}
+
+#[test]
+fn a_private_jvm_method_runs_alone_whatever_other_classes_spell() {
+    // #810: a private method of the same name in a Java and a Kotlin class still folds; a method
+    // a subclass overrides does not.
+    let export = http_value_flow("http_value_flow_private");
+    let consumers = export["consumers"].as_array().unwrap();
+    let rows = |at: &str| -> Vec<&serde_json::Value> {
+        (consumers.iter())
+            .filter(|c| c["site"].as_str().unwrap().contains(at))
+            .collect()
+    };
+    for path in ["Client.java", "Client.kt"] {
+        let twin = rows(&format!("::{path}::Client.ViaPrivateTwin"));
+        assert!(
+            matches!(twin.as_slice(), [row] if row["contract"] == "http::GET::/api/orders"
+                && row["via"] == "env:API_URL"),
+            "{path}: {twin:?}"
+        );
+    }
+    let overridable = rows("::Client.java::Client.ViaOverridable");
+    assert!(
+        matches!(overridable.as_slice(), [row] if row["contract"].is_null() && row["via"].is_null()),
+        "{overridable:?}"
+    );
+}
+
+#[test]
 fn an_environment_key_needs_a_reader_bound_to_the_runtime() {
     let export = http_value_flow("http_value_flow_env_reader");
     let consumers = export["consumers"].as_array().unwrap();

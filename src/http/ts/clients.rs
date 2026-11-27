@@ -10,7 +10,7 @@ use super::super::join::{depends, opaque_lead, resolve, text_parts};
 use super::super::{consumer, fetch};
 use super::backstage;
 use super::config::Config;
-use crate::contract::Found;
+use crate::contract::{Found, Level, ReceiverIdentity};
 use crate::declared::{self, Declared, Types};
 use crate::lang::ts::GLOBAL_URL;
 use crate::lang::{Part, Step, Ty, Value};
@@ -35,23 +35,28 @@ pub(in crate::http) fn consumers(
             if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
                 continue;
             }
-            let expanded =
-                code.expand_with_call(Expand::Call(path, n), &backstage::discovered, &|args, _| {
+            let expanded = code.expand_with_call(
+                Expand::Call(path, n),
+                &backstage::discovered,
+                backstage::has_route,
+                &|args, _| {
                     let mut args = joined(args);
                     let plugin = backstage::based(&mut args);
-                    let args = config.decided(&args);
-                    // A URL through a proxy endpoint goes to the endpoint's target.
-                    let proxied = config.proxied(&args);
-                    let target = proxied.as_ref().and_then(|p| p.args.as_ref());
-                    let mut read = fetch(target.unwrap_or(&args))?;
-                    if let (None, Some(id)) = (&read.via, plugin) {
-                        read.via = Some(backstage::client(&id));
-                    }
-                    if let Some(p) = proxied {
-                        read.via = backstage::proxied(read.via, &p.endpoint, p.args.is_some());
-                    }
-                    Some(read)
-                });
+                    config.decided(args, |args, uncertain| {
+                        let identity = slash_base(args);
+                        let proxied = config.proxied(args);
+                        let target = proxied.as_ref().and_then(|p| p.args.as_deref());
+                        let mut read = fetch(target.unwrap_or(args))?;
+                        if let (None, Some(id)) = (&read.via, &plugin) {
+                            read.via = Some(backstage::client(id));
+                        }
+                        if let Some(p) = proxied {
+                            read.via = backstage::proxied(read.via, &p.endpoint, p.args.is_some());
+                        }
+                        Some((read, identity, uncertain))
+                    })
+                },
+            );
             for Expanded {
                 site: (site, at),
                 frames,
@@ -59,11 +64,64 @@ pub(in crate::http) fn consumers(
             } in expanded
             {
                 let shape = response_reads(code, literals.types(), (path, n), &frames);
-                found.push(consumer(site, at, read, shape));
+                for (read, identity, uncertain) in read {
+                    let mut side = consumer(site, at, read, shape.clone());
+                    side.cap = uncertain.then_some(Level::Inferred);
+                    side.identity = identity.or(side.identity);
+                    found.push(side);
+                }
             }
         }
     }
     found
+}
+
+/// Keep a replacement on an environment base until the workload supplies its value.
+fn slash_base(args: &mut [Value]) -> Option<ReceiverIdentity> {
+    let Value::Str(parts) = args.first_mut()? else {
+        return None;
+    };
+    if !parts.iter().any(|p| matches!(p, Part::StripStart)) {
+        return None;
+    }
+    *parts = crate::lang::fold_strips(std::mem::take(parts));
+    let starts = parts
+        .iter()
+        .take_while(|p| matches!(p, Part::StripStart))
+        .count();
+    if starts == 0 {
+        return None;
+    }
+    let env = matches!(parts.get(starts), Some(Part::Env(_)));
+    let ends = parts
+        .get(starts + 1..)?
+        .iter()
+        .map_while(|p| match p {
+            Part::StripEnd(strip) => Some(*strip),
+            _ => None,
+        })
+        .take(starts)
+        .collect::<Vec<_>>();
+    if ends.len() != starts {
+        return None;
+    }
+    parts.drain(starts + 1..=starts * 2);
+    parts.drain(..starts);
+    env.then(|| {
+        let tail = &parts[1..];
+        let end = tail
+            .iter()
+            .position(|part| matches!(part, Part::QuerySuffix))
+            .unwrap_or(tail.len());
+        let mut suffix = super::super::render(&tail[..end]);
+        if let Some(at) = suffix.find(['?', '#']) {
+            suffix.truncate(at);
+        }
+        ReceiverIdentity::HttpBase {
+            strips: ends,
+            suffix,
+        }
+    })
 }
 
 /// `args` with a first argument `new URL(reference, base)` replaced by the join of the two (RFC

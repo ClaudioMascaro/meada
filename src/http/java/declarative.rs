@@ -555,6 +555,7 @@ mod tests {
             files: &[],
             configs: &configs,
             symlinks: &[],
+            channel_clients: &[],
         };
         consumers(&code, &indexed)
     }

@@ -295,6 +295,14 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         ("tagOptions", "TAG_CAARLO_URL"),
         ("Client.OrdersDirect", "FIELD_URL"),
         ("Client.Orders", "FIELD_URL"),
+        ("Cross.Get", "CROSS_URL"),
+        ("Typed.Get", "CROSS_URL"),
+        ("TwinA.Get", "TWIN_A_URL"),
+        ("TwinB.Get", "TWIN_B_URL"),
+        ("AnonSvc.Get", "ANON_URL"),
+        ("AnonLocal", "ANON_BUS_URL"),
+        ("AnonLoaded", "ANON_URL"),
+        ("AnonNamed", "ANON_BROKER_URL"),
     ];
     for (function, variable) in read {
         let expected = format!("env:{variable}");
@@ -337,6 +345,7 @@ fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
         "uncalled.get",
         "matched.get",
         "literal.get",
+        "Unknown.Get",
     ];
     for function in unread {
         assert_eq!(vias.get(function), Some(&None), "{function}");
@@ -1002,7 +1011,8 @@ fn a_declarative_client_method_is_an_open_item_at_its_definition() {
 /// A Backstage service reads a base URL through `config.getString('a.b')` and the key holds
 /// `${VAR}` in `app-config*.yaml` (#617): the read is the variable, which the peer's
 /// `base_url_env` maps, so two providers of the route no longer leave the link `ambiguous`. A
-/// literal value and a key no file holds leave the host unresolved. A `readonly`, `private` or
+/// literal value gives its host, and another root may supply a second base. A key no file holds
+/// leaves the host unresolved. A `readonly`, `private` or
 /// `#x` field the constructor writes once with the read holds it in every method (#688). A value
 /// a partial gives through `$include`, and a `$env` value, read as if inline (#689).
 #[test]
@@ -1024,41 +1034,52 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
     }
     let export: serde_json::Value =
         serde_json::from_str(&Engine::open(&web).unwrap().export().unwrap()).unwrap();
-    let vias: std::collections::BTreeMap<&str, Option<&str>> = export["consumers"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|c| {
-            let site = c["site"].as_str().unwrap();
-            (site.split("::").nth(2).unwrap(), c["via"].as_str())
-        })
-        .collect();
-    let expected = [
-        ("viaGetString", Some("env:API_URL")),
-        ("viaOptional", Some("env:OPT_URL")),
-        ("viaLocalFile", Some("env:LOCAL_URL")),
+    let mut vias = std::collections::BTreeMap::<_, Vec<_>>::new();
+    for consumer in export["consumers"].as_array().unwrap() {
+        let site = consumer["site"].as_str().unwrap();
+        vias.entry(site.split("::").nth(2).unwrap())
+            .or_default()
+            .push(consumer["via"].as_str());
+    }
+    let expected: &[(&str, &[Option<&str>])] = &[
+        (
+            "viaGetString",
+            &[Some("env:API_URL"), Some("host:localhost:7007")],
+        ),
+        ("viaOptional", &[Some("env:OPT_URL")]),
+        ("viaLocalFile", &[Some("env:LOCAL_URL")]),
         // Through a partial's key path, a whole partial and `$env` (#689).
-        ("viaIncludedKey", Some("env:API_URL")),
-        ("viaIncludedBlock", Some("env:API_URL")),
-        ("viaEnvValue", Some("env:API_URL")),
-        ("literalValue", None),
-        ("missingKey", None),
+        ("viaIncludedKey", &[Some("env:API_URL")]),
+        ("viaIncludedBlock", &[Some("env:API_URL")]),
+        ("viaEnvValue", &[Some("env:API_URL")]),
+        ("literalValue", &[Some("host:other.example.com")]),
+        ("missingKey", &[None]),
         // Another pack's config file (`application.yaml`) is no Backstage config.
-        ("notAppConfig", None),
-        // A field only the constructor writes, once (#688), and the fields that stay unread: a
-        // public mutable one, one written twice, under a condition or outside the constructor,
-        // one its callers give, and one of a JavaScript file.
-        ("OrdersClient.list", Some("env:API_URL")),
-        ("PublicClient.list", None),
-        ("TwiceClient.list", None),
-        ("ConditionalClient.list", None),
-        ("LateClient.list", None),
-        ("ParameterClient.list", None),
-        ("AssignedClient.list", None),
-        ("LegacyClient.list", None),
+        ("notAppConfig", &[None]),
+        // OrdersClient reads its own initializer. The two constructor parameters get the
+        // same base from makeClients; competing writes and the JS field stay unknown.
+        (
+            "OrdersClient.list",
+            &[Some("env:API_URL"), Some("host:localhost:7007")],
+        ),
+        ("PublicClient.list", &[None]),
+        ("TwiceClient.list", &[None]),
+        ("ConditionalClient.list", &[None]),
+        ("LateClient.list", &[None]),
+        (
+            "ParameterClient.list",
+            &[Some("env:API_URL"), Some("host:localhost:7007")],
+        ),
+        (
+            "AssignedClient.list",
+            &[Some("env:API_URL"), Some("host:localhost:7007")],
+        ),
+        ("LegacyClient.list", &[None]),
     ];
-    for (function, via) in expected {
-        assert_eq!(vias.get(function), Some(&via), "{function}");
+    for &(function, expected) in expected {
+        let actual = vias.get_mut(function).unwrap();
+        actual.sort_unstable();
+        assert_eq!(actual, expected, "{function}");
     }
 
     let links: Vec<(&str, &str, &str)> = export["links"]
@@ -1070,6 +1091,8 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
             [
                 "viaGetString",
                 "OrdersClient",
+                "ParameterClient",
+                "AssignedClient",
                 "viaIncludedKey",
                 "viaIncludedBlock",
             ]
@@ -1089,7 +1112,7 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
         "inferred",
         "base URL from API_URL, a base_url_env of peer example.com/backstage/api",
     );
-    assert_eq!(links, [link; 4]);
+    assert_eq!(links, [link; 6]);
 }
 
 /// A method's context explains the inferred peer through its readonly field and an included

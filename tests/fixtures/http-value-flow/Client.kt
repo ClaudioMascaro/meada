@@ -32,4 +32,7 @@ class Client(private val rest: RestTemplate) {
     fun QueryConditional(flag: Boolean) {
         rest.getForObject(System.getenv("API_URL") + "/api/orders" + (if (flag) "?x=1" else ""), String::class.java)
     }
+    // #810: Client.java spells a private `jvmBase` too; neither can be overridden.
+    private fun jvmBase(): String = System.getenv("API_URL")
+    fun ViaPrivateTwin() { rest.getForObject(jvmBase() + "/api/orders", String::class.java) }
 }

@@ -1,7 +1,7 @@
 //! HTTP routing through evaluated Services, Ingresses and the workloads running code.
 
 use super::{Http, PROXY_VIA, contract, fits, gateway_contracts, join, route};
-use crate::contract::{ContractKind, Level, Link};
+use crate::contract::{ContractKind, Level, Link, ReceiverIdentity};
 use crate::iac::Node;
 use crate::image::{Image, environment::Environments};
 use crate::index::{Consumer, Export, Gateway, Provider};
@@ -114,12 +114,7 @@ impl<'a> Routing<'a> {
             .flat_map(|(e, r)| e.providers.iter().map(move |p| (r, p)))
             .collect::<Vec<_>>();
         let links = crate::image::execution_links(exports, repositories);
-        let executions = Image
-            .executions(exports, &links)
-            .into_iter()
-            .filter(|x| x.level != Level::Ambiguous)
-            .collect();
-        let nodes = exports
+        let nodes: BTreeMap<_, Location> = exports
             .iter()
             .flat_map(|export| {
                 export.iac.iter().map(move |node| {
@@ -128,6 +123,16 @@ impl<'a> Routing<'a> {
                         Location { export, node },
                     )
                 })
+            })
+            .collect();
+        // A chart environment runs code for channel resolution alone (front 6, Goal 2).
+        let executions = Image
+            .executions(exports, &links)
+            .into_iter()
+            .filter(|x| x.level != Level::Ambiguous)
+            .filter(|x| {
+                (nodes.get(&(x.workload.clone(), x.root.clone())))
+                    .is_none_or(|l| !crate::image::chart_env(l.node))
             })
             .collect();
         let mut selected = BTreeMap::<_, Vec<_>>::new();
@@ -514,6 +519,24 @@ fn base_url(value: &str) -> Option<(&str, &str)> {
     Some((host, path))
 }
 
+/// A workload supplies the base after extraction. Replay an explicit TS strip before
+/// appending the written suffix, which can start in the middle of a path segment.
+fn workload_url<'a>(consumer: &'a Consumer, raw: &str) -> Option<(&'a str, String, String)> {
+    let wanted = consumer.contract.as_deref().and_then(route);
+    if let Some(ReceiverIdentity::HttpBase { strips, suffix }) = &consumer.identity {
+        let method = wanted
+            .map(|(method, _)| method)
+            .or(consumer.method.as_deref())?;
+        let base = strips.iter().fold(raw, |base, op| op.apply(base));
+        let url = format!("{base}{suffix}");
+        let (host, path) = base_url(&url)?;
+        return Some((method, host.into(), path.into()));
+    }
+    let (method, path) = wanted?;
+    let (host, base) = base_url(raw)?;
+    Some((method, host.into(), join(base, path)))
+}
+
 fn collapse(mut links: Vec<Link>) -> Vec<Link> {
     let mut grouped = BTreeMap::<LinkKey, (Link, BTreeSet<String>)>::new();
     for link in links.drain(..) {
@@ -548,13 +571,11 @@ fn collapse(mut links: Vec<Link>) -> Vec<Link> {
 }
 
 pub(super) fn prepare(exports: &mut [Export], repositories: &[Repository]) {
-    if !exports.iter().any(|e| {
-        e.consumers.iter().any(|c| {
-            c.contract
-                .as_deref()
-                .is_some_and(|c| c.starts_with("http::"))
-        })
-    }) {
+    let is_http = |c: &Consumer| {
+        c.contract.as_deref().and_then(route).is_some()
+            || matches!(c.identity, Some(ReceiverIdentity::HttpBase { .. }))
+    };
+    if !exports.iter().any(|e| e.consumers.iter().any(is_http)) {
         return;
     }
     if !exports.iter().any(|e| {
@@ -578,11 +599,7 @@ pub(super) fn prepare(exports: &mut [Export], repositories: &[Repository]) {
         let mut out = Prepared::default();
         let mut consumers = Vec::new();
         for consumer in &export.consumers {
-            let Some(wanted) = consumer
-                .contract
-                .as_deref()
-                .filter(|c| c.starts_with("http::"))
-            else {
+            if !is_http(consumer) {
                 consumers.push(consumer.clone());
                 continue;
             };
@@ -590,24 +607,26 @@ pub(super) fn prepare(exports: &mut [Export], repositories: &[Repository]) {
             let (via, proxy) = via
                 .split_once(PROXY_VIA)
                 .map_or((via, None), |(v, p)| (v, Some(p)));
-            if let Some(variable) = via.strip_prefix("env:") {
+            // A Base URL declaration wins over a host infrastructure gives the variable:
+            // `Http.link` below takes it.
+            let undeclared = |v: &&str| repo.config.declared_dir(v).is_none();
+            if let Some(variable) = via.strip_prefix("env:").filter(undeclared) {
                 let scoped =
                     environments.scoped_values(&export.repository, &consumer.site, variable);
                 if !scoped.is_empty() {
                     let mut links = Vec::new();
                     let mut resolved = Vec::new();
                     for value in scoped {
-                        let Some((host, base)) = value.value.and_then(base_url) else {
-                            continue;
-                        };
-                        let Some((method, path)) = route(wanted) else {
+                        let Some((method, host, path)) =
+                            value.value.and_then(|raw| workload_url(consumer, raw))
+                        else {
                             continue;
                         };
                         let mut consumer = consumer.clone();
-                        consumer.contract = Some(contract(method, &join(base, path)));
+                        consumer.contract = Some(contract(method, &path));
                         let caller = routing.location(value.workload, value.root);
                         let found = routing
-                            .links(&consumer, repo, host, caller, Some(&value.reason))
+                            .links(&consumer, repo, &host, caller, Some(&value.reason))
                             .unwrap_or_else(|| {
                                 let mut by_host = consumer.clone();
                                 by_host.via = Some(format!(
@@ -697,7 +716,54 @@ pub(super) fn prepare(exports: &mut [Export], repositories: &[Repository]) {
 
 #[cfg(test)]
 mod tests {
-    use super::service_name;
+    use super::{Execution, Export, Level, Node, Repository, Routing, service_name};
+
+    /// A chart environment's execution runs code for channel resolution alone: HTTP routing
+    /// never takes it as a caller, while a Compose service's covering the same site stays one.
+    #[test]
+    fn routing_skips_helm_environment_executions() {
+        let repo = Repository {
+            identity: "example.com/acme/svc".into(),
+            root: Default::default(),
+            config: Default::default(),
+            decisions: Default::default(),
+            index: Default::default(),
+        };
+        let node = |ty: &str, path: &str, address: &str, block: &str| Node {
+            ty: ty.into(),
+            path: path.into(),
+            address: address.into(),
+            block: block.into(),
+            root: ".".into(),
+            ..Default::default()
+        };
+        let nodes = [
+            node("HelmValues", "chart/values.yaml", "lib-chart.envs", "env"),
+            node("service", "compose.yaml", "services.svc", "services.svc"),
+        ];
+        let executions = (nodes.iter())
+            .map(|n| Execution {
+                workload: n.identity(&repo.identity),
+                root: ".".into(),
+                repository: repo.identity.clone(),
+                path: ".".into(),
+                level: Level::Declared,
+                reason: String::new(),
+            })
+            .collect();
+        let exports = [Export {
+            repository: repo.identity.clone(),
+            iac: nodes.to_vec(),
+            executions,
+            ..Export::default()
+        }];
+        let repositories = [repo];
+        let routing = Routing::new(&exports, &repositories);
+        let site = "example.com/acme/svc::main.go::main";
+        let callers = routing.callers("example.com/acme/svc", site);
+        let types: Vec<&str> = callers.iter().map(|l| l.node.ty.as_str()).collect();
+        assert_eq!(types, ["service"]);
+    }
 
     #[test]
     fn kubernetes_service_dns_forms_keep_the_optional_namespace_and_port() {

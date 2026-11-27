@@ -471,6 +471,15 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   exactly: what a name of the crate that is no listed constructor makes passes nothing), so a
   setter missing from the list ends the chain and its client (or its router, app, scope,
   resource or Rocket instance) is not read.
+- A Go function's returns (`Walk::deferred_write` in `lang/go.rs`, #948): in a function with a
+  `defer` and one named result, the result's address taken anywhere (`&base`, `&u.Host`), a
+  function literal that assigns, increments, decrements or calls a method of the result or of a
+  field, element or pointee of it (`u.Host = ..`, `m[k] = ..`, `*p = ..`), or a deferred method
+  call on it (`defer u.fix()`) adds an unknown return, so the HTTP return fold leaves the call
+  open. A name a literal declares again, and a literal that is never deferred, count as the
+  result (the safe side). Not seen, so the function keeps the value its `return` gives: a
+  deferred method value of the result (`f := u.fix; defer f()`) and an address a pointer-receiver
+  method takes outside a literal (`u.attach(reg); defer reg.run()`).
 - A Go struct field tagged `env:"X"` or `envconfig:"X"` reads `X` only when its struct is declared
   in the same file as the read, and a selector matches it by its field path (`cfg.API.URL` is
   `API.URL`) whatever the variable's type: an untagged field of another struct with the same path
@@ -479,4 +488,13 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   (`config.URL`) whose tail matches a tagged path reads as `X` too; the key prefixes of the
   libraries (`env-prefix`, `envPrefix`, envconfig's `Process("app")`) are not applied; nesting past
   64 levels is not read (#618).
+- Python return folding (`Code::py_decorated`, #949, #962): a function is not folded when it, its
+  class, or a repository class whose family holds its class carries a decorator, called or bare,
+  outside `PY_KEEPS_BODY` (`staticmethod`, `classmethod`, `dataclass`, `lru_cache`, with their
+  `dataclasses.` and `functools.` spellings). A decorated heir stops the fold of its base's method
+  for every receiver. The list matches the decorator's written name, so an alias
+  (`from mylib import swap as lru_cache`) passes as the listed decorator. Guards by absence, so
+  these still fold (#949's path too): an heir in a file without facts (over budget or unparsed),
+  an heir whose family is unknown (C3 refused, a cycle, past `FAMILY_DEPTH`), and a rebinding
+  without `@` (`Sub = install(Sub)`, `Sub.origin = ..`, `setattr`).
 - pydantic-settings reads (#619, `settings_consts` in `lang/python.rs`): a field of a `BaseSettings` subclass is read as `<env_prefix><FIELD>` uppercased or its literal `alias` / `validation_alias`, with `env_prefix` a literal of `model_config = SettingsConfigDict(...)` or an inner `class Config`. A base class defined in another file, inherited settings, an instance a function returns (`@lru_cache def get_settings(): return Settings()`), `AliasChoices`, `case_sensitive` and `env_nested_delimiter` leave the base unresolved or read the unprefixed name.

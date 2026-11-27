@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet};
 
 use serde::Serialize;
 
-use super::{Direction, Graph, calls_on_link, held, in_path};
+use super::{Direction, Graph, calls_on_link, held, runs};
 use crate::contract::{self, Level, Link};
 use crate::index::{CallSite, Export};
 use crate::lang::{self, Facts};
@@ -374,9 +374,9 @@ impl<'a> Graph<'a> {
         }
         if let Some((n, path)) = self.path_of(id) {
             let repository = &self.exports[n].repository;
-            for x in (self.executions.iter())
-                .filter(|x| x.repository == *repository && in_path(path, &x.path))
-            {
+            for x in (self.executions.iter()).filter(|x| {
+                x.repository == *repository && runs(x, &self.exports[n].manifests, path)
+            }) {
                 let evidence = Evidence {
                     level: x.level,
                     by: None,
@@ -807,11 +807,13 @@ pub(crate) fn attribute<'g>(
                 continue;
             };
             let dir = dir.trim_end_matches('/');
-            let at = match folder {
-                "" => dir,
-                _ => dir
-                    .strip_prefix(folder)
-                    .map_or("..", |d| d.trim_start_matches('/')),
+            let at = if folder.is_empty() {
+                dir
+            } else if let Some(member) = dir.strip_prefix(folder).and_then(|d| d.strip_prefix('/'))
+            {
+                member
+            } else {
+                continue;
             };
             let via = reached.get(at).filter(|_| !at.is_empty() && at != "..");
             if let Some(via) = via

@@ -1,0 +1,4 @@
+url: https://orders.example.com
+topic: orders.created
+b:
+  url: https://orders.example.com/v2

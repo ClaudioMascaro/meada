@@ -644,6 +644,8 @@ fn listen<'a>(
         path: path.into(),
         call: n,
         role,
+        client: None,
+        cap: None,
     };
     let handler = || {
         Side::Consumer(Handler::Def {
@@ -769,6 +771,7 @@ mod tests {
             files: &[],
             configs: &configs,
             symlinks: &[],
+            channel_clients: &[],
         };
         let mut messages = messages(&code, &indexed);
         messages.extend(super::super::aws::test_messages(&code, Some(&indexed)));
@@ -1701,6 +1704,7 @@ mod tests {
                 files: &[],
                 configs: &[],
                 symlinks: &[],
+                channel_clients: &[],
             };
             (0..3)
                 .map(|_| {
@@ -1741,6 +1745,7 @@ mod tests {
                 files: &[],
                 configs: &[],
                 symlinks: &[],
+                channel_clients: &[],
             };
             (0..3)
                 .map(|_| {

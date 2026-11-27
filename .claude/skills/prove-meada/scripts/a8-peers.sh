@@ -344,6 +344,7 @@ links_of() { # <export> <fn>
 
 expected_export() { # <base export> <workspace> <run>
   jq -S --arg workspace "$2" --rawfile cases "$3/cases.tsv" \
+    --rawfile gosrc "$3/base/g9/gocli/client.go" \
     --slurpfile environment "$3/base/g9/export.json" \
     --slurpfile proxy "$3/base/g10d/export.json" \
     -f "$HERE/a8-expected.jq" "$1"
@@ -419,6 +420,8 @@ compare_exports() { # <run holding base/ and head/ exports>
     echo
     echo "Only \`commit\` and \`dirty\` are omitted. Landed contract/origin changes use #683;"
     echo "their full links copy the base inline controls, and only their terminal process calls change."
+    echo "g9 adds #973's Go \`type\` rows read from its source; where calls change, communities are"
+    echo "checked by spec #31's guarantees over the expected calls instead of byte for byte."
     echo "Every other field, location, row and process attribute stays in the comparison."
     echo
   } >> "$out"
@@ -427,6 +430,22 @@ compare_exports() { # <run holding base/ and head/ exports>
       || die "could not derive specified export for $w"
     jq -S 'del(.commit, .dirty)' "$run/head/$w/export.json" > "$run/head/$w/actual.json" \
       || die "jq failed on head/$w"
+    # Calls the spec changes regroup communities (#973): those are checked by spec #31's
+    # guarantees against the expected calls, and the rest of the export byte for byte.
+    if ! jq -e --slurpfile b "$run/base/$w/export.json" '.calls == $b[0].calls' \
+      "$run/base/$w/expected.json" >/dev/null; then
+      jq -r --slurpfile expected "$run/base/$w/expected.json" -f "$HERE/a8-communities.jq" \
+        "$run/head/$w/export.json" > "$run/$w-communities.txt" || die "community check failed on $w"
+      if [ -s "$run/$w-communities.txt" ]; then
+        failures=$((failures + 1))
+        { echo "- $w: FAIL communities against the expected calls:"; sed 's/^/  - /' "$run/$w-communities.txt"; } >> "$out"
+      else
+        echo "- $w: communities hold spec #31 over the expected calls (members, names, connected)" >> "$out"
+      fi
+      for f in "$run/base/$w/expected.json" "$run/head/$w/actual.json"; do
+        jq -S 'del(.communities)' "$f" > "$f.tmp" && mv "$f.tmp" "$f" || die "jq failed on $f"
+      done
+    fi
     if cmp -s "$run/base/$w/expected.json" "$run/head/$w/actual.json"; then
       echo "- $w: complete export matches base plus specified resolutions" >> "$out"
     else

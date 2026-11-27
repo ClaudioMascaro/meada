@@ -155,6 +155,14 @@ fn ts() -> Vec<Case> {
         t("members", x(format!("a{}", ".b".repeat(5 * LONG)))),
         t("method-chain", x(format!("a{}", ".m(1)".repeat(5 * LONG)))),
         t(
+            "receiver-annotations",
+            format!(
+                "class Client<T> {{ send() {{}} }}\ntype Cycle = Cycle;\nfunction f(a: {}, b: {}, c: Cycle) {{ a.send(); b.send(); c.send(); }}",
+                nest("Client<", "string", ">", 200),
+                vec!["Client<string>"; 10_000].join(" | "),
+            ),
+        ),
+        t(
             "blocks",
             format!("export function f() {{ {} }}\n", nest("{", "", "}", DEEP)),
         ),
@@ -1274,6 +1282,15 @@ fn go() -> Vec<Case> {
                     DEEP
                 )
             )),
+        ),
+        // Type uses nested past every depth limit of the pack: slices and function types.
+        m(
+            "nested types",
+            format!(
+                "package h\n\nimport \"example.com/h/svc\"\n\nvar s {}svc.T\n\nvar f {}\n",
+                "[]".repeat(DEEP),
+                nest("func(", "svc.T", ")", DEEP)
+            ),
         ),
         m(
             "chi route functions",

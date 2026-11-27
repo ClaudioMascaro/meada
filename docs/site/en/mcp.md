@@ -36,7 +36,7 @@ wait their turn. In your agent's configuration (for example Claude Code's `.mcp.
       "mcpServers": {
         "meada": {
           "command": "sh",
-          "args": ["-c", "exec docker run -i --rm --network none --user \"$(id -u):$(id -g)\" -v \"${PWD%/*}:${PWD%/*}\" -w \"$PWD\" ghcr.io/claudiomascaro/meada:1.5.0 mcp"]
+          "args": ["-c", "exec docker run -i --rm --network none --user \"$(id -u):$(id -g)\" -v \"${PWD%/*}:${PWD%/*}\" -w \"$PWD\" ghcr.io/claudiomascaro/meada:1.6.0 mcp"]
         }
       }
     }
@@ -94,7 +94,7 @@ for the version it was published with; fetch the one for your version.
 
     ```sh
     mkdir -p ~/.claude/skills/meada
-    curl -fsSL https://raw.githubusercontent.com/ClaudioMascaro/meada/v1.5.0/skills/meada/SKILL.md -o ~/.claude/skills/meada/SKILL.md
+    curl -fsSL https://raw.githubusercontent.com/ClaudioMascaro/meada/v1.6.0/skills/meada/SKILL.md -o ~/.claude/skills/meada/SKILL.md
     ```
 
 - **Another agent that reads skill folders** (`SKILL.md` with frontmatter): copy the

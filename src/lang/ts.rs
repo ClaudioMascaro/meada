@@ -7,11 +7,14 @@ use std::rc::Rc;
 use tree_sitter::{Language, Node, Parser};
 
 use super::{
-    Binds, Call, ConfigInput, Const, Declaration, Def, Export, Facts, Field, Import, Imported,
-    Invocation, Kind, LanguagePack, Modules, Param, Part, Ty, Value, children, named, text,
+    Binds, Call, ConfigInput, Const, Declaration, Def, Export, Facts, Field, FieldWrites, Import,
+    Imported, Invocation, Kind, LanguagePack, Modules, Param, Part, Ty, Value, children, named,
+    text,
 };
 use crate::{Result, package, qualify};
 
+mod globals;
+mod receivers;
 mod references;
 mod types;
 mod uses;
@@ -91,7 +94,7 @@ impl LanguagePack for TsJs {
             member_writes: Some(Vec::new()),
             ..Facts::default()
         };
-        let mut write_bytes = 0;
+        let mut write_bytes = [0; 2];
         let mut receiver_bytes = 0;
         let mut uses = uses::Uses::new(src, &parents);
         let mut references = references::References::default();
@@ -101,15 +104,21 @@ impl LanguagePack for TsJs {
         let typescript = path.ends_with(".ts") || path.ends_with(".tsx");
         let mut sealed: Vec<(String, String, Option<Value>)> = Vec::new();
         let mut writes: BTreeMap<(Option<String>, String), Vec<Option<Value>>> = BTreeMap::new();
+        // The private fields by class and name with their initializer (`private_field`), and
+        // each member write's value as a statement of any method (`Stated`, `member_writes`).
+        let mut private: Vec<(String, String, Stated)> = Vec::new();
+        let mut stated: BTreeMap<(Option<String>, String), Vec<Stated>> = BTreeMap::new();
         let mut assigned = HashSet::new();
         let mut query_writes = HashMap::new();
         let mut query_locals = Vec::new();
         // Each function definition by its node: the `return`s written in its body.
         let mut functions: HashMap<usize, usize> = HashMap::new();
+        let mut results: HashMap<usize, usize> = HashMap::new();
         // Explicit stack instead of recursion: generated code can nest deeper than the call
         // stack.
         let mut stack = vec![Visit {
             node: root,
+            block: root,
             scope: String::new(),
             depth: 0,
             body: root,
@@ -117,12 +126,18 @@ impl LanguagePack for TsJs {
         }];
         while let Some(Visit {
             node,
+            block,
             scope,
             depth,
             body,
             binding,
         }) = stack.pop()
         {
+            let block = match node.kind() {
+                "statement_block" | "switch_body" | "for_statement" | "for_in_statement"
+                | "catch_clause" | "class_static_block" => node,
+                _ => block,
+            };
             let mut inner = scope.clone();
             let mut defined = definition(node, binding, src, &parents);
             if depth >= DEFINITION_DEPTH
@@ -162,6 +177,7 @@ impl LanguagePack for TsJs {
                         .unwrap_or_default(),
                     ..Def::new(inner.clone(), kind, range)
                 });
+                receivers::definition(node, src, &inner, &parents, &mut facts);
             }
             references.visit(node, &scope, src, &parents);
             match node.kind() {
@@ -172,19 +188,43 @@ impl LanguagePack for TsJs {
                     let arguments =
                         (node.child_by_field_name("arguments")).filter(|a| a.kind() == "arguments");
                     if let Some(function) = callee_node(node) {
+                        if let Some(receiver) = results.remove(&node.id()) {
+                            facts.receivers[receiver].class =
+                                super::Class::Result(facts.calls.len());
+                        }
                         // The artifact's `await` is outside the call: so is its span.
                         let start = if awaited_artifact(node) {
                             function.start_byte()
                         } else {
                             node.start_byte()
                         };
+                        if function.kind() == "member_expression"
+                            && let Some(head) =
+                                function.child_by_field_name("object").map(unwrapped)
+                            && head.kind() == "identifier"
+                            && globals::namespace(text(head, src))
+                            && parents.global(text(head, src), head.start_byte())
+                        {
+                            facts.ts_global_calls.insert((start, node.end_byte()));
+                        }
+                        let callee = callee(function, src);
+                        let (root, awaits) = receivers::wrapped(function, src)
+                            .map_or((None, false), |(name, awaited)| (Some(name), awaited));
+                        let head = root
+                            .as_deref()
+                            .or_else(|| callee.rsplit_once('.').map(|(h, _)| h));
+                        if head.is_some_and(|h| h.starts_with("this."))
+                            && !instance_context(function, &parents)
+                        {
+                            facts.ts_rebound_this.insert((start, node.end_byte()));
+                        }
                         facts.calls.push(Call {
                             arity: None,
                             labels: None,
-                            awaited: false,
-                            constructs: false,
+                            awaited: receivers::awaited(node, &parents),
+                            constructs: node.kind() == "new_expression",
                             scope: scope.clone(),
-                            callee: callee(function, src),
+                            callee,
                             range: start..node.end_byte(),
                             args: arguments
                                 .map(|a| {
@@ -196,10 +236,10 @@ impl LanguagePack for TsJs {
                             kwargs: Vec::new(),
                             decorates: None,
                             by_path: false,
-                            root: None,
+                            root,
                             on: None,
                             unwraps: false,
-                            awaits: false,
+                            awaits,
                             receiver: (function.kind() == "member_expression")
                                 .then(|| function.child_by_field_name("object"))
                                 .flatten()
@@ -226,6 +266,12 @@ impl LanguagePack for TsJs {
                         });
                     }
                 }
+                "object" => {
+                    if let Some(owner) = literal_name(node, src, &parents) {
+                        let methods = literal_methods(node, src);
+                        facts.ts_literal_methods.insert(owner, methods);
+                    }
+                }
                 "interface_declaration" | "type_alias_declaration" => {
                     if let Some(name) = node.child_by_field_name("name") {
                         facts.consts.push(Const {
@@ -237,6 +283,14 @@ impl LanguagePack for TsJs {
                     }
                 }
                 "public_field_definition" if typescript => {
+                    if let Some(name) = private_field(node, src) {
+                        let initial = node.child_by_field_name("value");
+                        private.push((
+                            scope.clone(),
+                            name,
+                            stated_value(initial, src, &scope, &parents),
+                        ));
+                    }
                     if let Some(name) = sealed_field(node, src) {
                         let initial = node.child_by_field_name("value");
                         // A URL whose members `this.f` writes is no longer what it was built
@@ -256,9 +310,10 @@ impl LanguagePack for TsJs {
                 | "update_expression"
                     if typescript =>
                 {
-                    for (name, plain) in member_writes(node, src, &scope, &parents) {
-                        let at = writes.entry((name, scope.clone())).or_default();
+                    for (name, plain, value) in member_writes(node, src, &scope, &parents) {
+                        let at = writes.entry((name.clone(), scope.clone())).or_default();
                         at.push(plain);
+                        stated.entry((name, scope.clone())).or_default().push(value);
                     }
                 }
                 "import_statement" => {
@@ -336,7 +391,7 @@ impl LanguagePack for TsJs {
             {
                 query_locals.push((qualify(&scope, text(name, src)), scope.clone(), initial));
             }
-            selector_writes(node, src, &scope, &mut facts, &mut write_bytes);
+            selector_writes(node, src, &scope, &parents, &mut facts, &mut write_bytes);
             if node.kind() == "assignment_expression"
                 && named.is_some()
                 && let Some(Assigned {
@@ -372,7 +427,30 @@ impl LanguagePack for TsJs {
             };
             for name in pattern.map(|p| bound(p, src)).unwrap_or_default() {
                 if !(BODIES.contains(&node.kind()) && kept(&name)) {
-                    facts.locals.push(qualify(&inner, &name));
+                    let qualified = qualify(&inner, &name);
+                    if matches!(
+                        node.kind(),
+                        "variable_declarator" | "catch_clause" | "for_in_statement"
+                    ) {
+                        let start = pattern.map_or(node.start_byte(), |p| p.end_byte());
+                        let binding_block = if parents
+                            .of(node)
+                            .is_some_and(|p| p.kind() == "variable_declaration")
+                        {
+                            body
+                        } else {
+                            block
+                        };
+                        receivers::record(
+                            &mut facts.ts_locals,
+                            qualified.clone(),
+                            binding_block,
+                            start,
+                            None,
+                            None,
+                        );
+                    }
+                    facts.locals.push(qualified);
                 }
             }
             if node.kind() == "variable_declarator"
@@ -386,6 +464,16 @@ impl LanguagePack for TsJs {
                     src,
                     &scope,
                     &parents,
+                );
+                let receiver =
+                    receivers::local(node, name, src, &scope, &parents, &mut facts, &mut results);
+                receivers::record(
+                    &mut facts.ts_locals,
+                    qualify(&scope, name),
+                    block,
+                    node.end_byte(),
+                    receiver,
+                    Some(facts.consts.len()),
                 );
                 // A `new URL` whose path or host the file writes through its name is no longer
                 // the string it was built from.
@@ -406,6 +494,7 @@ impl LanguagePack for TsJs {
                         .filter(|(value, _, _)| value.id() == child.id())
                         .map(|(_, name, range)| (name.clone(), range.clone())),
                     node: child,
+                    block,
                     scope: inner.clone(),
                     depth: depth + usize::from(is_def),
                     body: if BODIES.contains(&node.kind()) {
@@ -424,6 +513,7 @@ impl LanguagePack for TsJs {
         // ponytail: a write through an alias of `this` (`const self = this; self.f = v`) or
         // `Object.assign(this, ..)` is not seen, nor a subclass that redeclares a non-private
         // `readonly` field; see `docs/agents/ceilings/language-packs.md`.
+        facts.field_writes = field_writes(private, &stated);
         for (class, name, initial) in sealed {
             let inside = |scope: &str| {
                 (scope.strip_prefix(class.as_str()))
@@ -500,6 +590,14 @@ impl LanguagePack for TsJs {
                 "do_statement",
             ],
         );
+        let typed: HashSet<_> = facts.receivers.iter().map(|r| r.name.as_str()).collect();
+        for (name, bindings) in std::mem::take(&mut facts.ts_locals) {
+            if typed.contains(name.rsplit('.').next().unwrap_or(&name)) {
+                facts.ts_locals.insert(name, bindings);
+            } else {
+                facts.ts_record_locals.insert(name, bindings);
+            }
+        }
         Ok(facts)
     }
 
@@ -781,6 +879,7 @@ fn join(dir: &str, path: &str) -> Option<String> {
 
 struct Visit<'t> {
     node: Node<'t>,
+    block: Node<'t>,
     scope: String,
     /// How many definitions enclose `node`.
     depth: usize,
@@ -853,6 +952,10 @@ struct Parents<'t> {
     /// Whether the file binds or assigns `require` anywhere: a `require(..)` is then no load.
     // ponytail: per file, not per scope; a file that shadows `require` once records none.
     require_declared: bool,
+    local_literals: HashMap<String, HashMap<usize, Option<usize>>>,
+    global_shadows: HashMap<String, Vec<Range<usize>>>,
+    imported_types: HashSet<String>,
+    promise_shadows: Vec<Range<usize>>,
     /// Merged lexical scopes that hide the runtime String conversion.
     string_shadows: Vec<Range<usize>>,
     /// Merged lexical scopes that hide the Node.js process object.
@@ -872,6 +975,9 @@ impl<'t> Parents<'t> {
         let mut url_required = false;
         let mut require_declared = false;
         let mut arrow_parameters = Vec::new();
+        let mut globals = globals::Bindings::default();
+        let mut bindings = HashMap::<String, Vec<Node>>::new();
+        let mut promise_bindings = Vec::new();
         let mut string_bindings = Vec::new();
         let mut string_writes = Vec::new();
         let mut process_bindings = Vec::new();
@@ -908,6 +1014,12 @@ impl<'t> Parents<'t> {
             {
                 arrow_parameters.push(left.start_byte());
             }
+            globals.visit(node, src, |name| {
+                bindings.entry(name.into()).or_default().push(node);
+            });
+            if declares_promise(node, src) {
+                promise_bindings.push(node);
+            }
             url_declared |= shadows_runtime(node, src, "URL");
             url_required |= runtime_url_require(node, src);
             require_declared |= shadows_runtime(node, src, "require");
@@ -922,6 +1034,9 @@ impl<'t> Parents<'t> {
             members_written(node, src, &mut written);
             let target = written_name_target(node);
             let names = target.map(|t| bound(t, src)).unwrap_or_default();
+            for name in &names {
+                globals.write(name, node.start_byte());
+            }
             if names.iter().any(|name| name == "String") {
                 string_writes.push(node.start_byte());
             }
@@ -943,15 +1058,57 @@ impl<'t> Parents<'t> {
             assigned,
             written,
             url_declared,
+            local_literals: HashMap::new(),
+            global_shadows: HashMap::new(),
+            imported_types: std::mem::take(&mut globals.imported_types),
+            promise_shadows: Vec::new(),
             string_shadows: Vec::new(),
             process_shadows: Vec::new(),
             strict_scopes,
             arrow_parameters,
         };
+        for (name, nodes) in bindings {
+            // Record shadowing declarations too, including parameters of anonymous functions.
+            let fresh = |node: Node<'t>| {
+                let declaration = parents.of(node)?;
+                (node.kind() == "variable_declarator"
+                    && node.child_by_field_name("name")?.kind() == "identifier"
+                    && declaration
+                        .child_by_field_name("kind")
+                        .is_some_and(|k| text(k, src) == "const")
+                    && unwrapped(node.child_by_field_name("value")?).kind() == "object"
+                    && literal_name(unwrapped(node.child_by_field_name("value")?), src, &parents)
+                        .is_none())
+                .then_some(node.end_byte())
+            };
+            if !nodes.iter().any(|n| fresh(*n).is_some()) {
+                continue;
+            }
+            let mut scopes = HashMap::new();
+            for node in nodes {
+                let Some(scope) = parents.binding_scope(node, src) else {
+                    scopes.clear();
+                    break;
+                };
+                scopes
+                    .entry(scope.id())
+                    .and_modify(|v| *v = None)
+                    .or_insert_with(|| fresh(node));
+            }
+            parents.local_literals.insert(name, scopes);
+        }
+        parents.global_shadows = globals.scopes(&parents, root, src);
+        parents.promise_shadows = parents.runtime_shadows(promise_bindings, Vec::new(), root, src);
         parents.string_shadows = parents.runtime_shadows(string_bindings, string_writes, root, src);
         parents.process_shadows =
             parents.runtime_shadows(process_bindings, process_writes, root, src);
         parents
+    }
+
+    fn global(&self, name: &str, at: usize) -> bool {
+        self.global_shadows
+            .get(name)
+            .is_none_or(|scopes| !runtime_hidden(scopes, at))
     }
 
     fn runtime_shadows(
@@ -991,26 +1148,52 @@ impl<'t> Parents<'t> {
         runtime_hidden(&self.string_shadows, at)
     }
 
+    fn local_literal(&self, object: Node<'t>, src: &[u8]) -> bool {
+        let object = unwrapped(object);
+        if object.kind() != "identifier" {
+            return false;
+        }
+        let Some(scopes) = self.local_literals.get(text(object, src)) else {
+            return false;
+        };
+        let mut scope = Some(object);
+        for _ in 0..FOLD_DEPTH {
+            let Some(node) = scope else { break };
+            if node.kind() == "with_statement" {
+                return false;
+            }
+            if let Some(declaration) = scopes.get(&node.id()) {
+                return declaration.is_some_and(|end| end <= object.start_byte());
+            }
+            scope = self.of(node);
+        }
+        false
+    }
+
     /// Parameters and expression names belong to their own function; declarations belong
     /// to their enclosing lexical scope, or function for var. A bounded lookup that cannot
     /// establish the scope conservatively hides the runtime throughout the file.
     fn runtime_scope(&self, node: Node<'t>, src: &[u8], root: Node<'t>) -> Range<usize> {
+        self.binding_scope(node, src).unwrap_or(root).byte_range()
+    }
+
+    fn binding_scope(&self, node: Node<'t>, src: &[u8]) -> Option<Node<'t>> {
         match node.kind() {
             "formal_parameters" => {
-                return self.of(node).unwrap_or(root).byte_range();
+                return self.of(node);
             }
             "catch_clause"
             | "arrow_function"
             | "function_expression"
             | "function"
             | "generator_function"
-            | "class" => return node.byte_range(),
+            | "class" => return Some(node),
             "for_in_statement"
                 if node
                     .child_by_field_name("kind")
                     .is_none_or(|kind| text(kind, src) != "var") =>
             {
-                return node.byte_range();
+                return Some(node);
             }
             _ => {}
         }
@@ -1034,11 +1217,11 @@ impl<'t> Parents<'t> {
                         "statement_block" | "for_statement" | "for_in_statement" | "switch_body"
                     ))
             {
-                return parent.byte_range();
+                return Some(parent);
             }
             at = self.of(parent);
         }
-        root.byte_range()
+        None
     }
 
     fn enclosing_strict(&self, node: Node) -> bool {
@@ -1091,6 +1274,29 @@ fn loads_from(node: Node, src: &[u8], up: &Parents) -> Option<String> {
     let mut args = named(node.child_by_field_name("arguments")?);
     let arg = args.next().filter(|a| a.kind() == "string")?;
     (loads && args.next().is_none()).then(|| unquote(arg, src))
+}
+
+/// Type declarations and imported local names can hide the built-in Promise type.
+fn declares_promise(node: Node, src: &[u8]) -> bool {
+    match node.kind() {
+        "type_alias_declaration"
+        | "interface_declaration"
+        | "class_declaration"
+        | "abstract_class_declaration"
+        | "class"
+        | "enum_declaration" => node
+            .child_by_field_name("name")
+            .is_some_and(|name| text(name, src) == "Promise"),
+        "internal_module" | "module" => node.child_by_field_name("name").is_some_and(|name| {
+            let start = name.start_byte();
+            name.named_descendant_for_byte_range(start, start + 1)
+                .is_some_and(|first| first.kind() == "identifier" && text(first, src) == "Promise")
+        }),
+        "import_statement" | "import_alias" | "import_require_clause" => {
+            shadows_runtime(node, src, "Promise")
+        }
+        _ => false,
+    }
 }
 
 /// Whether `node` binds `name`, hiding the runtime name. Only the named `URL` export of Node's
@@ -1296,23 +1502,26 @@ fn written_name_target(node: Node) -> Option<Node> {
     }
 }
 
-fn selector_writes(node: Node, src: &[u8], scope: &str, facts: &mut Facts, spent: &mut usize) {
+fn selector_writes(
+    node: Node,
+    src: &[u8],
+    scope: &str,
+    up: &Parents,
+    facts: &mut Facts,
+    spent: &mut [usize; 2],
+) {
     if facts.member_writes.is_none() {
         return;
     }
-    let target = match node.kind() {
-        "assignment_expression" | "augmented_assignment_expression" => {
-            node.child_by_field_name("left")
-        }
-        "update_expression" => node
-            .child_by_field_name("argument")
-            .or_else(|| named(node).next()),
-        "unary_expression" if children(node).any(|n| text(n, src) == "delete") => node
-            .child_by_field_name("argument")
-            .or_else(|| named(node).next()),
-        _ => return,
-    };
-    let mut pending: Vec<_> = target.into_iter().collect();
+    let target =
+        if node.kind() == "unary_expression" && children(node).any(|n| text(n, src) == "delete") {
+            node.child_by_field_name("argument")
+                .or_else(|| named(node).next())
+        } else {
+            written_name_target(node)
+        };
+    let Some(target) = target else { return };
+    let mut pending = vec![target];
     while let Some(target) = pending.pop() {
         if facts.member_writes.is_none() {
             break;
@@ -1340,14 +1549,70 @@ fn selector_writes(node: Node, src: &[u8], scope: &str, facts: &mut Facts, spent
             }
         };
         if let Some(object) = target.child_by_field_name("object") {
+            let owner = |object| {
+                let name = callee(object, src);
+                if (name == "this" || name.starts_with("this.")) && !instance_context(target, up) {
+                    "(this)".into()
+                } else {
+                    name
+                }
+            };
+            let mut depth = 0;
+            let mut inner = unwrapped(object);
+            while !facts.ts_record_writes_incomplete
+                && matches!(inner.kind(), "subscript_expression" | "member_expression")
+            {
+                depth += 1;
+                let Some(receiver) = inner.child_by_field_name("object") else {
+                    break;
+                };
+                let name = inner
+                    .child_by_field_name("property")
+                    .map(|p| text(p, src).into())
+                    .or_else(|| {
+                        inner
+                            .child_by_field_name("index")
+                            .filter(|n| n.kind() == "string")
+                            .map(|n| unquote(n, src))
+                    });
+                if up.local_literal(receiver, src) {
+                    facts
+                        .ts_local_literal_writes
+                        .entry(owner(receiver))
+                        .or_default()
+                        .insert(node.start_byte());
+                }
+                let write = super::MemberWrite {
+                    scope: scope.into(),
+                    object: owner(receiver),
+                    field: name,
+                    range: node.byte_range(),
+                };
+                spent[1] = spent[1].saturating_add(write.bytes());
+                if depth > FOLD_DEPTH || spent[1] > super::MAX_BYTES {
+                    facts.ts_record_writes_incomplete = true;
+                    facts.ts_record_writes.clear();
+                    break;
+                }
+                facts.ts_record_writes.push(write);
+                inner = unwrapped(receiver);
+            }
+            if up.local_literal(object, src) {
+                facts
+                    .ts_local_literal_writes
+                    .entry(owner(object))
+                    .or_default()
+                    .insert(node.start_byte());
+            }
+            let object = owner(object);
             facts.member_write(
                 super::MemberWrite {
                     scope: scope.into(),
-                    object: callee(object, src),
+                    object,
                     field,
                     range: node.byte_range(),
                 },
-                spent,
+                &mut spent[0],
             );
         }
     }
@@ -1646,7 +1911,10 @@ fn assignment(node: Node, src: &[u8], up: &Parents) -> Option<Assigned> {
 /// The name of the top-level `const` whose object literal holds `property` (a pair or a
 /// method): `o` for the `litM` of `const o = { litM() {} }`.
 fn literal_owner(property: Node, src: &[u8], up: &Parents) -> Option<String> {
-    let object = up.of(property).filter(|o| o.kind() == "object")?;
+    literal_name(up.of(property).filter(|o| o.kind() == "object")?, src, up)
+}
+
+fn literal_name(object: Node, src: &[u8], up: &Parents) -> Option<String> {
     let declarator = (up.of(object)).filter(|d| d.kind() == "variable_declarator")?;
     let name = declarator.child_by_field_name("name")?;
     let declaration = up.of(declarator)?;
@@ -1661,6 +1929,47 @@ fn literal_owner(property: Node, src: &[u8], up: &Parents) -> Option<String> {
             .is_some_and(|k| text(k, src) == "const")
         && top.kind() == "program")
         .then(|| text(name, src).to_string())
+}
+
+/// Inspect each key once. A later spread or computed key may change any earlier method.
+fn literal_methods(object: Node, src: &[u8]) -> BTreeMap<String, bool> {
+    let mut methods = BTreeMap::new();
+    let mut wildcard = 0;
+    for member in named(object) {
+        let key = member
+            .child_by_field_name("name")
+            .or_else(|| member.child_by_field_name("key"))
+            .or_else(|| (member.kind() == "shorthand_property_identifier").then_some(member));
+        if member.kind() == "spread_element"
+            || key.is_some_and(|k| k.kind() == "computed_property_name")
+        {
+            wildcard = member.end_byte();
+            continue;
+        }
+        let Some(key) = key else { continue };
+        let name = if key.kind() == "string" {
+            unquote(key, src)
+        } else {
+            text(key, src).to_string()
+        };
+        let method = key.kind() == "property_identifier"
+            && match member.kind() {
+                "method_definition" => !children(member).any(|n| matches!(n.kind(), "get" | "set")),
+                "pair" => member
+                    .child_by_field_name("value")
+                    .is_some_and(|v| FUNCTIONS.contains(&v.kind())),
+                _ => false,
+            };
+        if let Some(position) = methods.get_mut(&name) {
+            *position = 0;
+        } else if method {
+            methods.insert(name, member.end_byte());
+        }
+    }
+    methods
+        .into_iter()
+        .map(|(name, at)| (name, at <= wildcard))
+        .collect()
 }
 
 /// The bindings of `import d, { a, b as c } from 's'` and `import * as ns from 's'`.
@@ -2025,6 +2334,25 @@ fn parts(node: Node, src: &[u8], up: &Parents) -> Option<Vec<Part>> {
     parts_at(node, src, up, 0)
 }
 
+fn trailing_slash<'a>(call: Node<'a>, src: &[u8]) -> Option<(Node<'a>, super::SlashStrip)> {
+    let function = call.child_by_field_name("function")?;
+    if text(function.child_by_field_name("property")?, src) != "replace" {
+        return None;
+    }
+    let mut args = named(call.child_by_field_name("arguments")?).filter(|a| a.kind() != "comment");
+    let pattern = args.next().filter(|a| a.kind() == "regex")?;
+    let replacement = args.next()?;
+    if args.next().is_some() || !matches!(text(replacement, src), "''" | "\"\"" | "``") {
+        return None;
+    }
+    let strip = match text(pattern, src) {
+        r"/\/$/" | r"/\/$/g" => super::SlashStrip::One,
+        r"/\/+$/" | r"/\/+$/g" | r"/\/*$/" | r"/\/*$/g" => super::SlashStrip::All,
+        _ => return None,
+    };
+    Some((function.child_by_field_name("object")?, strip))
+}
+
 /// `parts` of a node `depth` levels inside the expression it started from; past `FOLD_DEPTH`
 /// the rest is a hole.
 fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Part>> {
@@ -2084,6 +2412,29 @@ fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
         "identifier" if text(node, src) != "undefined" => {
             Some(vec![Part::Ref(text(node, src).to_string())])
         }
+        "member_expression"
+            if let Some(indexed) = node.child_by_field_name("object")
+                && indexed.kind() == "subscript_expression"
+                && let Some(field) =
+                    this_member(indexed.child_by_field_name("object")?, src, up) =>
+        {
+            let property = text(node.child_by_field_name("property")?, src).to_owned();
+            let key = indexed.child_by_field_name("index")?;
+            let mut out = vec![Part::RecordStart {
+                at: key.start_byte(),
+                field,
+                property,
+            }];
+            if key.kind() == "number"
+                && let Ok(n) = text(key, src).parse::<u32>()
+            {
+                out.push(Part::Text(n.to_string()));
+            } else {
+                out.extend(inside(key));
+            }
+            out.push(Part::RecordEnd);
+            Some(out)
+        }
         "member_expression" if let Some(name) = this_member(node, src, up) => {
             Some(vec![Part::Ref(name)])
         }
@@ -2091,6 +2442,9 @@ fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
         | "non_null_expression"
         | "as_expression"
         | "satisfies_expression" => parts(named(node).next()?),
+        "call_expression" if let Some((object, strip)) = trailing_slash(node, src) => {
+            Some(strip.wrap(inside(object)))
+        }
         _ => url_form(node, src, up, depth)
             .or_else(|| env_read(node, src, up, depth).map(|env| vec![env])),
     }
@@ -2249,16 +2603,33 @@ const CONFIG_READS: &[&str] = &["getString", "getOptionalString"];
 
 /// `config.getString('a.b')` as a `Part::Read` of the key, for the kind to decide.
 fn config_read(call: Node, function: Node, src: &[u8]) -> Option<Part> {
-    let args = call.child_by_field_name("arguments")?;
-    let mut args = named(args);
-    let key = args.next().filter(|k| k.kind() == "string")?;
-    if args.next().is_some() {
-        return None;
+    let key = |call: Node| {
+        let mut args =
+            named(call.child_by_field_name("arguments")?).filter(|n| n.kind() != "comment");
+        let arg = args.next().filter(|k| k.kind() == "string")?;
+        args.next().is_none().then(|| unquote(arg, src))
+    };
+    let mut keys = vec![key(call)?];
+    let mut base = function.child_by_field_name("object")?;
+    while base.kind() == "call_expression" {
+        let method = callee_node(base)?;
+        if !method
+            .child_by_field_name("property")
+            .is_some_and(|p| matches!(text(p, src), "getConfig" | "getOptionalConfig"))
+        {
+            break;
+        }
+        if keys.len() >= FOLD_DEPTH {
+            return None;
+        }
+        keys.push(key(base)?);
+        base = method.child_by_field_name("object")?;
     }
+    keys.reverse();
     Some(Part::Read {
         scope: std::sync::Arc::from(""),
         callee: callee(function, src),
-        key: unquote(key, src),
+        key: keys.join("."),
         parameter: false,
         then: Vec::new(),
     })
@@ -2284,24 +2655,29 @@ fn this_member(node: Node, src: &[u8], up: &Parents) -> Option<String> {
     if object.kind() != "this" || !named {
         return None;
     }
+    instance_context(node, up).then(|| format!("this.{}", text(property, src)))
+}
+
+fn instance_context(node: Node, up: &Parents) -> bool {
     let mut at = node;
     for _ in 0..THIS_CLIMB {
-        let parent = up.of(at)?;
+        let Some(parent) = up.of(at) else {
+            return false;
+        };
         match parent.kind() {
             "class_body" => {
-                let shared = (at.children(&mut at.walk())).any(|c| c.kind() == "static");
-                let instance = !shared && at.kind() != "class_static_block";
-                return instance.then(|| format!("this.{}", text(property, src)));
+                return at.kind() != "class_static_block"
+                    && !children(at).any(|c| c.kind() == "static");
             }
             "method_definition" if up.of(parent).is_none_or(|b| b.kind() != "class_body") => {
-                return None;
+                return false;
             }
-            kind if kind != "arrow_function" && FUNCTIONS.contains(&kind) => return None,
-            "function_declaration" | "generator_function_declaration" => return None,
+            kind if kind != "arrow_function" && FUNCTIONS.contains(&kind) => return false,
+            "function_declaration" | "generator_function_declaration" => return false,
             _ => at = parent,
         }
     }
-    None
+    false
 }
 
 /// The name of the instance field `node` (a `public_field_definition`) declares, when only its
@@ -2311,12 +2687,27 @@ fn this_member(node: Node, src: &[u8], up: &Parents) -> Option<String> {
 /// private names (https://tc39.es/ecma262/#sec-private-names). A `static` or `abstract` field
 /// is no instance's.
 fn sealed_field(node: Node, src: &[u8]) -> Option<String> {
+    let (name, private, readonly) = instance_field(node, src)?;
+    (private || readonly).then_some(name)
+}
+
+/// The name of the instance field `node` (a `public_field_definition`) declares when only its
+/// class may reach it (`private`, `#x`), whatever writes it there (`Facts::field_writes`).
+fn private_field(node: Node, src: &[u8]) -> Option<String> {
+    let (name, private, _) = instance_field(node, src)?;
+    private.then_some(name)
+}
+
+/// The plain name of the instance field `node` declares, whether only its class may reach it
+/// and whether it is `readonly`; `None` for a `static` or `abstract` field or a computed name.
+fn instance_field(node: Node, src: &[u8]) -> Option<(String, bool, bool)> {
     let name = node.child_by_field_name("name")?;
-    let mut sealed = name.kind() == "private_property_identifier";
+    let mut private = name.kind() == "private_property_identifier";
+    let mut readonly = false;
     for child in node.children(&mut node.walk()) {
         match child.kind() {
-            "readonly" => sealed = true,
-            "accessibility_modifier" if text(child, src) == "private" => sealed = true,
+            "readonly" => readonly = true,
+            "accessibility_modifier" if text(child, src) == "private" => private = true,
             "static" | "abstract" => return None,
             _ => {}
         }
@@ -2325,7 +2716,57 @@ fn sealed_field(node: Node, src: &[u8]) -> Option<String> {
         name.kind(),
         "property_identifier" | "private_property_identifier"
     );
-    (sealed && plain).then(|| text(name, src).to_string())
+    plain.then(|| (text(name, src).to_string(), private, readonly))
+}
+
+/// What one write gives a private field (`Facts::field_writes`): `Some(Some(v))` the value of a
+/// plain `this.f = v` statement or an initializer, `Some(None)` a `null` or no initializer,
+/// `None` any other write (an operator, a pattern, an expression that is no statement, a
+/// function).
+type Stated = Option<Option<Value>>;
+
+/// What the right side `right` of a plain write or an initializer gives (`Stated`).
+fn stated_value(right: Option<Node>, src: &[u8], scope: &str, up: &Parents) -> Stated {
+    match right {
+        None => Some(None),
+        Some(v) if v.kind() == "null" => Some(None),
+        Some(v) if FUNCTIONS.contains(&v.kind()) || v.kind() == "class" => None,
+        Some(v) => Some(Some(value(v, src, scope, up))),
+    }
+}
+
+/// The values each private field's class assigns it (`Facts::field_writes`): the writes of a
+/// member so named, or of a computed member of `this`, in scopes from its class down. None for a
+/// field one of them leaves unknown, nor for one only `null` reaches.
+fn field_writes(
+    private: Vec<(String, String, Stated)>,
+    stated: &BTreeMap<(Option<String>, String), Vec<Stated>>,
+) -> Vec<FieldWrites> {
+    let mut out = Vec::new();
+    for (class, name, initial) in private {
+        let inside = |scope: &str| {
+            (scope.strip_prefix(class.as_str())).is_some_and(|r| r.is_empty() || r.starts_with('.'))
+        };
+        let written = [Some(name.clone()), None].into_iter().flat_map(|key| {
+            let (from, to) = (class.clone(), format!("{class}/"));
+            (stated.range((key.clone(), from)..(key, to)))
+                .filter(|((_, scope), _)| inside(scope))
+                .flat_map(|((_, scope), values)| values.iter().map(move |v| (scope, v)))
+        });
+        let (mut values, mut known) = (Vec::new(), true);
+        for (scope, given) in std::iter::once((&class, &initial)).chain(written) {
+            match given {
+                None => known = false,
+                Some(None) => {}
+                Some(Some(value)) => values.push((scope.clone(), value.clone())),
+            }
+        }
+        if known && !values.is_empty() {
+            let name = qualify(&class, &name);
+            out.push(FieldWrites { name, values });
+        }
+    }
+    out
 }
 
 /// The members the write `node` (`=`, `op=`, `++`) assigns: each one's name, `None` for a
@@ -2337,7 +2778,7 @@ fn member_writes(
     src: &[u8],
     scope: &str,
     up: &Parents,
-) -> Vec<(Option<String>, Option<Value>)> {
+) -> Vec<(Option<String>, Option<Value>, Stated)> {
     let target = match node.kind() {
         "update_expression" => node.child_by_field_name("argument"),
         _ => node.child_by_field_name("left"),
@@ -2351,7 +2792,7 @@ fn member_writes(
             "member_expression" => t.child_by_field_name("property").map(|p| text(p, src)),
             "subscript_expression" => match t.child_by_field_name("index") {
                 Some(index) if index.kind() == "string" => {
-                    out.push((Some(unquote(index, src)), None));
+                    out.push((Some(unquote(index, src)), None, None));
                     continue;
                 }
                 _ if on_this => None,
@@ -2377,7 +2818,19 @@ fn member_writes(
                 false => value(v, src, scope, up),
             }
         });
-        out.push((name.map(str::to_string), plain));
+        // As a statement of any method, a write a private field's values hold (`Stated`).
+        let statement = node.kind() == "assignment_expression"
+            && Some(t) == target
+            && on_this
+            && up
+                .of(node)
+                .is_some_and(|s| s.kind() == "expression_statement");
+        // A computed member of `this` may be any field: it leaves each unknown.
+        let stated = match node.child_by_field_name("right") {
+            Some(right) if statement && name.is_some() => stated_value(Some(right), src, scope, up),
+            _ => None,
+        };
+        out.push((name.map(str::to_string), plain, stated));
     }
     out
 }
@@ -2496,6 +2949,29 @@ fn callee(node: Node, src: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::lang::Use;
+
+    #[test]
+    fn only_the_global_promise_supplies_an_awaited_output() {
+        for (declaration, global) in [
+            ("interface Promise<T> {}", false),
+            ("abstract class Promise<T> {}", false),
+            ("enum Promise { A }", false),
+            ("namespace Promise {}", false),
+            ("namespace Promise.Inner.Other {}", false),
+            ("import type { Other as Promise } from 'some-lib';", false),
+            ("import * as Promise from 'some-lib';", false),
+            ("import Promise = require('some-lib');", false),
+            ("import { Promise as Other } from 'some-lib';", true),
+            ("function other() { type Promise<T> = T; }", true),
+        ] {
+            let source = format!("function open(): Promise<Client> {{}} {declaration}");
+            let facts = TsJs.parse("a.ts", source.as_bytes()).unwrap();
+            let open = facts.defs.iter().find(|def| def.name == "open").unwrap();
+            assert_eq!(open.output.is_some(), global, "{declaration}");
+        }
+        let source = b"function open<Promise>(): Promise<Client> {}";
+        assert!(TsJs.parse("a.ts", source).unwrap().defs[0].output.is_none());
+    }
 
     #[test]
     fn a_tsconfig_that_is_invalid_or_past_the_size_limit_declares_no_paths() {
@@ -3681,5 +4157,42 @@ mod tests {
             assert_eq!(call.args.len(), 1);
             assert_eq!(&source[call.range.clone()], written);
         }
+    }
+
+    /// A private field (`private`, `#x`) keeps each non-null value its class writes it as a plain
+    /// statement or initializer, in the constructor or any method; a public or static field, one
+    /// only `null` reaches, one an operator or a computed member of `this` writes, keeps none.
+    #[test]
+    fn field_writes_keep_what_a_class_writes_its_private_fields() {
+        let src = "class C {\n\
+                   private a: X;\n\
+                   #b: X | null = null;\n\
+                   private c = make();\n\
+                   d: X;\n\
+                   private static e = make();\n\
+                   private f: X | null = null;\n\
+                   private g: X;\n\
+                   constructor(p) { this.a = p.one(); this.g = p; }\n\
+                   open() { this.#b = make(); this.f = null; this.d = make(); }\n\
+                   bump() { this.g += 1; }\n\
+                   }\n\
+                   class D { private a: X; m() { this.a = other(); } }\n\
+                   class E { private a = make(); m(k) { this[k] = 1; } }\n";
+        let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
+        let found: Vec<(&str, Vec<&str>)> = (facts.field_writes.iter())
+            .map(|w| {
+                (
+                    w.name.as_str(),
+                    w.values.iter().map(|(at, _)| at.as_str()).collect(),
+                )
+            })
+            .collect();
+        let expected: [(&str, Vec<&str>); 4] = [
+            ("C.a", vec!["C.constructor"]),
+            ("C.#b", vec!["C.open"]),
+            ("C.c", vec!["C"]),
+            ("D.a", vec!["D.m"]),
+        ];
+        assert_eq!(found, expected);
     }
 }

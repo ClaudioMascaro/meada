@@ -1,4 +1,4 @@
-extraction revision 6
+extraction revision 10
 
 CREATE TABLE meta (identity TEXT NOT NULL, configs TEXT NOT NULL);
 CREATE TABLE files (
@@ -23,7 +23,7 @@ CREATE INDEX candidates_call ON candidates (call);
 CREATE INDEX candidates_target ON candidates (target);
 CREATE TABLE contracts (
     role TEXT NOT NULL, contract TEXT, site TEXT NOT NULL, via TEXT, path TEXT NOT NULL,
-    method TEXT, fragments TEXT, shape TEXT, identity TEXT, lead TEXT
+    method TEXT, fragments TEXT, shape TEXT, identity TEXT, lead TEXT, cap TEXT, client TEXT
 );
 CREATE INDEX contracts_path ON contracts (path);
 CREATE TABLE documents (
@@ -399,6 +399,7 @@ sample.ts
     {
       "scope": "",
       "callee": "SNSClient",
+      "constructs": true,
       "range": {
         "start": 1125,
         "end": 1142
@@ -415,6 +416,7 @@ sample.ts
     {
       "scope": "publishAws",
       "callee": "PublishCommand",
+      "constructs": true,
       "range": {
         "start": 1179,
         "end": 1228
@@ -671,7 +673,44 @@ sample.ts
     "serve.item",
     "serve.error"
   ],
-  "receivers": [],
+  "receivers": [
+    {
+      "scope": "",
+      "name": "app",
+      "class": {
+        "Result": 0
+      }
+    },
+    {
+      "scope": "",
+      "name": "sdk",
+      "class": {
+        "Named": "SNSClient"
+      }
+    }
+  ],
+  "ts_locals": {
+    "app": [
+      {
+        "block": {
+          "start": 0,
+          "end": 1233
+        },
+        "declared": 370,
+        "receiver": 0
+      }
+    ],
+    "sdk": [
+      {
+        "block": {
+          "start": 0,
+          "end": 1233
+        },
+        "declared": 1142,
+        "receiver": 1
+      }
+    ]
+  },
   "member_writes": [],
   "loops": [
     {
@@ -1624,11 +1663,21 @@ sample.go
       "hash": "f75a453ef683fdbb85a2400d741944a6787e67bfcf9019f1b0f43c866372ac18"
     },
     {
-      "name": "Getter",
+      "name": "Settings",
       "kind": "Class",
       "range": {
         "start": 140,
-        "end": 184
+        "end": 189
+      },
+      "params": [],
+      "hash": "3cafee809ffb6d8f9539dc7c211d08f0ee6c1cf7480b3e53ad577a3db8c10abe"
+    },
+    {
+      "name": "Getter",
+      "kind": "Class",
+      "range": {
+        "start": 196,
+        "end": 240
       },
       "params": [],
       "hash": "e5d75616a1a42155674b4895cbd817dc1acd2d8537eab8dd8e89ea901fc912e4"
@@ -1637,8 +1686,8 @@ sample.go
       "name": "Getter.Get",
       "kind": "Method",
       "range": {
-        "start": 160,
-        "end": 182
+        "start": 216,
+        "end": 238
       },
       "params": [
         {
@@ -1655,8 +1704,8 @@ sample.go
       "name": "New",
       "kind": "Function",
       "range": {
-        "start": 186,
-        "end": 290
+        "start": 242,
+        "end": 346
       },
       "params": [
         {
@@ -1673,8 +1722,8 @@ sample.go
       "name": "Store.Get",
       "kind": "Method",
       "range": {
-        "start": 292,
-        "end": 354
+        "start": 348,
+        "end": 410
       },
       "params": [
         {
@@ -1720,6 +1769,12 @@ sample.go
     },
     {
       "Local": {
+        "exported": "Settings",
+        "local": "Settings"
+      }
+    },
+    {
+      "Local": {
         "exported": "Getter",
         "local": "Getter"
       }
@@ -1737,24 +1792,24 @@ sample.go
       "scope": "New",
       "callee": "fmt.Sprint",
       "range": {
-        "start": 231,
-        "end": 255
+        "start": 287,
+        "end": 311
       }
     },
     {
       "scope": "New",
       "callee": "db.Open",
       "range": {
-        "start": 257,
-        "end": 271
+        "start": 313,
+        "end": 327
       }
     },
     {
       "scope": "Store.Get",
       "callee": "Meters",
       "range": {
-        "start": 341,
-        "end": 352
+        "start": 397,
+        "end": 408
       }
     }
   ],
@@ -1764,6 +1819,33 @@ sample.go
     },
     {
       "name": "New.label"
+    }
+  ],
+  "references": [
+    {
+      "scope": "New",
+      "name": "Store",
+      "kind": "type",
+      "range": {
+        "start": 268,
+        "end": 273
+      }
+    },
+    {
+      "scope": "Store.Get",
+      "name": "Store",
+      "kind": "type",
+      "range": {
+        "start": 357,
+        "end": 362
+      }
+    }
+  ],
+  "env_fields": [
+    {
+      "class": "Settings",
+      "field": "URL",
+      "var": "STORE_URL"
     }
   ],
   "receivers": [
@@ -1786,6 +1868,13 @@ sample.go
       "name": "s",
       "class": {
         "Type": "Store"
+      }
+    },
+    {
+      "scope": "Settings",
+      "name": "URL",
+      "class": {
+        "Type": "string"
       }
     },
     {
@@ -1882,6 +1971,7 @@ sample.java
         "end": 451
       },
       "params": [],
+      "private": true,
       "hash": "3001d812e93de91045c564d8299adb118a7e7347157dc0c7c04ce371a0e4b383"
     },
     {
@@ -3298,6 +3388,9 @@ sample.tsx
         "end": 222
       },
       "params": [],
+      "bases": [
+        "Base"
+      ],
       "hash": "a2feefd823768a4791f10402389d9d823cf94d26fa280ce9ebab6fa6e1ae8479"
     },
     {
@@ -3379,6 +3472,7 @@ sample.tsx
     {
       "scope": "load",
       "callee": "(import)",
+      "awaited": true,
       "range": {
         "start": 282,
         "end": 306
@@ -3469,7 +3563,15 @@ sample.tsx
   "locals": [
     "load.Widget"
   ],
-  "receivers": [],
+  "receivers": [
+    {
+      "scope": "Page",
+      "name": "t",
+      "class": {
+        "Type": "Theme"
+      }
+    }
+  ],
   "member_writes": []
 }
 

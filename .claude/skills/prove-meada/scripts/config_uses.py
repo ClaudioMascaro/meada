@@ -61,7 +61,9 @@ def file_sha256(path):
 
 def expected_tools(base):
     """#672 adds the alert kind and #860 the CI kind to the search description of the pre-config catalog, and
-    nothing else. The CI sentence is the doc comment of `Search::kind` in `src/mcp.rs` at #860, line break included."""
+    #947 rewrites the context tool's symbol description, and nothing else. The CI sentence is the doc comment of
+    `Search::kind` in `src/mcp.rs` at #860, line break included; the symbol sentence is the doc comment of
+    `ContextArgs::symbol` in `src/mcp.rs` at #947 (c7e0d623)."""
     expected = copy.deepcopy(base)
     search = next(tool for tool in expected if tool['name'] == 'search')
     kind = search['inputSchema']['properties']['kind']
@@ -71,6 +73,13 @@ def expected_tools(base):
     if kind['description'].count(before) != 1:
         raise ValueError('pre-config search description differs from the pinned catalog')
     kind['description'] = kind['description'].replace(before, after, 1)
+    context = next(tool for tool in expected if tool['name'] == 'context')
+    symbol = context['inputSchema']['properties']['symbol']
+    if symbol['description'] != ('Symbol name, `<path>::<name>` or full identity; a resource, `resource::<kind>::<id>`; '
+                                 "a channel, `channel::<broker>::<name>`; or an IaC node's address."):
+        raise ValueError('pre-config context symbol description differs from the pinned catalog')
+    symbol['description'] = ('Symbol, `<path>::<name>` or full identity. Also accepts `http::GET::/orders`, '
+                             '`resource::<kind>::<id>`, `channel::<broker>::<name>`, or an IaC address.')
     return expected
 
 
@@ -416,7 +425,7 @@ class Probe:
                 expected=expected_orphan_rows(oracle)
                 self.check(name+' complete orphan set/count',orphan_set(h[name]['status'])==(expected,len(expected)),h[name]['status'])
                 self.comparisons.compare(name + ' existing status lines', strip_orphans(status_before_855(b[name]['status'])), strip_orphans(status_before_855(h[name]['status'])))
-        self.comparisons.compare('whole catalog, historical control plus #672 and #860', expected_tools(b['tools']), h['tools'])
+        self.comparisons.compare('whole catalog, historical control plus #672, #860 and #947', expected_tools(b['tools']), h['tools'])
         self.comparisons.compare('plain all query tools', b['plain_texts'], h['plain_texts'])
         for i,(q,text) in enumerate(zip(queries,h['texts'])):
             args=q['arguments']

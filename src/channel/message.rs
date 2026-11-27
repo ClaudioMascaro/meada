@@ -18,6 +18,11 @@ pub struct Message {
     pub path: String,
     pub call: usize,
     pub role: Side,
+    /// The declared `call` of the Client declaration that made the side (`[[channel_client]]`).
+    pub client: Option<String>,
+    /// The weakest level a link of the side may take: `inferred` for one of several names a
+    /// configuration key holds (`Found::cap`).
+    pub cap: Option<crate::contract::Level>,
 }
 
 #[derive(Clone)]
@@ -88,6 +93,19 @@ pub fn queue_name(url: Option<&Value>) -> Option<Option<String>> {
 /// What a form reads of a call's arguments: the channel names.
 pub type Read<'a> = &'a dyn Fn(&[Value], &Keywords) -> Option<Vec<Option<String>>>;
 
+/// What a form reads of a call's arguments: the channel names, and the environment variable an
+/// unresolved name is read from (`env_of`), which a workload that sets it names.
+pub type ReadEnv<'a> =
+    &'a dyn Fn(&[Value], &Keywords) -> Option<(Vec<Option<String>>, Option<String>)>;
+
+/// The environment variable `value` is read from, when it is one environment read.
+pub fn env_of(value: &Value) -> Option<String> {
+    match crate::names::argument(value)? {
+        crate::names::Argument::Environment(name) => Some(name),
+        _ => None,
+    }
+}
+
 /// A producer per name read at each site an expansion found.
 pub fn produce<'a>(
     code: &Code<'a>,
@@ -99,6 +117,17 @@ pub fn produce<'a>(
     produce_with(code, Expand::Call(path, n), None, broker, read)
 }
 
+/// `produce`, each unresolved side keeping the variable its name is read from.
+pub fn produce_env<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    n: usize,
+    broker: &'static str,
+    read: ReadEnv,
+) -> Vec<Message> {
+    produce_env_with(code, Expand::Call(path, n), None, broker, read)
+}
+
 /// `produce` from any start, with what `inject` reads off annotations (`Code::expand_with`).
 pub fn produce_with<'a>(
     code: &Code<'a>,
@@ -107,20 +136,34 @@ pub fn produce_with<'a>(
     broker: &'static str,
     read: Read,
 ) -> Vec<Message> {
+    let read = |a: &[Value], k: &Keywords| read(a, k).map(|names| (names, None));
+    produce_env_with(code, from, inject, broker, &read)
+}
+
+/// `produce_env` from any start, with what `inject` reads off annotations.
+pub fn produce_env_with<'a>(
+    code: &Code<'a>,
+    from: Expand<'a>,
+    inject: Option<&Inject<'a, '_>>,
+    broker: &'static str,
+    read: ReadEnv,
+) -> Vec<Message> {
     (code.expand_with(from, inject, read).into_iter())
         .flat_map(
             |Expanded {
                  site: (site, at),
-                 found: names,
+                 found: (names, environment),
                  ..
              }| {
                 names.into_iter().map(move |name| Message {
-                    environment: None,
+                    environment: environment.clone(),
                     broker,
                     name,
                     path: site.into(),
                     call: at,
                     role: Side::Producer,
+                    client: None,
+                    cap: None,
                 })
             },
         )
@@ -140,6 +183,18 @@ pub fn consume<'a>(
     consume_with(code, Expand::Call(path, n), None, broker, read, handler)
 }
 
+/// `consume`, each unresolved side keeping the variable its name is read from.
+pub fn consume_env<'a>(
+    code: &Code<'a>,
+    path: &'a str,
+    n: usize,
+    broker: &'static str,
+    read: ReadEnv,
+    handler: Option<Handler>,
+) -> Vec<Message> {
+    consume_env_with(code, Expand::Call(path, n), None, broker, read, handler)
+}
+
 /// `consume` from any start, with what `inject` reads off annotations (`Code::expand_with`).
 pub fn consume_with<'a>(
     code: &Code<'a>,
@@ -149,11 +204,24 @@ pub fn consume_with<'a>(
     read: Read,
     handler: Option<Handler>,
 ) -> Vec<Message> {
+    let read = |a: &[Value], k: &Keywords| read(a, k).map(|names| (names, None));
+    consume_env_with(code, from, inject, broker, &read, handler)
+}
+
+/// `consume_env` from any start, with what `inject` reads off annotations.
+pub fn consume_env_with<'a>(
+    code: &Code<'a>,
+    from: Expand<'a>,
+    inject: Option<&Inject<'a, '_>>,
+    broker: &'static str,
+    read: ReadEnv,
+    handler: Option<Handler>,
+) -> Vec<Message> {
     (code.expand_with(from, inject, read).into_iter())
         .flat_map(
             |Expanded {
                  site: (site, at),
-                 found: names,
+                 found: (names, environment),
                  ..
              }| {
                 let handler = handler.clone().unwrap_or_else(|| Handler::Def {
@@ -161,12 +229,14 @@ pub fn consume_with<'a>(
                     name: code.files()[site].calls[at].scope.clone(),
                 });
                 names.into_iter().map(move |name| Message {
-                    environment: None,
+                    environment: environment.clone(),
                     broker,
                     name,
                     path: site.into(),
                     call: at,
                     role: Side::Consumer(handler.clone()),
+                    client: None,
+                    cap: None,
                 })
             },
         )
@@ -224,6 +294,8 @@ pub fn publish_with<'a>(
                     path: site.into(),
                     call: at,
                     role,
+                    client: None,
+                    cap: None,
                 }
             },
         )
@@ -261,6 +333,8 @@ pub fn bind_with<'a>(
                     path: site.into(),
                     call: at,
                     role: Side::Binding { exchange, pattern },
+                    client: None,
+                    cap: None,
                 })
             },
         )

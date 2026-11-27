@@ -1,10 +1,8 @@
 //! Backstage configuration reads in the URLs of TypeScript consumers (#617). The pack writes
 //! what looks like a read, `config.getString('a.b')` or `getOptionalString`, as a `Part::Read`;
 //! this module decides. The key is looked up in the repository's `app-config*.yaml` files
-//! (`app-config.yaml` first, then the others in path order, the first that holds the key
-//! deciding), and a value that is exactly `${VAR}` makes the read the variable `VAR`
-//! (`Part::Env`), which `base_url_env` then maps. A literal value, a key no file holds and a
-//! read with a member left over stay unknown, as before.
+//! and their includes. Each distinct base supplies one reading. A value of exactly `${VAR}`
+//! supplies an environment read for `base_url_env` or workload configuration.
 //!
 //! Each root is read as a tree first (`includes`): an object whose only key is `$include` is
 //! replaced by the file (or the `#` key path of it) its value names, and one whose only key is
@@ -45,7 +43,7 @@ use crate::lang::{ConfigInput, Part, Value};
 use crate::resolve::Code;
 
 /// The reads of one extraction; the configuration files are parsed the first time one asks.
-pub(in crate::http) struct Config<'i> {
+pub(crate) struct Config<'i> {
     files: &'i [(&'i str, &'i [u8])],
     /// The config inputs that are symbolic links (`Indexed::symlinks`).
     symlinks: &'i [&'i str],
@@ -59,8 +57,12 @@ struct Read {
     keys: Properties,
     /// The keys two files give different values.
     contested: BTreeSet<String>,
+    /// Every value the files give each key (`Config::literals`).
+    literals: BTreeMap<String, BTreeSet<String>>,
     /// The includes no root followed, each once, sorted.
     unfollowed: Vec<Unfollowed>,
+    /// Whether a root was dropped (past `MAX_BYTES`, or not parsing): `literals` may lack values.
+    dropped: bool,
     /// Whether any file has a `proxy.endpoints` that is not null, an empty object included, or an
     /// include not followed where it may hold one (`TABLE_PATHS`): Backstage reads that table
     /// whenever it exists, so an empty or unread one leaves no key to say so.
@@ -100,7 +102,7 @@ const ENDPOINTS: &str = "proxy.endpoints.";
 const LEGACY: &str = "proxy.";
 
 impl<'i> Config<'i> {
-    pub(in crate::http) fn new(indexed: &Indexed<'i>) -> Self {
+    pub(crate) fn new(indexed: &Indexed<'i>) -> Self {
         Self::of(indexed.configs, indexed.symlinks)
     }
 
@@ -113,31 +115,97 @@ impl<'i> Config<'i> {
         }
     }
 
-    /// The arguments of a `fetch` with the reads in its URL decided.
-    pub(super) fn decided(&self, args: &[Value]) -> Vec<Value> {
-        let mut args = args.to_vec();
-        if let Some(Value::Str(parts)) = args.first_mut() {
-            for part in parts.iter_mut() {
-                if let Part::Read {
-                    callee, key, then, ..
-                } = part
-                {
-                    *part = match (then.is_empty() && !callee.ends_with(".getBaseUrl"))
-                        .then(|| self.variable(key))
-                        .flatten()
-                    {
-                        Some(var) => Part::Env(var),
-                        None => Part::Hole,
-                    };
+    /// A runtime record key can pick any entry. Each selected base still goes through config
+    /// substitution and the value's own trailing-slash operations.
+    pub(super) fn decided<R>(
+        &self,
+        args: Vec<Value>,
+        mut read: impl FnMut(&mut [Value], bool) -> Option<R>,
+    ) -> Option<Vec<R>> {
+        if let Some(Value::Str(parts)) = args.first()
+            && let Some(index) = parts.iter().position(|part| {
+                !matches!(part, Part::StripStart)
+                    && !matches!(part, Part::Text(text) if text.is_empty())
+            })
+            && let Part::RecordValues { key: None, values } = &parts[index]
+        {
+            let mut readings = Vec::new();
+            for value in values {
+                let mut args = args.clone();
+                if let Value::Str(parts) = &mut args[0] {
+                    parts.splice(index..=index, value.iter().cloned());
+                }
+                readings.extend(self.configured(args, |args, _| read(args, true))?);
+            }
+            return Some(readings);
+        }
+        self.configured(args, read)
+    }
+
+    /// Read each configured base separately. Other URL components retain their environment reads.
+    fn configured<R>(
+        &self,
+        mut args: Vec<Value>,
+        mut read: impl FnMut(&mut [Value], bool) -> Option<R>,
+    ) -> Option<Vec<R>> {
+        let Some(Value::Str(parts)) = args.first_mut() else {
+            return Some(vec![read(&mut args, false)?]);
+        };
+        let base = parts.iter().position(|p| {
+            !matches!(p, Part::StripStart) && !matches!(p, Part::Text(text) if text.is_empty())
+        });
+        let mut choices = None;
+        for (i, part) in parts.iter_mut().enumerate() {
+            if let Part::Read {
+                callee, key, then, ..
+            } = part
+            {
+                if then.is_empty() && !callee.ends_with(".getBaseUrl") {
+                    if Some(i) == base && !self.literals(key).is_empty() {
+                        choices = Some((i, self.literals(key)));
+                    }
+                    *part = self
+                        .keys()
+                        .get(key)
+                        .and_then(|value| env_var(value))
+                        .map_or(Part::Hole, Part::Env);
+                } else {
+                    *part = Part::Hole;
                 }
             }
         }
-        args
+        let Some((i, values)) = choices else {
+            return Some(vec![read(&mut args, false)?]);
+        };
+        let uncertain = values.len() > 1 || !self.whole();
+        values
+            .iter()
+            .map(|value| {
+                let mut args = args.clone();
+                if let Value::Str(parts) = &mut args[0] {
+                    parts[i] = if let Some(name) = env_var(value) {
+                        Part::Env(name)
+                    } else if value.contains("${") {
+                        Part::Hole
+                    } else {
+                        Part::Text(value.clone())
+                    };
+                }
+                read(&mut args, uncertain)
+            })
+            .collect()
     }
 
-    /// The variable a key's value names, when the first file holding the key gives `${VAR}`.
-    fn variable(&self, key: &str) -> Option<String> {
-        env_var(self.keys().get(key)?)
+    /// Distinct values from the roots and their includes, in deterministic order.
+    pub(crate) fn literals(&self, key: &str) -> &BTreeSet<String> {
+        static NONE: BTreeSet<String> = BTreeSet::new();
+        self.read().literals.get(key).unwrap_or(&NONE)
+    }
+
+    /// Whether `literals` holds every value the files may give: no root dropped, no include left
+    /// unfollowed (either may give any key another value).
+    pub(crate) fn whole(&self) -> bool {
+        !self.read().dropped && self.read().unfollowed.is_empty()
     }
 
     /// The keys of every `app-config*.yaml`, parsed the first time they are asked for.
@@ -158,8 +226,10 @@ impl<'i> Config<'i> {
             };
             let mut keys = BTreeMap::new();
             let mut contested = BTreeSet::new();
+            let mut literals: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
             let mut unfollowed = BTreeSet::new();
             let mut endpoints_table = false;
+            let mut dropped = false;
             let mut reading = includes::Reading::default();
             for (path, src) in roots(self.files) {
                 // An include not followed at the root, `proxy` or `proxy.endpoints` may hold the
@@ -169,11 +239,13 @@ impl<'i> Config<'i> {
                 unfollowed.extend(grafted.unfollowed);
                 endpoints_table |= grafted.watched_unread;
                 let Some(mut tree) = grafted.tree else {
+                    dropped = true;
                     continue;
                 };
                 expand(&mut tree);
                 endpoints_table |= !tree["proxy"]["endpoints"].is_null();
                 for (k, v) in flatten(&tree) {
+                    literals.entry(k.clone()).or_default().insert(v.clone());
                     match keys.get(&k) {
                         Some(kept) if *kept != v => {
                             contested.insert(k);
@@ -188,7 +260,9 @@ impl<'i> Config<'i> {
             Read {
                 keys,
                 contested,
+                literals,
                 unfollowed: unfollowed.into_iter().collect(),
+                dropped,
                 endpoints_table,
             }
         })
@@ -419,6 +493,8 @@ pub(in crate::http) fn unfollowed(code: &Code, config: &Config) -> Vec<Found> {
             fragments: vec![u.include.clone()],
             shape: None,
             lead: None,
+            cap: None,
+            client: None,
         })
         .collect()
 }
@@ -457,10 +533,13 @@ pub(crate) fn probe(files: &[(&str, Vec<u8>)]) -> usize {
     let url = [Value::Str(vec![Part::Text("/api/proxy/zz/x".into())])];
     let missed = config.proxied(&url).is_some() as usize;
     let keys: usize = (config.keys().iter()).map(|(k, v)| k.len() + v.len()).sum();
+    let literals: usize = (config.keys().keys())
+        .map(|k| config.literals(k).iter().map(String::len).sum::<usize>())
+        .sum();
     let unfollowed: usize = (config.unfollowed().iter())
         .map(|u| u.file.len() + u.include.len())
         .sum();
-    keys + config.endpoints().len() + missed + unfollowed
+    keys + literals + config.endpoints().len() + missed + unfollowed
 }
 
 #[cfg(test)]

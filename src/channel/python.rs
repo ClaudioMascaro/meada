@@ -302,6 +302,8 @@ fn sqs<'a>(code: &Code<'a>, path: &'a str, n: usize, consumer: bool) -> Vec<Mess
             path: expanded.site.0.into(),
             call: expanded.site.1,
             role: role.clone(),
+            client: None,
+            cap: None,
         })
     })
     .collect()

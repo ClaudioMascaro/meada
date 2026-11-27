@@ -485,6 +485,7 @@ mod tests {
             files: &[],
             configs: &configs,
             symlinks: &[],
+            channel_clients: &[],
         };
         let mut found: Vec<Sent> = (consumers(&code, &indexed).into_iter())
             .map(|f| (f.contract, f.via, f.method))

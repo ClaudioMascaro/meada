@@ -77,6 +77,8 @@ fn import_found(site: Site, specifier: String, chain: String) -> Found {
         fragments: Vec::new(),
         shape: None,
         lead: None,
+        cap: None,
+        client: None,
     }
 }
 
@@ -1432,6 +1434,8 @@ fn import(exports: &mut [Export], providers: &Providers) {
                         hops,
                         root: None,
                         lead: None,
+                        cap: None,
+                        client: None,
                     });
                 }
             }
@@ -1676,6 +1680,8 @@ fn exported_shapes(code: &Code, surface: &HashSet<String>) -> Vec<Found> {
                     fragments: Vec::new(),
                     shape: Some(shape),
                     lead: None,
+                    cap: None,
+                    client: None,
                 });
             }
         }
@@ -1724,6 +1730,8 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                     hops,
                     root: None,
                     lead: None,
+                    cap: None,
+                    client: None,
                 };
                 let installed = installed.entry(step_of(&script.site).0).or_default();
                 // The rows the CI step holds already: a package once, a script once.
@@ -1862,6 +1870,8 @@ fn consume(exports: &mut [Export], providers: &Providers) {
                         hops: Vec::new(),
                         root: None,
                         lead: None,
+                        cap: None,
+                        client: None,
                     });
                     let mut dependency = Dependency::default();
                     dependency.manifest = manifest.path.clone();
@@ -2564,6 +2574,8 @@ mod tests {
                 hops: Vec::new(),
                 root: None,
                 lead: None,
+                cap: None,
+                client: None,
             }],
             calls: vec![call_site],
             ..Export::default()
@@ -2782,6 +2794,7 @@ mod tests {
                 files: &names,
                 configs: &[],
                 symlinks: &[],
+                channel_clients: &[],
             };
             let found = Packages.extract(&code, &indexed);
             let mut rows: Vec<_> = (found.iter())
@@ -3155,6 +3168,8 @@ mod tests {
             hops: Vec::new(),
             root: None,
             lead: None,
+            cap: None,
+            client: None,
         };
         let repo = Repository {
             root: "/nonexistent".into(),
