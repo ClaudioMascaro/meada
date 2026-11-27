@@ -1208,13 +1208,38 @@ fn calls_method_of(call: Node, name: &str, src: &[u8]) -> bool {
     (call.child_by_field_name("function"))
         .filter(|f| f.kind() == "selector_expression")
         .and_then(|f| f.child_by_field_name("operand"))
-        .is_some_and(|o| o.kind() == "identifier" && text(o, src) == name)
+        .is_some_and(|o| is_name(written_base(o), name, src))
+}
+
+/// The name a write to `node` writes: through a field, an element, a pointee or an address
+/// (`u.Host`, `m[k]`, `*p`, `&u.Host`) and parentheses.
+fn written_base(mut node: Node) -> Node {
+    for _ in 0..PATH_DEPTH {
+        let next = match node.kind() {
+            "selector_expression" | "index_expression" | "unary_expression" => {
+                node.child_by_field_name("operand")
+            }
+            "parenthesized_expression" => named(node).next(),
+            _ => None,
+        };
+        match next {
+            Some(inner) => node = inner,
+            None => break,
+        }
+    }
+    node
+}
+
+/// Whether `node` is the identifier `name`.
+fn is_name(node: Node, name: &str, src: &[u8]) -> bool {
+    node.kind() == "identifier" && text(node, src) == name
 }
 
 /// Whether the body of `function` lets a deferred call write `name`, its named result: a
-/// function literal in it assigns it, increments it, decrements it or calls a method of it, or
-/// the body takes its address (`&base`). A name a literal declares again counts as the result,
-/// and so does a literal that is never deferred (the safe side).
+/// function literal in it assigns, increments, decrements or calls a method of it or of a field,
+/// element or pointee of it (`written_base`), or the body takes its address (`&base`,
+/// `&u.Host`). A name a literal declares again counts as the result, and so does a literal that
+/// is never deferred (the safe side).
 fn body_writes_result(function: Node, name: &str, src: &[u8]) -> bool {
     let mut stack: Vec<(Node, bool)> = function
         .child_by_field_name("body")
@@ -1222,16 +1247,24 @@ fn body_writes_result(function: Node, name: &str, src: &[u8]) -> bool {
         .into_iter()
         .collect();
     while let Some((n, in_literal)) = stack.pop() {
-        let targets = match n.kind() {
-            "assignment_statement" if in_literal => n.child_by_field_name("left"),
-            "inc_statement" | "dec_statement" if in_literal => Some(n),
+        let targets: Vec<Node> = match n.kind() {
+            "assignment_statement" if in_literal => match n.child_by_field_name("left") {
+                Some(left) if left.kind() == "expression_list" => named(left).collect(),
+                left => left.into_iter().collect(),
+            },
+            "inc_statement" | "dec_statement" if in_literal => named(n).collect(),
             "call_expression" if in_literal && calls_method_of(n, name, src) => return true,
             "unary_expression" => (n.child_by_field_name("operator"))
                 .filter(|o| text(*o, src) == "&")
-                .and_then(|_| n.child_by_field_name("operand")),
-            _ => None,
+                .and_then(|_| n.child_by_field_name("operand"))
+                .into_iter()
+                .collect(),
+            _ => Vec::new(),
         };
-        if targets.is_some_and(|t| identifiers(t).iter().any(|i| text(*i, src) == name)) {
+        if targets
+            .into_iter()
+            .any(|t| is_name(written_base(t), name, src))
+        {
             return true;
         }
         let inner = in_literal || n.kind() == "func_literal";
@@ -2266,6 +2299,22 @@ mod tests {
         )));
         assert!(unknown(
             "func f() (u URL) { defer u.fix(); return parse() }"
+        ));
+        // A write to a field, an element or the pointee of the result writes the result too.
+        assert!(unknown(
+            r#"func f() (u URL) { defer func() { u.Host = "y" }(); return parse() }"#
+        ));
+        assert!(unknown(
+            r#"func f() (m M) { defer func() { m["k"] = "y" }(); return parse() }"#
+        ));
+        assert!(unknown(
+            "func f() (u *URL) { defer func() { *u = URL{} }(); return parse() }"
+        ));
+        assert!(unknown(
+            "func f() (u URL) { defer func() { u.n++ }(); return parse() }"
+        ));
+        assert!(unknown(
+            "func f() (u URL) { defer fill(&u.Host); return parse() }"
         ));
         // Another name's address, or a method of another value, leaves the returns alone.
         assert!(!unknown(&format!(
