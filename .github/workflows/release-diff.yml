@@ -1,8 +1,8 @@
 name: Release diff
 
-# ADR 0029, "The release diff" (#852): on the release pull request, the links and orphan lines of the
-# candidate built from its head against the previous tag's release binary, over prove-meada's pinned public
-# corpora. The release pull request is the one titled `chore(release): <version>`, as the release notes'
+# ADR 0029, "The release diff" (#852): on the release pull request, the links, orphan lines and calls rows of
+# the candidate built from its head against the previous tag's release binary, and the cost of both, over
+# prove-meada's pinned public corpora. The release pull request is the one titled `chore(release): <version>`, as the release notes'
 # checklist names it: the title is in the event, so every other pull request skips the job without a runner.
 # A pull request retitled after it opened runs the job on its next push. The job also leaves the candidate
 # binary, which the release's smoke slices run: the release workflow only plans on a pull request.
@@ -67,7 +67,7 @@ jobs:
           path: ${{ runner.temp }}/candidate
           if-no-files-found: error
           retention-days: 30
-      - name: Diff links and orphan lines over the pinned public corpora
+      - name: Diff links, orphan lines and calls, and measure cost, over the pinned public corpora
         run: |
           python3 -m venv "$RUNNER_TEMP/venv"
           "$RUNNER_TEMP/venv/bin/pip" install --disable-pip-version-check PyYAML==6.0.3
@@ -85,6 +85,7 @@ jobs:
           path: |
             ${{ runner.temp }}/release-diff/diff.json
             ${{ runner.temp }}/release-diff/summary.md
+            ${{ runner.temp }}/release-diff/calls.json
             ${{ runner.temp }}/release-diff/base
             ${{ runner.temp }}/release-diff/head
             !${{ runner.temp }}/release-diff/*/*/indexes
