@@ -143,6 +143,16 @@ pub(super) fn discovered(
     }]))
 }
 
+/// The plugin and method already identify the request here. A caller may refine its path.
+pub(super) fn has_route(args: &[Value]) -> bool {
+    let Some(Value::Str(parts)) = args.first() else {
+        return false;
+    };
+    let base = parts.iter().find(|p| !matches!(p, Part::StripStart));
+    matches!(base, Some(Part::Read { callee, parameter: false, .. }) if callee.ends_with(".getBaseUrl"))
+        && super::super::method(args.get(1)).ok().flatten().is_some()
+}
+
 /// Replace a leading discovery result with the plugin's mount and retain its identity.
 pub(super) fn based(args: &mut [Value]) -> Option<String> {
     let Some(Value::Str(parts)) = args.first_mut() else {

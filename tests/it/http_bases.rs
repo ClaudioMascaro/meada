@@ -530,3 +530,49 @@ fn a_mutable_record_key_hides_a_constant() {
     );
     inferred_record_links(&repo);
 }
+
+#[test]
+fn discovery_requests_keep_the_direct_and_same_class_sites_when_callers_become_exact() {
+    let json = export(&fixture("http_discovery_sites"));
+    let via = "client:Backstage plugin orders at /api/orders";
+    for (caller, method) in [
+        ("Orders.get", "GET"),
+        ("readOrder", "GET"),
+        ("Orders.fail", "PUT"),
+        ("updateOrder", "PUT"),
+    ] {
+        one_link(
+            &json,
+            caller,
+            via,
+            &format!("http::{method}::/api/orders/list/{{}}"),
+            "inferred",
+        );
+    }
+}
+
+#[test]
+fn a_bare_environment_endpoint_does_not_imply_a_root_route() {
+    let repo = fixture("http_bare_env");
+    let json = export(&repo);
+    let bare = rows(&json, "consumers", "site", "Sender.postBase");
+    assert_eq!(bare.len(), 1);
+    assert_eq!(bare[0]["via"], "env:ENDPOINT_URL");
+    assert!(bare[0]["contract"].is_null(), "{bare:?}");
+    assert!(rows(&json, "links", "consumer", "Sender.postBase").is_empty());
+    one_link(
+        &json,
+        "postRoot",
+        "env:ENDPOINT_URL",
+        "http::POST::/",
+        "inferred",
+    );
+    std::fs::write(repo.join("compose.yaml"), "services:\n  client:\n    build: ./src\n    environment:\n      ENDPOINT_URL: https://orders.example.com/orders\n").unwrap();
+    one_link(
+        &export(&repo),
+        "Sender.postBase",
+        "env:ENDPOINT_URL",
+        "http::POST::/orders",
+        "inferred",
+    );
+}

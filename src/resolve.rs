@@ -5253,6 +5253,8 @@ struct Written<'a, 'i> {
     /// What the kind reads off annotated fields and parameters (`Code::expand_with`).
     inject: Option<&'i Inject<'a, 'i>>,
     external_value: Option<&'i ExternalValue<'a, 'i>>,
+    /// A reader may also keep a route it already knows before a caller supplies its arguments.
+    retain_site: Option<fn(&[Value]) -> bool>,
     /// The calls that write a member (`Code::expand_written`).
     writes: Option<CallWrites>,
 }
@@ -7505,16 +7507,17 @@ impl<'a> Code<'a> {
         inject: Option<&Inject<'a, '_>>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
     ) -> Vec<Expanded<'a, R>> {
-        self.expand_using(from, inject, None, read)
+        self.expand_using(from, inject, None, None, read)
     }
 
     pub(crate) fn expand_with_call<R>(
         &self,
         from: Expand<'a>,
         external_value: &ExternalValue<'a, '_>,
+        retain_site: fn(&[Value]) -> bool,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
     ) -> Vec<Expanded<'a, R>> {
-        self.expand_using(from, None, Some(external_value), read)
+        self.expand_using(from, None, Some(external_value), Some(retain_site), read)
     }
 
     fn expand_using<R>(
@@ -7522,6 +7525,7 @@ impl<'a> Code<'a> {
         from: Expand<'a>,
         inject: Option<&Inject<'a, '_>>,
         external_value: Option<&ExternalValue<'a, '_>>,
+        retain_site: Option<fn(&[Value]) -> bool>,
         read: &dyn Fn(&[Value], &Keywords) -> Option<R>,
     ) -> Vec<Expanded<'a, R>> {
         let mut out = Vec::new();
@@ -7540,6 +7544,7 @@ impl<'a> Code<'a> {
                     chain: None,
                     inject,
                     external_value,
+                    retain_site,
                     writes: None,
                 };
                 self.walk(
@@ -7564,6 +7569,7 @@ impl<'a> Code<'a> {
                     chain: Some(call),
                     inject,
                     external_value,
+                    retain_site,
                     writes: None,
                 };
                 self.walk(
@@ -7591,6 +7597,7 @@ impl<'a> Code<'a> {
                     chain: None,
                     inject,
                     external_value,
+                    retain_site,
                     writes: None,
                 };
                 self.walk(
@@ -7629,6 +7636,7 @@ impl<'a> Code<'a> {
             chain: None,
             inject: None,
             external_value: None,
+            retain_site: None,
             writes: Some(writes),
         };
         self.walk(
@@ -7725,6 +7733,14 @@ impl<'a> Code<'a> {
                 found,
             }));
             return;
+        }
+        if written.retain_site.is_some_and(|keep| keep(&values)) {
+            let (args, keywords) = unbound((values.clone(), kwargs.clone()), chain, &[]);
+            out.extend(read(&args, &keywords).map(|found| Expanded {
+                site: (site, at),
+                frames: frames.clone(),
+                found,
+            }));
         }
         let (under, climbed) = (frames.len(), out.len());
         for caller in callers {

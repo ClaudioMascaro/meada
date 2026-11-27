@@ -35,8 +35,11 @@ pub(in crate::http) fn consumers(
             if !is_fetch || code.args(path, n).is_none_or(<[_]>::is_empty) {
                 continue;
             }
-            let expanded =
-                code.expand_with_call(Expand::Call(path, n), &backstage::discovered, &|args, _| {
+            let expanded = code.expand_with_call(
+                Expand::Call(path, n),
+                &backstage::discovered,
+                backstage::has_route,
+                &|args, _| {
                     let mut args = joined(args);
                     let plugin = backstage::based(&mut args);
                     config.decided(args, |args, uncertain| {
@@ -52,7 +55,8 @@ pub(in crate::http) fn consumers(
                         }
                         Some((read, identity, uncertain))
                     })
-                });
+                },
+            );
             for Expanded {
                 site: (site, at),
                 frames,
@@ -63,7 +67,7 @@ pub(in crate::http) fn consumers(
                 for (read, identity, uncertain) in read {
                     let mut side = consumer(site, at, read, shape.clone());
                     side.cap = uncertain.then_some(Level::Inferred);
-                    side.identity = identity;
+                    side.identity = identity.or(side.identity);
                     found.push(side);
                 }
             }
