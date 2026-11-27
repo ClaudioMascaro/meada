@@ -245,7 +245,9 @@ Task or an already-awaited client awaited again supplies no receiver evidence.
   functions and methods (#810).
   Arguments bind by the usual wrapper rules. Async TypeScript and Python returns require an
   awaited call. A call with possible repository dispatch alternatives, different returns,
-  an unread part, or a recursive return stays unknown. Return folding shares `EVAL_DEPTH`
+  an unread part, or a recursive return stays unknown. A Go `defer` that may write the one
+  named result (in a literal, or `&result` passed) makes the return unknown (#948); a
+  redeclared name counts. Return folding shares `EVAL_DEPTH`
   and `EVAL_BUDGET` with other value flow and uses `WRAPPER_DEPTH` for nested returned calls.
 - `decide.rs`: `LIST_CANDIDATE_LIMIT` (5) is the number of candidates the unfiltered CLI overview
   shows per item. The focused list, prompt, MCP counts and export use the complete candidate set.

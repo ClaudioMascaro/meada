@@ -592,6 +592,32 @@ fn unknown_returns_and_path_changes_remain_unresolved() {
 }
 
 #[test]
+fn a_go_deferred_write_of_the_named_result_leaves_the_base_open() {
+    // #948: the deferred function writes `base` after `return` set it; the empty one does not.
+    let export = http_value_flow("http_value_flow_deferred");
+    let consumers = export["consumers"].as_array().unwrap();
+    let links = export["links"].as_array().unwrap();
+    let rows = |name: &str| -> Vec<&serde_json::Value> {
+        let at = format!("::client.go::{name}::");
+        (consumers.iter())
+            .filter(|c| c["site"].as_str().unwrap().contains(&at))
+            .collect()
+    };
+    let deferred = rows("ViaDeferredBase");
+    assert!(
+        matches!(deferred.as_slice(), [row] if row["contract"].is_null() && row["via"].is_null()
+            && !links.iter().any(|l| l["consumer"] == row["site"])),
+        "{deferred:?}"
+    );
+    let benign = rows("ViaBenignDefer");
+    assert!(
+        matches!(benign.as_slice(), [row] if row["contract"] == "http::GET::/api/orders"
+            && row["via"] == "env:API_URL"),
+        "{benign:?}"
+    );
+}
+
+#[test]
 fn an_environment_key_needs_a_reader_bound_to_the_runtime() {
     let export = http_value_flow("http_value_flow_env_reader");
     let consumers = export["consumers"].as_array().unwrap();

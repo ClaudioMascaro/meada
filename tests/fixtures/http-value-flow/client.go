@@ -65,3 +65,16 @@ func MiddleQuery(flag bool) {
 func unsafeDispatch(url interface{ methodBase() string }) {
 	_, _ = http.Get(url.methodBase() + "/api/orders")
 }
+
+// #948: a deferred function runs after `return` sets the named result, and writes it again.
+func deferredBase() (base string) {
+	defer func() { base = "https://other.example" }()
+	return os.Getenv("API_URL")
+}
+func ViaDeferredBase() { _, _ = http.Get(deferredBase() + "/api/orders") }
+
+func benignDeferBase() (base string) {
+	defer func() {}()
+	return os.Getenv("API_URL")
+}
+func ViaBenignDefer() { _, _ = http.Get(benignDeferBase() + "/api/orders") }

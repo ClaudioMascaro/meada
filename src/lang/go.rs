@@ -659,6 +659,9 @@ impl Walk<'_> {
                         (self.returns.entry(scope.to_string()).or_default()).push(value);
                     }
                 }
+                "defer_statement" if defer_sets_result(node, src) => {
+                    (self.returns.entry(scope.to_string()).or_default()).push(Value::Unknown);
+                }
                 "short_var_declaration" => {
                     if let Some(left) = node.child_by_field_name("left") {
                         let left = identifiers(left);
@@ -1158,6 +1161,48 @@ fn result_class(node: Node, src: &[u8]) -> Option<Class> {
 fn result_list(node: Node) -> Option<Node> {
     node.child_by_field_name("result")
         .filter(|r| r.kind() == "parameter_list")
+}
+
+/// Whether the `defer_statement` `node` may write the one named result of the function around
+/// it: it runs after `return` has set the result, so the value the function returns may be its
+/// own (Go spec, "Defer statements"; #948). A name the deferred function declares again counts
+/// as the result (the safe side).
+fn defer_sets_result(node: Node, src: &[u8]) -> bool {
+    let function = std::iter::successors(node.parent(), |n| n.parent()).find(|n| {
+        matches!(
+            n.kind(),
+            "function_declaration" | "method_declaration" | "func_literal"
+        )
+    });
+    let results: Vec<Node> = (declarations(function.and_then(result_list)).into_iter())
+        .flat_map(|(names, _)| names)
+        .collect();
+    // Several results keep no return value to fold, so there is nothing to undo.
+    let [result] = results[..] else {
+        return false;
+    };
+    // Only a function literal of the statement can write the result by name; its address
+    // handed to the deferred call (`defer fill(&base)`) lets that call write it too.
+    let mut stack = vec![node];
+    while let Some(n) = stack.pop() {
+        let targets = match n.kind() {
+            "assignment_statement" => n.child_by_field_name("left"),
+            "inc_statement" | "dec_statement" => Some(n),
+            "unary_expression" => (n.child_by_field_name("operator"))
+                .filter(|o| text(*o, src) == "&")
+                .and_then(|_| n.child_by_field_name("operand")),
+            _ => None,
+        };
+        if targets.is_some_and(|t| {
+            identifiers(t)
+                .iter()
+                .any(|i| text(*i, src) == text(result, src))
+        }) {
+            return true;
+        }
+        stack.extend(named(n));
+    }
+    false
 }
 
 fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
@@ -2140,6 +2185,55 @@ mod tests {
         );
         assert_eq!(returns("func f() (*T, error) { return mk(), nil }"), 0);
         assert_eq!(returns("func f() (r *T) { return }"), 0);
+    }
+
+    #[test]
+    fn a_deferred_write_of_a_named_result_is_an_unknown_return() {
+        let unknown = |src: &str| -> bool {
+            let facts = facts(&format!("package x\n\n{src}\n"));
+            let f = (facts.defs.iter())
+                .find(|d| d.name == "f" || d.name == "C.f")
+                .unwrap();
+            f.return_values.iter().any(|v| matches!(v, Value::Unknown))
+        };
+        // The deferred function runs after `return` sets `base` and writes it again (#948).
+        let ret = r#"return os.Getenv("U") }"#;
+        assert!(unknown(&format!(
+            r#"func f() (base string) {{ defer func() {{ base = "x" }}(); {ret}"#
+        )));
+        assert!(unknown(
+            "func f() (err error) { defer func() { if r := recover(); r != nil { err = e } }(); return g() }"
+        ));
+        assert!(unknown(&format!(
+            "func f() (n int) {{ defer func() {{ n++ }}(); {ret}"
+        )));
+        assert!(unknown(&format!(
+            "func (c C) f() (n int) {{ defer func() {{ n-- }}(); {ret}"
+        )));
+        assert!(unknown(&format!(
+            r#"func f() (base string) {{ defer (func() {{ base = "x" }})(); {ret}"#
+        )));
+        // Its address handed to the deferred call lets that call write it.
+        assert!(unknown(&format!(
+            "func f() (base string) {{ defer fill(&base); {ret}"
+        )));
+        // An empty deferred function, one writing only its own names, a named function deferred,
+        // unnamed results and several results (no return value is kept) leave the returns alone.
+        assert!(!unknown(
+            "func f() (n int, err error) { defer func() { err = e }(); return 1, nil }"
+        ));
+        assert!(!unknown(&format!(
+            "func f() (base string) {{ defer func() {{}}(); {ret}"
+        )));
+        assert!(!unknown(&format!(
+            "func f() (base string) {{ defer func() {{ x := 1; x = 2 }}(); {ret}"
+        )));
+        assert!(!unknown(&format!(
+            "func f() (base string) {{ defer close(); {ret}"
+        )));
+        assert!(!unknown(&format!(
+            "func f() string {{ base := \"\"; defer func() {{ base = \"x\" }}(); {ret}"
+        )));
     }
 
     #[test]
