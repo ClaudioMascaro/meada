@@ -96,7 +96,11 @@ def g9_type_uses($repo):
         | .steps = ([.steps[] | select(.via != "link" and (has("mark") | not))]
             + terminal_steps($base; $consumer[0]; $links))
       end)
-| if $workspace == "g9" then .calls = ((.calls + [g9_type_uses($base.repository)]) | sort_by(.id)) else . end
+# A base that already writes them (1.6.0 and later) keeps its calls, so its communities compare whole.
+| ([.calls[].id] | INDEX(.)) as $have
+| if $workspace == "g9"
+  then .calls = ((.calls + [g9_type_uses($base.repository) | select($have[.id] == null)]) | sort_by(.id))
+  else . end
 | .consumers |= sort_by(.site)
 | .links |= sort_by(.consumer, .provider, .contract)
 | del(.commit, .dirty)
