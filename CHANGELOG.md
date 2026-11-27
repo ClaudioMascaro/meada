@@ -6,15 +6,64 @@ All notable changes to Meada are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-27
+
+A minor release on the [1.x stability promise](https://github.com/ClaudioMascaro/meada/blob/main/docs/site/en/stability.md)
+that makes the affected set of a change usable by a merge queue: `meada trace` on the command line,
+`--affected` with the evidence of each file, changed lockfiles, declared base URLs and Kafka topics
+read from deployment configuration. It is minor for the CLI, the MCP server and the export (format
+1): it adds commands, `meada.toml` tables, export fields and values, and removes nothing. The
+public crate takes a major, `meada-core` 2.0.0, and keeps its own version from now on: its
+exhaustive enums gained variants (`export::Cause`: `wrong-kind`, `unknown-repository`,
+`no-candidates`; `msg::Msg`: four refusals of the new `meada.toml` tables), so a Rust client with
+an exhaustive `match` needs new arms. The extraction revision moves, so the first index after the
+upgrade rebuilds. There is no Postgres migration. The tag `v1.6.0` is cut on a new `release/1.6`
+branch from the merge of this release. Release notes in
+[pt-BR](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.6.0.md),
+[English](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.6.0.en.md) and
+[Spanish](https://github.com/ClaudioMascaro/meada/blob/main/docs/releases/1.6.0.es.md).
+
+### Added
+
+- `meada trace` on the command line (text, as the MCP tool answers), from a range or a file list
+  as well as uncommitted changes. `--affected` prints, as JSON, everything a change may affect,
+  file by file with the evidence of its strongest chain, the packages per tier and by manifest,
+  what the change reads (for a merge queue's pair criterion) and what stays open; `--batch`
+  answers many changes in one run (#970).
+- `meada trace --affected` reads a changed Yarn Berry `yarn.lock` against the change's base and
+  roots, in each workspace package it reaches, the files that load the dependency that moved (the
+  whole package when none does); root files that affect every package are `open` as
+  `all-packages`; a new import of a package reads its lockfile entry for the pair criterion. The
+  index records what each direct dependency resolves to (`resolved` in `meada export`, a line in
+  `context` on a package) (#971).
+- `[[base_url]]` in `meada.toml` declares which directory a base URL variable reaches: a consumer
+  reading it links `declared` to the routes served there, and a relative URL prefers a route of
+  its own package. Go reads an `env:` tag of a struct in another file and a `Sprintf` format held
+  in a file constant, and records type uses as edges, so a change to a request struct reaches the
+  consumers of its route (#973).
+- Kafka topics through deployment configuration: `[[helm_env]]` reads a chart's environment from
+  its values files, `[[channel_client]]` makes a side of an in-house client call, kafkajs clients
+  held in private class fields are recognized, and a topic read from Backstage's app-config names
+  its values; `trace --affected` carries a producer's change to its consumers across repositories
+  (#974).
+
 ### Changed
 
+- Exports and `symbols` hold exported TS/JS constants, types, enums and default expressions, and
+  imports of them link (#967).
+- A Backstage backend's `backend.add(import('<pkg>'))` links the package's default export (#968).
+- TS/JS uses that are no calls (JSX, types, values, members, `extends`, re-exports, dynamic
+  imports) are edges with a kind: `trace` up follows them and `context` lists them. Non-exported
+  top-level constants and types are symbols, an import of a name another workspace package
+  re-exports links to the original, and `startTestBackend`'s features link their default (#969).
+- The extraction revision and the stored schema move: the first `meada index` after the upgrade
+  rebuilds every index (#947, #967).
 - `meada decide --list` prints the decision kind and summarizes candidates. To see the full
   list, use `--list --item <id>`. Numbers at the prompt can differ from 1.3 when a dynamic URL's
   literal fragments fit shorter paths (#803, #804).
 - Exports list open items with their full decision targets. New stale causes distinguish a wrong
   kind, an unknown repository and an item with no candidates. Rust crates that match every
   `meada_core::export::Cause` variant must handle the new variants (#802, #805, #939).
-
 - Every orphan line of `meada status` names the scope its absence holds in, as the mark does:
   `orphan resource::s3::unused: no use in the workspace; main.tf:4 ...`, or the repository of a
   workspace of one (`no use in example.com/acme/infra`). It holds for `no use`, `no provisioner`,
@@ -26,6 +75,7 @@ All notable changes to Meada are recorded here. The format follows
 
 ### Fixed
 
+- A call in a Go test file no longer gives a value to a field read in production code (#973).
 - Rebuild indexes written before the Go literal-key extraction fix on the next local index
   open or on `meada index --workspace` (#946).
 - Check linked decisions before reading their target in saving modes and identify the repository
@@ -38,7 +88,6 @@ All notable changes to Meada are recorded here. The format follows
 - Count linked consumers omitted from HTTP route `context` and point to upward `trace` (#935).
 - Save accepted model decisions before sending the next request, so an interrupted run
   can resume with the still-open items (#937).
-
 - `meada status` no longer drops the stale and waiting decisions, and the other lines under each
   repository, without a word. When a repository of the workspace is not indexed, is indexed by
   another version or is locked, a line in their place says they were not evaluated and to run
@@ -2446,7 +2495,9 @@ and `trace` from the two longest processes. The spec adds about 0.3 MB and 0.03 
 The rise of the single-file reindex since 2026-10-14 predates it (specs #22 and #23), and at
 692 files it is close to its target.
 
-[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/ClaudioMascaro/meada/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.6.0
+[1.5.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.5.0
 [1.4.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.4.0
 [1.3.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.3.0
 [1.2.0]: https://github.com/ClaudioMascaro/meada/releases/tag/v1.2.0

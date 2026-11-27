@@ -1,11 +1,12 @@
-# The binary's crate at the root, and `meada-core` (ADR 0014): one version for both, `meada`
-# depending on `meada-core` at exactly that version; `meada-core` is published first.
+# The binary's crate at the root, and `meada-core` (ADR 0014): `meada` depends on `meada-core` at
+# exactly its version, and `meada-core` is published first. Since 1.6.0 the crate keeps its own
+# version: its public enums gained variants, a major of the crate (`docs/site/en/stability.md`).
 [workspace]
 members = [".", "meada-core"]
 default-members = [".", "meada-core"]
 
 [workspace.package]
-version = "1.5.0"
+version = "1.6.0"
 edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/ClaudioMascaro/meada"
@@ -58,7 +59,7 @@ hyper = { version = "1.9.0", features = ["server", "http1"] }
 hyper-util = { version = "0.1.21", features = ["tokio"] }
 ignore = "0.4.33"
 # At the workspace's version, exactly: bump both together.
-meada-core = { path = "meada-core", version = "=1.5.0" }
+meada-core = { path = "meada-core", version = "=2.0.0" }
 # The OIDC module's JWT validation (ADR 0012), only behind `oidc`, and the GitHub App module's
 # JWT signing (ADR 0013), only behind `github-app`, and the local accounts' Ed25519 tokens (ADR
 # 0024), only behind `accounts`: RustCrypto as its backend, since the other, aws-lc-rs, would be a

@@ -151,7 +151,8 @@ Os campos de `shape` (`source`, `fields`, `open`, `scalars`, `declared`, `option
 - `steps[].mark`: `cycle`, `seen`, `ambiguous`, `unresolved`, `no-provider`, `produces`, `consumes` e `depth-limit`;
 - Os valores de `stale_decisions[].cause` são `call-gone`, `item-not-open`, `wrong-kind`, `unknown-repository`, `target-gone`, `no-candidates`, `not-candidate`.
 
-As novas variantes de `meada_core::export::Cause` exigem uma versão principal da crate pública.
+As novas variantes de `meada_core::export::Cause` exigem uma versão principal da crate pública:
+vieram com o `meada-core` 2.0.0 (Meada 1.6.0).
 Clientes Rust que fazem `match` exaustivo precisam tratar as novas variantes. Leitores JSON
 tolerantes a campos desconhecidos aceitam `open_items` no formato 1. Um leitor que valida o conjunto
 antigo de causas precisa aceitar as novas.
