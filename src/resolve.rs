@@ -5474,9 +5474,9 @@ pub struct Code<'a> {
     /// The definitions a call that is no exact caller may reach, and how many definitions have
     /// each last name segment (`Code::name_matched`).
     matched: OnceCell<(HashSet<Target<'a>>, HashMap<&'a str, usize>)>,
-    /// The Python definitions, by file and name, that carry a decorator outside `PY_KEEPS_BODY`
-    /// (`Code::py_decorated`).
-    py_rebinding: OnceCell<HashSet<(&'a str, &'a str)>>,
+    /// The Python definitions that carry a decorator outside `PY_KEEPS_BODY`, then every class of
+    /// the families of the decorated classes, the decorated class included (`Code::py_decorated`).
+    py_rebinding: OnceCell<[HashSet<Target<'a>>; 2]>,
     mutations: RefCell<HashMap<usize, mutations::Index<'a>>>,
     pack: &'static dyn LanguagePack,
 }
@@ -8307,37 +8307,42 @@ impl<'a> Code<'a> {
     /// the receiver) carries a decorator outside `PY_KEEPS_BODY`, called (`@use_host(..)`, #949)
     /// or bare (`@install class C`, #962).
     fn py_decorated(&self, function: Target<'a>) -> bool {
-        let rebinding = self.py_rebinding.get_or_init(|| {
+        let [decorated, blocked] = self.py_rebinding.get_or_init(|| {
             let rebinds = |name: &str| !PY_KEEPS_BODY.contains(&name);
-            let mut out = HashSet::new();
+            let mut decorated = HashSet::new();
             for (&path, facts) in self.resolver.files {
                 let calls = facts.calls.iter().filter(|c| rebinds(&c.callee));
-                out.extend(calls.filter_map(|c| Some((path, c.decorates.as_deref()?))));
+                let names = calls.filter_map(|c| c.decorates.as_deref());
+                decorated.extend(names.map(|name| Target { path, name }));
                 let defs = facts
                     .defs
                     .iter()
                     .filter(|d| d.decorators.iter().any(|d| rebinds(d)));
-                out.extend(defs.map(|d| (path, d.name.as_str())));
+                decorated.extend(defs.map(|d| Target {
+                    path,
+                    name: d.name.as_str(),
+                }));
             }
-            out
+            // A decorated class blocks the methods of its own class and of every class of its
+            // family (which starts with it), so a query is one lookup.
+            let mut blocked = HashSet::new();
+            for &class in &decorated {
+                blocked.insert(class);
+                let family = self.resolver.families.get(&class).and_then(Option::as_ref);
+                blocked.extend(family.into_iter().flatten().filter_map(|a| match a {
+                    Ancestor::Class(c) => Some(*c),
+                    Ancestor::Opaque(_) => None,
+                }));
+            }
+            [decorated, blocked]
         });
-        if rebinding.contains(&(function.path, function.name)) {
-            return true;
-        }
         let class = crate::parent(function.name);
-        if class.is_empty() {
-            return false;
-        }
-        let class = Ancestor::Class(Target {
-            path: function.path,
-            name: class,
-        });
-        rebinding.iter().any(|&(path, name)| {
-            let heir = Target { path, name };
-            Ancestor::Class(heir) == class
-                || (self.resolver.families.get(&heir))
-                    .is_some_and(|family| family.as_ref().is_some_and(|f| f.contains(&class)))
-        })
+        decorated.contains(&function)
+            || (!class.is_empty()
+                && blocked.contains(&Target {
+                    path: function.path,
+                    name: class,
+                }))
     }
 
     /// The string returned by an exact call under its argument frame. HTTP also folds

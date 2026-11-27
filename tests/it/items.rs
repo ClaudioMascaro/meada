@@ -651,6 +651,7 @@ fn a_python_decorator_of_the_function_or_its_class_leaves_the_base_open() {
         "ModuleSettings.ViaModuleDataclass",
         "ViaCachedBase",
         "ViaBareCachedBase",
+        "PlainChild.ViaPlainChild",
     ];
     for name in kept {
         let linked = rows(name);

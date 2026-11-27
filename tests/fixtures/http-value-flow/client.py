@@ -244,3 +244,17 @@ class InheritingChild(OriginBase):
 
 def ViaChildInstance():
     return requests.get(InheritingChild().inherited_origin() + "/api/orders")
+
+
+# A decorated ancestor does not rebind what a plain heir defines.
+@register("base")
+class DecoratedBase:
+    pass
+
+
+class PlainChild(DecoratedBase):
+    def child_origin(self):
+        return os.getenv("API_URL")
+
+    def ViaPlainChild(self):
+        return requests.get(self.child_origin() + "/api/orders")
