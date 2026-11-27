@@ -377,7 +377,7 @@ def cost_section(captured):
         return f"{old / unit:.1f} -> {new / unit:.1f} (x{ratio}){over}"
 
     lines += ["| Workspace | Index s | Peak RSS MiB | Index MiB | Export MiB |", "|---|" + "---:|" * 4]
-    large = []
+    large, measured = [], False
     for ws in sorted(base["index_seconds"].keys() & head["index_seconds"].keys()):
         seconds = base["index_seconds"][ws], head["index_seconds"][ws]
         rss = [side.get("rss_kb", {}).get(ws) for side in (base, head)]
@@ -388,11 +388,12 @@ def cost_section(captured):
             cell(*seconds, budget=prove.TIME if seconds[0] >= prove.TIME_FLOOR else None),
             cell(*rss, 1024, prove.RSS), cell(*index, mib), cell(*total, mib, prove.SIZE)]) + " |")
         for entry in sorted((old or {}).keys() & (new or {}).keys()):
+            measured = True
             if new[entry] > old[entry] * prove.SIZE:
                 large.append(f"- {ws}/{entry} {old[entry] / mib:.1f} -> {new[entry] / mib:.1f} MiB "
                              f"(x{new[entry] / old[entry] if old[entry] else float('inf'):.2f})")
     lines += ["", f"Entries over the export budget (x{prove.SIZE}):", ""]
-    lines += large or ["none"]
+    lines += large or ["none" if measured else "-"]
     return lines + ["", "One run per side, base first, on one runner: the timings are a single sample."]
 
 
@@ -581,6 +582,7 @@ def selftest_cost(tmp):
     old = {"version": "v0", "index_seconds": {"w": 10.0}}  # an artifact made before this change
     replay = "\n".join(cost_section({"base": old, "head": {**old, "index_seconds": {"w": 13.0}}}))
     assert "| w | 10.0 -> 13.0 (x1.30) over | - | - | - |" in replay, replay
+    assert "(x1.5):\n\n-\n" in replay, "no export bytes: the budget was not measured, not met: " + replay
     assert cost_section({"head": h}) == ["## Cost", "", "No capture.json on both sides."]
 
 
