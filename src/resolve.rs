@@ -397,6 +397,7 @@ impl<'a> Binders<'a> {
 pub struct Resolver<'a> {
     ts: bool,
     ts_site: Cell<Option<(usize, usize, bool)>>,
+    ts_key_read: Cell<bool>,
     ts_locals: HashMap<&'a str, ts::FileLocals<'a>>,
     ts_packages: BTreeSet<String>,
     ts_heirs: HashMap<String, Vec<Target<'a>>>,
@@ -1157,6 +1158,7 @@ impl<'a> Resolver<'a> {
             ts_heirs: HashMap::new(),
             ts_writes: None,
             ts_site: Cell::new(None),
+            ts_key_read: Cell::new(false),
             ts_locals: if ts {
                 ts::locals(files)
             } else {
@@ -5281,6 +5283,7 @@ pub(crate) const FIELD_DEPTH: usize = 16;
 #[derive(Default)]
 struct Fold<'a, 'i> {
     held: Vec<(&'a str, &'a str)>,
+    record_site: Option<(&'a str, usize)>,
     nested: usize,
     chain: bool,
     /// Preserve verified constructor type names for selected SDK identity arguments.
@@ -5290,6 +5293,7 @@ struct Fold<'a, 'i> {
     inject: Option<&'i Inject<'a, 'i>>,
     external_value: Option<&'i ExternalValue<'a, 'i>>,
     returning: Vec<(&'a str, usize)>,
+    independent: Option<Target<'a>>,
     foreign: usize,
     /// Constructions and their factory callers supply fields independently of a method's callers.
     field_frames: Option<&'i [Frame<'a>]>,
@@ -7979,8 +7983,36 @@ impl<'a> Code<'a> {
         wants: &mut Option<Target<'a>>,
     ) -> Value {
         let mut out = Vec::new();
+        let mut records = Vec::new();
         for part in parts {
             let value = match part {
+                Part::RecordStart {
+                    at,
+                    field,
+                    property,
+                } => {
+                    records.push((out.len(), *at, field, property));
+                    continue;
+                }
+                Part::RecordEnd if let Some((at, _, field, property)) = records.pop() => {
+                    let key = out.split_off(at);
+                    self.ts_record(
+                        (path, scope),
+                        (field, property),
+                        key,
+                        frames,
+                        depth,
+                        fold,
+                        wants,
+                    )
+                    .unwrap_or(Value::Unknown)
+                }
+                Part::Ref(name) if let Some((_, at, _, _)) = records.last() => {
+                    let previous = fold.record_site.replace((path, *at));
+                    let value = self.name(path, scope, name, frames, depth, fold, wants);
+                    fold.record_site = previous;
+                    value
+                }
                 Part::Ref(name) => self.name(path, scope, name, frames, depth, fold, wants),
                 Part::EnvKey { name, reader } => {
                     if reader.as_deref().is_some_and(|reader| {
@@ -8253,9 +8285,15 @@ impl<'a> Code<'a> {
         };
         let def = self.def(function.path, function.name)?;
         let (first, rest) = def.return_values.split_first()?;
+        let same_method = extended && javascript && self.args(path, index).is_some_and(<[_]>::is_empty)
+            && stored.callee.strip_prefix("this.").is_some_and(|member| {
+                matches!(self.resolver.class(path, &stored.scope), Binding::Def(class)
+                    if class.path == function.path && class.name == crate::parent(function.name)
+                        && member == own_name(function.name) && !self.resolver.ts_override(class, member))
+            });
         if extended {
             if stored.constructs
-                || !self.runs_alone(function)
+                || !(same_method || self.runs_alone(function))
                 || (def.asynchronous && !(awaited || stored.awaited))
                 || (javascript && !def.terminal_return)
                 || (self.pack.extensions().contains(&"py")
@@ -8302,6 +8340,10 @@ impl<'a> Code<'a> {
             _ => false,
         };
         let mut pending = None;
+        let independent = fold.independent;
+        if same_method {
+            fold.independent = Some(function);
+        }
         fold.returning.push(site);
         let mut returned = |value| {
             self.eval(
@@ -8322,6 +8364,7 @@ impl<'a> Code<'a> {
                 _ => false,
             });
         fold.returning.pop();
+        fold.independent = independent;
         if agrees {
             if let Some(pending) = pending {
                 wants.get_or_insert(pending);
@@ -8349,13 +8392,49 @@ impl<'a> Code<'a> {
         {
             return value;
         }
-        match self.resolver.read(path, scope, name) {
+        let (binding, local) = match fold.record_site {
+            Some((file, at)) if file == path => {
+                let Some(facts) = self.full(path) else {
+                    return Value::Unknown;
+                };
+                self.resolver.record_binding(path, scope, name, at, facts)
+            }
+            Some(_) => return Value::Unknown,
+            None => (self.resolver.read(path, scope, name), None),
+        };
+        match binding {
             Binding::Const(at, constant) => {
                 // `const a = b; const b = a;` folds to nothing.
                 if fold.held.contains(&(at, constant)) || self.resolver.redeclared(at, constant) {
                     return Value::Unknown;
                 }
-                let Some((value, within)) = self.held(at, constant) else {
+                // An imported key continues at the exported initializer, in its own file.
+                let local = if fold.record_site.is_some() && at != path {
+                    let Some(facts) = self.full(at) else {
+                        return Value::Unknown;
+                    };
+                    match facts
+                        .ts_locals
+                        .get(constant)
+                        .or_else(|| facts.ts_record_locals.get(constant))
+                        .map(Vec::as_slice)
+                    {
+                        Some([binding]) => Some(binding),
+                        Some(_) => return Value::Unknown,
+                        None => None,
+                    }
+                } else {
+                    local
+                };
+                let held = match local {
+                    Some(binding) => binding
+                        .constant
+                        .and_then(|i| self.full(at)?.consts.get(i))
+                        .filter(|c| c.name == constant)
+                        .map(|c| (&c.value, scope_of(constant))),
+                    None => self.held(at, constant),
+                };
+                let Some((value, within)) = held else {
                     return Value::Unknown;
                 };
                 let foreign = usize::from(within != scope_of(constant));
@@ -8368,7 +8447,12 @@ impl<'a> Code<'a> {
                     fold.objects.push(object);
                 }
                 fold.foreign += foreign;
+                let previous = fold.record_site;
+                if let Some(binding) = local {
+                    fold.record_site = Some((at, binding.declared.saturating_sub(1)));
+                }
                 let folded = self.eval(at, within, value, frames, depth, fold, wants);
+                fold.record_site = previous;
                 fold.foreign -= foreign;
                 fold.held.pop();
                 if object.is_some() {
@@ -8376,6 +8460,7 @@ impl<'a> Code<'a> {
                 }
                 folded
             }
+            Binding::Param(function, _, _) if fold.independent == Some(function) => Value::Unknown,
             Binding::Param(function, _, _)
                 if !self.follow_request_parameters.get()
                     && !self.unchanged_parameter(function, name) =>
@@ -8400,15 +8485,23 @@ impl<'a> Code<'a> {
                     let arg = self.arg(frame.path, frame.index, function, n);
                     let param = self.param(function, n);
                     let bound = match (arg, param.and_then(|p| p.default.as_ref())) {
-                        (Some(arg), _) => self.argument_value(
-                            frame.path,
-                            &call.scope,
-                            arg,
-                            frames,
-                            depth + 1,
-                            fold,
-                            wants,
-                        ),
+                        (Some(arg), _) => {
+                            let previous = fold.record_site;
+                            if previous.is_some() {
+                                fold.record_site = Some((frame.path, call.range.start));
+                            }
+                            let value = self.argument_value(
+                                frame.path,
+                                &call.scope,
+                                arg,
+                                frames,
+                                depth + 1,
+                                fold,
+                                wants,
+                            );
+                            fold.record_site = previous;
+                            value
+                        }
                         // A left-out argument takes the parameter's default.
                         (None, Some(default)) => self.argument_value(
                             function.path,
@@ -8623,6 +8716,17 @@ fn unbind(value: Value, chain: bool, keep: &[&str]) -> Value {
                 .into_iter()
                 .map(|p| {
                     // What remains a name is a parameter no call site binds (#801).
+                    if let Part::RecordValues {
+                        key: Some(name),
+                        values,
+                    } = &p
+                        && !keep.contains(&name.as_str())
+                    {
+                        return Part::RecordValues {
+                            key: None,
+                            values: values.clone(),
+                        };
+                    }
                     if let Some(name) = p.parameter().filter(|name| !keep.contains(name)) {
                         Part::Limit(crate::lang::Limit::Parameter(name.to_owned()))
                     } else {

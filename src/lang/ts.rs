@@ -94,7 +94,7 @@ impl LanguagePack for TsJs {
             member_writes: Some(Vec::new()),
             ..Facts::default()
         };
-        let mut write_bytes = 0;
+        let mut write_bytes = [0; 2];
         let mut receiver_bytes = 0;
         let mut uses = uses::Uses::new(src, &parents);
         let mut references = references::References::default();
@@ -449,6 +449,7 @@ impl LanguagePack for TsJs {
                             binding_block,
                             start,
                             None,
+                            None,
                         );
                     }
                     facts.locals.push(qualified);
@@ -474,6 +475,7 @@ impl LanguagePack for TsJs {
                     block,
                     node.end_byte(),
                     receiver,
+                    Some(facts.consts.len()),
                 );
                 // A `new URL` whose path or host the file writes through its name is no longer
                 // the string it was built from.
@@ -591,9 +593,13 @@ impl LanguagePack for TsJs {
             ],
         );
         let typed: HashSet<_> = facts.receivers.iter().map(|r| r.name.as_str()).collect();
-        facts
-            .ts_locals
-            .retain(|name, _| typed.contains(name.rsplit('.').next().unwrap_or(name)));
+        for (name, bindings) in std::mem::take(&mut facts.ts_locals) {
+            if typed.contains(name.rsplit('.').next().unwrap_or(&name)) {
+                facts.ts_locals.insert(name, bindings);
+            } else {
+                facts.ts_record_locals.insert(name, bindings);
+            }
+        }
         Ok(facts)
     }
 
@@ -1443,7 +1449,7 @@ fn selector_writes(
     scope: &str,
     up: &Parents,
     facts: &mut Facts,
-    spent: &mut usize,
+    spent: &mut [usize; 2],
 ) {
     if facts.member_writes.is_none() {
         return;
@@ -1484,10 +1490,48 @@ fn selector_writes(
             }
         };
         if let Some(object) = target.child_by_field_name("object") {
-            let mut object = callee(object, src);
-            if (object == "this" || object.starts_with("this.")) && !instance_context(target, up) {
-                object = "(this)".into();
+            let owner = |object| {
+                let name = callee(object, src);
+                if (name == "this" || name.starts_with("this.")) && !instance_context(target, up) {
+                    "(this)".into()
+                } else {
+                    name
+                }
+            };
+            let mut depth = 0;
+            let mut inner = unwrapped(object);
+            while !facts.ts_record_writes_incomplete
+                && matches!(inner.kind(), "subscript_expression" | "member_expression")
+            {
+                depth += 1;
+                let Some(receiver) = inner.child_by_field_name("object") else {
+                    break;
+                };
+                let name = inner
+                    .child_by_field_name("property")
+                    .map(|p| text(p, src).into())
+                    .or_else(|| {
+                        inner
+                            .child_by_field_name("index")
+                            .filter(|n| n.kind() == "string")
+                            .map(|n| unquote(n, src))
+                    });
+                let write = super::MemberWrite {
+                    scope: scope.into(),
+                    object: owner(receiver),
+                    field: name,
+                    range: node.byte_range(),
+                };
+                spent[1] = spent[1].saturating_add(write.bytes());
+                if depth > FOLD_DEPTH || spent[1] > super::MAX_BYTES {
+                    facts.ts_record_writes_incomplete = true;
+                    facts.ts_record_writes.clear();
+                    break;
+                }
+                facts.ts_record_writes.push(write);
+                inner = unwrapped(receiver);
             }
+            let object = owner(object);
             facts.member_write(
                 super::MemberWrite {
                     scope: scope.into(),
@@ -1495,7 +1539,7 @@ fn selector_writes(
                     field,
                     range: node.byte_range(),
                 },
-                spent,
+                &mut spent[0],
             );
         }
     }
@@ -2294,6 +2338,29 @@ fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
         }
         "identifier" if text(node, src) != "undefined" => {
             Some(vec![Part::Ref(text(node, src).to_string())])
+        }
+        "member_expression"
+            if let Some(indexed) = node.child_by_field_name("object")
+                && indexed.kind() == "subscript_expression"
+                && let Some(field) =
+                    this_member(indexed.child_by_field_name("object")?, src, up) =>
+        {
+            let property = text(node.child_by_field_name("property")?, src).to_owned();
+            let key = indexed.child_by_field_name("index")?;
+            let mut out = vec![Part::RecordStart {
+                at: key.start_byte(),
+                field,
+                property,
+            }];
+            if key.kind() == "number"
+                && let Ok(n) = text(key, src).parse::<u32>()
+            {
+                out.push(Part::Text(n.to_string()));
+            } else {
+                out.extend(inside(key));
+            }
+            out.push(Part::RecordEnd);
+            Some(out)
         }
         "member_expression" if let Some(name) = this_member(node, src, up) => {
             Some(vec![Part::Ref(name)])

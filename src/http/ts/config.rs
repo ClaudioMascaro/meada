@@ -115,8 +115,35 @@ impl<'i> Config<'i> {
         }
     }
 
-    /// Read each configured base separately. Other URL components retain their environment reads.
+    /// A runtime record key can pick any entry. Each selected base still goes through config
+    /// substitution and the value's own trailing-slash operations.
     pub(super) fn decided<R>(
+        &self,
+        args: Vec<Value>,
+        mut read: impl FnMut(&mut [Value], bool) -> Option<R>,
+    ) -> Option<Vec<R>> {
+        if let Some(Value::Str(parts)) = args.first()
+            && let Some(index) = parts.iter().position(|part| {
+                !matches!(part, Part::StripStart)
+                    && !matches!(part, Part::Text(text) if text.is_empty())
+            })
+            && let Part::RecordValues { key: None, values } = &parts[index]
+        {
+            let mut readings = Vec::new();
+            for value in values {
+                let mut args = args.clone();
+                if let Value::Str(parts) = &mut args[0] {
+                    parts.splice(index..=index, value.iter().cloned());
+                }
+                readings.extend(self.configured(args, |args, _| read(args, true))?);
+            }
+            return Some(readings);
+        }
+        self.configured(args, read)
+    }
+
+    /// Read each configured base separately. Other URL components retain their environment reads.
+    fn configured<R>(
         &self,
         mut args: Vec<Value>,
         mut read: impl FnMut(&mut [Value], bool) -> Option<R>,

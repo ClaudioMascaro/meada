@@ -347,3 +347,186 @@ fn a_late_base_uses_the_suffix_as_written() {
         "inferred",
     );
 }
+
+const DISCOVERY: &str = "return this.discovery.getBaseUrl('orders');";
+const INDEXED: &str = "this.perEnv[env].url";
+
+fn no_base(repo: &Path, caller: &str) {
+    let json = export(repo);
+    let consumers = rows(&json, "consumers", "site", caller);
+    assert_eq!(consumers.len(), 1, "{consumers:?}");
+    assert!(consumers[0]["contract"].is_null(), "{consumers:?}");
+    assert!(rows(&json, "links", "consumer", caller).is_empty());
+}
+
+#[test]
+fn a_method_returning_a_discovery_base_is_the_base() {
+    let repo = fixture("http_base_method");
+    one_link(
+        &export(&repo),
+        "Client.list",
+        "client:Backstage plugin orders at /api/orders",
+        "http::GET::/api/orders/list",
+        "inferred",
+    );
+}
+
+#[test]
+fn a_method_with_two_returns_reads_nothing() {
+    let repo = fixture("http_base_two_returns");
+    replace(
+        &repo,
+        "src/method.ts",
+        DISCOVERY,
+        "if (flag) return this.discovery.getBaseUrl('orders'); return 'https://orders.example.com';",
+    );
+    no_base(&repo, "Client.list");
+}
+
+#[test]
+fn a_method_reading_a_parameter_reads_nothing() {
+    let repo = fixture("http_base_method_param");
+    replace(
+        &repo,
+        "src/method.ts",
+        "async base()",
+        "async base(id = 'orders')",
+    );
+    replace(
+        &repo,
+        "src/method.ts",
+        DISCOVERY,
+        "return this.discovery.getBaseUrl(id);",
+    );
+    no_base(&repo, "Client.list");
+}
+
+#[test]
+fn a_record_indexed_by_a_parameter_gives_one_inferred_link_per_value() {
+    let repo = fixture("http_base_record");
+    inferred_record_links(&repo);
+}
+
+fn inferred_record_links(repo: &Path) {
+    let json = export(repo);
+    let mut links: Vec<_> = rows(&json, "links", "consumer", "Store.list")
+        .into_iter()
+        .map(|r| {
+            (
+                r["contract"].as_str().unwrap(),
+                r["level"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    links.sort_unstable();
+    assert_eq!(
+        links,
+        [(ORDERS, "inferred"), ("http::GET::/v2/orders", "inferred")]
+    );
+}
+
+#[test]
+fn a_record_indexed_by_a_literal_gives_that_value() {
+    let repo = fixture("http_base_one_entry");
+    replace(&repo, "src/record.ts", INDEXED, "this.perEnv['b'].url");
+    one_link(
+        &export(&repo),
+        "Store.list",
+        HOST,
+        "http::GET::/v2/orders",
+        "exact",
+    );
+}
+
+#[test]
+fn a_record_written_outside_the_constructor_reads_nothing() {
+    let repo = fixture("http_base_record_write");
+    replace(
+        &repo,
+        "src/record.ts",
+        "  list(env:",
+        "  reset(next) { this.perEnv = next; }\n  list(env:",
+    );
+    no_base(&repo, "Store.list");
+}
+
+#[test]
+fn a_key_outside_the_record_reads_nothing() {
+    let repo = fixture("http_base_unlisted");
+    replace(&repo, "src/record.ts", INDEXED, "this.perEnv['c'].url");
+    no_base(&repo, "Store.list");
+}
+
+#[test]
+fn a_spread_in_the_record_reads_nothing() {
+    let repo = fixture("http_base_spread");
+    replace(
+        &repo,
+        "src/record.ts",
+        "this.perEnv = {",
+        "this.perEnv = { ...config,",
+    );
+    no_base(&repo, "Store.list");
+}
+
+#[test]
+fn writing_an_entry_invalidates_the_record() {
+    for (i, target) in ["this.perEnv.a.url", "this.perEnv['a'].url", "this.perEnv.a"]
+        .into_iter()
+        .enumerate()
+    {
+        let repo = fixture(&format!("http_base_record_entry_write_{i}"));
+        replace(&repo, "src/record.ts", INDEXED, "this.perEnv['a'].url");
+        replace(
+            &repo,
+            "src/record.ts",
+            "  list(env:",
+            &format!("  reset(next) {{ {target} = next; }}\n  list(env:"),
+        );
+        no_base(&repo, "Store.list");
+    }
+}
+
+#[test]
+fn a_record_key_uses_the_constant_in_scope_at_the_read() {
+    let repo = fixture("http_base_record_key_scope");
+    replace(
+        &repo,
+        "src/record.ts",
+        "declare const config: any;",
+        "declare const config: any;\nconst env = 'a';",
+    );
+    replace(
+        &repo,
+        "src/record.ts",
+        "list(env: string) {",
+        "list() { { const env = 'b'; void env; }",
+    );
+    one_link(&export(&repo), "Store.list", HOST, ORDERS, "exact");
+}
+
+#[test]
+fn a_record_key_alias_uses_its_own_declaration_site() {
+    let repo = fixture("http_base_record_key_alias");
+    replace(
+        &repo,
+        "src/record.ts",
+        "list(env: string) {",
+        "list() { { const env = 'b'; void env; } const env = 'a'; const key = env; { const env = 'b';",
+    );
+    replace(&repo, "src/record.ts", INDEXED, "this.perEnv[key].url");
+    replace(&repo, "src/record.ts", "/orders`); }", "/orders`); } }");
+    one_link(&export(&repo), "Store.list", HOST, ORDERS, "exact");
+}
+
+#[test]
+fn a_mutable_record_key_hides_a_constant() {
+    let repo = fixture("http_base_record_key_mutable");
+    replace(
+        &repo,
+        "src/record.ts",
+        "list(env: string) {",
+        "list(input: string) { { const env = 'a'; void env; } let env = input;",
+    );
+    inferred_record_links(&repo);
+}

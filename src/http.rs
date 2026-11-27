@@ -344,10 +344,12 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead
         _ => return Some((None, None, None)),
     };
     // A strip around a still-composite receiver can change its last path segment.
-    if parts
-        .iter()
-        .any(|p| matches!(p, Part::StripStart | Part::StripEnd(_)))
-    {
+    if parts.iter().any(|p| {
+        matches!(
+            p,
+            Part::StripStart | Part::StripEnd(_) | Part::RecordValues { .. }
+        )
+    }) {
         return Some((None, None, None));
     }
     // Only a terminal optional query is irrelevant. If path text follows it, that text
@@ -551,6 +553,9 @@ fn render(parts: &[Part]) -> String {
             | Part::Read { .. }
             | Part::Invoke { .. }
             | Part::EnvKey { .. }
+            | Part::RecordStart { .. }
+            | Part::RecordEnd
+            | Part::RecordValues { .. }
             | Part::StripStart
             | Part::StripEnd(_)
             | Part::QuerySuffix

@@ -6,76 +6,121 @@ use std::collections::{BTreeMap, BTreeSet};
 mod fields;
 pub(super) use fields::Writes;
 
-type Changes<'a> = Vec<(usize, Option<&'a TsLocal>)>;
+type Changes<T> = Vec<(usize, Option<T>)>;
 
 /// Each change in the innermost visible declaration, so repeated calls in sibling blocks
 /// need one binary search instead of a scan of every declaration of the name.
 pub(super) struct FileLocals<'a> {
     id: usize,
     test: bool,
-    changes: HashMap<(&'a str, &'a str), Changes<'a>>,
+    changes: HashMap<(&'a str, &'a str), Changes<&'a TsLocal>>,
+    keys: std::cell::OnceCell<HashMap<String, Changes<TsLocal>>>,
+}
+
+fn changes<'a, T>(bindings: &'a [TsLocal], keep: impl Fn(&'a TsLocal) -> T) -> Changes<T> {
+    let mut events = Vec::new();
+    for (i, b) in bindings
+        .iter()
+        .enumerate()
+        .filter(|(_, b)| !b.block.is_empty())
+    {
+        events.push((b.block.start, true, i));
+        events.push((b.block.end, false, i));
+    }
+    events.sort_unstable();
+    let mut active = BTreeSet::new();
+    let mut changes = Vec::new();
+    for (at, enter, i) in events {
+        let key = (
+            bindings[i].block.start,
+            std::cmp::Reverse(bindings[i].block.end),
+            i,
+        );
+        if enter {
+            active.insert(key);
+        } else {
+            active.remove(&key);
+        }
+        changes.push((at, active.last().map(|k| keep(&bindings[k.2]))));
+    }
+    changes
+}
+
+fn visible<T>(changes: &[(usize, Option<T>)], at: usize) -> Option<&T> {
+    let n = changes.partition_point(|(position, _)| *position <= at);
+    changes.get(n.checked_sub(1)?)?.1.as_ref()
 }
 
 pub(super) fn locals<'a>(files: &BTreeMap<&'a str, &'a Facts>) -> HashMap<&'a str, FileLocals<'a>> {
-    let mut result = HashMap::new();
-    for (id, (&path, &facts)) in files.iter().enumerate() {
-        let mut names = HashMap::new();
-        for (qualified, bindings) in &facts.ts_locals {
-            let mut events = Vec::new();
-            for (i, b) in bindings
-                .iter()
-                .enumerate()
-                .filter(|(_, b)| !b.block.is_empty())
-            {
-                events.push((b.block.start, true, i));
-                events.push((b.block.end, false, i));
-            }
-            events.sort_unstable();
-            let mut active = BTreeSet::new();
-            let mut changes = Vec::new();
-            for (at, enter, i) in events {
-                let key = (
-                    bindings[i].block.start,
-                    std::cmp::Reverse(bindings[i].block.end),
-                    i,
-                );
-                if enter {
-                    active.insert(key);
-                } else {
-                    active.remove(&key);
-                }
-                changes.push((at, active.last().map(|k| &bindings[k.2])));
-            }
-            names.insert((super::scope_of(qualified), own_name(qualified)), changes);
-        }
-        result.insert(
-            path,
-            FileLocals {
-                id,
-                test: crate::http::is_test_file(path),
-                changes: names,
-            },
-        );
-    }
-    result
+    files
+        .iter()
+        .enumerate()
+        .map(|(id, (&path, &facts))| {
+            (
+                path,
+                FileLocals {
+                    id,
+                    test: crate::http::is_test_file(path),
+                    changes: facts
+                        .ts_locals
+                        .iter()
+                        .map(|(name, bindings)| {
+                            (
+                                (super::scope_of(name), own_name(name)),
+                                changes(bindings, |b| b),
+                            )
+                        })
+                        .collect(),
+                    keys: Default::default(),
+                },
+            )
+        })
+        .collect()
 }
 
 impl<'a> Resolver<'a> {
     /// None when this name has no ranged declarations at this site, Some(None) in a gap.
-    pub(super) fn ts_local(
-        &self,
-        path: &str,
-        scope: &str,
-        name: &str,
-    ) -> Option<Option<&'a TsLocal>> {
+    pub(super) fn ts_local(&self, path: &str, scope: &str, name: &str) -> Option<Option<&TsLocal>> {
         let (file, at, _) = self.ts_site.get()?;
         let locals = self.ts_locals.get(path)?;
         if file != locals.id {
             return None;
         }
-        let changes = locals.changes.get(&(scope, name))?;
-        let n = changes.partition_point(|(position, _)| *position <= at);
-        Some(n.checked_sub(1).and_then(|i| changes[i].1))
+        if self.ts_key_read.get() {
+            let changes = locals.keys.get()?.get(&crate::qualify(scope, name))?;
+            return Some(visible(changes, at));
+        }
+        Some(visible(locals.changes.get(&(scope, name))?, at).copied())
+    }
+
+    pub(super) fn record_binding(
+        &self,
+        path: &'a str,
+        scope: &'a str,
+        name: &'a str,
+        at: usize,
+        facts: &'a Facts,
+    ) -> (super::Binding<'a>, Option<&TsLocal>) {
+        self.ts_locals[path].keys.get_or_init(|| {
+            facts
+                .ts_locals
+                .iter()
+                .chain(&facts.ts_record_locals)
+                .map(|(name, bindings)| (name.clone(), changes(bindings, TsLocal::clone)))
+                .collect()
+        });
+        self.at_ts_site(path, at, || {
+            let previous = self.ts_key_read.replace(true);
+            let binding = self.read(path, scope, name);
+            let local = match binding {
+                super::Binding::Const(file, qualified) if file == path => self
+                    .ts_local(path, super::scope_of(qualified), name)
+                    .flatten(),
+                _ => None,
+            };
+            self.ts_key_read.set(previous);
+            (binding, local)
+        })
     }
 
     pub(super) fn receiver_class(

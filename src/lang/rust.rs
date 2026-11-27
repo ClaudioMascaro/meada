@@ -2180,6 +2180,9 @@ mod tests {
                     | Part::Limit(_)
                     | Part::EnvKey { .. }
                     | Part::Invoke { .. }
+                    | Part::RecordStart { .. }
+                    | Part::RecordEnd
+                    | Part::RecordValues { .. }
                     | Part::StripStart
                     | Part::StripEnd(_)
                     | Part::QuerySuffix

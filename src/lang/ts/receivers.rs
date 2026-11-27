@@ -55,11 +55,13 @@ pub(super) fn record(
     block: Node,
     declared: usize,
     receiver: Option<usize>,
+    constant: Option<usize>,
 ) {
     locals.entry(name).or_default().push(TsLocal {
         block: block.byte_range(),
         declared,
         receiver,
+        constant,
     });
 }
 
@@ -160,6 +162,7 @@ fn constructor_receivers(
     scope: &str,
     src: &[u8],
     declared: &std::collections::HashSet<String>,
+    up: &Parents,
     info: &mut TsClass,
     facts: &mut Facts,
 ) {
@@ -194,6 +197,20 @@ fn constructor_receivers(
         let Some(value) = assign.child_by_field_name("right") else {
             continue;
         };
+        if value.kind() == "object"
+            && !info.initialized.contains_key(name)
+            && named(value).filter(|n| n.kind() != "comment").all(|p| {
+                p.kind() == "pair"
+                    && p.child_by_field_name("value")
+                        .is_some_and(|v| v.kind() == "object")
+            })
+        {
+            let ctor = crate::qualify(scope, "constructor");
+            let record = super::value(value, src, &ctor, up);
+            info.records
+                .entry(name.into())
+                .or_insert((assign.start_byte(), record));
+        }
         let stripped = super::trailing_slash(value, src);
         let argument = stripped.map_or(value, |(object, _)| object);
         if argument.kind() == "identifier"
@@ -313,11 +330,12 @@ pub(super) fn definition(node: Node, src: &[u8], scope: &str, up: &Parents, fact
             }
         }
         if let Some(ctor) = ctor {
-            constructor_receivers(ctor, scope, src, &declared, &mut info, facts);
+            constructor_receivers(ctor, scope, src, &declared, up, &mut info, facts);
         }
         if !info.fields.is_empty()
             || !info.implements.is_empty()
             || !info.constructed.is_empty()
+            || !info.records.is_empty()
             || !info.parameters.is_empty()
         {
             facts.ts_classes.insert(scope.to_string(), info);

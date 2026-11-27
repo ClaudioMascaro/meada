@@ -1,5 +1,5 @@
 use super::super::{Binding, Caller, Code, Fold, Resolver, Target, Work};
-use crate::lang::Value;
+use crate::lang::{Part, Value, literal};
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -19,6 +19,8 @@ pub(in crate::resolve) struct Writes<'a> {
     program: Marks<'a>,
     tests: Marks<'a>,
     incomplete: [bool; 2],
+    contents: [Marks<'a>; 2],
+    contents_incomplete: [bool; 2],
 }
 
 impl<'a> Writes<'a> {
@@ -30,12 +32,20 @@ impl<'a> Writes<'a> {
                 result.incomplete[usize::from(test)] = true;
                 continue;
             };
-            let marks = if test {
-                &mut result.tests
-            } else {
-                &mut result.program
-            };
-            for w in writes {
+            let index = usize::from(test);
+            result.contents_incomplete[index] |= facts.ts_record_writes_incomplete;
+            for (w, contents) in writes
+                .iter()
+                .map(|w| (w, false))
+                .chain(facts.ts_record_writes.iter().map(|w| (w, true)))
+            {
+                let marks = if contents {
+                    &mut result.contents[index]
+                } else if test {
+                    &mut result.tests
+                } else {
+                    &mut result.program
+                };
                 let enclosing = match r.class(path, &w.scope) {
                     Binding::Def(t) => Some(t),
                     _ => None,
@@ -160,16 +170,26 @@ impl<'a> Resolver<'a> {
                     .get(field)
                     .copied()
                     .or_else(|| c.parameters.get(field)?.assignment)
+                    .or_else(|| c.records.get(field).map(|(offset, _)| *offset))
             })
             .map(|at| (class.path, at));
+        let record = info.is_some_and(|c| c.records.contains_key(field));
+        if record && (writes.contents_incomplete[0] || (test && writes.contents_incomplete[1])) {
+            return true;
+        }
         let written = |owner| {
-            [&writes.program, &writes.tests][..if test { 2 } else { 1 }]
+            let sets = [
+                (&writes.program, &writes.contents[0]),
+                (&writes.tests, &writes.contents[1]),
+            ];
+            sets[..if test { 2 } else { 1 }]
                 .iter()
-                .any(|marks| {
+                .any(|(marks, contents)| {
                     [Some(field), None].iter().any(|&f| {
                         marks
                             .get(&(owner, f))
                             .is_some_and(|only| only.is_none() || *only != seed)
+                            || (record && contents.contains_key(&(owner, f)))
                     })
                 })
         };
@@ -198,6 +218,75 @@ impl<'a> Code<'a> {
             &self.resolver.callers
         };
         callers.get(&target).map_or(&[], Vec::as_slice)
+    }
+
+    /// Select the property of one record entry, or the possible properties of a dynamic key.
+    #[expect(clippy::too_many_arguments)]
+    pub(in crate::resolve) fn ts_record(
+        &self,
+        (path, scope): (&'a str, &'a str),
+        (field, property): (&'a str, &str),
+        key: Vec<Part>,
+        frames: &[super::super::Frame<'a>],
+        depth: usize,
+        fold: &mut Fold<'a, '_>,
+        wants: &mut Option<Target<'a>>,
+    ) -> Option<Value> {
+        let r = self.resolver;
+        let Binding::Def(class) = r.class(path, scope) else {
+            return None;
+        };
+        let field = field.strip_prefix("this.")?;
+        let (_, Value::Object(entries)) = r.files[path]
+            .ts_classes
+            .get(class.name)?
+            .records
+            .get(field)?
+        else {
+            return None;
+        };
+        if r.ts_field_written(class, field, crate::http::is_test_file(path)) {
+            return None;
+        }
+        let (ctor, _) =
+            r.defs[path].get_key_value(crate::qualify(class.name, "constructor").as_str())?;
+        let selected = literal(&key);
+        let pending = key.iter().find_map(Part::parameter).map(str::to_owned);
+        let mut seen = std::collections::HashSet::new();
+        let mut values = Vec::new();
+        for (name, entry) in entries.iter().rev() {
+            if matches!(name.as_str(), "..." | "[]") {
+                return None;
+            }
+            if !seen.insert(name) || selected.as_ref().is_some_and(|k| k != name) {
+                continue;
+            }
+            let Value::Object(fields) = entry else {
+                return None;
+            };
+            if fields
+                .iter()
+                .any(|(key, _)| matches!(key.as_str(), "..." | "[]"))
+            {
+                return None;
+            }
+            let (_, value) = fields.iter().rev().find(|(key, _)| key == property)?;
+            match self.eval(path, ctor, value, frames, depth, fold, wants) {
+                Value::Str(parts) => values.push(parts),
+                Value::Ref(name) => values.push(vec![Part::Ref(name)]),
+                _ => return None,
+            }
+        }
+        if selected.is_some() {
+            values.pop().map(Value::Str)
+        } else if values.is_empty() {
+            None
+        } else {
+            Some(Value::Str(vec![Part::RecordValues {
+                key: pending,
+                values,
+            }]))
+        }
     }
 
     /// Read the argument at each exact construction, including values supplied to its factory.
