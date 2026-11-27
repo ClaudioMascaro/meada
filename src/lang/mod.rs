@@ -533,6 +533,9 @@ pub struct Facts {
     /// Additional lexical bindings for computed TS record keys, kept with the values.
     #[serde(default, skip_serializing_if = "lean_or_empty")]
     pub ts_record_locals: BTreeMap<String, Vec<TsLocal>>,
+    /// Declaration offsets of annotated receivers initialized with an object literal.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub ts_annotated_literals: BTreeSet<usize>,
     /// Member calls on a namespace proven global, identified by their full call span.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub ts_global_calls: BTreeSet<(usize, usize)>,

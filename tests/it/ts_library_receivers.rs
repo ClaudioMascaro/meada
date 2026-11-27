@@ -161,3 +161,19 @@ fn only_an_unwrapped_result_types_an_awaited_value() {
     assert_eq!(candidates(row), ["Client.listen", "Peer.listen"], "{row}");
     no_candidate(call("fromResponse", "json"));
 }
+
+#[test]
+fn an_outside_annotation_on_a_repository_literal_keeps_its_answer() {
+    let row = call("literal", "check");
+    assert_eq!(row["level"], "exact", "{row}");
+    assert_eq!(candidates(row), ["v.check"], "{row}");
+}
+
+#[test]
+fn a_nested_or_field_literal_keeps_the_ordinary_member_lookup() {
+    for caller in ["nested", "Service.checkValue"] {
+        let row = call(caller, "check");
+        assert_eq!(row["level"], "inferred", "{row}");
+        assert_eq!(candidates(row), ["Store.check"], "{row}");
+    }
+}

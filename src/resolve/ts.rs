@@ -325,6 +325,18 @@ impl<'a> Resolver<'a> {
             self.holder(&self.lexical(path, &call.scope, head, &mut self.seen(path, &call.scope)))?
         };
         let class = self.receiver_class(p, s, n)?;
+        let facts = self.files[p];
+        let declaration = self
+            .ts_local(p, s, n)
+            .flatten()
+            .map(|local| local.declared)
+            .or_else(|| facts.ts_classes.get(s)?.initialized.get(n).copied());
+        // A literal supplies its own implementation even when its annotation is from a library.
+        if declaration.is_some_and(|at| facts.ts_annotated_literals.contains(&at))
+            || (s.is_empty() && declaration.is_none() && facts.ts_literal_methods.contains_key(n))
+        {
+            return None;
+        }
         let ty = match class {
             Class::TsGlobalValue => return Some(Resolution::Unresolved),
             // Only the by-name answer can change for an outside result. The exact lookup

@@ -110,6 +110,9 @@ pub(super) fn local(
             }),
     };
     put(facts, scope, name, class?);
+    if super::unwrapped(value).kind() == "object" {
+        facts.ts_annotated_literals.insert(node.end_byte());
+    }
     Some(index)
 }
 
@@ -287,6 +290,11 @@ pub(super) fn definition(node: Node, src: &[u8], scope: &str, up: &Parents, fact
                     };
                     if let Some(class) = class {
                         put(facts, scope, &field, class);
+                        if let Some(value) =
+                            init.filter(|v| super::unwrapped(*v).kind() == "object")
+                        {
+                            facts.ts_annotated_literals.insert(value.start_byte());
+                        }
                     }
                 }
             } else if member.kind() == "method_definition" && text(name, src) == "constructor" {
