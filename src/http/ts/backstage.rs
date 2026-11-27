@@ -148,7 +148,9 @@ pub(super) fn based(args: &mut [Value]) -> Option<String> {
     let Some(Value::Str(parts)) = args.first_mut() else {
         return None;
     };
-    let first = parts.first_mut()?;
+    let first = parts
+        .iter_mut()
+        .find(|part| !matches!(part, Part::StripStart))?;
     let Part::Read { callee, key, .. } = first else {
         return None;
     };

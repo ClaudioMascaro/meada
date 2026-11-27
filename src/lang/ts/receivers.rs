@@ -194,14 +194,17 @@ fn constructor_receivers(
         let Some(value) = assign.child_by_field_name("right") else {
             continue;
         };
-        if value.kind() == "identifier"
-            && parameters.contains(text(value, src))
+        let stripped = super::trailing_slash(value, src);
+        let argument = stripped.map_or(value, |(object, _)| object);
+        if argument.kind() == "identifier"
+            && parameters.contains(text(argument, src))
             && !info.initialized.contains_key(name)
         {
             info.parameters
                 .entry(name.into())
                 .or_insert_with(|| TsFieldParameter {
-                    name: text(value, src).into(),
+                    name: text(argument, src).into(),
+                    strip: stripped.map(|(_, strip)| strip),
                     assignment: Some(assign.start_byte()),
                 });
         }
@@ -290,6 +293,7 @@ pub(super) fn definition(node: Node, src: &[u8], scope: &str, up: &Parents, fact
                         field.into(),
                         TsFieldParameter {
                             name: field.into(),
+                            strip: None,
                             assignment: None,
                         },
                     );

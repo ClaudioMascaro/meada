@@ -1,7 +1,7 @@
 //! HTTP routing through evaluated Services, Ingresses and the workloads running code.
 
 use super::{Http, PROXY_VIA, contract, fits, gateway_contracts, join, route};
-use crate::contract::{ContractKind, Level, Link};
+use crate::contract::{ContractKind, Level, Link, ReceiverIdentity};
 use crate::iac::Node;
 use crate::image::{Image, environment::Environments};
 use crate::index::{Consumer, Export, Gateway, Provider};
@@ -519,6 +519,24 @@ fn base_url(value: &str) -> Option<(&str, &str)> {
     Some((host, path))
 }
 
+/// A workload supplies the base after extraction. Replay an explicit TS strip before
+/// appending the written suffix, which can start in the middle of a path segment.
+fn workload_url<'a>(consumer: &'a Consumer, raw: &str) -> Option<(&'a str, String, String)> {
+    let wanted = consumer.contract.as_deref().and_then(route);
+    if let Some(ReceiverIdentity::HttpBase { strips, suffix }) = &consumer.identity {
+        let method = wanted
+            .map(|(method, _)| method)
+            .or(consumer.method.as_deref())?;
+        let base = strips.iter().fold(raw, |base, op| op.apply(base));
+        let url = format!("{base}{suffix}");
+        let (host, path) = base_url(&url)?;
+        return Some((method, host.into(), path.into()));
+    }
+    let (method, path) = wanted?;
+    let (host, base) = base_url(raw)?;
+    Some((method, host.into(), join(base, path)))
+}
+
 fn collapse(mut links: Vec<Link>) -> Vec<Link> {
     let mut grouped = BTreeMap::<LinkKey, (Link, BTreeSet<String>)>::new();
     for link in links.drain(..) {
@@ -553,13 +571,11 @@ fn collapse(mut links: Vec<Link>) -> Vec<Link> {
 }
 
 pub(super) fn prepare(exports: &mut [Export], repositories: &[Repository]) {
-    if !exports.iter().any(|e| {
-        e.consumers.iter().any(|c| {
-            c.contract
-                .as_deref()
-                .is_some_and(|c| c.starts_with("http::"))
-        })
-    }) {
+    let is_http = |c: &Consumer| {
+        c.contract.as_deref().and_then(route).is_some()
+            || matches!(c.identity, Some(ReceiverIdentity::HttpBase { .. }))
+    };
+    if !exports.iter().any(|e| e.consumers.iter().any(is_http)) {
         return;
     }
     if !exports.iter().any(|e| {
@@ -583,11 +599,7 @@ pub(super) fn prepare(exports: &mut [Export], repositories: &[Repository]) {
         let mut out = Prepared::default();
         let mut consumers = Vec::new();
         for consumer in &export.consumers {
-            let Some(wanted) = consumer
-                .contract
-                .as_deref()
-                .filter(|c| c.starts_with("http::"))
-            else {
+            if !is_http(consumer) {
                 consumers.push(consumer.clone());
                 continue;
             };
@@ -605,17 +617,16 @@ pub(super) fn prepare(exports: &mut [Export], repositories: &[Repository]) {
                     let mut links = Vec::new();
                     let mut resolved = Vec::new();
                     for value in scoped {
-                        let Some((host, base)) = value.value.and_then(base_url) else {
-                            continue;
-                        };
-                        let Some((method, path)) = route(wanted) else {
+                        let Some((method, host, path)) =
+                            value.value.and_then(|raw| workload_url(consumer, raw))
+                        else {
                             continue;
                         };
                         let mut consumer = consumer.clone();
-                        consumer.contract = Some(contract(method, &join(base, path)));
+                        consumer.contract = Some(contract(method, &path));
                         let caller = routing.location(value.workload, value.root);
                         let found = routing
-                            .links(&consumer, repo, host, caller, Some(&value.reason))
+                            .links(&consumer, repo, &host, caller, Some(&value.reason))
                             .unwrap_or_else(|| {
                                 let mut by_host = consumer.clone();
                                 by_host.via = Some(format!(

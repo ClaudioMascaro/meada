@@ -266,6 +266,13 @@ impl<'a> Code<'a> {
             }
             fold.field_wants.get_or_insert(target);
         }
-        Some(value)
+        Some(match (parameter.strip, value) {
+            (Some(strip), Value::Str(parts)) => Value::Str(strip.wrap(parts)),
+            (Some(strip), Value::Ref(name)) => {
+                Value::Str(strip.wrap(vec![crate::lang::Part::Ref(name)]))
+            }
+            (Some(strip), Value::Unknown) => Value::Str(strip.wrap(vec![crate::lang::Part::Hole])),
+            (_, value) => value,
+        })
     }
 }

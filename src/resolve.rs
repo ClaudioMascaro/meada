@@ -8054,7 +8054,7 @@ impl<'a> Code<'a> {
                 other => out.push(Part::unread(&other)),
             }
         }
-        Value::Str(out)
+        Value::Str(crate::lang::fold_strips(out))
     }
 
     #[expect(clippy::too_many_arguments)]
@@ -8292,6 +8292,8 @@ impl<'a> Code<'a> {
                         | Part::Env(_)
                         | Part::EnvOr(..)
                         | Part::EnvKey { .. }
+                        | Part::StripStart
+                        | Part::StripEnd(_)
                         | Part::QuerySuffix
                         | Part::Read { .. }
                 )

@@ -2180,6 +2180,8 @@ mod tests {
                     | Part::Limit(_)
                     | Part::EnvKey { .. }
                     | Part::Invoke { .. }
+                    | Part::StripStart
+                    | Part::StripEnd(_)
                     | Part::QuerySuffix
                     | Part::Hole => "{}".into(),
                 })

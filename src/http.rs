@@ -343,6 +343,13 @@ fn locate(args: &[Value]) -> Option<(Option<String>, Option<String>, Option<Lead
         Some(Value::Ref(_)) => return None,
         _ => return Some((None, None, None)),
     };
+    // A strip around a still-composite receiver can change its last path segment.
+    if parts
+        .iter()
+        .any(|p| matches!(p, Part::StripStart | Part::StripEnd(_)))
+    {
+        return Some((None, None, None));
+    }
     // Only a terminal optional query is irrelevant. If path text follows it, that text
     // can be either part of the path or part of the query.
     let end = parts.iter().rposition(|p| {
@@ -544,6 +551,8 @@ fn render(parts: &[Part]) -> String {
             | Part::Read { .. }
             | Part::Invoke { .. }
             | Part::EnvKey { .. }
+            | Part::StripStart
+            | Part::StripEnd(_)
             | Part::QuerySuffix
             | Part::Ref(_)
             | Part::Limit(_)
@@ -1055,7 +1064,7 @@ impl ContractKind for Http {
                     consumer.site.clone(),
                     provider.site.clone(),
                     contract.clone(),
-                    level,
+                    consumer.cap.map_or(level, |cap| level.max(cap)),
                     reason,
                     None,
                     None,

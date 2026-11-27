@@ -5182,14 +5182,14 @@ mod tests {
             SCHEMA.trim_start()
         );
         let identity = [
-            crate::contract::ReceiverIdentity {
+            crate::contract::ReceiverIdentity::Sdk {
                 kind: "subscription".into(),
                 parts: vec![
                     crate::names::Argument::Literal("orders".into()),
                     crate::names::Argument::Environment("SUBSCRIPTION".into()),
                 ],
             },
-            crate::contract::ReceiverIdentity {
+            crate::contract::ReceiverIdentity::Sdk {
                 kind: "entity".into(),
                 parts: vec![crate::names::Argument::Unresolved],
             },

@@ -2217,6 +2217,25 @@ fn parts(node: Node, src: &[u8], up: &Parents) -> Option<Vec<Part>> {
     parts_at(node, src, up, 0)
 }
 
+fn trailing_slash<'a>(call: Node<'a>, src: &[u8]) -> Option<(Node<'a>, super::SlashStrip)> {
+    let function = call.child_by_field_name("function")?;
+    if text(function.child_by_field_name("property")?, src) != "replace" {
+        return None;
+    }
+    let mut args = named(call.child_by_field_name("arguments")?).filter(|a| a.kind() != "comment");
+    let pattern = args.next().filter(|a| a.kind() == "regex")?;
+    let replacement = args.next()?;
+    if args.next().is_some() || !matches!(text(replacement, src), "''" | "\"\"" | "``") {
+        return None;
+    }
+    let strip = match text(pattern, src) {
+        r"/\/$/" | r"/\/$/g" => super::SlashStrip::One,
+        r"/\/+$/" | r"/\/+$/g" | r"/\/*$/" | r"/\/*$/g" => super::SlashStrip::All,
+        _ => return None,
+    };
+    Some((function.child_by_field_name("object")?, strip))
+}
+
 /// `parts` of a node `depth` levels inside the expression it started from; past `FOLD_DEPTH`
 /// the rest is a hole.
 fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Part>> {
@@ -2283,6 +2302,9 @@ fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
         | "non_null_expression"
         | "as_expression"
         | "satisfies_expression" => parts(named(node).next()?),
+        "call_expression" if let Some((object, strip)) = trailing_slash(node, src) => {
+            Some(strip.wrap(inside(object)))
+        }
         _ => url_form(node, src, up, depth)
             .or_else(|| env_read(node, src, up, depth).map(|env| vec![env])),
     }
@@ -2441,16 +2463,33 @@ const CONFIG_READS: &[&str] = &["getString", "getOptionalString"];
 
 /// `config.getString('a.b')` as a `Part::Read` of the key, for the kind to decide.
 fn config_read(call: Node, function: Node, src: &[u8]) -> Option<Part> {
-    let args = call.child_by_field_name("arguments")?;
-    let mut args = named(args);
-    let key = args.next().filter(|k| k.kind() == "string")?;
-    if args.next().is_some() {
-        return None;
+    let key = |call: Node| {
+        let mut args =
+            named(call.child_by_field_name("arguments")?).filter(|n| n.kind() != "comment");
+        let arg = args.next().filter(|k| k.kind() == "string")?;
+        args.next().is_none().then(|| unquote(arg, src))
+    };
+    let mut keys = vec![key(call)?];
+    let mut base = function.child_by_field_name("object")?;
+    while base.kind() == "call_expression" {
+        let method = callee_node(base)?;
+        if !method
+            .child_by_field_name("property")
+            .is_some_and(|p| matches!(text(p, src), "getConfig" | "getOptionalConfig"))
+        {
+            break;
+        }
+        if keys.len() >= FOLD_DEPTH {
+            return None;
+        }
+        keys.push(key(base)?);
+        base = method.child_by_field_name("object")?;
     }
+    keys.reverse();
     Some(Part::Read {
         scope: std::sync::Arc::from(""),
         callee: callee(function, src),
-        key: unquote(key, src),
+        key: keys.join("."),
         parameter: false,
         then: Vec::new(),
     })

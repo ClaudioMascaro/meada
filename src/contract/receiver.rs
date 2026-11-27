@@ -7,9 +7,16 @@ use crate::names::Argument;
 
 /// A kind's receiver subtype and the name arguments folded in its exact construction frame.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct ReceiverIdentity {
-    pub(crate) kind: String,
-    pub(crate) parts: Vec<Argument>,
+#[serde(untagged)]
+pub enum ReceiverIdentity {
+    Sdk {
+        kind: String,
+        parts: Vec<Argument>,
+    },
+    HttpBase {
+        strips: Vec<crate::lang::SlashStrip>,
+        suffix: String,
+    },
 }
 
 /// The execution scope in which companion environment values may be combined.

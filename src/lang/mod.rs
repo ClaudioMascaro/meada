@@ -1003,6 +1003,8 @@ pub struct TsFieldParameter {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assignment: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip: Option<SlashStrip>,
 }
 
 /// What the syntax says a name holds. It is read as written: the shared side decides whether
@@ -1773,8 +1775,67 @@ pub fn literal(parts: &[Part]) -> Option<String> {
         .collect()
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
+pub enum SlashStrip {
+    One,
+    All,
+}
+
+impl SlashStrip {
+    pub(crate) fn apply(self, text: &str) -> &str {
+        match self {
+            Self::One => text.strip_suffix('/').unwrap_or(text),
+            Self::All => text.trim_end_matches('/'),
+        }
+    }
+
+    pub(crate) fn wrap(self, mut parts: Vec<Part>) -> Vec<Part> {
+        self.finish(&mut parts, 0);
+        parts
+    }
+
+    // Only a run reaching the unknown part needs to wait for another substitution.
+    fn finish(self, parts: &mut Vec<Part>, start: usize) {
+        while parts.len() > start {
+            let Some(Part::Text(last)) = parts.last_mut() else {
+                parts.insert(start, Part::StripStart);
+                parts.push(Part::StripEnd(self));
+                return;
+            };
+            let len = self.apply(last).len();
+            let done = len > 0 || (self == Self::One && !last.is_empty());
+            last.truncate(len);
+            if done {
+                return;
+            }
+            parts.pop();
+        }
+    }
+}
+
+/// Reapply pending replacements after their receivers have been substituted.
+pub(crate) fn fold_strips(parts: Vec<Part>) -> Vec<Part> {
+    if !parts.iter().any(|p| matches!(p, Part::StripStart)) {
+        return parts;
+    }
+    let mut out = Vec::new();
+    let mut starts = Vec::new();
+    for part in parts {
+        match part {
+            Part::StripStart => starts.push(out.len()),
+            Part::StripEnd(strip) if let Some(start) = starts.pop() => {
+                strip.finish(&mut out, start)
+            }
+            other => out.push(other),
+        }
+    }
+    out
+}
+
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub enum Part {
+    StripStart,
+    StripEnd(SlashStrip),
     Text(String),
     /// A name inside a string, folded like `Value::Ref`.
     Ref(String),

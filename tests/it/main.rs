@@ -55,6 +55,7 @@ mod gopkg;
 mod grammar;
 mod helm_env;
 mod hostile;
+mod http_bases;
 mod http_iac;
 mod iac;
 mod iac_http_routes;

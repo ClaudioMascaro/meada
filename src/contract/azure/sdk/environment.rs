@@ -28,7 +28,7 @@ pub(super) fn identity(name: &Argument, sub: Option<&Argument>) -> ReceiverIdent
             sub => sub.clone(),
         });
     }
-    ReceiverIdentity {
+    ReceiverIdentity::Sdk {
         kind: if sub.is_some() {
             "subscription"
         } else {
@@ -149,7 +149,10 @@ pub(crate) fn environment_identity(
                 );
         }
     };
-    match (identity.kind.as_str(), identity.parts.as_slice()) {
+    let ReceiverIdentity::Sdk { kind, parts } = identity else {
+        return None;
+    };
+    match (kind.as_str(), parts.as_slice()) {
         ("entity", [name]) => match choices(name, values) {
             Choices::Literal(name) => record(entity(&name), &[&name]),
             Choices::Scoped(scopes) => {
