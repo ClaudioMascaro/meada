@@ -625,3 +625,44 @@ func (s *sender) send() { _, _ = s.req.Post("/run") }
     std::fs::write(repo.join("svc-a/client/sender_test.go"), write).unwrap();
     assert_no_base(&links(&repo), site);
 }
+
+#[test]
+fn a_test_struct_literal_does_not_supply_a_production_http_base() {
+    let repo = mono("base_url_test_struct_literal");
+    let src = r#"package client
+import "net/http"
+type sender struct { endpoint string }
+func (s *sender) send() { http.Post(s.endpoint + "/run", "application/json", nil) }
+"#;
+    let sample = r#"package client
+import "os"
+func sample() *sender { return &sender{endpoint: os.Getenv("B_URL")} }
+"#;
+    std::fs::write(repo.join("svc-a/client/sender.go"), src).unwrap();
+    let site = "svc-a/client/sender.go::sender.send";
+    let before = shown(&of(&links(&repo), site));
+    std::fs::write(repo.join("svc-a/client/sender_test.go"), sample).unwrap();
+    assert_eq!(shown(&of(&links(&repo), site)), before);
+}
+
+#[test]
+fn a_test_struct_literal_does_not_supply_a_production_request_client() {
+    let repo = mono("base_url_test_request_literal");
+    let src = r#"package client
+import "github.com/go-resty/resty/v2"
+type sender struct { req *resty.Request }
+func (s *sender) send() { s.req.Post("/run") }
+"#;
+    let sample = r#"package client
+import (
+    "os"
+    "github.com/go-resty/resty/v2"
+)
+func sample() *sender { return &sender{req: resty.New().SetBaseURL(os.Getenv("B_URL")).R()} }
+"#;
+    std::fs::write(repo.join("svc-a/client/sender.go"), src).unwrap();
+    let site = "svc-a/client/sender.go::sender.send";
+    let before = shown(&of(&links(&repo), site));
+    std::fs::write(repo.join("svc-a/client/sender_test.go"), sample).unwrap();
+    assert_eq!(shown(&of(&links(&repo), site)), before);
+}

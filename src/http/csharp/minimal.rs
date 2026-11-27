@@ -553,6 +553,23 @@ mod tests {
     }
 
     #[test]
+    fn a_test_caller_supplies_no_group_to_production_extension_routes() {
+        let program = |prefix: &str| {
+            format!(
+                "{USINGS}using Acme.Routes;\n{APP_START}app.MapGroup(\"/{prefix}\").MapOrders();"
+            )
+        };
+        let main = program("orders");
+        let sample = program("sample");
+        let found = contracts(served_in(&[
+            ("Program.cs", &main),
+            ("Routes.cs", ROUTES),
+            ("tests/Sample.cs", &sample),
+        ]));
+        assert_eq!(found, ["http::GET::/orders", "http::GET::/orders/{}"]);
+    }
+
+    #[test]
     fn an_extension_method_maps_its_routes_under_each_group_it_is_called_on() {
         let found = routed(
             "var orders = app.MapGroup(\"/v1\").MapGroup(\"/orders\");\n\

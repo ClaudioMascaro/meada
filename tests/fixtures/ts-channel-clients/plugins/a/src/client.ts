@@ -16,3 +16,11 @@ export class Service {
   constructor(private client: KafkaClient) {}
   listen() { this.client.createConsumer(process.env.ORDERS_TOPIC); }
 }
+
+export function listenTopic(client: KafkaClient, topic: string) {
+  client.createConsumer(topic);
+}
+
+export function listenOrders(client: KafkaClient) {
+  listenTopic(client, 'orders.created');
+}

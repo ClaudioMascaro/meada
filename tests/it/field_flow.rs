@@ -278,3 +278,22 @@ fn a_constructor_base_and_a_method_argument_reach_the_same_request() {
         "{requests:?}"
     );
 }
+
+#[test]
+fn a_test_caller_of_a_factory_adds_no_production_topic() {
+    let repo = repo("field_test_factory");
+    replace(&repo, BUILD, "function make(", "export function make(");
+    replace(
+        &repo,
+        "plugins/orders/src/OrderService.test.ts",
+        "return new OrderService(",
+        "return make(",
+    );
+    replace(
+        &repo,
+        "plugins/orders/src/OrderService.test.ts",
+        "import { OrderService } from './service';",
+        "import { make } from './build';",
+    );
+    assert_eq!(topics(&export(&repo)), [APPROVED]);
+}

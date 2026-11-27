@@ -508,6 +508,8 @@ pub struct Resolver<'a> {
     /// reach another function: it is not kept, so a wrapper or a parameter is never climbed
     /// through it.
     callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
+    /// Test calls to production definitions, consulted only for a field read in a test.
+    test_callers: HashMap<Target<'a>, Vec<Caller<'a>>>,
     /// Exact constructions eligible to supply fields read in the class's file.
     ts_constructions: HashMap<Target<'a>, Vec<Caller<'a>>>,
     /// What each call resolved to when the resolver was built, by file and position
@@ -1212,6 +1214,7 @@ impl<'a> Resolver<'a> {
             known: crate::lang::known_outside(language),
             globals: language.globals(),
             callers: HashMap::new(),
+            test_callers: HashMap::new(),
             ts_constructions: HashMap::new(),
             built: HashMap::new(),
             built_final: false,
@@ -1384,21 +1387,29 @@ impl<'a> Resolver<'a> {
         let mut extension_callers: HashMap<Target, Vec<Caller>> = HashMap::new();
         let mut built = HashMap::new();
         for (path, facts) in files {
+            let test = crate::http::is_test_file(path);
+            let supplies = |target: Target| !test || crate::http::is_test_file(target.path);
             let built: &mut Vec<Resolution> = built.entry(*path).or_default();
             for (index, call) in facts.calls.iter().enumerate() {
                 let resolution = resolver.call(path, call);
                 built.push(resolution.clone());
                 match resolution {
                     Resolution::Exact(target) => {
+                        if !supplies(target) {
+                            if path.ends_with(".go") {
+                                resolver
+                                    .test_callers
+                                    .entry(target)
+                                    .or_default()
+                                    .push(Caller { path, index });
+                            }
+                            continue;
+                        }
                         callers
                             .entry(target)
                             .or_default()
                             .push(Caller { path, index });
-                        if resolver.ts
-                            && call.constructs
-                            && (!crate::http::is_test_file(path)
-                                || crate::http::is_test_file(target.path))
-                        {
+                        if resolver.ts && call.constructs {
                             resolver
                                 .ts_constructions
                                 .entry(target)
@@ -1406,7 +1417,9 @@ impl<'a> Resolver<'a> {
                                 .push(Caller { path, index });
                         }
                     }
-                    Resolution::Inferred(target) if resolver.extension_call(path, call, target) => {
+                    Resolution::Inferred(target)
+                        if supplies(target) && resolver.extension_call(path, call, target) =>
+                    {
                         (extension_callers.entry(target).or_default()).push(Caller { path, index });
                     }
                     _ => {}
@@ -6405,7 +6418,11 @@ impl<'a> Code<'a> {
     // ponytail: a literal of an alias or a defined type (`type B = T`, `type B T`) written by
     // position, and a conversion from another struct type (`T(other)`), are not seen as setting
     // the fields of `T`.
-    pub fn field_values(&self, field: Field<'a>) -> Option<Vec<(&'a str, &'a str, &'a Value)>> {
+    pub fn field_values(
+        &self,
+        field: Field<'a>,
+        test_read: bool,
+    ) -> Option<Vec<(&'a str, &'a str, &'a Value)>> {
         let (at, ty, name) = field;
         let index = self.literals.get_or_init(|| {
             let mut index: HashMap<&'a str, BTreeSet<(&'a str, &'a str)>> = HashMap::new();
@@ -6423,6 +6440,9 @@ impl<'a> Code<'a> {
         let mut out = Vec::new();
         let markers = [index.get(name), index.get("*")];
         for &(path, marker) in markers.into_iter().flatten().flatten() {
+            if !test_read && crate::http::is_test_file(path) {
+                continue;
+            }
             let by_position = marker.ends_with("{*}");
             let scope = scope_of(marker);
             for &literal in self.consts(path, marker) {
@@ -6526,7 +6546,7 @@ impl<'a> Code<'a> {
         }
         (self.field_reads.borrow_mut()).insert(key, Value::Unknown);
         let mut reads = Vec::new();
-        let all = self.field_values(field).is_some_and(|values| {
+        let all = self.field_values(field, test_read).is_some_and(|values| {
             !values.is_empty()
                 && (values.into_iter()).all(|(path, scope, value)| {
                     let frames = &mut Vec::new();
@@ -6588,7 +6608,14 @@ impl<'a> Code<'a> {
             return false;
         }
         let callers: Vec<Caller> = (self.resolver.callers.get(&function).into_iter().flatten())
-            .filter(|c| test_read || !c.path.ends_with("_test.go"))
+            .chain(
+                self.resolver
+                    .test_callers
+                    .get(&function)
+                    .into_iter()
+                    .flatten()
+                    .filter(|_| test_read),
+            )
             .copied()
             .collect();
         !callers.is_empty()
@@ -8624,7 +8651,7 @@ impl<'a> Code<'a> {
                 let marks = |on: &Marked| matches!(on, Marked::Field { class: c, name, .. } if c == class && name == field);
                 let injected = fold.inject.and_then(|i| self.injected(at, marks, i));
                 let field = (at, class, field);
-                let test_read = path.ends_with("_test.go");
+                let test_read = crate::http::is_test_file(path);
                 injected.unwrap_or_else(|| {
                     self.field_read(field, fold.field_depth, fold.nested, test_read)
                 })
@@ -11648,6 +11675,31 @@ mod tests {
             alone
         });
         assert_eq!(alone, ["A.own", "holder", "plain"]);
+    }
+
+    #[test]
+    fn test_arguments_do_not_supply_production_parameters_or_origins() {
+        let sources = [
+            ("a.py", "def wrap(r):\n    return r\nwrap(Alpha())\n"),
+            ("test_a.py", "from a import wrap\nwrap(Beta())\n"),
+        ];
+        assert_eq!(held_by(py(), &sources, "a.py", "wrap", "r"), ["a.py Alpha"]);
+        over(py(), &sources, |code| {
+            let function = Target {
+                path: "a.py",
+                name: "wrap",
+            };
+            let paths = |args: Vec<(&str, &str, &Value)>| {
+                args.into_iter()
+                    .map(|(path, _, _)| path.to_string())
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(paths(code.param_args(function, 0)), ["a.py"]);
+            assert_eq!(
+                paths(code.param_values(function, 0, None).unwrap()),
+                ["a.py"]
+            );
+        });
     }
 
     #[test]

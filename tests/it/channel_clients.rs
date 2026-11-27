@@ -270,3 +270,25 @@ fn a_declared_ts_client_reads_the_configured_argument_field() {
         ["channel::kafka::orders.shipped"]
     );
 }
+
+#[test]
+fn a_test_caller_supplies_no_topic_to_a_production_wrapper() {
+    let (export, _) = ts_clients();
+    let call = export["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|call| {
+            call["id"]
+                .as_str()
+                .unwrap()
+                .ends_with("client.test.ts::sample::listenTopic#0")
+        })
+        .unwrap();
+    assert_eq!(call["level"], "exact");
+    assert_eq!(
+        sides(export, "consumers", "::listenOrders"),
+        ["channel::kafka::orders.created"]
+    );
+    assert!(!sides(export, "consumers", "").contains(&"channel::kafka::test.topic".into()));
+}
