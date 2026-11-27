@@ -1,6 +1,6 @@
 ---
 name: meada
-description: Use when locating a symbol, finding its callers or other uses, assessing which files a change or lockfile affects, or tracing routes, channels, packages, shared resources and CI pipelines across repositories.
+description: Use when querying Meada's MCP tools (`search`, `context`, `trace`), locating a symbol, finding its callers or other uses, assessing which files a change or lockfile affects, or tracing routes, channels, packages, shared resources and CI pipelines across repositories.
 ---
 
 # Meada
@@ -23,7 +23,8 @@ Server mode reads indexed data.
 3. **Follow** with `trace` from that identity. Use `direction: "down"` for what it reaches
    and `"up"` for what depends on it, including non-call uses. For local edits, pass
    `{"changes":"uncommitted","direction":"up"}` to trace dependents of the symbols the diff
-   touches. For affected files, use the CLI below.
+   touches. For affected files, use the CLI below. Stop tracing when the footer's weakest
+   level supports the action you need to take.
 4. **Read** the lines the answer names before you edit them or state a claim about them.
 
 Every MCP tool takes `budget` (tokens, 2000 by default). Raise it when the answer is cut short.
@@ -78,6 +79,8 @@ weakest:
   the workspace, or the repository of a workspace of one. A use in a repository the workspace does
   not select is not seen. An orphan line is a lead for review, never by itself a reason to delete
   a resource.
+- **`(unresolved)`.** When a URL or channel name is computed at run time and Meada cannot
+  resolve it, `context` shows it without a link. Read the call site to trace its destination.
 - **Open items.** Search by enclosing symbol or call expression with `kind: "ambiguous"` or
   `"unresolved"` for open links or dynamic URLs. Inspect the candidates or the reason an item
   cannot be decided. Propose the displayed `meada decide` command to the user when a choice
@@ -114,8 +117,8 @@ it consumes it.
   `name` or `uses`. A search with no `kind` leaves them out.
 - **Callers.** `context` on the file's path (`.github/workflows/publish.yml`) lists one
   `consumer:` line per caller in the workspace: repository, file, address, the link, and the
-  keys of `with` and `secrets` it passes. The list covers the workspace: a caller in a
-  repository outside it is unknown to Meada.
+  keys of `with` and `secrets` it passes. A missing CI caller is unproven. Callers outside
+  the workspace are invisible to Meada.
 - **Chain.** `trace` with `direction: "up"` follows callers through intermediate reusable
   pipelines and composite actions. Three starts give the same chain: the file's path, its node
   (`<repository>::<file path>::.`) and the contract (`ci::...`).
@@ -123,8 +126,8 @@ it consumes it.
   wrote, `1a2b3c4` the commit Meada read the called file at. Meada resolves no ref, so `exact`
   says the caller names that file, not that it runs the indexed version. `, ref mismatch` marks
   a caller pinned to a full commit id other than the indexed one: read the file at that commit
-  before you state what that caller runs. `(indexed commit unknown)` means Meada had no
-  indexed commit to compare with the ref.
+  before you state what that caller runs. `(indexed commit unknown)` never carries
+  `ref mismatch` because Meada has no indexed commit to compare with the ref.
 - **Permissions.** A `consumer:` line of a CI job ends with the `permissions` block that governs
   it: its own, else its pipeline's, else `not declared`. The `permissions:` line under
   `provides` is what the CI jobs of the called pipeline declare together. A reason that ends
