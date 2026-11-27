@@ -294,6 +294,7 @@ class Probe:
         self.run = Path(args.run).resolve()
         self.run.mkdir(parents=True, exist_ok=False)
         self.base, self.head = [str(Path(p).resolve()) for p in [args.base_bin, args.head_bin]]
+        self.pr_base = str(Path(args.pr_base_bin).resolve()) if args.pr_base_bin else None
         self.http = args.http
         self.ui_bin = str(Path(args.ui_bin).resolve()) if args.ui_bin else None
         self.ui_dir = str(Path(args.ui_dir).resolve()) if args.ui_dir else None
@@ -602,7 +603,8 @@ class Probe:
         write(self.run,'boutique/source-key.json',json.dumps({'pin':pin,'artifacts':artifacts,'expected_builders':sorted(expected)},indent=2))
         exports = {}
         repos = {}
-        for side,binary in [('base',self.base),('head',self.head)]:
+        sides = [('base',self.base),('head',self.head)] + ([('pr-base',self.pr_base)] if self.pr_base else [])
+        for side,binary in sides:
             repo = self.run/'work'/side/'boutique'
             shutil.copytree(source,repo,symlinks=True)
             repos[side]=repo
@@ -625,8 +627,14 @@ class Probe:
         raw_head=(self.run/'boutique/head/export.out').read_text()
         write(self.run,'boutique/export.diff',''.join(difflib.unified_diff(raw_base.splitlines(True),raw_head.splitlines(True),fromfile='base',tofile='head')))
         outside_images = lambda doc: {key: value for key, value in doc.items() if key not in allowed}
-        self.comparisons.compare('boutique unchanged whole fields outside new image model',
-                                 outside_images(base), outside_images(head))
+        # Fields outside the image model move with every later release (#967, #969, #973): with the
+        # PR's base binary they answer to it, so only this change's own rows differ.
+        if self.pr_base:
+            self.comparisons.compare('boutique unchanged whole fields outside new image model, against the PR base',
+                                     outside_images(exports['pr-base']), outside_images(head))
+        else:
+            self.comparisons.compare('boutique unchanged whole fields outside new image model',
+                                     outside_images(base), outside_images(head))
         for key in ['providers','links']:
             old=[r for r in head[key] if not str(r.get('contract','')).startswith('image::')]
             self.comparisons.compare('boutique all existing '+key+' rows', base[key], old)
@@ -756,6 +764,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--historical-bin', '--base-bin', dest='base_bin', required=True)
     p.add_argument('--head-bin', required=True)
+    p.add_argument('--pr-base-bin', help="the PR base's binary: boutique's fields outside the image model answer to it")
     p.add_argument('--run', required=True)
     p.add_argument('--http', action='store_true')
     p.add_argument('--ui-bin', help='optional independently built ui-feature head binary')

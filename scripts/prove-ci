@@ -111,7 +111,7 @@ FLOWS = (
     ('config-uses', r'src/(iac/config_uses\.rs|config_values\.rs|index\.rs|engine\.rs|trace\.rs|contract\.rs|iac/orphans\.rs)'
      r'|meada-core/src/(export|context|search|trace)\.rs|ui/src/(graph\.ts|GraphPage\.tsx)',
      'config_uses.py --head-bin {ui} --historical-bin {pre_config} --http --ui-dir ui/dist'),
-    ('images', f'{IMAGES}|{PATTERNS}', 'images.py --head-bin {head} --historical-bin {pre_image} --http --public --ui-bin {ui} --ui-dir ui/dist'),
+    ('images', f'{IMAGES}|{PATTERNS}', 'images.py --head-bin {head} --historical-bin {pre_image} --pr-base-bin {base} --http --public --ui-bin {ui} --ui-dir ui/dist'),
 )
 
 
