@@ -62,10 +62,12 @@ UI and scope artifacts; generic capture does not replace them. For #676/#684's b
 untouched PROVED baseline before planting, and distinguish script catches from fresh blind
 judgments. Pending rounds and old BROKEN receipts remain visible until actually rerun.
 
-On the release pull request, workflow `Release diff` compares the candidate's links and orphan
-lines with the previous tag's over the pinned public corpora (#852, ADR 0029) and leaves the
-candidate binary; [references/release-diff.md](references/release-diff.md) has its trigger,
-artifacts and how its counts are read.
+On the release pull request, workflow `Release diff` compares the candidate's links, orphan lines
+and calls rows with the previous tag's over the pinned public corpora (#852, ADR 0029), measures the
+cost of both and leaves the candidate binary; [references/release-diff.md](references/release-diff.md)
+has its trigger, artifacts and how it is read. The release evidence is written by a fresh agent from
+the brief in [references/release-diff-judge.md](references/release-diff-judge.md); calls and cost
+hold nothing.
 
 ## Scope
 
