@@ -33,7 +33,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 import prove
@@ -91,20 +90,28 @@ def identity(name):
     return url.removeprefix("https://").lower()
 
 
-def meada(bin, cwd, log, *words):
+def meada(bin, cwd, log, *words, stdout):
+    """`bin words` in `cwd`, stdout straight to `stdout` and stderr to `log.stderr`: its wall seconds and peak
+    RSS KiB. `prove.MEASURE` reaps it from a fresh interpreter: a child of this process would report at least
+    this process's own peak."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("LC_")}
-    started = time.monotonic()
-    result = subprocess.run([bin, *words], cwd=cwd, env={**env, "LANG": "en_US.UTF-8"}, text=True,
-                            capture_output=True, timeout=prove.TIMEOUT)
-    (cwd / f"{log}.stderr").write_text(result.stderr)
-    if result.returncode:
-        raise RuntimeError(f"{bin} {' '.join(words)} in {cwd} exited {result.returncode}: {result.stderr[-1500:]}")
-    return result.stdout, round(time.monotonic() - started, 1)
+    errors = cwd / f"{log}.stderr"
+    result = subprocess.run([sys.executable, "-I", "-c", prove.MEASURE, str(stdout), str(errors), str(prove.TIMEOUT),
+                             bin, *words], cwd=cwd, env={**env, "LANG": "en_US.UTF-8"}, capture_output=True,
+                            text=True, check=True)
+    spent = json.loads(result.stdout)
+    if spent["exit"] and spent["seconds"] >= prove.TIMEOUT:  # MEASURE's timer killed it
+        raise subprocess.TimeoutExpired([bin, *words], prove.TIMEOUT)
+    if spent["exit"]:
+        tail = errors.read_text(errors="replace")[-1500:]
+        raise RuntimeError(f"{bin} {' '.join(words)} in {cwd} exited {spent['exit']}: {tail}")
+    return round(spent["seconds"], 1), spent["rss_kb"]
 
 
 def capture(side, bin, workspaces, sources, run):
-    """Each workspace indexed by `bin` from its own copies: exports per repository, `status`, seconds."""
-    seconds = {}
+    """Each workspace indexed by `bin` from its own copies: exports per repository and `status`; and the cost,
+    index seconds, the peak RSS of the index and export commands, the bytes of `indexes/` and of each export."""
+    seconds, rss, index_bytes, export_bytes = {}, {}, {}, {}
     for ws, names in workspaces.items():
         folder = run / side / ws
         folder.mkdir(parents=True)
@@ -114,14 +121,21 @@ def capture(side, bin, workspaces, sources, run):
             shutil.copytree(sources[name], repo, symlinks=True)
             manifest += ["", "[[repository]]", f'repo = "{identity(name)}"', f"path = {json.dumps(str(repo))}"]
         (folder / "workspace.toml").write_text("\n".join(manifest) + "\n")
-        _, seconds[ws] = meada(bin, folder, "index", "index", "--workspace", "workspace.toml")
+        seconds[ws], rss[ws] = meada(bin, folder, "index", "index", "--workspace", "workspace.toml",
+                                     stdout=folder / "index.stdout")
+        export_bytes[ws] = {}
         for name in names:
-            out, _ = meada(bin, folder, f"{name}.export", "export", "--workspace", "workspace.toml", "--repo", identity(name))
-            (folder / f"{name}.export.json").write_text(out)
-        out, _ = meada(bin, folder, "status", "status", "--workspace", "workspace.toml")
-        (folder / "status.txt").write_text(out)
-    version, _ = meada(bin, run / side, "version", "--version")
-    (run / side / "capture.json").write_text(json.dumps({"version": version.strip(), "index_seconds": seconds}, indent=1))
+            export = folder / f"{name}.export.json"
+            _, peak = meada(bin, folder, f"{name}.export", "export", "--workspace", "workspace.toml",
+                            "--repo", identity(name), stdout=export)
+            rss[ws] = max(rss[ws], peak)
+            export_bytes[ws][name] = export.stat().st_size
+        meada(bin, folder, "status", "status", "--workspace", "workspace.toml", stdout=folder / "status.txt")
+        index_bytes[ws] = sum(p.stat().st_size for p in (folder / "indexes").rglob("*") if p.is_file())
+    meada(bin, run / side, "version", "--version", stdout=run / side / "version.txt")
+    (run / side / "capture.json").write_text(json.dumps(
+        {"version": (run / side / "version.txt").read_text().strip(), "index_seconds": seconds, "rss_kb": rss,
+         "index_bytes": index_bytes, "export_bytes": export_bytes}, indent=1))
 
 
 def link_rows(exports):
@@ -347,6 +361,41 @@ def tally(changes):
     return out
 
 
+def cost_section(captured):
+    """Base against candidate per workspace; ` over` marks a value past one of `prove.py`'s budgets."""
+    lines = ["## Cost", ""]
+    if not {"base", "head"} <= captured.keys():
+        return lines + ["No capture.json on both sides."]
+    base, head = captured["base"], captured["head"]
+    mib = 1 << 20
+
+    def cell(old, new, unit=1, budget=None):
+        if old is None or new is None:
+            return "-"
+        ratio = f"{new / old:.2f}" if old else "-"
+        over = " over" if budget and new > old * budget else ""
+        return f"{old / unit:.1f} -> {new / unit:.1f} (x{ratio}){over}"
+
+    lines += ["| Workspace | Index s | Peak RSS MiB | Index MiB | Export MiB |", "|---|" + "---:|" * 4]
+    large = []
+    for ws in sorted(base["index_seconds"].keys() & head["index_seconds"].keys()):
+        seconds = base["index_seconds"][ws], head["index_seconds"][ws]
+        rss = [side.get("rss_kb", {}).get(ws) for side in (base, head)]
+        index = [side.get("index_bytes", {}).get(ws) for side in (base, head)]
+        old, new = (side.get("export_bytes", {}).get(ws) for side in (base, head))
+        total = [entries if entries is None else sum(entries.values()) for entries in (old, new)]
+        lines.append(f"| {ws} | " + " | ".join([
+            cell(*seconds, budget=prove.TIME if seconds[0] >= prove.TIME_FLOOR else None),
+            cell(*rss, 1024, prove.RSS), cell(*index, mib), cell(*total, mib, prove.SIZE)]) + " |")
+        for entry in sorted((old or {}).keys() & (new or {}).keys()):
+            if new[entry] > old[entry] * prove.SIZE:
+                large.append(f"- {ws}/{entry} {old[entry] / mib:.1f} -> {new[entry] / mib:.1f} MiB "
+                             f"(x{new[entry] / old[entry] if old[entry] else float('inf'):.2f})")
+    lines += ["", f"Entries over the export budget (x{prove.SIZE}):", ""]
+    lines += large or ["none"]
+    return lines + ["", "One run per side, base first, on one runner: the timings are a single sample."]
+
+
 def summary(changes, base_label, head_label, captured=None):
     lines = ["# Release diff: links, orphan lines, calls and cost against the previous tag", "",
              f"- Base: {base_label}", f"- Candidate: {head_label}"]
@@ -380,6 +429,10 @@ def write(run, changes, base_label, head_label, k=SAMPLE):
         text += "\n" + "\n".join(calls_section(calls, run, k)) + "\n"
     except Exception as error:
         text += f"\n## Calls\n\nBLOCKED: {type(error).__name__}: {error}\n"
+    try:
+        text += "\n" + "\n".join(cost_section(captured)) + "\n"
+    except Exception as error:
+        text += f"\n## Cost\n\nBLOCKED: {type(error).__name__}: {error}\n"
     (run / "summary.md").write_text(text)
     print(text, end="")
 
@@ -497,7 +550,38 @@ def selftest_write(tmp, base, head):
     # An export `load` takes and the calls comparison cannot: the section says so, the rest stands.
     text = (tmp / "bad" / "summary.md").read_text()
     assert "## Calls\n\nBLOCKED: AttributeError" in text and "## Links" in text, text
-    assert (tmp / "bad" / "diff.json").is_file()
+    assert (tmp / "bad" / "diff.json").is_file() and "## Cost" in text, text
+
+
+def selftest_cost(tmp):
+    tmp.mkdir(parents=True)
+    fake = tmp / "fake.py"
+    fake.write_text("import sys; print('out'); sys.stderr.write('err'); sys.exit(int(sys.argv[1]))\n")
+    seconds, rss = meada(sys.executable, tmp, "ok", str(fake), "0", stdout=tmp / "ok.out")
+    assert (tmp / "ok.out").read_text() == "out\n" and (tmp / "ok.stderr").read_text() == "err" and rss > 0
+    try:
+        meada(sys.executable, tmp, "bad", str(fake), "3", stdout=tmp / "bad.out")
+        raise AssertionError("a failing command must raise")
+    except RuntimeError as error:
+        assert "exited 3" in str(error)
+    held = bytearray(300 << 20)
+    held[::4096] = b"x" * len(held[::4096])
+    _, rss = meada(sys.executable, tmp, "small", str(fake), "0", stdout=tmp / "small.out")
+    assert rss < 200 << 10, f"the peak is the command's own, not this process's: {rss} KiB"
+    del held
+    b = {"version": "v0", "index_seconds": {"w": 10.0, "q": 1.0}, "rss_kb": {"w": 1024, "q": 1024},
+         "index_bytes": {"w": 1048576, "q": 1}, "export_bytes": {"w": {"a": 1048576, "b": 1048576}, "q": {"c": 1}}}
+    h = {"version": "v1", "index_seconds": {"w": 13.0, "q": 1.9}, "rss_kb": {"w": 1100, "q": 1024},
+         "index_bytes": {"w": 4194304, "q": 1}, "export_bytes": {"w": {"a": 1048576, "b": 2097152}, "q": {"c": 1}}}
+    text = "\n".join(cost_section({"base": b, "head": h}))
+    assert "10.0 -> 13.0 (x1.30) over" in text, text      # past x1.25, base above the 2 s floor
+    assert "1.0 -> 1.9 (x1.90) |" in text, text           # under the floor: no mark
+    assert "1.0 -> 4.0 (x4.00) |" in text, text           # index bytes carry no budget
+    assert "w/b 1.0 -> 2.0 MiB (x2.00)" in text and "w/a" not in text.split("export budget")[1], text
+    old = {"version": "v0", "index_seconds": {"w": 10.0}}  # an artifact made before this change
+    replay = "\n".join(cost_section({"base": old, "head": {**old, "index_seconds": {"w": 13.0}}}))
+    assert "| w | 10.0 -> 13.0 (x1.30) over | - | - | - |" in replay, replay
+    assert cost_section({"head": h}) == ["## Cost", "", "No capture.json on both sides."]
 
 
 def selftest():
@@ -558,6 +642,7 @@ def selftest():
         base_export, head_export = selftest_calls()
         selftest_samples(Path(tmp) / "samples", base_export, head_export)
         selftest_write(Path(tmp) / "write", base_export, head_export)
+        selftest_cost(Path(tmp) / "cost")
     print("release-diff selftest: equal sides give no diff; one planted change of each type is counted right")
 
 
