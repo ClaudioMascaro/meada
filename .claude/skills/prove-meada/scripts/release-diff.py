@@ -37,6 +37,10 @@ LEVELS = ("exact", "declared", "inferred", "decided", "ambiguous")
 ORPHAN = re.compile(r"^\s+orphan (.+?): (no [a-z]+)(?: in [^;]+)?; (.*?)(?: \[(" + "|".join(LEVELS) + r")\])?$")
 LINK_TYPES = ("new", "vanished", "raised", "dropped")
 ORPHAN_TYPES = ("appeared", "vanished", "level moved")
+# What a calls row can show between the two sides; one row can show several.
+CALL_TYPES = ("new", "vanished", "raised", "dropped", "retargeted", "candidates removed", "candidates gained",
+              "certain lost")
+CERTAIN = ("exact", "declared")
 
 
 def rank(level):
@@ -175,6 +179,66 @@ def compare(base, head):
     return changes
 
 
+def call_changes(base, head):
+    """The changed calls rows between one entry's two exports, by row key. A change of `narrowed`,
+    `decorates`, `holder` or `span` alone is no change."""
+    old_rows = prove.rows("calls", base.get("calls") or [])
+    new_rows = prove.rows("calls", head.get("calls") or [])
+
+    def level(row):
+        return row.get("level") or "unresolved"
+
+    def kept(row):
+        return row and {"level": row.get("level"), "target": row.get("target"),
+                        "candidates": row.get("candidates") or [], "span": row.get("span")}
+
+    out = []
+    for key in sorted(old_rows.keys() | new_rows.keys()):
+        old, new = old_rows.get(key), new_rows.get(key)
+        types, removed, gained = [], [], []
+        if not old:
+            types, label = ["new"], level(new)
+        elif not new:
+            types, label = ["vanished"], level(old)
+        else:
+            moved = rank(new.get("level")) - rank(old.get("level"))
+            label = f"{level(old)} -> {level(new)}" if moved else level(new)
+            if moved:
+                types.append("raised" if moved < 0 else "dropped")
+            elif old.get("target") != new.get("target"):
+                types.append("retargeted")
+            before, after = set(old.get("candidates") or []), set(new.get("candidates") or [])
+            removed, gained = sorted(before - after), sorted(after - before)
+            types += ["candidates removed"] * bool(removed) + ["candidates gained"] * bool(gained)
+        if old and old.get("level") in CERTAIN and (
+                not new or rank(new.get("level")) > rank(old.get("level")) or new.get("target") != old.get("target")):
+            types.append("certain lost")
+        if types:
+            out.append({"key": key, "use": (new or old).get("kind") or "call", "types": types, "level": label,
+                        "removed": removed, "gained": gained, "base": kept(old), "head": kept(new)})
+    # The target's declaration, from the symbols of the export whose row is shown.
+    for side, export in (("head", head), ("base", base)):
+        shown = [c for c in out if ("head" if c["head"] else "base") == side]
+        wanted = {c[side]["target"] for c in shown}
+        spans = {s["id"]: s.get("span") for s in export.get("symbols") or [] if s.get("id") in wanted}
+        for c in shown:
+            c["target_span"] = spans.get(c[side]["target"])
+    return out
+
+
+def call_tally(changes):
+    """(workspace, entry) -> type -> rows, with the candidates removed and gained counted too; and
+    (use kind, level) -> type -> rows."""
+    entries, pairs = collections.defaultdict(collections.Counter), collections.defaultdict(collections.Counter)
+    for c in changes:
+        row = entries[c["workspace"], c["entry"]]
+        row.update(c["types"])
+        row["candidates removed n"] += len(c["removed"])
+        row["candidates gained n"] += len(c["gained"])
+        pairs[c["use"], c["level"]].update(c["types"])
+    return entries, pairs
+
+
 def tally(changes):
     """(pair, level) -> type -> count; a pair is `kind statement`."""
     out = collections.defaultdict(collections.Counter)
@@ -240,6 +304,41 @@ def cmd_diff(a):
     return 0
 
 
+def selftest_calls():
+    def call(id, level, target=None, candidates=(), kind=None):
+        row = {"id": id, "caller": "r::a.ts", "target": target, "level": level,
+               "span": {"path": "a.ts", "start": 0, "end": 1}}
+        if candidates:
+            row["candidates"] = list(candidates)
+        if kind:
+            row["kind"] = kind
+        return row
+
+    base = {"calls": [call("same", "exact", "r::b.ts::f"), call("order", "ambiguous", None, ["x", "y"]),
+                      call("up", "ambiguous", None, ["r::b.ts::f", "z"]), call("down", "exact", "r::b.ts::f"),
+                      call("moved", "exact", "r::b.ts::f"), call("trim", "ambiguous", None, ["p", "q", "r"]),
+                      call("gone", "declared", "r::b.ts::g"), call("free", None)],
+            "symbols": [{"id": "r::b.ts::f", "span": {"path": "b.ts", "start": 5, "end": 9}}]}
+    head = {"calls": [call("same", "exact", "r::b.ts::f"), call("order", "ambiguous", None, ["y", "x"]),
+                      call("up", "exact", "r::b.ts::f"), call("down", "inferred", "r::b.ts::f"),
+                      call("moved", "exact", "r::b.ts::h"), call("trim", "ambiguous", None, ["p", "q"]),
+                      call("new", "exact", "r::b.ts::f", kind="type"), call("free", None)],
+            "symbols": base["symbols"]}
+    got = {c["key"]: c for c in call_changes(base, head)}
+    assert sorted(got) == ["down", "gone", "moved", "new", "trim", "up"], got
+    assert got["up"]["types"] == ["raised", "candidates removed"] and got["up"]["level"] == "ambiguous -> exact"
+    assert got["down"]["types"] == ["dropped", "certain lost"]
+    assert got["moved"]["types"] == ["retargeted", "certain lost"] and got["moved"]["level"] == "exact"
+    assert got["trim"]["types"] == ["candidates removed"] and got["trim"]["removed"] == ["r"]
+    assert got["gone"]["types"] == ["vanished", "certain lost"] and got["gone"]["level"] == "declared"
+    assert got["new"]["types"] == ["new"] and got["new"]["use"] == "type"
+    assert got["new"]["target_span"] == {"path": "b.ts", "start": 5, "end": 9}
+    assert call_changes({"symbols": []}, {"calls": []}) == [] == call_changes(base, base)
+    entries, pairs = call_tally([{**c, "workspace": "w", "entry": "e"} for c in got.values()])
+    assert entries["w", "e"]["certain lost"] == 3 and entries["w", "e"]["candidates removed n"] == 3
+    assert pairs["type", "exact"]["new"] == 1 and pairs["call", "ambiguous -> exact"]["raised"] == 1
+
+
 def selftest():
     def link(consumer, contract, level):
         return {"consumer": consumer, "provider": "github.com/acme/b::serve", "contract": contract, "level": level,
@@ -294,6 +393,7 @@ def selftest():
     assert set(chosen) == {"code", "infra", "ci"} and "meada" in chosen["code"], chosen
     assert all(not table()[n][1].startswith("probe:") for names in chosen.values() for n in names), chosen
     assert identity("meada") == "github.com/claudiomascaro/meada" and identity("a7-iac") == "github.com/zz-prove/a7-iac"
+    selftest_calls()
     print("release-diff selftest: equal sides give no diff; one planted change of each type is counted right")
 
 
