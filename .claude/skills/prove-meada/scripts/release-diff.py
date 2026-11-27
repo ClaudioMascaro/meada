@@ -2,7 +2,8 @@
 """The release diff (#852, ADR 0029): the links and orphan lines of a candidate against the previous tag.
 
   release-diff.py run --base-bin B --head-bin H --run DIR [--repos a,b] [--base-label T] [--head-label T]
-  release-diff.py diff --run DIR [--base-label T] [--head-label T]   (again, over what `run` captured)
+                      [--sample N]
+  release-diff.py diff --run DIR [--base-label T] [--head-label T] [--sample N]   (again, over what `run` captured)
   release-diff.py --selftest                                         (no Meada)
 
 `run` indexes each group of pinned public corpus entries as one workspace with each binary: the entries of
@@ -13,10 +14,17 @@ and `summary.md` (counts per pair and per level; a pair is a contract kind and a
 A link is the same link when `prove.py`'s link key is (consumer, provider, contract, root); an orphan line is
 the same line when its repository, contract and place are. Exit 0 with or without a diff: the diff goes to a
 judge, it is never a verdict. Exit 2: a capture failed.
+
+The summary then holds the `calls` rows of every entry, a row being the same when its `id` is: counts per entry
+and per use kind and level, a seeded sample of at most N rows per group with their source lines, and every
+changed row in `calls.json`; and the cost of each side (index seconds, peak RSS, index and export bytes). Both
+are reported and hold nothing: an error in one is a `BLOCKED` line in its section, never the exit code.
 """
 
 import argparse
 import collections
+import contextlib
+import io
 import json
 import os
 import random
@@ -340,13 +348,13 @@ def tally(changes):
 
 
 def summary(changes, base_label, head_label, captured=None):
-    lines = ["# Release diff: links and orphan lines against the previous tag", "",
+    lines = ["# Release diff: links, orphan lines, calls and cost against the previous tag", "",
              f"- Base: {base_label}", f"- Candidate: {head_label}"]
     for side, info in (captured or {}).items():
         spent = ", ".join(f"{ws} {s} s" for ws, s in info["index_seconds"].items())
         lines.append(f"- {side}: `{info['version']}`, index seconds per workspace: {spent}")
     if not changes:
-        return "\n".join(lines + ["", "No change: the candidate states the same links and orphan lines as the base."]) + "\n"
+        return "\n".join(lines + ["", "No link or orphan line change: the candidate states the same links and orphan lines as the base."]) + "\n"
     counts = tally(changes)
     for statement, types in (("links", LINK_TYPES), ("orphan lines", ORPHAN_TYPES)):
         rows = sorted(k for k in counts if k[0].endswith(" " + statement))
@@ -359,11 +367,19 @@ def summary(changes, base_label, head_label, captured=None):
     return "\n".join(lines) + "\n"
 
 
-def write(run, changes, base_label, head_label):
+def write(run, changes, base_label, head_label, k=SAMPLE):
     captured = {side: json.loads((run / side / "capture.json").read_text())
                 for side in ("base", "head") if (run / side / "capture.json").is_file()}
     (run / "diff.json").write_text(json.dumps(changes, indent=1, sort_keys=True) + "\n")
     text = summary(changes, base_label, head_label, captured)
+    (run / "summary.md").write_text(text)
+    # The sections from here hold nothing, so an error in one is a line in it, never the job's.
+    try:
+        calls = entry_calls(run)
+        (run / "calls.json").write_text(json.dumps(calls, indent=1, sort_keys=True) + "\n")
+        text += "\n" + "\n".join(calls_section(calls, run, k)) + "\n"
+    except Exception as error:
+        text += f"\n## Calls\n\nBLOCKED: {type(error).__name__}: {error}\n"
     (run / "summary.md").write_text(text)
     print(text, end="")
 
@@ -386,13 +402,13 @@ def cmd_run(a):
     except (RuntimeError, subprocess.TimeoutExpired) as error:
         print(f"BLOCKED: {error}")
         return 2
-    write(run, compare(load(run / "base"), load(run / "head")), a.base_label, a.head_label)
+    write(run, compare(load(run / "base"), load(run / "head")), a.base_label, a.head_label, a.sample)
     return 0
 
 
 def cmd_diff(a):
     run = Path(a.run).resolve()
-    write(run, compare(load(run / "base"), load(run / "head")), a.base_label, a.head_label)
+    write(run, compare(load(run / "base"), load(run / "head")), a.base_label, a.head_label, a.sample)
     return 0
 
 
@@ -463,6 +479,27 @@ def selftest_samples(tmp, base, head):
     assert [c["key"] for c in call_samples(changes)["lost a candidate"]] == ["trim"], "a raise to exact is judged once"
 
 
+def selftest_write(tmp, base, head):
+    def side(run, name, export):
+        (run / name / "w").mkdir(parents=True)
+        (run / name / "w" / "status.txt").write_text("")
+        (run / name / "w" / "a.export.json").write_text(json.dumps(export))
+
+    link = {"consumer": "a::get", "provider": "b::serve", "contract": "http::GET::/x", "level": "inferred"}
+    for run, head_calls in ((tmp / "good", head["calls"]), (tmp / "bad", [5])):
+        side(run, "base", {**base, "links": [link]})
+        side(run, "head", {**head, "calls": head_calls, "links": [{**link, "level": "exact"}]})
+    for run in (tmp / "good", tmp / "bad"):
+        with contextlib.redirect_stdout(io.StringIO()):
+            write(run, compare(load(run / "base"), load(run / "head")), "v0", "v1", k=5)
+    text = (tmp / "good" / "summary.md").read_text()
+    assert text.index("## Links") < text.index("## Calls") and (tmp / "good" / "calls.json").is_file(), text
+    # An export `load` takes and the calls comparison cannot: the section says so, the rest stands.
+    text = (tmp / "bad" / "summary.md").read_text()
+    assert "## Calls\n\nBLOCKED: AttributeError" in text and "## Links" in text, text
+    assert (tmp / "bad" / "diff.json").is_file()
+
+
 def selftest():
     def link(consumer, contract, level):
         return {"consumer": consumer, "provider": "github.com/acme/b::serve", "contract": contract, "level": level,
@@ -511,7 +548,7 @@ def selftest():
         text = summary(changes, "v0 (base)", "v1 (head)")
         assert "| http links | inferred -> exact | 0 | 0 | 1 | 0 |" in text, text
         assert "| image orphan lines | - | 1 | 0 | 0 |" in text, text
-        assert "No change" in summary([], "v0", "v1")
+        assert "No link or orphan line change" in summary([], "v0", "v1")
     # The default selection: every URL-pinned entry and this checkout, in three workspaces, no probe.
     chosen = groups(public())
     assert set(chosen) == {"code", "infra", "ci"} and "meada" in chosen["code"], chosen
@@ -520,6 +557,7 @@ def selftest():
     with tempfile.TemporaryDirectory(prefix="release-diff-selftest-") as tmp:
         base_export, head_export = selftest_calls()
         selftest_samples(Path(tmp) / "samples", base_export, head_export)
+        selftest_write(Path(tmp) / "write", base_export, head_export)
     print("release-diff selftest: equal sides give no diff; one planted change of each type is counted right")
 
 
@@ -538,6 +576,7 @@ def main():
         p.add_argument("--run", required=True)
         p.add_argument("--base-label", default="base")
         p.add_argument("--head-label", default="candidate")
+        p.add_argument("--sample", type=int, default=SAMPLE, metavar="N", help="calls rows sampled per group")
     a = parser.parse_args()
     return cmd_run(a) if a.command == "run" else cmd_diff(a)
 
