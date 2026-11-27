@@ -190,6 +190,8 @@ struct Walk<'s> {
     assigned: Vec<(String, String, Keep)>,
     /// The single value each `return` of a definition gives.
     returns: HashMap<String, Vec<Value>>,
+    /// The functions (by node id) whose body a `defer` already had read (`deferred_write`).
+    deferring: HashSet<usize>,
     /// The standard-library packages whose calls and constants the values fold.
     std: values::Std,
     /// The package-level `var`s, which hold their value only if nothing assigns them.
@@ -659,7 +661,7 @@ impl Walk<'_> {
                         (self.returns.entry(scope.to_string()).or_default()).push(value);
                     }
                 }
-                "defer_statement" if defer_sets_result(node, src) => {
+                "defer_statement" if self.deferred_write(node) => {
                     (self.returns.entry(scope.to_string()).or_default()).push(Value::Unknown);
                 }
                 "short_var_declaration" => {
@@ -763,6 +765,25 @@ impl Walk<'_> {
             inner.reverse();
             stack.extend((inner.into_iter()).map(|n| (n, Rc::clone(&inner_scope), inner_depth)));
         }
+    }
+
+    /// Whether the `defer_statement` `node` may write the one named result of the function around
+    /// it: it runs after `return` has set the result, so the value the function returns may be its
+    /// own (Go spec, "Defer statements"; #948). The deferred call itself may be a method of the
+    /// result (`defer u.fix()`); the rest is the body's (`body_writes_result`), read once per
+    /// function.
+    fn deferred_write(&mut self, node: Node) -> bool {
+        let src = self.src;
+        let Some((function, result)) = one_named_result(node) else {
+            return false;
+        };
+        let name = text(result, src);
+        if named(node).next().is_some_and(|call| {
+            call.kind() == "call_expression" && calls_method_of(call, name, src)
+        }) {
+            return true;
+        }
+        self.deferring.insert(function.id()) && body_writes_result(function, name, src)
     }
 
     /// Turns the names whose every binding writes one class into receivers, and drops the written
@@ -1163,44 +1184,58 @@ fn result_list(node: Node) -> Option<Node> {
         .filter(|r| r.kind() == "parameter_list")
 }
 
-/// Whether the `defer_statement` `node` may write the one named result of the function around
-/// it: it runs after `return` has set the result, so the value the function returns may be its
-/// own (Go spec, "Defer statements"; #948). A name the deferred function declares again counts
-/// as the result (the safe side).
-fn defer_sets_result(node: Node, src: &[u8]) -> bool {
+/// The function around `node` and its one named result, if it names exactly one: several
+/// results keep no return value to fold.
+fn one_named_result(node: Node) -> Option<(Node, Node)> {
     let function = std::iter::successors(node.parent(), |n| n.parent()).find(|n| {
         matches!(
             n.kind(),
             "function_declaration" | "method_declaration" | "func_literal"
         )
-    });
-    let results: Vec<Node> = (declarations(function.and_then(result_list)).into_iter())
+    })?;
+    let results: Vec<Node> = (declarations(result_list(function)).into_iter())
         .flat_map(|(names, _)| names)
         .collect();
-    // Several results keep no return value to fold, so there is nothing to undo.
-    let [result] = results[..] else {
-        return false;
-    };
-    // Only a function literal of the statement can write the result by name; its address
-    // handed to the deferred call (`defer fill(&base)`) lets that call write it too.
-    let mut stack = vec![node];
-    while let Some(n) = stack.pop() {
+    match results[..] {
+        [result] => Some((function, result)),
+        _ => None,
+    }
+}
+
+/// Whether `call` (a `call_expression`) calls a method of `name` (`u.fix()`): a pointer
+/// receiver may write it.
+fn calls_method_of(call: Node, name: &str, src: &[u8]) -> bool {
+    (call.child_by_field_name("function"))
+        .filter(|f| f.kind() == "selector_expression")
+        .and_then(|f| f.child_by_field_name("operand"))
+        .is_some_and(|o| o.kind() == "identifier" && text(o, src) == name)
+}
+
+/// Whether the body of `function` lets a deferred call write `name`, its named result: a
+/// function literal in it assigns it, increments it, decrements it or calls a method of it, or
+/// the body takes its address (`&base`). A name a literal declares again counts as the result,
+/// and so does a literal that is never deferred (the safe side).
+fn body_writes_result(function: Node, name: &str, src: &[u8]) -> bool {
+    let mut stack: Vec<(Node, bool)> = function
+        .child_by_field_name("body")
+        .map(|b| (b, false))
+        .into_iter()
+        .collect();
+    while let Some((n, in_literal)) = stack.pop() {
         let targets = match n.kind() {
-            "assignment_statement" => n.child_by_field_name("left"),
-            "inc_statement" | "dec_statement" => Some(n),
+            "assignment_statement" if in_literal => n.child_by_field_name("left"),
+            "inc_statement" | "dec_statement" if in_literal => Some(n),
+            "call_expression" if in_literal && calls_method_of(n, name, src) => return true,
             "unary_expression" => (n.child_by_field_name("operator"))
                 .filter(|o| text(*o, src) == "&")
                 .and_then(|_| n.child_by_field_name("operand")),
             _ => None,
         };
-        if targets.is_some_and(|t| {
-            identifiers(t)
-                .iter()
-                .any(|i| text(*i, src) == text(result, src))
-        }) {
+        if targets.is_some_and(|t| identifiers(t).iter().any(|i| text(*i, src) == name)) {
             return true;
         }
-        stack.extend(named(n));
+        let inner = in_literal || n.kind() == "func_literal";
+        stack.extend(named(n).map(|c| (c, inner)));
     }
     false
 }
@@ -1442,6 +1477,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         first_results: Vec::new(),
         assigned: Vec::new(),
         returns: HashMap::new(),
+        deferring: HashSet::new(),
         std: values::Std::default(),
         vars: BTreeSet::new(),
         selected: BTreeSet::new(),
@@ -2216,6 +2252,27 @@ mod tests {
         // Its address handed to the deferred call lets that call write it.
         assert!(unknown(&format!(
             "func f() (base string) {{ defer fill(&base); {ret}"
+        )));
+        // A deferred local bound to a literal that writes it, its address taken anywhere in the
+        // function, and a deferred method of it (a pointer receiver may write it).
+        assert!(unknown(&format!(
+            r#"func f() (base string) {{ restore := func() {{ base = "x" }}; defer restore(); {ret}"#
+        )));
+        assert!(unknown(&format!(
+            r#"func f() (base string) {{ p := &base; defer func() {{ *p = "x" }}(); {ret}"#
+        )));
+        assert!(unknown(&format!(
+            "func f() (base string) {{ p := &base; defer set(p); {ret}"
+        )));
+        assert!(unknown(
+            "func f() (u URL) { defer u.fix(); return parse() }"
+        ));
+        // Another name's address, or a method of another value, leaves the returns alone.
+        assert!(!unknown(&format!(
+            "func f() (base string) {{ x := 1; p := &x; defer set(p); {ret}"
+        )));
+        assert!(!unknown(&format!(
+            "func f() (base string) {{ defer mu.Unlock(); {ret}"
         )));
         // An empty deferred function, one writing only its own names, a named function deferred,
         // unnamed results and several results (no return value is kept) leave the returns alone.

@@ -471,6 +471,13 @@ infix call (a hard keyword as an operand, `misparsed`) leaves the whole file out
   exactly: what a name of the crate that is no listed constructor makes passes nothing), so a
   setter missing from the list ends the chain and its client (or its router, app, scope,
   resource or Rocket instance) is not read.
+- A Go function's returns (`Walk::deferred_write` in `lang/go.rs`, #948): in a function with a
+  `defer` and one named result, the result's address taken anywhere (`&base`), a function literal
+  that assigns, increments, decrements or calls a method of the result, or a deferred method call
+  on it (`defer u.fix()`) adds an unknown return, so the HTTP return fold leaves the call open. A
+  name a literal declares again, and a literal that is never deferred, count as the result (the
+  safe side). A deferred method value of the result (`f := u.fix; defer f()`) is not seen: its
+  function keeps the value its `return` gives.
 - A Go struct field tagged `env:"X"` or `envconfig:"X"` reads `X` only when its struct is declared
   in the same file as the read, and a selector matches it by its field path (`cfg.API.URL` is
   `API.URL`) whatever the variable's type: an untagged field of another struct with the same path
