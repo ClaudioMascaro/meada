@@ -1,7 +1,3 @@
-//! The console with `[oidc]` (#306, ADR 0014): admission by the nodes' module against the
-//! `oidc` module's loopback issuer and JWKS, the `session`, `config` and admission routes, and the
-//! token's grant bounding every view. No service is needed.
-
 use std::path::PathBuf;
 
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
@@ -16,13 +12,10 @@ use crate::server::Server;
 
 const WEB: &str = "example.com/chain/web";
 const GATEWAY: &str = "example.com/chain/gateway";
-/// The nodes' public URL, which `[oidc] public_url` names.
 const NODES: &str = "https://meada.example";
 const SCOPE: &str = "meada:read";
 const SUBJECT: &str = "alice-7c1e";
 
-/// The `[[repository]]` entries and `[oidc]` of every console here: the identities claim, groups
-/// mapping `team-web` to `WEB`, `team-gw` to `GATEWAY` and `team-all` to `*`, and `SCOPE`.
 fn head(issuer: &str) -> String {
     format!(
         "\n[[repository]]\nrepo = \"{WEB}\"\npath = \"../web\"\n\n[[repository]]\nrepo = \
@@ -31,7 +24,6 @@ fn head(issuer: &str) -> String {
     )
 }
 
-/// The `[oidc]` of `head`.
 fn oidc(issuer: &str) -> String {
     format!(
         "\n[oidc]\nissuer = \"{issuer}\"\npublic_url = \"{NODES}\"\nidentities_claim = \
@@ -45,14 +37,12 @@ fn ui_oidc() -> String {
     ui_section() + "client_id = \"meada-console\"\n"
 }
 
-/// A console over `issuer`'s keys, running.
 fn console(case: &str, issuer: &Issuer) -> (PathBuf, Server) {
     let dir = console_dir(case, Some(VERSION), &head(&issuer.base), &ui_oidc());
     let console = start(&dir, "127.0.0.1:0");
     (dir, console)
 }
 
-/// The claims of a console token of `issuer` for `subject`, granting `identities`, with `SCOPE`.
 fn claims(issuer: &str, identities: &[&str]) -> Value {
     json!({
         "iss": issuer, "aud": PUBLIC, "sub": SUBJECT,
@@ -61,7 +51,6 @@ fn claims(issuer: &str, identities: &[&str]) -> Value {
     })
 }
 
-/// `claims` changed by `edit`.
 fn edited(issuer: &str, edit: impl FnOnce(&mut Value)) -> Value {
     let mut claims = claims(issuer, &[WEB]);
     edit(&mut claims);
@@ -76,7 +65,6 @@ fn ask(console: &Server, path: &str, token: &str) -> Reply {
     send(console, "GET", path, &[("Authorization", &bearer(token))])
 }
 
-/// The token check of `pasted`, by the bearer of `token`.
 fn check(console: &Server, token: &str, pasted: &str) -> Reply {
     let body = json!({ "token": pasted }).to_string();
     let headers = [("Authorization", bearer(token)), ("Origin", PUBLIC.into())];
@@ -84,7 +72,6 @@ fn check(console: &Server, token: &str, pasted: &str) -> Reply {
     send_body(console, "POST", "/api/v1/admission/check", &headers, &body)
 }
 
-/// Neither `stderr` nor `answers` carries a part of a token of `tokens` or a claim value.
 fn assert_leaks_nothing(stderr: &str, tokens: &[&str]) {
     for token in tokens {
         for part in token.split('.') {
@@ -96,9 +83,6 @@ fn assert_leaks_nothing(stderr: &str, tokens: &[&str]) {
     }
 }
 
-/// No token, an expired one, the nodes' audience, another issuer and `HS256` get 401 with
-/// `WWW-Authenticate`; a missing scope is a 403; a valid token is a viewer's session. The static
-/// files and `config` need no token, and every answer's policy names the issuer's origin.
 #[test]
 fn admits_a_bearer_token_for_the_console_s_audience() {
     let (signing, jwk) = key("k1");
@@ -184,8 +168,6 @@ fn admits_a_bearer_token_for_the_console_s_audience() {
     assert_leaks_nothing(&console.stderr(), &tokens);
 }
 
-/// The start is refused without `[ui] client_id`, and when the issuer's metadata or JWKS cannot
-/// be read, as a node's is.
 #[test]
 fn refuses_to_start_without_client_id_metadata_or_jwks() {
     let (_, jwk) = key("k1");
@@ -212,7 +194,6 @@ fn refuses_to_start_without_client_id_metadata_or_jwks() {
         format!("meada: {MANIFEST}:23: `ui`: `ui.client_id` is missing\n")
     );
 
-    // A port nothing listens on: no metadata.
     let dir = console_dir(
         "ui_oidc_metadata",
         Some(VERSION),
@@ -236,8 +217,6 @@ fn refuses_to_start_without_client_id_metadata_or_jwks() {
     );
 }
 
-/// `admission`: the issuer's metadata, the cached key ids, the last read and the groups table
-/// bounded by the viewer's grant; once the JWKS fails, the failed refresh with why.
 #[test]
 fn shows_the_admission_state_and_a_failed_refresh() {
     let (signing, jwk) = key("k1");
@@ -256,7 +235,6 @@ fn shows_the_admission_state_and_a_failed_refresh() {
     assert!(admission["refreshed"].as_str().unwrap().ends_with('Z'));
     assert_eq!(admission["failed"], Value::Null);
     assert_eq!(admission["groups_claim"], json!("groups"));
-    // `team-gw` maps to an identity outside the grant: listed without it.
     assert_eq!(
         admission["groups"],
         json!({"team-web": [WEB], "team-gw": [], "team-all": ["*"]})
@@ -270,7 +248,6 @@ fn shows_the_admission_state_and_a_failed_refresh() {
     let whole = ask(&console, "/api/v1/admission", &all).json();
     assert_eq!(whole["groups"]["team-gw"], json!([GATEWAY]));
 
-    // A token naming a `kid` the cache lacks fetches the JWKS, which now fails.
     issuer.serve(None);
     let (other, _) = key("k9");
     let unknown = sign(&other, "k9", Algorithm::ES256, &claims(&base, &[WEB]));
@@ -287,9 +264,6 @@ fn shows_the_admission_state_and_a_failed_refresh() {
     assert_leaks_nothing(&stderr, &[&web, &all, &unknown]);
 }
 
-/// `admission/check`: each check's outcome as a node makes it, and the identities a valid token
-/// admits, bounded by the viewer's own grant; the pasted token reaches no stderr line and the
-/// check sends the issuer nothing, not even for an unknown `kid`. A body over the cap is a 413.
 #[test]
 fn checks_a_pasted_token_and_forwards_it_nowhere() {
     let (signing, jwk) = key("k1");
@@ -297,11 +271,9 @@ fn checks_a_pasted_token_and_forwards_it_nowhere() {
     let base = issuer.base.clone();
     let (_dir, console) = console("ui_oidc_check", &issuer);
     let es256 = |claims: &Value| sign(&signing, "k1", Algorithm::ES256, claims);
-    // The viewer reads `WEB` only.
     let viewer = es256(&claims(&base, &[WEB]));
     let all = es256(&edited(&base, |c| c["groups"] = json!(["team-all"])));
 
-    // A token for a node: its audience is a resource of the nodes'.
     let node = |edit: &dyn Fn(&mut Value)| {
         let mut claims = claims(&base, &[WEB, GATEWAY]);
         claims["aud"] = json!(format!("{NODES}/{WEB}"));
@@ -365,7 +337,6 @@ fn checks_a_pasted_token_and_forwards_it_nowhere() {
         }
     }
 
-    // Over the cap: 413, and the body is never quoted back.
     let big = "x".repeat(17 << 10);
     let reply = check(&console, &all, &big);
     assert_eq!(reply.status, 413);
@@ -383,7 +354,6 @@ fn checks_a_pasted_token_and_forwards_it_nowhere() {
     assert_eq!(reply.status, 400);
     assert_eq!(reply.json()["error"]["code"], json!("bad_request"));
     assert!(!reply.body.contains(valid.as_str()));
-    // A check needs the console's own origin and a token, as every API route does.
     let body = json!({ "token": valid }).to_string();
     let reply = send_body(
         &console,
@@ -407,8 +377,6 @@ fn checks_a_pasted_token_and_forwards_it_nowhere() {
     assert_leaks_nothing(&console.stderr(), &tokens);
 }
 
-/// A viewer granted one repository sees only its `[[repository]]` entry, and no error text that
-/// names another; a `*` grant sees everything.
 #[test]
 fn a_viewer_s_grant_bounds_every_view() {
     let (signing, jwk) = key("k1");
@@ -446,7 +414,6 @@ fn a_viewer_s_grant_bounds_every_view() {
     };
     let (repos, manifest) = entries(&web);
     assert_eq!(repos, [WEB]);
-    // State that belongs to no repository is whole.
     assert_eq!(manifest["manifest"]["oidc"]["issuer"], json!(base));
     assert_eq!(
         manifest["manifest"]["ui"]["client_id"],
@@ -473,9 +440,6 @@ fn a_viewer_s_grant_bounds_every_view() {
     assert_eq!(entries(&gateway).0, [GATEWAY]);
     assert_eq!(entries(&all).0, [WEB, GATEWAY]);
 
-    // On disk, an error in `GATEWAY`'s entry that was written with its identity as the value: no
-    // error `describe` words quotes a written value (#545), so no viewer sees the identity, and `web`
-    // sees what `all` sees. The cut to a position is a second guard (`ui::cut_named`).
     let broken = head(&base).replace(
         "path = \"../gateway\"\n",
         &format!("path = \"../gateway\"\nserve.strip = \"{GATEWAY}\"\n"),
@@ -499,13 +463,11 @@ fn a_viewer_s_grant_bounds_every_view() {
     let whole = errors(&all);
     assert!(!whole.as_array().unwrap().is_empty(), "{whole}");
     assert!(!whole.to_string().contains(UNLISTED), "{whole}");
-    // The message names the key and the expected type only, so no viewer sees the value.
     assert_eq!(errors(&web), whole);
 
     assert_leaks_nothing(&console.stderr(), &[&web, &gateway, &all]);
 }
 
-/// An identity known only through a groups mapping is still hidden in on-disk errors.
 #[test]
 fn manifest_errors_hide_identities_known_only_through_groups() {
     const HIDDEN: &str = "private.example/group/hidden";
@@ -520,7 +482,6 @@ fn manifest_errors_hide_identities_known_only_through_groups() {
         &format!("path = \"../web\"\nserve.strip = \"{HIDDEN}\"\n"),
     );
     write_manifest(&dir, &broken, &ui_oidc());
-    // The error does not quote the identity, for the whole view or a restricted one (#545).
     let whole = ask(&console, "/api/v1/manifest", &token(&["*"])).json();
     assert!(!whole["errors"].as_array().unwrap().is_empty(), "{whole}");
     assert!(!whole["errors"].to_string().contains(HIDDEN), "{whole}");
@@ -528,22 +489,16 @@ fn manifest_errors_hide_identities_known_only_through_groups() {
     assert!(!restricted.to_string().contains(HIDDEN), "{restricted}");
     assert_eq!(restricted["errors"], whole["errors"]);
 
-    // A new on-disk group may have the wrong scalar shape, so it never reached loaded state.
     const NEW: &str = "private.example/group/new";
     let broken = source.replace(&format!("[\"{HIDDEN}\"]"), &format!("\"{NEW}\""));
     write_manifest(&dir, &broken, &ui_oidc());
     let whole = ask(&console, "/api/v1/manifest", &token(&["*"])).json();
     assert!(!whole["errors"].as_array().unwrap().is_empty(), "{whole}");
-    // A wrong-typed value is never quoted, so the whole view holds no identity to hide either.
     assert!(!whole.to_string().contains(NEW), "{whole}");
     let restricted = ask(&console, "/api/v1/manifest", &token(&[WEB])).json();
     assert!(!restricted.to_string().contains(NEW), "{restricted}");
 }
 
-/// The playground and the exports (#305) bounded by the viewer's grant, as a node bounds a call
-/// (#290): a `*` grant answers the chain goldens; a grant of `WEB` alone answers about `WEB` with
-/// every peer outside the grant dropped before the answer is built, and a repository outside it
-/// is the 404 of one the console does not serve.
 #[test]
 fn a_viewer_s_grant_bounds_the_playground_and_the_exports() {
     use super::playground::{
@@ -607,9 +562,6 @@ fn a_viewer_s_grant_bounds_the_playground_and_the_exports() {
     assert_leaks_nothing(&console.stderr(), &[&web, &all]);
 }
 
-/// The CI kind under a viewer's grant (#829, ADR 0028): a grant that reads the repository of the
-/// pipelines answers the link; one that reads two callers alone answers, in the query page and
-/// in the export the graph draws, no link to that repository and no consumer of it.
 #[test]
 fn a_viewer_s_grant_bounds_the_ci_kind_in_the_playground_and_the_graph() {
     use super::playground::{ci_console, query};
@@ -663,15 +615,10 @@ fn a_viewer_s_grant_bounds_the_ci_kind_in_the_playground_and_the_graph() {
             assert!(!name.contains("acme/workflows"), "{section}: {name}");
         }
     }
-    // The calls inside the repository keep their links.
     let local = "ci::github.com/acme/app-a/tools/local".to_string();
     assert!(names(&graph, "links").contains(&local), "{graph}");
 }
 
-/// The identity provider's `type` (ADR 0016): `admission` names it, `generic` with the key absent
-/// and `entra` when set, and nothing else changes for the same tokens: every read route (the
-/// file `manifest` echoes aside), `session` and `admission/check`, a token in overage
-/// (`_claim_names`, no `groups`) included.
 #[test]
 fn admission_names_the_type_and_nothing_else_changes() {
     let (signing, jwk) = key("k1");
@@ -762,7 +709,6 @@ fn admission_names_the_type_and_nothing_else_changes() {
     assert_eq!(entra, &vec![json!("entra"); 4]);
     assert_eq!(answers, typed);
     assert_eq!(stderr, typed_stderr);
-    // The overage token has no groups: no grant through `team-gw`.
     let session = |nth: usize| &answers[nth * routes.len()].3;
     assert_eq!(session(5)["groups"], json!([]));
     assert_eq!(session(5)["grant"], json!([]));
@@ -771,7 +717,6 @@ fn admission_names_the_type_and_nothing_else_changes() {
     assert_leaks_nothing(stderr, &tokens[1..]);
 }
 
-/// Without `[oidc]`, the admission routes are not there.
 #[test]
 fn without_oidc_the_admission_routes_are_absent() {
     let dir = console_dir("ui_oidc_absent", Some(VERSION), "", &ui_section());
@@ -787,8 +732,6 @@ fn without_oidc_the_admission_routes_are_absent() {
     assert_eq!(reply.status, 404);
 }
 
-/// Managed workspaces have no bootstrap entries: every operational view and the token check
-/// must use their checked current workspace, including nested peers and credential owners.
 #[cfg(feature = "generation-pointer")]
 #[test]
 fn managed_workspace_reads_and_admission_check_obey_viewer_grants() {
@@ -925,8 +868,6 @@ fn managed_workspace_reads_and_admission_check_obey_viewer_grants() {
     );
 }
 
-/// An operator is decided from the configured group or a boolean claim, and sees the whole
-/// workspace even when the token grants a single repository. A string is never a boolean.
 #[test]
 fn operator_groups_and_boolean_claims_decide_the_role_and_whole_workspace_view() {
     let (encoding, jwk) = key("operator");
@@ -971,7 +912,6 @@ fn operator_groups_and_boolean_claims_decide_the_role_and_whole_workspace_view()
     }
 }
 
-/// Operator configuration errors name their file, line and the keys that must be corrected.
 #[test]
 fn operator_configuration_requires_oidc_one_role_key_and_the_group_claim() {
     let issuer = "http://127.0.0.1:9";
@@ -1035,8 +975,6 @@ fn operator_configuration_requires_oidc_one_role_key_and_the_group_claim() {
     }
 }
 
-/// No refused operation waits for an upload: Host, Origin, authentication, disabled writes
-/// and the role are decided first. Every refusal leaves one safe audit line.
 #[test]
 fn refused_writes_are_authorized_and_audited_before_any_body_is_consumed() {
     use std::io::{BufRead, BufReader, Write};

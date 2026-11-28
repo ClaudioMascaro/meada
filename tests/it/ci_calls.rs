@@ -1,7 +1,3 @@
-//! The CI contract (#824, ADR 0028): a CI job that calls a reusable pipeline of another
-//! repository of the workspace is a consumer of `ci::<repository identity>/<path>`, and the
-//! pipeline's file node is its provider.
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -14,11 +10,8 @@ const PUBLISH: &str = ".github/workflows/publish.yml";
 const CI: &str = ".github/workflows/ci.yml";
 const CONTRACT: &str = "ci::github.com/acme/workflows/.github/workflows/publish.yml";
 
-/// The words that open a line of a CI side in `context`.
 const SIDE_WORDS: [&str; 4] = ["provides ", "consumes ", "  consumer: ", "  provider: "];
 
-/// The reproduction of #816 as siblings in one case directory: the reusable pipelines
-/// (`acme/workflows`), an intermediate reusable pipeline (`acme/wrapper`) and three callers.
 pub(crate) fn reproduction(case: &str) -> [PathBuf; 5] {
     ["workflows", "wrapper", "app-a", "app-b", "app-c"].map(|name| {
         let origin = format!("https://github.com/acme/{name}.git");
@@ -26,36 +19,29 @@ pub(crate) fn reproduction(case: &str) -> [PathBuf; 5] {
     })
 }
 
-/// The indexed commit of the checkout at `root`, as a link's reason shows it.
 pub(crate) fn indexed(root: &Path) -> String {
     git(root, &["rev-parse", "HEAD"])[..7].to_string()
 }
 
-/// The export of the repository where `engine` runs, as JSON.
 pub(crate) fn exported(engine: &Engine) -> Value {
     serde_json::from_str(&engine.export().unwrap()).unwrap()
 }
 
-/// The texts at `key` of the rows of the section `section` of `export`.
 fn column<'a>(export: &'a Value, section: &str, key: &str) -> Vec<&'a str> {
     (export[section].as_array().unwrap().iter())
         .map(|row| row[key].as_str().unwrap())
         .collect()
 }
 
-/// The contracts among `contracts` that name a pipeline file: the calls of CI jobs, without
-/// those of the CI steps of `forms.yml` (#826, `ci_uses`).
 fn pipelines(contracts: Vec<&str>) -> Vec<&str> {
     let pipeline = |contract: &&str| contract.contains("/.github/workflows/");
     contracts.into_iter().filter(pipeline).collect()
 }
 
-/// Whether `answer` holds a line of a CI side.
 fn sided(answer: &str) -> bool {
     (answer.lines()).any(|line| SIDE_WORDS.iter().any(|word| line.starts_with(word)))
 }
 
-/// The lines of `answer` that start with `prefix`, without it.
 pub(crate) fn listed<'a>(answer: &'a str, prefix: &str) -> Vec<&'a str> {
     (answer.lines())
         .filter_map(|line| line.strip_prefix(prefix))
@@ -69,8 +55,6 @@ fn a_reusable_pipeline_lists_every_ci_job_of_the_workspace_that_calls_it() {
     let answer = engine.context(PUBLISH, None).unwrap();
     let at = indexed(&workflows);
     let ci = ".github/workflows/ci.yml";
-    // Exactly four, #820's table: two CI jobs of one repository are two consumers, each with
-    // the Git ref it wrote and the keys it passes.
     assert_eq!(
         listed(&answer, "  consumer: "),
         [
@@ -96,12 +80,9 @@ fn a_reusable_pipeline_lists_every_ci_job_of_the_workspace_that_calls_it() {
     );
 }
 
-/// `on` holds `workflow_call` as a list (`lint.yml`), a map (`publish.yml`) and a string
-/// (`scan.yml`); `internal.yml` runs on a push alone and provides nothing.
 #[test]
 fn a_pipeline_provides_only_with_workflow_call_and_its_identifier_is_lower_cased() {
     let [workflows, _, app_a, _, app_c] = reproduction("ci_calls_providers");
-    // The path keeps its case: `Publish.yml` is another file than `publish.yml`.
     fs::write(
         app_c.join(".github/workflows/case.yml"),
         "on: push\njobs:\n  cased:\n    uses: acme/workflows/.github/workflows/Publish.yml@main\n",
@@ -123,7 +104,6 @@ fn a_pipeline_provides_only_with_workflow_call_and_its_identifier_is_lower_cased
         .context(".github/workflows/internal.yml", None)
         .unwrap();
     assert!(!sided(&internal), "{internal}");
-    // `Acme/Workflows`, as app-a writes it, is `acme/workflows`: one contract.
     let scan = engine.context(".github/workflows/scan.yml", None).unwrap();
     let at = indexed(&workflows);
     assert_eq!(listed(&scan, "provides "), [file("scan.yml")], "{scan}");
@@ -131,7 +111,6 @@ fn a_pipeline_provides_only_with_workflow_call_and_its_identifier_is_lower_cased
         listed(&scan, "  consumer: "),
         [
             format!("github.com/acme/app-a {CI}:24 jobs.scan [exact: @v2 (indexed {at})] permissions: not declared"),
-            // The `$/` call of `forms.yml` (#826), inside the repository: no ref.
             "github.com/acme/workflows .github/workflows/forms.yml:8 jobs.rooted [exact: own repository] permissions: not declared"
                 .to_string(),
         ],
@@ -139,8 +118,6 @@ fn a_pipeline_provides_only_with_workflow_call_and_its_identifier_is_lower_cased
     );
     let publish = engine.context(PUBLISH, None).unwrap();
     assert_eq!(listed(&publish, "  consumer: ").len(), 4, "{publish}");
-    // A call to a file that provides nothing is a consumer no provider answers, marked absent
-    // (#827): no file of that name, and a file that is there and is not reusable.
     for (job, name, mark) in [
         (
             ".github/workflows/case.yml::jobs.cased",
@@ -173,7 +150,6 @@ fn a_pipeline_provides_only_with_workflow_call_and_its_identifier_is_lower_cased
     assert!(levels.iter().all(|level| *level == "exact"), "{levels:?}");
 }
 
-/// A `uses` writes no host: it is the one of the consumer's repository identity.
 #[test]
 fn the_host_of_a_call_is_the_consumers_own() {
     let case = "ci_calls_hosts";
@@ -185,7 +161,6 @@ fn the_host_of_a_call_is_the_consumers_own() {
     );
     let callers = [
         ("ci-app-a", Some("https://git.example.com/acme/app-a.git")),
-        // Another host (GitHub Connect) and no `origin`: neither names the peer.
         ("ci-app-b", Some("https://github.com/acme/app-b.git")),
         ("ci-wrapper", None),
     ]
@@ -215,15 +190,12 @@ fn the_host_of_a_call_is_the_consumers_own() {
         ["lint.yml", "publish.yml", "scan.yml"]
             .map(|name| format!("ci::git.example.com/acme/workflows/.github/workflows/{name}"))
     );
-    // The wrapper without `origin` still provides its own reusable pipeline, to local calls.
     for export in [other, none] {
         assert!(column(&export, "consumers", "site").is_empty(), "{export}");
         assert!(column(&export, "links", "contract").is_empty(), "{export}");
     }
 }
 
-/// The reason shows the Git ref as written and the provider's indexed commit, and flags only a
-/// full commit id other than it. The level never depends on the ref.
 #[test]
 fn a_reason_shows_the_ref_and_flags_only_another_full_commit_id() {
     let [workflows, _, _, _, app_c] = reproduction("ci_calls_refs");
@@ -234,7 +206,6 @@ fn a_reason_shows_the_ref_and_flags_only_another_full_commit_id() {
         ("same", head.clone(), ""),
         ("upper", head.to_uppercase(), ""),
         ("other", other.to_string(), ", ref mismatch"),
-        // An abbreviated commit id reads as a name, as a tag and a branch do.
         ("short", other[..7].to_string(), ""),
         ("tag", "v1.2.3".to_string(), ""),
         ("branch", "release/2026".to_string(), ""),
@@ -266,12 +237,9 @@ fn a_reason_shows_the_ref_and_flags_only_another_full_commit_id() {
         .collect();
     shown.sort();
     assert_eq!(shown, expected, "{answer}");
-    // One contract for the file, whatever refs its consumers name.
     assert_eq!(listed(&answer, "provides "), [CONTRACT], "{answer}");
 }
 
-/// app-a's CI steps call `actions/checkout` and `docker/build-push-action`, and one of its CI
-/// jobs a pipeline of `other-org`: none is in the workspace, so none holds a side.
 #[test]
 fn a_uses_outside_the_workspace_holds_no_side_on_any_surface() {
     let [_, _, app_a, ..] = reproduction("ci_calls_external");
@@ -287,7 +255,6 @@ fn a_uses_outside_the_workspace_holds_no_side_on_any_surface() {
     }
     let ambiguous = engine.search("", Some("ambiguous"), None).unwrap();
     assert_eq!(ambiguous, "no matches for ``\n");
-    // The open items are the CI steps whose `./<folder>` is unresolved (#826), none of these.
     let unresolved = engine.search("", Some("unresolved"), None).unwrap();
     for line in unresolved.lines() {
         assert!(line.contains("(unresolved) candidates: 0; "), "{line}");
@@ -303,13 +270,9 @@ fn a_uses_outside_the_workspace_holds_no_side_on_any_surface() {
         assert!(!export.contains(name), "{export}");
         assert!(!status.contains(name), "{status}");
     }
-    // The whole status: each repository and its config files, no line of a side, and one
-    // orphan, the reusable pipeline `forms.yml` nothing calls (#827).
     assert_golden("ci-calls.status.txt", &status);
 }
 
-/// The sides of a CI node come before its values: a pipeline of many CI steps shows who calls
-/// it under the default budget, where its values alone would spend it (#829's verification).
 #[test]
 fn context_on_a_long_pipeline_lists_its_callers_under_the_default_budget() {
     let [workflows, _, app_a, ..] = reproduction("ci_calls_long");
@@ -327,7 +290,6 @@ fn context_on_a_long_pipeline_lists_its_callers_under_the_default_budget() {
     assert_eq!(listed(&answer, "  consumer: ").len(), 4, "{answer}");
     let (sides, values) = (answer.find("provides ci::"), answer.find("\nvalues:"));
     assert!(sides < values, "{answer}");
-    // A consumer too: the pipeline it calls is above its own values.
     let answer = engine
         .context(&format!("{CI}::jobs.publish"), None)
         .unwrap();
@@ -335,13 +297,11 @@ fn context_on_a_long_pipeline_lists_its_callers_under_the_default_budget() {
     assert!(sides.is_some() && sides < values, "{answer}");
 }
 
-/// An index knows only its own repository: alone, a call names no repository of the workspace.
 #[test]
 fn a_caller_indexed_alone_holds_no_side_until_its_peer_is_in_the_workspace() {
     let case = "ci_calls_alone";
     let app_b = fixture_repo(case, "ci-app-b", Some("https://github.com/acme/app-b.git"));
     let job = format!("{CI}::jobs[\"publish-prd\"]");
-    // An earlier run of this test left the peer beside it.
     let _ = fs::remove_dir_all(app_b.with_file_name("ci-workflows"));
     {
         let alone = Engine::open(&app_b).unwrap();
@@ -376,7 +336,6 @@ fn a_caller_indexed_alone_holds_no_side_until_its_peer_is_in_the_workspace() {
     );
 }
 
-/// The answers and the exports of the reproduction, whole.
 #[test]
 fn the_reproduction_answers_and_exports_as_its_goldens() {
     let [workflows, wrapper, app_a, ..] = reproduction("ci_calls_goldens");
@@ -386,7 +345,6 @@ fn the_reproduction_answers_and_exports_as_its_goldens() {
     assert_golden("ci-calls.context.txt", &answers.join("\n"));
     let found = engine.search("publish", Some("contract"), None).unwrap();
     assert_golden("ci-calls.search.txt", &found);
-    // The default search answers as before: the CI contracts crowd no search.
     let default = engine.search("publish", None, None).unwrap();
     assert!(!default.contains("ci::"), "{default}");
     assert_golden("ci-calls.app-a.export.json", &engine.export().unwrap());
@@ -396,8 +354,6 @@ fn the_reproduction_answers_and_exports_as_its_goldens() {
     }
 }
 
-/// The hand declaration of #816 (`[[resource]]` with `via` on the keys of the call) keeps its
-/// sides and its `declared` link beside the CI contract.
 #[test]
 fn a_hand_declaration_keeps_its_declared_link_beside_the_ci_contract() {
     let [workflows, _, app_a, ..] = reproduction("ci_calls_declared");
@@ -450,8 +406,6 @@ fn a_hand_declaration_keeps_its_declared_link_beside_the_ci_contract() {
     );
 }
 
-/// Each side is indexed in its own repository, so an edit to one file changes the answer after
-/// the refresh a query makes, as a cold index gives it.
 #[test]
 fn an_edited_call_or_provider_answers_as_a_cold_index_does() {
     let repos = reproduction("ci_calls_fresh");
@@ -459,7 +413,6 @@ fn an_edited_call_or_provider_answers_as_a_cold_index_does() {
     let engine = Engine::open(workflows).unwrap();
     let before = engine.context(PUBLISH, None).unwrap();
     assert_eq!(listed(&before, "  consumer: ").len(), 4, "{before}");
-    // Only a consumer's `uses`: the wrapper now calls another pipeline.
     let release = wrapper.join(".github/workflows/release.yml");
     let text = fs::read_to_string(&release).unwrap();
     fs::write(&release, text.replace("publish.yml@main", "lint.yml@v3")).unwrap();
@@ -472,7 +425,6 @@ fn an_edited_call_or_provider_answers_as_a_cold_index_does() {
         lint.contains("  consumer: github.com/acme/wrapper .github/workflows/release.yml:5 jobs.release [exact: @v3 "),
         "{lint}"
     );
-    // Only the provider's file: the pipeline is reusable no more.
     let publish = workflows.join(PUBLISH);
     let text = fs::read_to_string(&publish).unwrap();
     fs::write(
@@ -509,14 +461,11 @@ pub(crate) fn traced(engine: &Engine, from: &str, direction: Direction) -> Strin
     engine.trace(Start::From(from), direction, None).unwrap()
 }
 
-/// The lines of the chain in `answer`, without its footer.
 pub(crate) fn chain(answer: &str) -> Vec<&str> {
     let lines: Vec<&str> = answer.lines().collect();
     lines[..lines.len() - 1].to_vec()
 }
 
-/// A CI job calls the pipeline, so the pipeline is no writer that goes on to its readers: down
-/// from it are its own CI job and CI steps, and up from a caller is the pipeline of its file.
 #[test]
 fn trace_follows_no_ci_call_against_its_direction() {
     let [workflows, _, _, app_b, _] = reproduction("ci_calls_trace_direction");
@@ -544,8 +493,6 @@ fn trace_follows_no_ci_call_against_its_direction() {
     );
 }
 
-/// A key or a Git ref that holds a line break would write a line of its own in `context`
-/// (found by the verifier of #824): such a key is no key, and such a `uses` names no pipeline.
 #[test]
 fn a_key_or_a_ref_with_a_control_character_writes_no_line_of_its_own() {
     let [workflows, _, app_a, ..] = reproduction("ci_calls_forged");
@@ -587,8 +534,6 @@ fn trace_up_from_a_reusable_pipeline_reaches_its_callers_through_an_intermediate
     let answer = traced(&engine, PUBLISH, Direction::Up);
     let (at, through) = (indexed(&workflows), indexed(&wrapper));
     let release = ".github/workflows/release.yml";
-    // Each caller of #820's table, then the pipeline of its file; `acme/wrapper`'s file is a
-    // provider itself, so the chain goes on to `acme/app-c`, which never names `publish.yml`.
     assert_eq!(
         chain(&answer),
         [
@@ -614,7 +559,6 @@ fn trace_up_from_a_reusable_pipeline_reaches_its_callers_through_an_intermediate
         ],
         "{answer}"
     );
-    // The weakest level of the chain, its five links and its five repositories.
     let footer = answer.lines().last().unwrap();
     assert!(
         footer.starts_with("chain: exact · 5 hops · 5 repos · "),
@@ -627,7 +571,6 @@ fn trace_down_from_a_caller_reaches_the_pipeline_it_calls_through_the_intermedia
     let [workflows, wrapper, _, _, app_c] = reproduction("ci_calls_trace_down");
     let engine = Engine::open(&app_c).unwrap();
     let release = ".github/workflows/release.yml";
-    // `jobs.release` alone fits the CI job of `acme/wrapper` too.
     let start = format!("github.com/acme/app-c::{release}::jobs.release");
     let answer = traced(&engine, &start, Direction::Down);
     let (at, through) = (indexed(&workflows), indexed(&wrapper));
@@ -669,7 +612,6 @@ fn a_ci_contract_its_pipeline_node_and_its_file_path_start_the_same_chain() {
         assert_eq!(traced(&engine, CONTRACT, direction), by_path);
         assert_eq!(traced(&engine, &node, direction), by_path);
     }
-    // A contract no pipeline of the workspace provides is still no start.
     let missing = traced(
         &engine,
         &CONTRACT.replace("publish", "absent"),
@@ -681,7 +623,6 @@ fn a_ci_contract_its_pipeline_node_and_its_file_path_start_the_same_chain() {
     );
 }
 
-/// Two reusable pipelines that call each other: GitHub refuses the run, the files still exist.
 #[test]
 fn a_cycle_of_ci_calls_ends_at_the_walks_own_cycle_mark() {
     let [workflows, wrapper, ..] = reproduction("ci_calls_trace_cycle");
@@ -705,10 +646,8 @@ fn a_cycle_of_ci_calls_ends_at_the_walks_own_cycle_mark() {
     for direction in [Direction::Up, Direction::Down] {
         let answer = traced(&engine, start, direction);
         let lines = chain(&answer);
-        // Pipeline, CI job, pipeline, CI job, and the start again: no level past it.
         assert_eq!(lines.len(), 5, "{answer}");
         assert!(lines[4].ends_with("loop.yml:1 . (cycle)"), "{answer}");
-        // A budget below the chain cuts it, as it cuts every chain.
         let cut = engine
             .trace(Start::From(start), direction, Some(60))
             .unwrap();
@@ -716,7 +655,6 @@ fn a_cycle_of_ci_calls_ends_at_the_walks_own_cycle_mark() {
     }
 }
 
-/// A sibling that calls the pipeline and that no `meada.toml` names is no part of the workspace.
 #[test]
 fn trace_reaches_a_caller_only_when_the_workspace_holds_its_repository() {
     let case = "ci_calls_trace_peers";

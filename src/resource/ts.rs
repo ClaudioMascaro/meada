@@ -1,4 +1,3 @@
-//! AWS SDK v3 resource operations, guarded by both SDK client and command origins.
 use super::aws::OPERATIONS;
 use crate::contract::Found;
 use crate::resolve::Code;

@@ -1,17 +1,7 @@
 #!/bin/sh
 set -eu
-# The fetch of a refresh under [oidc.github] (ADR 0016): it reads the entries that
-# `meada workspace show --pulled` prints, which leave out the additions whose adder holds no
-# accepted role, and fetches each mirror. A failed fetch stops the refresh before index and
-# publish (#316). Usage: fetch-pulled.sh <file written by `meada workspace show --pulled`>.
 list=${1:?Give the file written by meada workspace show --pulled}
 pairs=$(awk '
-  # Reads the keys of each [[repository]] table itself: any table header ends the entry before
-  # it, so a [[repository.peer]] or [[repository.resource]] table adds nothing. A key may be
-  # quoted. A value is the text between its quotes. Basic strings only: an identity and a mirror path carry no literal string,
-  # multi-line string or escape, and no multi-line array with a line that starts with [. The same
-  # program is in deploy/compose/fetch-pulled.sh and the chart workspace.fetch (values.yaml); a
-  # test fails when the two drift (#544).
   function value(line) { sub(/^[^=]*=[ \t]*"/, "", line); sub(/".*$/, "", line); return line }
   function flush() { if (inrepo && (repo != "" || path != "")) print repo " " path; repo = ""; path = "" }
   /^[ \t]*\[/ { flush(); inrepo = ($0 ~ /^[ \t]*\[\[[ \t]*repository[ \t]*\]\]/); next }

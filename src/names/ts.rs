@@ -1,12 +1,8 @@
-//! External constructions followed through TypeScript constant bindings.
 use std::collections::HashMap;
 
 use crate::lang::Value;
 use crate::resolve::{Code, Follow, Form, Of};
 
-/// A client's factory: the package it is imported from, the factory as JavaScript would write it
-/// (`new Kafka().producer()`), and the constant the client is bound to (its file and qualified
-/// name).
 #[derive(Clone)]
 pub(crate) struct Factory<'a> {
     pub package: &'a str,
@@ -14,8 +10,6 @@ pub(crate) struct Factory<'a> {
     pub binding: Option<(&'a str, &'a str)>,
 }
 
-/// The `Factory` of `chain`, from its `Constants` origin: `None` unless it comes from an import
-/// of something outside the repository.
 pub(crate) fn factory<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -25,7 +19,6 @@ pub(crate) fn factory<'a>(
     factory_of(code, path, scope, Of::Name(chain))
 }
 
-/// `factory` of any value written in `scope` of `path`.
 pub(crate) fn factory_of<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -51,11 +44,6 @@ pub(crate) fn factory_of<'a>(
     })
 }
 
-/// The factory of the private field `this.<field>` a method of its class makes a call on, when
-/// every non-null value the class assigns it comes from one factory (`Facts::field_writes`): a
-/// construction the constants walk follows, or a call of a member of another such field
-/// (`this.kafka.producer()`). The field is then that client wherever the class reads it, bound
-/// to the field.
 pub(crate) fn field_factory<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -65,8 +53,6 @@ pub(crate) fn field_factory<'a>(
     field_factory_in(code, path, scope, chain, &mut HashMap::new())
 }
 
-/// `field_factory`, each field's answer kept in `known`: a field is read once, and one met again
-/// while it is read (`a` made from `this.b`, `b` from `this.a`) has none.
 fn field_factory_in<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -77,7 +63,6 @@ fn field_factory_in<'a>(
     let field = chain.strip_prefix("this.").filter(|f| !f.contains('.'))?;
     let held = code.field_writes(path).iter().find(|w| {
         let (class, name) = w.name.rsplit_once('.').unwrap_or(("", &w.name));
-        // A method of the class, or its own body for an initializer.
         let within = |r: &str| r.is_empty() || r.starts_with('.');
         name == field && scope.strip_prefix(class).is_some_and(within)
     })?;
@@ -103,8 +88,6 @@ fn field_factory_in<'a>(
     answer
 }
 
-/// The factory of a call of a member of a private field (`this.kafka.producer()`): the field's
-/// factory with that step.
 fn member_call<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -121,8 +104,6 @@ fn member_call<'a>(
     Some(made)
 }
 
-/// The outside construction of a method receiver and its first constructed argument.
-/// The raw argument is checked before expansion so its original scope and imports survive.
 pub(crate) fn constructor_argument<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -138,8 +119,6 @@ pub(crate) fn constructor_argument<'a>(
     Some((client, package, constructor))
 }
 
-/// Expands the object options of the first constructed argument, preserving wrapper sites. A
-/// field assigned after the object is made, before the call, is unknown.
 pub(crate) fn constructor_options<'a, T>(
     code: &Code<'a>,
     path: &'a str,

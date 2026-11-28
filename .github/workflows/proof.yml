@@ -1,8 +1,5 @@
 name: Proof
 
-# E2E and the bounded #676/#684 proofs, apart from the required gates in `ci.yml` so their
-# skipped jobs never share a required check's name. A pull request runs E2E only with the `e2e`
-# label, on a non-draft PR and a relevant change (`scripts/check --ci`).
 on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, ready_for_review]
@@ -35,15 +32,11 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # CPU-heavy reader probes share the runner; bound their concurrent test count.
   RUST_TEST_THREADS: '2'
 
 permissions:
   contents: read
 
-# rustup, preinstalled on the runners, installs the toolchain `rust-toolchain.toml` pins on the
-# first cargo command. The image is pinned: `ubuntu-latest` moves to 26.04 from 2026-10-19
-# (actions/runner-images#14748), and a new image is a change of its own.
 jobs:
   e2e-scope:
     runs-on: ubuntu-24.04
@@ -117,7 +110,6 @@ jobs:
         working-directory: ui
       - run: npm run build
         working-directory: ui
-      # A manual baseline gets no CI run, so the frontend it binds passes its own checks here.
       - run: npm run check:version
         working-directory: ui
       - run: npm test
@@ -130,8 +122,6 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # No product mutation is automatic. The baseline produces raw checks for a fresh checker;
-  # only a manual candidate phase with that checker's PROVED receipt may plant one bug.
   proof-a7-a8:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
@@ -168,8 +158,6 @@ jobs:
           if [ -n "$UI_RUN" ]; then [[ "$UI_RUN" =~ ^[1-9][0-9]*$ ]]; fi
           python3 -m venv "$RUNNER_TEMP/a7-a8-venv"
           "$RUNNER_TEMP/a7-a8-venv/bin/pip" install --disable-pip-version-check python-hcl2==8.1.4 PyYAML==6.0.3
-      # Binaries from these runs are executed: only this repository's own manual proof runs
-      # qualify, never a fork's pull request run that could upload an artifact of the same name.
       - name: Accept only this repository's manual proof runs
         if: env.PROOF_PHASE != 'baseline'
         env:
@@ -292,7 +280,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-  # The explicit baseline binds native, UI and source captures to one source and manifest.
   proof-a7-a8-ui:
     needs: [proof-a7-a8, e2e-frontend]
     if: github.event_name == 'workflow_dispatch' && inputs.proof_phase == 'baseline'
@@ -319,7 +306,6 @@ jobs:
         timeout-minutes: 3
         env:
           PROVE_NODE: ${{ runner.temp }}/console-graph-node
-        # No --with-deps: the runner image has Chromium's libraries, and apt's mirror failed this step (#786).
         run: |
           npm install --prefix "$PROVE_NODE" --no-audit --no-fund playwright-core@1.61.1 axe-core@4.12.1
           "$PROVE_NODE/node_modules/.bin/playwright-core" install chromium
@@ -409,8 +395,6 @@ jobs:
     timeout-minutes: 90
     env:
       CARGO_BUILD_JOBS: '2'
-      # These binaries are exercised as a black box. Keep the shared target and the six
-      # immutable reference executables small, at the same optimization level as their controls.
       CARGO_PROFILE_DEV_DEBUG: '0'
       CARGO_INCREMENTAL: '0'
       RUST_TEST_THREADS: '2'
@@ -472,7 +456,6 @@ jobs:
       - name: Prepare browser proof tools
         if: env.PROVE_CONSOLE == 'true'
         timeout-minutes: 3
-        # No --with-deps: the runner image has Chromium's libraries, and apt's mirror failed this step (#786).
         run: |
           npm install --prefix "$PROVE_NODE" --no-audit --no-fund playwright-core@1.61.1 axe-core@4.12.1
           "$PROVE_NODE/node_modules/.bin/playwright-core" install chromium
@@ -481,7 +464,6 @@ jobs:
         run: |
           docker run -d --name zz-prove-postgres -p 5432:5432 -e POSTGRES_PASSWORD=meada-test postgres:15-alpine
           timeout 60 bash -c 'until docker exec zz-prove-postgres pg_isready -U postgres; do sleep 1; done'
-      # Also the drivers of the skill's Scope rows the change selects (`FLOWS` in scripts/prove-ci).
       - name: Capture selected behavior against the PR base
         id: capture
         run: '"$RUNNER_TEMP/prove-venv/bin/python" scripts/prove-ci'

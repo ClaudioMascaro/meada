@@ -1,5 +1,3 @@
-//! Curated and repository-configured infrastructure abstractions (#671).
-
 use meada::engine::{Direction, Engine, Start};
 use serde_json::Value;
 
@@ -347,7 +345,6 @@ fn equivalent_mapping_key_paths_never_create_directionless_self_uses() {
         "custom-quoted-definition",
         Some("https://example.com/custom-671-quoted/infra.git"),
     );
-    // Keep repository provenance equal while changing only the mapping spelling.
     let path = root.join("main.tf.json");
     let source = std::fs::read_to_string(&path).unwrap();
     std::fs::write(path, format!("{source}\n")).unwrap();
@@ -467,7 +464,6 @@ fn registry_modules_create_the_named_resources_and_workloads_and_honor_disabled_
                 "example.com/custom-671-registry/infra::main.tf::module.table".into(),
                 ".".into()
             ),
-            // `putin_khuylo` gates the bucket upstream: `false` or unknown leaves none (#787).
             (
                 "resource::s3::confirmed-assets".into(),
                 "example.com/custom-671-registry/infra::main.tf::module.confirmed_bucket".into(),
@@ -502,8 +498,6 @@ fn registry_modules_create_the_named_resources_and_workloads_and_honor_disabled_
     }
 }
 
-/// A module's `bool` input takes the strings `"true"` and `"false"`, as Terraform converts them
-/// (cty's `convert`, string to bool); any other string, `"True"` too, stays unknown (#787).
 #[test]
 fn module_bool_inputs_read_the_strings_terraform_converts_to_bool() {
     let root = fixture_repo(

@@ -1,14 +1,3 @@
-//! Summarises how an export golden changed between two git revisions, per section.
-//!
-//! ```text
-//! cargo run --example golden_diff -- [golden.json...] [--range <range>]
-//! ```
-//!
-//! `--range A...B` (the default is `origin/main...HEAD`) compares the merge-base of `A` and `B`
-//! with `B`. `--range A` alone compares `A` with the file on disk (the working tree). With no
-//! golden given, every `tests/golden/*.export.json` that differs between the two sides is
-//! compared. A file missing on one side is reported as added or removed.
-
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::process::Command;
@@ -51,7 +40,6 @@ fn field(v: &Value, name: &str) -> String {
     }
 }
 
-/// The identity of an entry in a section.
 fn key(section: &str, v: &Value) -> String {
     let parts: &[&str] = match section {
         "symbols" | "calls" => &["id"],
@@ -72,7 +60,6 @@ fn key(section: &str, v: &Value) -> String {
         .join(" | ")
 }
 
-/// The fields whose change is worth naming, per section.
 fn watched(section: &str) -> &'static [&'static str] {
     match section {
         "calls" => &["level", "target", "candidates"],
@@ -84,7 +71,6 @@ fn watched(section: &str) -> &'static [&'static str] {
     }
 }
 
-/// A short form of a value; a target is named `set` and a list is counted, so moves group.
 fn short(f: &str, v: Option<&Value>) -> String {
     let s = match v {
         None | Some(Value::Null) => "null".into(),
@@ -120,7 +106,6 @@ fn section_diff(section: &str, base: &Value, head: &Value) -> String {
     let (b, h) = (index(section, base), index(section, head));
     let added: BTreeSet<String> = h.keys().filter(|k| !b.contains_key(*k)).cloned().collect();
     let removed: BTreeSet<String> = b.keys().filter(|k| !h.contains_key(*k)).cloned().collect();
-    // "field: old -> new" -> keys
     let mut moves: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut changed = 0;
     for (k, bv) in &b {
@@ -132,7 +117,6 @@ fn section_diff(section: &str, base: &Value, head: &Value) -> String {
         for f in watched(section) {
             if bv.get(*f) != hv.get(*f) {
                 let (old, new) = (short(f, bv.get(*f)), short(f, hv.get(*f)));
-                // Another target, or other candidates of the same count, read alike in short.
                 let label = if old == new {
                     format!("{f}: changed")
                 } else {
@@ -189,7 +173,6 @@ fn diff_docs(base: &Value, head: &Value) -> String {
     out
 }
 
-/// `None` as `rev` reads the working tree.
 fn load(rev: Option<&str>, path: &str) -> Option<Value> {
     let text = match rev {
         Some(rev) => git(&["show", &format!("{rev}:{path}")])?,
@@ -198,7 +181,6 @@ fn load(rev: Option<&str>, path: &str) -> Option<Value> {
     serde_json::from_str(&text).ok()
 }
 
-/// Splits a range into the base revision and the optional head.
 fn resolve(range: &str) -> Result<(String, Option<String>), String> {
     match range.split_once("...") {
         Some((a, b)) => git(&["merge-base", a, b])

@@ -6,8 +6,8 @@ within 8 KiB; its relocated details stay within 24 KiB (`tests/it/docs.rs`). The
 the map. Terms are `GLOSSARY.md`'s; decisions are in `docs/adr/`.
 
 A new module, seam or invariant gets a route here and detail in `map/`. A new module needs both: its name on a line below, and its own line in that area file (`every_module_has_a_line_in_the_map_naming_its_area_file`, `tests/it/docs.rs`). A limit goes to the
-relevant part of [ceilings.md](ceilings.md). Full module descriptions remain in the
-[core catalogue](map/overview/crates.md) and [binary catalogue](map/overview/modules-src.md).
+relevant part of [ceilings.md](ceilings.md). The [core contract](../../meada-core/src/README.en.md) and the
+[binary contract](../../src/README.en.md) link implementation boundaries.
 
 ## Flow
 
@@ -17,7 +17,7 @@ Workspace opening, refresh, partial exports and deterministic output:
 ## Crates
 
 The binary and deterministic `meada-core`, WASM exports, versioning and grammar ownership:
-[crate rules](map/overview/crates.md), then [core detail](map/core.md).
+[crate contract](../../meada-core/README.en.md), then [core detail](map/core.md).
 
 - `meada-core/src/manifest.rs`, `meada-core/src/ids.rs`, `meada-core/src/workspace.rs`, `meada-core/src/authorize.rs`, `meada-core/src/msg.rs`, `meada-core/src/http.rs`, `meada-core/src/export.rs`, `meada-core/src/shape.rs`, `drift.rs`, `meada-core/src/render.rs`, `search.rs`, `context.rs`, `trace.rs`, `meada-core/src/lib.rs`, `meada-core/src/wasm.rs`: shared deterministic types, validation and renderers. [core](map/core.md).
 - `meada-core/src/named.rs`, `effective.rs`: named workspaces, catalog and proposals. [workspaces](map/workspaces.md).
@@ -25,7 +25,7 @@ The binary and deterministic `meada-core`, WASM exports, versioning and grammar 
 ## Modules (`src/`)
 
 Each line names modules and the area that owns their detail. Split area indexes route to the
-relevant topic. The [full catalogue](map/overview/modules-src.md) retains each module's description.
+relevant topic. The [binary contract](../../src/README.en.md) links the package interfaces.
 
 A new module joins the line below that names its area, and its own line goes in that area file (or its topic leaf), beside the lines that start with its first path, never at the end of a file.
 
@@ -46,7 +46,7 @@ A new module joins the line below that names its area, and its own line goes in 
 
 ## Console frontend (`ui/`)
 
-[Build and bundle rules](map/overview/console-frontend-ui.md), [console detail](map/console.md).
+[Build and bundle rules](../../ui/README.en.md), [console detail](map/console.md).
 
 ## Named workspaces (spec S5)
 
@@ -71,7 +71,7 @@ seams](map/seams.md). Read the relevant extension before changing it.
 
 ## Deployment (`deploy/`)
 
-[Validation commands](map/overview/deployment-deploy.md), [deployment detail](map/deployment.md).
+[Validation commands](../../deploy/README.en.md), [deployment detail](map/deployment.md).
 
 ## Tests (`tests/`)
 
@@ -90,6 +90,5 @@ boundaries and use `scripts/split-agents <file>`; retain every entry.
 
 ## Known ceilings
 
-[Limits by area](ceilings.md) and [how ceilings are recorded](map/overview/known-ceilings.md).
-Read the relevant topic when a limit is touched; every `ponytail:` limit remains checked by
-`tests/it/docs.rs`.
+Read the [limits by area](ceilings.md) when a limit is touched. Each `ponytail:` limit lists
+its value and reason there. `tests/it/docs.rs` checks that every marked limit is named.

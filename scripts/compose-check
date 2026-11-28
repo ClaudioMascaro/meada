@@ -77,7 +77,6 @@ assert list(migrate) == ["postgres"] and migrate["postgres"]["url_env"] == "MEAD
 assert not any("postgres://" in line for path in DEPLOY.glob("*.toml") for line in path.read_text().splitlines() if not line.startswith("#")), "no URL in a manifest"
 print("compose-check: opt-in Postgres service, migrate step order and roles passed")
 
-# The proposal server (ADR 0022): opt in, its own pull and port, the read role, never a node's volume.
 assert not any("proposals" in name for name in postgres), "the proposal server is opt-in"
 proposals = json.loads(subprocess.check_output(
     ["docker", "compose", "--env-file", ".env.example", "-f", "compose.yaml", "-f", "compose.console.yaml",
@@ -105,7 +104,6 @@ for section in ["valkey", "generations", "refresh_lock"]:
     assert proposals_bootstrap[section] == node_bootstrap[section]
 print("compose-check: opt-in proposal server, its pull, port and read role passed")
 
-# The local accounts proof of concept (ADR 0024): one env file selects the whole recipe.
 env = dict(line.split("=", 1) for line in (DEPLOY / ".env.accounts.example").read_text().splitlines()
            if line and not line.startswith("#"))
 assert env["COMPOSE_FILE"].split(":") == ["compose.yaml", "compose.console.yaml", "compose.postgres.yaml", "compose.accounts.yaml"]
@@ -121,7 +119,6 @@ def reaches(services, start, goal, seen=()):
                for dep in services[start].get("depends_on", {}))
 
 
-# The order: certificates, Postgres, migrate, store and Valkey, the seed, the job, the console and the nodes.
 for later, earlier in [("postgres", "certificates"), ("postgres-migrate", "postgres"), ("seed", "bucket"), ("seed", "valkey"),
                        ("bucket", "store"), ("store", "certificates"), ("valkey", "certificates"),
                        ("generation-indexer", "seed"), ("generation-indexer", "postgres-migrate"),
@@ -134,7 +131,6 @@ for later, earlier in [("postgres", "certificates"), ("postgres-migrate", "postg
 assert poc["seed"]["depends_on"]["bucket"]["condition"] == "service_completed_successfully"
 assert poc["generation-indexer"]["depends_on"]["seed"]["condition"] == "service_completed_successfully"
 
-# The key pair: the private half in the console's and the certificates step's mounts, no other.
 def volumes(name):
     return {mount["source"]: mount for mount in poc[name]["volumes"] if mount["type"] == "volume"}
 
@@ -148,7 +144,6 @@ script = (DEPLOY / "certificates.sh").read_text()
 assert "openssl genpkey -algorithm ed25519 -out /accounts-private/private.pem" in script
 assert not any(word in line for line in script.splitlines() if "accounts-private" in line for word in ["cat ", "echo ", "printf "]), "the key is never printed"
 
-# The manifests: the console signs and keeps accounts, the nodes hold the public half only.
 mounted = lambda name: {pathlib.Path(m["source"]).name for m in poc[name]["volumes"] if m["type"] == "bind"}
 assert "console.accounts.workspace.toml" in mounted("console")
 assert all("generations.accounts.workspace.toml" in mounted(name) for name in ["generation-one", "generation-two"])
@@ -169,7 +164,6 @@ assert poc["console"]["environment"]["MEADA_POSTGRES_URL"].startswith("postgres:
 assert "MEADA_ADMIN_PASSWORD" in poc["console"]["environment"]
 assert all("MEADA_ADMIN_PASSWORD" not in poc[name]["environment"] for name in ["generation-one", "generation-two"])
 
-# The proxy of the nodes forwards Authorization and holds no bearer; the other profiles' keep theirs.
 caddyfile = (DEPLOY / "Caddyfile.accounts").read_text()
 assert "MEADA_TOKEN" not in caddyfile and "header_up" not in caddyfile and "reverse_proxy backend-one:7333 backend-two:7333" in caddyfile
 assert "environment" not in poc["proxy"] and "Caddyfile.accounts" in mounted("proxy")
@@ -184,7 +178,6 @@ def listen_port(services, alias):
     return backend["command"][backend["command"].index("--listen") + 1].rsplit(":", 1)[1]
 
 
-# The main proxy, in every profile: loopback only, the exact token matcher, the upstream port the backends listen on.
 main_caddyfile = (DEPLOY / "Caddyfile").read_text()
 assert '@admitted header Authorization "Bearer {$MEADA_TOKEN}"' in main_caddyfile, "the exact token matcher"
 for services in [local["services"], generations["services"], console, postgres, proposals, poc]:

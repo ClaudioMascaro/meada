@@ -8,8 +8,6 @@ pub(super) use fields::Writes;
 
 type Changes<T> = Vec<(usize, Option<T>)>;
 
-/// Each change in the innermost visible declaration, so repeated calls in sibling blocks
-/// need one binary search instead of a scan of every declaration of the name.
 pub(super) struct FileLocals<'a> {
     id: usize,
     test: bool,
@@ -79,7 +77,6 @@ pub(super) fn locals<'a>(files: &BTreeMap<&'a str, &'a Facts>) -> HashMap<&'a st
 }
 
 impl<'a> Resolver<'a> {
-    /// None when this name has no ranged declarations at this site, Some(None) in a gap.
     pub(super) fn ts_local(&self, path: &str, scope: &str, name: &str) -> Option<Option<&TsLocal>> {
         let (file, at, _) = self.ts_site.get()?;
         let locals = self.ts_locals.get(path)?;
@@ -165,7 +162,6 @@ impl<'a> Resolver<'a> {
         answer
     }
 
-    /// Bare package specifiers may be workspace imports, so heirs are indexed by name.
     pub(super) fn index_ts_heirs(&self) -> HashMap<String, Vec<Target<'a>>> {
         let mut heirs = HashMap::<String, Vec<Target>>::new();
         for (&path, &facts) in self.files {
@@ -200,7 +196,6 @@ impl<'a> Resolver<'a> {
             .is_some_and(|c| c.fields.iter().any(|f| f == member || f == "*"))
     }
 
-    /// The name closure follows each adjacency list once, including cyclic heritage.
     pub(super) fn ts_any_heir(
         &self,
         name: &str,
@@ -290,8 +285,6 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// A value of a known global has no repository members; an outside annotation still
-    /// admits literal methods, test doubles and classes whose heritage names that type.
     pub(super) fn ts_library_call(
         &self,
         path: &'a str,
@@ -305,7 +298,6 @@ impl<'a> Resolver<'a> {
         if self.files[path].ts_global_calls.contains(&span) {
             return Some(Resolution::Unresolved);
         }
-        // Await may unwrap the annotated receiver to an unrelated value.
         if call.awaits {
             return None;
         }
@@ -331,7 +323,6 @@ impl<'a> Resolver<'a> {
             .flatten()
             .map(|local| local.declared)
             .or_else(|| facts.ts_classes.get(s)?.initialized.get(n).copied());
-        // A literal supplies its own implementation even when its annotation is from a library.
         if declaration.is_some_and(|at| facts.ts_annotated_literals.contains(&at))
             || (s.is_empty() && declaration.is_none() && facts.ts_literal_methods.contains_key(n))
         {
@@ -339,8 +330,6 @@ impl<'a> Resolver<'a> {
         }
         let ty = match class {
             Class::TsGlobalValue => return Some(Resolution::Unresolved),
-            // Only the by-name answer can change for an outside result. The exact lookup
-            // of a factory must not recursively repeat the candidate checks for its inputs.
             Class::Result(_) if !matching => return None,
             Class::Result(i) => {
                 let made = self.files[p].calls.get(*i)?;

@@ -1,6 +1,3 @@
-//! Packages (spec #22): every named `package.json` of a workspace repository provides
-//! `package::npm::<name>`, and every dependency entry naming such a package links to it.
-
 use crate::common;
 
 use std::fs;
@@ -9,8 +6,6 @@ use std::path::{Path, PathBuf};
 use common::{age, assert_golden, fixture_repo, without_processes};
 use meada::engine::{Direction, Engine, Start};
 
-/// The package fixtures as siblings in one case directory. `web`, `api` and `mono` name
-/// `shared` as their peer, `fork` names `mono`, so a query from any of them sees all five.
 struct Packages {
     shared: PathBuf,
     web: PathBuf,
@@ -53,8 +48,6 @@ fn a_dependency_on_a_workspace_package_links_to_its_manifest() {
 fn workspace_ranges_stay_in_their_repository_and_the_same_name_elsewhere_is_ambiguous() {
     let p = packages("packages_mono");
 
-    // `b` depends on `a` through `workspace:*`: exact, though `fork` also provides `@example/a`.
-    // `c` names `a` with a plain range: both providers fit. `ignored/` is in `.gitignore`.
     assert_golden("pkg-mono.export.json", &without_processes(&export(&p.mono)));
     assert_golden("pkg-fork.export.json", &without_processes(&export(&p.fork)));
 }
@@ -71,8 +64,6 @@ fn ambiguous_package_links_are_not_open_items() {
     );
 }
 
-/// Bumps the shared version, narrows a range, renames what the kit exports, and adds a manifest
-/// that takes a second provider of `@example/a` into the monorepo.
 fn edit(p: &Packages) {
     let replace = |repo: &Path, file: &str, from: &str, to: &str| {
         let text = fs::read_to_string(repo.join(file)).unwrap();
@@ -81,7 +72,6 @@ fn edit(p: &Packages) {
     };
     replace(&p.shared, "package.json", "1.2.0", "1.3.0");
     replace(&p.web, "package.json", "^1.0.0", "^2.0.0");
-    // The kit renames an export and a subpath: the calls through them stop crossing.
     let renamed = "export { greet as hello } from './greet';";
     replace(
         &p.shared,
@@ -112,10 +102,6 @@ fn an_edited_package_json_relinks_like_a_cold_export() {
     edit(&cold);
     assert_ne!(refreshed, before);
     assert_eq!(refreshed, repos(&cold));
-    // Bumping `shared` to 1.3.0 flips `web`'s `~1.2.0`, and the edit narrowing `^1.0.0` to
-    // `^2.0.0` flips the other: both entries now say `range mismatch`, and so do the links of
-    // the two calls into `shared` (`clean` and `squash`).
-    // The processes repeat the reasons of the links they cross: count the entries and links.
     let mismatches = |export: &str| {
         let mut json: serde_json::Value = serde_json::from_str(export).unwrap();
         json.as_object_mut().unwrap().remove("processes");
@@ -123,8 +109,6 @@ fn an_edited_package_json_relinks_like_a_cold_export() {
     };
     assert_eq!(mismatches(&before[0]), 0);
     assert_eq!(mismatches(&refreshed[0]), 4);
-    // The calls through the renamed export and subpath no longer cross: no consumer, link or
-    // import names them.
     let fixed = "example.com/pkg/web::src/app.ts::main::fixed#0";
     for (export, crossing) in [(&before[0], true), (&refreshed[0], false)] {
         let json: serde_json::Value = serde_json::from_str(export).unwrap();
@@ -176,7 +160,6 @@ fn a_local_binding_of_the_imported_name_does_not_cross() {
     };
     let mut crossing = [sites("links", "consumer"), sites("imports", "site")].concat();
     crossing.retain(|c| c.contains("::src/app.ts::"));
-    // `welcome` crosses, through the link and its import resolution.
     let welcome = crossing.iter().filter(|c| *c == WELCOME_GREET).count();
     assert_eq!(welcome, 2, "{crossing:?}");
     for hidden in ["hidden", "caught", "destructured", "shadowed"] {
@@ -186,7 +169,6 @@ fn a_local_binding_of_the_imported_name_does_not_cross() {
             "{hidden}: {crossing:?}"
         );
     }
-    // A package outside the workspace has no consumer, link, import or dependency entry.
     for list in ["consumers", "links", "imports", "dependencies"] {
         assert!(!json[list].to_string().contains("express"), "{list}");
     }
@@ -210,8 +192,6 @@ fn each_entry_field_resolves_and_only_the_nearest_manifest_counts() {
     assert_eq!(how("src/entries.ts::entries::esm#0"), Some("module"));
     assert_eq!(how("src/entries.ts::entries::tool#0"), Some("path"));
     assert_eq!(how("src/entries.ts::entries::part#0"), Some("path"));
-    // `e2e/package.json` declares the kit in `devDependencies`; `tools/package.json`, the
-    // nearest manifest of `tools/run.ts`, does not declare it, though the root one does.
     assert_eq!(how("e2e/smoke.ts::smoke::greet#0"), Some("exports"));
     assert_eq!(how("tools/run.ts::run::greet#0"), None);
     assert!(!json["links"].to_string().contains(&at("tools/run.ts")));
@@ -226,17 +206,14 @@ fn a_field_that_leads_to_no_source_does_not_stop_the_search_and_no_field_reads_a
     let row =
         |level: &str, how: &str, target: String| vec![(level.to_string(), how.to_string(), target)];
 
-    // `types` names a declaration file that is no source: `main` is tried next.
     assert_eq!(
         imports("dts"),
         row("exact", "main", shared("dts/index.js", "dts"))
     );
-    // None of `exports`, `types`, `module` and `main`: Node's default, `./index`.
     assert_eq!(
         imports("plain"),
         row("exact", "path", shared("plain/index.ts", "plain"))
     );
-    // No `index` file either: the files of the package exporting the name are listed.
     assert_eq!(
         imports("thing"),
         row("ambiguous", "path", shared("bare/src/thing.ts", "thing"))
@@ -249,8 +226,6 @@ fn the_first_field_that_leads_to_a_file_wins_and_a_nested_package_is_not_the_out
     let at = |callee: &str| format!("example.com/pkg/web::src/nest.ts::nest::{callee}#0");
     let shared = |file: &str, name: &str| format!("example.com/pkg/shared::{file}::{name}");
 
-    // `types` maps through the `outDir` (inferred) to `index.ts`; the later `main`, a source
-    // that would be exact, is not tried.
     assert_eq!(
         imports_of(&p.web, &at("prec")),
         [(
@@ -259,8 +234,6 @@ fn the_first_field_that_leads_to_a_file_wins_and_a_nested_package_is_not_the_out
             shared("prec/index.ts", "prec")
         )]
     );
-    // With no entry field Node reads `index.<ext>`, never `index/index.ts`; and that file, like
-    // a subpath file, belongs to a nested package, not to `@example/nest`.
     assert!(imports_of(&p.web, &at("inner")).is_empty());
     assert!(imports_of(&p.web, &at("deep")).is_empty());
 }
@@ -292,7 +265,6 @@ fn trace_up_from_a_function_behind_build_output_reaches_both_callers() {
     assert_golden("pkg-shared.trace-up-outdir.txt", &up);
 }
 
-/// The `(level, how, target)` of every import resolution of `site` in `repo`'s export.
 fn imports_of(repo: &Path, site: &str) -> Vec<(String, String, String)> {
     let json: serde_json::Value = serde_json::from_str(&export(repo)).unwrap();
     let text = |i: &serde_json::Value, k: &str| i[k].as_str().unwrap().to_string();
@@ -311,7 +283,6 @@ fn build_output_is_inferred_and_an_unmappable_entry_lists_its_candidates() {
     let shared = |file: &str, name: &str| format!("example.com/pkg/shared::{file}::{name}");
     let inferred = |target: String| vec![("inferred".to_string(), "outDir".to_string(), target)];
 
-    // `types` and a pattern subpath point into `dist`, which `rootDir` maps to `src`.
     assert_eq!(
         imports_of(&p.web, &at("clean", "normalize")),
         inferred(shared("src/text.ts", "normalize"))
@@ -325,8 +296,6 @@ fn build_output_is_inferred_and_an_unmappable_entry_lists_its_candidates() {
         imports_of(&p.api, label),
         inferred(shared("src/text.ts", "normalize"))
     );
-    // `sealed` has an `outDir` and no `rootDir`: `dist/index.js` would be `index.ts` at the
-    // package directory, which is not there. Both files exporting `seal` are listed.
     let sealed = |file: &str| {
         (
             "ambiguous".to_string(),
@@ -338,12 +307,10 @@ fn build_output_is_inferred_and_an_unmappable_entry_lists_its_candidates() {
         imports_of(&p.web, &at("lock", "seal")),
         vec![sealed("sealed/src/one.ts"), sealed("sealed/src/two.ts")]
     );
-    // An ambiguous import is no open item for `meada decide`.
     let items = Engine::open(&p.web).unwrap().open_items().unwrap();
     assert!(items.iter().all(|i| i.path != "src/text.ts"));
 }
 
-/// The rows a query asks of the index of `repo`, one line each with its columns spaced.
 fn rows_of(repo: &Path, sql: &str) -> Vec<String> {
     let db = rusqlite::Connection::open(repo.join(".meada/index.db")).unwrap();
     let mut rows = db.prepare(sql).unwrap();
@@ -404,13 +371,11 @@ fn an_exported_constant_or_default_expression_is_an_import_target() {
     ] {
         assert!(exports.iter().any(|r| r == row), "{row} in {exports:#?}");
     }
-    // A URL built from an enum member reads as before: no contract.
     let fetches: Vec<&serde_json::Value> = (json["consumers"].as_array().unwrap().iter())
         .filter(|c| (c["site"].as_str()).is_some_and(|s| s.contains("use.ts::useAll::fetch")))
         .collect();
     assert_eq!(fetches.len(), 1, "{fetches:#?}");
     assert!(fetches[0]["contract"].is_null(), "{fetches:#?}");
-    // The `S` row alone does not bring `status.ts` into the package's surface.
     let shapes = rows_of(
         &repo,
         "SELECT path, method FROM contracts WHERE role = 'shape' ORDER BY path, method",
@@ -422,7 +387,6 @@ fn an_exported_constant_or_default_expression_is_an_import_target() {
         "{shapes:#?}"
     );
 
-    // A refresh resolves `plugin.ts` from its stored facts and writes the same rows.
     let symbols = rows_of(
         &repo,
         "SELECT id, start || ' ' || end, hash FROM symbols ORDER BY id",
@@ -453,8 +417,6 @@ fn an_exported_constant_or_default_expression_is_an_import_target() {
     );
 }
 
-/// The export's `imports` rows at `file` that name `specifier`, whole and without their `site`,
-/// sorted by their JSON text.
 fn rows_at(repo: &Path, file: &str, specifier: &str) -> Vec<serde_json::Value> {
     let json: serde_json::Value = serde_json::from_str(&export(repo)).unwrap();
     let mut rows: Vec<serde_json::Value> = (json["imports"].as_array().into_iter().flatten())
@@ -494,7 +456,6 @@ fn a_backstage_backend_add_of_a_dynamic_import_links_its_default() {
         assert_eq!(dynamic(s), fixed(s), "{s}");
         assert!(dynamic(s).iter().all(|r| r["name"] == "default"), "{s}");
     }
-    // The `dist/` entry maps to no source: the candidates the static twin gets.
     assert!(!dynamic("@scope/plugin-e").is_empty());
 
     let what = |s: &str| -> Vec<(String, String, String)> {
@@ -520,7 +481,6 @@ fn a_backstage_backend_add_of_a_dynamic_import_links_its_default() {
         what("@scope/plugin-d"),
         exact("main", sym("plugin-d/src/index.ts", "root"))
     );
-    // A relative module is no cross-package edge, and an external one has no `imports` row.
     assert!(dynamic("./local").is_empty());
     assert!(dynamic("@backstage/plugin-external").is_empty());
 }
@@ -536,7 +496,6 @@ fn an_add_of_a_dynamic_import_on_another_receiver_links_nothing() {
     let sites: Vec<&str> = (json["imports"].as_array().unwrap().iter())
         .map(|i| i["site"].as_str().unwrap())
         .collect();
-    // The one backend that does link is in the same package: the case is not vacuous.
     assert!(
         sites
             .iter()
@@ -562,7 +521,6 @@ fn an_add_of_a_dynamic_import_on_another_receiver_links_nothing() {
         leaks.extend((sites.iter().filter(|s| s.starts_with(&prefix))).map(|s| s.to_string()));
     }
     assert!(leaks.is_empty(), "{leaks:#?}");
-    // A member taken off a dynamic import is a use of its own (front 2), not an `add`.
     let prefix = "example.com/pkg/backend-add::packages/backend/src/then.ts::";
     let then: Vec<&str> = (sites.iter().copied())
         .filter(|s| s.starts_with(prefix))
@@ -585,7 +543,6 @@ fn a_create_backend_reached_by_another_spelling_links_like_the_original() {
         )
     };
     assert_eq!(at("index.ts").len(), 1);
-    // A relative re-export, an import under another name, a `const` imported from another file.
     for file in ["reexported.ts", "renamed.ts", "imported-const.ts"] {
         assert_eq!(at(file), at("index.ts"), "{file}");
     }
@@ -598,8 +555,6 @@ fn a_warm_index_keeps_the_rows_of_an_unchanged_backend() {
         let json: serde_json::Value = serde_json::from_str(&export(repo)).unwrap();
         json["imports"].as_array().unwrap().clone()
     };
-    // Another file of the backend's package changes, so the package is extracted again while
-    // `index.ts` keeps its stored facts, which hold no argument.
     let touch = |repo: &Path| {
         let set = repo.join("packages/backend/src/set.ts");
         let text = fs::read_to_string(&set).unwrap();
@@ -663,8 +618,6 @@ fn editing_the_providers_tsconfig_relinks_like_a_cold_export() {
     edit(&cold);
     assert_ne!(refreshed, before);
     assert_eq!(refreshed, export(&cold.web));
-    // `dist/index.d.ts` no longer maps to a file: the import lists what exports the name.
-    // The nested `@example/sealed` exports a `normalize` too: it is not a candidate.
     assert_eq!(
         imports_of(&warm.web, CLEAN),
         [(
@@ -722,7 +675,6 @@ fn a_consumer_carries_the_range_flag_of_its_dependency() {
         assert!(text.contains(from), "{file:?} lacks {from}");
         fs::write(&file, text.replace(from, to)).unwrap();
     };
-    // `web` asks for a major `kit` that is not out; `api` names it by a tag.
     replace(
         &p.web,
         "\"@example/kit\": \"^2.0.0\"",
@@ -769,8 +721,6 @@ fn consumers_in_the_same_repository_show_through_workspace_ranges() {
         .context("example.com/pkg/mono::packages/a/src/index.js::add", None)
         .unwrap();
 
-    // `b` names `a` through `workspace:*` (`range unchecked`, exact); `c` names it with
-    // `^1.0.0`, which accepts 1.0.0, while `fork` also provides `@example/a` (`ambiguous`).
     assert_golden("pkg-mono.context-add.txt", &found);
 }
 
@@ -801,7 +751,6 @@ fn exported_declarations_are_searchable_and_have_context() {
         "{context}"
     );
     assert!(context.lines().any(|l| l == "callees: none"), "{context}");
-    // The same constant in two packages: a bare name fits both, and they are two copies.
     let limit = engine.context("LIMIT", None).unwrap();
     assert!(
         limit.starts_with("`LIMIT` fits 2 symbols; pass one of:\n"),
@@ -826,7 +775,6 @@ fn declaration_files_give_rows_and_a_committed_copy_is_a_duplicate() {
         .collect();
     let shape = "example.com/pkg/exported::packages/a/dist/shape.d.ts::Shape";
     assert!(ids.contains(&shape), "{ids:#?}");
-    // `dist/shape.d.ts` holds the same interface as `src/shape.ts`: one group of two.
     let copies = engine.search("Shape", Some("duplicate"), None).unwrap();
     assert!(copies.starts_with("2 copies\n"), "{copies}");
     for path in ["packages/a/dist/shape.d.ts", "packages/a/src/shape.ts"] {
@@ -843,7 +791,6 @@ fn an_exported_value_and_type_of_one_name_keep_their_zod_shapes() {
     );
     Engine::open(&repo).unwrap().export().unwrap();
 
-    // The type comes first in `schema.ts`; the one row is the value's.
     let symbols = rows_of(
         &repo,
         "SELECT id, start || ' ' || end FROM symbols WHERE path = 'packages/a/src/schema.ts'",
@@ -857,7 +804,6 @@ fn an_exported_value_and_type_of_one_name_keep_their_zod_shapes() {
             "example.com/pkg/exported::packages/a/src/schema.ts::Foo {at} {end}"
         )]
     );
-    // What meada 1.5.0 keeps for this fixture: the `Foo` row reaches `schema.ts` as before.
     let shapes = rows_of(
         &repo,
         "SELECT method, via, shape FROM contracts WHERE role = 'shape' \
@@ -931,7 +877,6 @@ fn the_default_a_backend_adds_is_no_export_door() {
     };
     let added = fixture_repo("packages_backend_add_door", "pkg-backend-add", BACKEND_ADD);
     assert!(!doors(&added).iter().any(|d| d == alpha));
-    // Without the `add`, nothing imports it: the drop above is what keeps it out.
     let bare = fixture_repo(
         "packages_backend_add_no_door",
         "pkg-backend-add",

@@ -4,7 +4,6 @@
 
 use serde_json::Value as Json;
 
-/// The first 16 hex characters of the BLAKE3 hash of `text`: an id (`^[0-9a-f]{16}$`).
 fn id(text: &str) -> String {
     blake3::hash(text.as_bytes()).to_hex()[..16].to_string()
 }
@@ -113,7 +112,6 @@ pub type VersionEntry<'a> = (
 pub fn workspace_version_id(entries: &[VersionEntry]) -> String {
     let entries: Vec<Json> = (entries.iter())
         .map(|(repo, path, blocks, owner, added_by, added_by_time)| {
-            // Inserted in key order, so sorted whether or not the map keeps insertion order.
             let fields = [
                 ("added_by", added_by.map(Json::from)),
                 ("added_by_time", added_by_time.map(Json::from)),
@@ -166,7 +164,6 @@ fn canonical(value: &toml::Value) -> Json {
         toml::Value::Table(table) => {
             let mut keys: Vec<_> = table.iter().collect();
             keys.sort_by_key(|(key, _)| *key);
-            // Inserted in key order, so sorted whether or not the map keeps insertion order.
             Json::Object(
                 keys.into_iter()
                     .map(|(k, v)| (k.clone(), canonical(v)))

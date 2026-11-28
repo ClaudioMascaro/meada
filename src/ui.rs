@@ -57,28 +57,20 @@ mod write;
 
 type Answer = Response<BoxBody<Bytes, Infallible>>;
 
-/// A request's bounded body: empty except for token checks, playground queries and admitted
-/// operations, or the status refusing it (413 past its route's cap, 400 when it could not be
-/// read).
 type Body = std::result::Result<Bytes, StatusCode>;
 
-/// The version the front end's files must be built for.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// The file at the root of `[ui] dir` naming the version the front end was built for:
-/// `{"version": "<Meada version>"}`.
 const VERSION_FILE: &str = "meada-ui.json";
 
 // ponytail: the most bytes of `meada-ui.json`; past it the file counts as another version.
 const UI_VERSION_MAX: u64 = 4096;
 
-/// The path of the token check, a route whose body the console reads.
 const CHECK: &str = "/api/v1/admission/check";
 
 // ponytail: the most bytes of a token check's body: a JWT in `{"token": ...}` with room to spare.
 const CHECK_MAX: usize = 16 << 10;
 
-/// The path of the playground, the other route whose body the console reads.
 const QUERY: &str = "/api/v1/query";
 
 // ponytail: the most bytes of a playground query's body: an identity, a generation id and a
@@ -89,7 +81,6 @@ const QUERY_MAX: usize = 16 << 10;
 const AUDIT_LIMIT_MAX: i64 = 100;
 const AUDIT_LIMIT: i64 = 50;
 
-/// The fixed bodies of the 403s.
 const HOST_REFUSED: &str = "Forbidden: Host header is not allowed\n";
 const ORIGIN_REFUSED: &str = "Forbidden: Origin header is not allowed\n";
 const WRITE_REFUSED: &str = "Forbidden: a write needs an Origin header\n";
@@ -98,7 +89,6 @@ const WRITE_REFUSED: &str = "Forbidden: a write needs an Origin header\n";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct File {
-    // Required, but checked by `validate`, so that both missing keys are named at once.
     dir: Option<String>,
     public_url: Option<String>,
     audience: Option<String>,
@@ -125,9 +115,6 @@ pub struct Config {
 }
 
 impl File {
-    /// The section checked, every problem at once; `dir` is relative to `base`. With
-    /// `accounts` (the manifest has `[accounts]`, ADR 0024) and no `[oidc]`, `operations` needs no
-    /// operator key: a local account's role is its own.
     fn validate(
         self,
         base: &Path,
@@ -197,8 +184,6 @@ impl File {
     }
 }
 
-/// `[ui]` of `src`, the content of `file`, checked when the manifest has it: each problem on a
-/// line naming the file, the line and the key.
 pub(crate) fn validated(
     file: &Path,
     src: &str,
@@ -210,7 +195,6 @@ pub(crate) fn validated(
     };
     let table: toml::Table = toml::from_str(src)?;
     let oidc = table.get("oidc").and_then(toml::Value::as_table);
-    // Without the `accounts` feature, `[accounts]` was already the error naming it.
     let accounts = table.contains_key("accounts");
     section
         .validate(base, oidc, accounts)
@@ -223,67 +207,39 @@ pub(crate) fn validated(
         })
 }
 
-/// The console: what it started with.
 struct Console {
-    /// The bootstrap manifest's path.
     file: PathBuf,
-    /// The validated bootstrap as loaded, never secret values.
     bootstrap: Manifest,
-    /// Operational reads own a permit until all their blocking work finishes.
     readers: Arc<tokio::sync::Semaphore>,
     #[cfg(feature = "github-app")]
     apps: Vec<crate::github_app::Config>,
     ui: Config,
-    /// `[ui] dir`, resolved: no file outside it is served.
     root: PathBuf,
-    /// The bootstrap manifest as loaded at start, a JSON table. It names secrets' variables and
-    /// files only: a section holds no secret (ADR 0012).
     loaded: Value,
-    /// The content security policy of every answer.
     csp: header::HeaderValue,
-    /// The nodes' OIDC module, with `[oidc]`: the console's admission.
     #[cfg(feature = "oidc")]
     oidc: Option<Arc<crate::oidc::Oidc>>,
-    /// The grant providers (`grant::Providers::of` the bootstrap manifest), which the OIDC module
-    /// feeds and the catalog, the exclusions and the admission view read.
     #[cfg(feature = "oidc")]
     providers: Arc<crate::grant::Providers>,
-    /// What the playground and the exports answer from.
     holds: Holds,
-    /// The entries of the last current workspace version a role was computed from, by id: a
-    /// version is immutable, so the id is the key (`teams`).
     #[cfg(all(feature = "oidc", feature = "generation-pointer"))]
     entries: std::sync::Mutex<Option<(String, Arc<Vec<Value>>)>>,
-    /// The audit of every write, with `[postgres]` (#328).
     audit: crate::audit::Audit,
-    /// Local accounts, with `[accounts]` (ADR 0024): the signing key pair, the accounts table and
-    /// the bound on password hashes.
     #[cfg(feature = "accounts")]
     accounts: Option<accounts::Local>,
-    /// The SCIM endpoint under `/scim/v2/`, with `[directory]` (#334).
     #[cfg(feature = "directory")]
     scim: Option<crate::directory::scim::Scim>,
-    /// What the console reads of the directory, with `[directory]` (#335): deprovisioning at
-    /// admission, the owner picker, `owner_missing` and the admission counts.
     #[cfg(feature = "directory")]
     directory: Option<crate::directory::read::Directory>,
 }
 
-/// What the console answers the playground and the exports from, read per request, so that what
-/// an index or a pull lands after the start answers with no restart.
 enum Holds {
-    /// Without `[snapshot]`: the repositories the bootstrap manifest lists, as read at start,
-    /// each index under `index_dir`, as `meada mcp --listen --workspace` serves them.
     Listed(Box<Manifest>),
-    /// With `[snapshot]`: the generations its own pull keeps in `local_dir`, the one
-    /// `<local_dir>/current` names by default, as `--generations` serving reads them; without
-    /// `local_dir`, the error naming it.
     #[cfg(feature = "snapshot")]
     Generations(std::result::Result<crate::snapshot::serve::Current, String>),
 }
 
 impl Holds {
-    /// What a console of the bootstrap `read` (at `file`) answers from.
     fn of(file: &Path, read: &Manifest) -> Self {
         #[cfg(feature = "snapshot")]
         if let Some(snapshot) = &read.snapshot {
@@ -297,44 +253,30 @@ impl Holds {
     }
 }
 
-/// Who asks: the admitted subject (none behind the proxy), its role and what it may read.
 #[derive(Clone)]
 struct Session {
     subject: Option<String>,
-    /// The global operator (ADR 0014).
     operator: bool,
-    /// The token's groups, sorted (empty behind the proxy).
     #[cfg_attr(
         not(any(feature = "oidc", feature = "refresh-lock")),
         expect(dead_code)
     )]
     groups: Vec<String>,
-    /// A team operator's teams, sorted (ADR 0015, #324); empty for everyone else.
     teams: Vec<String>,
-    /// The subject's grant; none behind the proxy, where every identity is read.
     #[cfg(feature = "oidc")]
     grant: Option<crate::grant::Grant>,
-    /// The subject's GitHub login, under the GitHub grant provider, when it is a valid one (#332).
     login: Option<String>,
-    /// Under the GitHub grant provider, its host and the GitHub grant's state at admission.
     #[cfg(feature = "oidc")]
     github: Option<(String, crate::grant::GrantState)>,
-    /// Admitted by a local account's session token (ADR 0024).
     #[cfg(feature = "accounts")]
     account: bool,
-    /// A local account whose row, read before a write, no longer stands (suspended, unknown or
-    /// hostile, `Console::standing`): its subject operates no named workspace (ADR 0024).
     #[cfg(feature = "accounts")]
     suspended: bool,
-    /// The directory could not be read at admission (#451): the request's later directory reads
-    /// take that answer and write no second stderr line.
     #[cfg(feature = "directory")]
     directory_down: bool,
 }
 
 impl Session {
-    /// The session of an admitted subject, whichever verifier admitted it, with a team
-    /// operator's `teams`: the console's, and the proposal server's with none (ADR 0022).
     #[cfg(feature = "oidc")]
     fn admitted(admitted: crate::grant::Admitted, teams: Vec<String>) -> Self {
         Session {
@@ -354,8 +296,6 @@ impl Session {
         }
     }
 
-    /// The session of a local account's session token (ADR 0024): the account as the grant
-    /// providers admitted it (its verified login among it, #561), with a team operator's `teams`.
     #[cfg(feature = "accounts")]
     fn local(admitted: crate::grant::Admitted, teams: Vec<String>) -> Self {
         Session {
@@ -364,8 +304,6 @@ impl Session {
         }
     }
 
-    /// The session behind the operator's proxy, and of a route that needs no token: a viewer
-    /// with no subject that reads everything.
     fn anonymous() -> Self {
         Session {
             subject: None,
@@ -386,9 +324,6 @@ impl Session {
         }
     }
 
-    /// Whether the session may read `identity`. Every view that lists or answers about a
-    /// repository asks it (the manifest's entries here; the read routes and the playground of
-    /// #304 and #305 through the same call), as a node bounds its answers (#290).
     fn reads(&self, identity: &str) -> bool {
         if self.operator {
             return true;
@@ -401,17 +336,14 @@ impl Session {
         true
     }
 
-    /// Whether the session is a team operator: a non-operator with a team.
     fn is_team_operator(&self) -> bool {
         !self.operator && !self.teams.is_empty()
     }
 
-    /// The owner groups a team operator's audit line names: its teams, for a refusal.
     fn owners(&self) -> Option<&[String]> {
         self.is_team_operator().then_some(&self.teams[..])
     }
 
-    /// What the session reads, as `meada-core` takes it.
     #[cfg(feature = "refresh-lock")]
     fn core_grant(&self) -> meada_core::authorize::Grant {
         #[cfg(feature = "oidc")]
@@ -421,7 +353,6 @@ impl Session {
         meada_core::authorize::Grant::All
     }
 
-    /// The GitHub grant provider's host, under it.
     #[cfg(feature = "refresh-lock")]
     fn github_host(&self) -> Option<&str> {
         #[cfg(feature = "oidc")]
@@ -431,7 +362,6 @@ impl Session {
         None
     }
 
-    /// The session's role: `operator`, `team_operator` or `viewer`.
     fn role(&self) -> &'static str {
         match (self.operator, self.is_team_operator()) {
             (true, _) => "operator",
@@ -440,10 +370,6 @@ impl Session {
         }
     }
 
-    /// The `session` answer: the subject and role; with `[oidc]` or `[accounts]`, `groups` and
-    /// `grant` (the union of the grant providers'), and `teams` for a team operator; with
-    /// `[oidc.github]`, `login` when the token has a valid one, `github_host` and `github_grant`
-    /// (#332); with a local account's session token, `account: true` (ADR 0024).
     fn document(&self) -> Value {
         #[cfg_attr(not(feature = "oidc"), expect(unused_mut))]
         let mut document = json!({"subject": self.subject, "role": self.role()});
@@ -476,7 +402,6 @@ impl Session {
         document
     }
 
-    /// Whether the session reads every identity: operator, proxy admission or a `*` grant.
     fn whole(&self) -> bool {
         if self.operator {
             return true;
@@ -498,7 +423,6 @@ pub fn listen(listen: &str, manifest: &Path) -> Result<()> {
     let address = crate::mcp::address(listen)?;
     let console = Arc::new(Console::start(manifest)?);
     crate::mcp::serve_http(address, move |bound, _| {
-        // The password's line first: the providers' poll may write its own lines.
         #[cfg(feature = "accounts")]
         if let Some(local) = &console.accounts {
             local.announce();
@@ -538,8 +462,6 @@ pub fn proposals(listen: &str, manifest: &Path) -> Result<()> {
     workspaces::proposals::listen(listen, manifest)
 }
 
-/// Bounded POST bodies for token checks, playground queries and already-authorized operations.
-/// Other bodies stay unread. Tokens and raw uploads are never printed or forwarded.
 async fn read(parts: &hyper::http::request::Parts, body: Incoming) -> Body {
     let max = match parts.uri.path() {
         CHECK => CHECK_MAX,
@@ -616,7 +538,6 @@ impl Console {
                 }
             }
         }
-        // As a node does: the issuer's metadata and JWKS read now, a start check.
         #[cfg(feature = "oidc")]
         let providers = Arc::new(crate::grant::Providers::of(&read));
         #[cfg(feature = "oidc")]
@@ -629,8 +550,6 @@ impl Console {
                 None
             }
         };
-        // Under break glass a bearer goes to one verifier by its issuer (ADR 0024): the identity
-        // provider's must not be the console's own.
         #[cfg(feature = "accounts")]
         if let (Some(oidc), Some(accounts)) = (&oidc, &read.accounts)
             && accounts.break_glass
@@ -639,16 +558,12 @@ impl Console {
             let problem = Msg::AccountsBreakGlassIssuer.text();
             problems.push(at("accounts.break_glass", problem));
         }
-        // The audit (#328): a version this binary does not know refuses the start; Postgres
-        // unreachable does not (reads are served, writes answer 503 naming why on stderr).
         #[cfg(feature = "postgres")]
         if let Some(postgres) = &read.postgres
             && let Err(version) = crate::postgres::probe(postgres)
         {
             problems.push(at("postgres", version));
         }
-        // The directory (#334): the SCIM token read now, once; a missing, unreadable or short one
-        // refuses the start, naming its key.
         #[cfg(feature = "directory")]
         let scim = match (&read.directory, &read.postgres) {
             (Some(directory), Some(postgres)) => match directory.token() {
@@ -667,9 +582,6 @@ impl Console {
         };
         #[cfg(feature = "directory")]
         let directory = Self::directory_of(&read);
-        // Local accounts (ADR 0024): the key pair read now, once, then the default account
-        // created when the table is empty; only once every other check passed, so a refused start
-        // touches no table.
         #[cfg(feature = "accounts")]
         let accounts = match (&read.accounts, problems.is_empty()) {
             (Some(section), true) => match accounts::Local::start(section) {
@@ -696,7 +608,6 @@ impl Console {
         let table: toml::Table = toml::from_str(&src)?;
         #[cfg_attr(not(feature = "directory"), expect(unused_mut))]
         let mut loaded = serde_json::to_value(table)?;
-        // The manifest route names where the SCIM token comes from, its default included.
         #[cfg(feature = "directory")]
         if let Some(directory) = loaded.get_mut("directory").and_then(Value::as_object_mut)
             && !directory.contains_key("token_file")
@@ -731,7 +642,6 @@ impl Console {
         })
     }
 
-    /// What the console reads of the directory, with `[directory]` and `[postgres]` (#335).
     #[cfg(feature = "directory")]
     fn directory_of(read: &Manifest) -> Option<crate::directory::read::Directory> {
         let (directory, postgres) = (read.directory.as_ref()?, read.postgres.as_ref()?);
@@ -741,11 +651,6 @@ impl Console {
         ))
     }
 
-    /// A request under `/scim/v2/` (#334), in order: the `Host` check, a 403 for any request
-    /// carrying `Origin`, the SCIM token (else a 401 with `WWW-Authenticate: Bearer`), the body
-    /// bounded at `SCIM_BODY_MAX` (else a 413) and of a JSON media type (else a 415); then the
-    /// directory answers. OIDC admission never applies here. Each write leaves one line,
-    /// `scim: <method> <resource> <id>: <status>`, `<id>` `-` when no stored resource is named.
     #[cfg(feature = "directory")]
     async fn scim(
         &self,
@@ -846,7 +751,6 @@ impl Console {
         answer.body(body.boxed()).expect("a valid response")
     }
 
-    /// The security headers of every answer, including a refusal before admission.
     fn secure(&self, mut answer: Answer) -> Answer {
         let headers = answer.headers_mut();
         headers.insert("x-content-type-options", "nosniff".parse().unwrap());
@@ -855,8 +759,6 @@ impl Console {
         answer
     }
 
-    /// All request authorization runs before the listener consumes any body. An operation's
-    /// pre-authentication refusal has no subject and never logs its query or body arguments.
     fn checked(
         self: &Arc<Self>,
         bound: SocketAddr,
@@ -899,9 +801,6 @@ impl Console {
                 &message,
             )))
         };
-        // With local accounts (ADR 0024), a token is checked before anything else of a write, so
-        // a request without one is a 401 and a token awaiting its password change a 403
-        // `password_change_required`, whatever `operations` says.
         #[cfg(feature = "accounts")]
         let admitted_first = (self.accounts.as_ref()).is_some_and(|local| !local.break_glass);
         #[cfg(not(feature = "accounts"))]
@@ -910,8 +809,6 @@ impl Console {
         if writes_off && !admitted_first {
             return disabled(None);
         }
-        // A named workspace's creation (#342) is a write too: a directory that cannot say whether
-        // the subject was deprovisioned refuses it as it refuses an operation.
         #[cfg(feature = "workspaces")]
         let writes =
             operation.is_some() || (write && route.is_some_and(|r| r.starts_with("workspaces")));
@@ -920,7 +817,6 @@ impl Console {
         let session = match self.admit(headers, route, writes) {
             Ok(session) => session,
             Err((refused, message)) => {
-                // Empty when the directory's line already stands for the request (#451).
                 if !message.is_empty() {
                     audit(None, &message);
                 }
@@ -930,9 +826,6 @@ impl Console {
         if writes_off {
             return disabled(session.subject.as_deref());
         }
-        // A local account's write (an operation, a named workspace's, account administration)
-        // acts as its row stands now, not as its token says (ADR 0024); a read, the playground's
-        // `query` included, keeps the token's session.
         #[cfg(feature = "accounts")]
         let subject = session.subject.clone();
         #[cfg(feature = "accounts")]
@@ -950,8 +843,6 @@ impl Console {
             return Err(refused);
         }
         if let Some(operation) = operation {
-            // A team operator saves and applies workspace versions; the generation operations
-            // stay the global operator's (ADR 0015).
             let team =
                 session.is_team_operator() && route.is_some_and(|r| r.starts_with("workspace/"));
             let anonymous = session.subject.as_deref().is_none_or(str::is_empty);
@@ -967,7 +858,6 @@ impl Console {
                     "-",
                     &message,
                 );
-                // Recorded with the route's action and no argument: the body is never read.
                 if let Some(action) = route.and_then(write::recorded) {
                     let actor = write::actor(&session, session.owners());
                     (self.audit).refused(&actor, action, &json!({}), &message);
@@ -982,7 +872,6 @@ impl Console {
         Ok(session)
     }
 
-    /// Routes only an already-admitted request; its exact session survives body consumption.
     fn answer(self: &Arc<Self>, request: &Request<Body>, session: &Session) -> Answer {
         let path = request.uri().path();
         let route = path.strip_prefix("/api/v1/");
@@ -994,15 +883,6 @@ impl Console {
         }
     }
 
-    /// Admission of a request to the API route `route` (`None`: a static file), `write` when it
-    /// is one of the audited operations. Behind the proxy every request is a viewer's; with
-    /// `[accounts]`, a session token of this console (`admit_local`); under break glass, the
-    /// default account's session token when the bearer's issuer is this console, else the
-    /// identity provider's admission (`admit_break_glass`); with `[oidc]`, a bearer
-    /// token for `[ui] audience`, except for the static files and `config`, which the browser
-    /// needs to log in. With `[directory]`, the token's `user_claim` is then
-    /// looked up (`deprovisioned`) before any role is computed. A refusal comes with the line
-    /// the pre-authentication audit prints, empty when the directory's line stands for it.
     fn admit(
         self: &Arc<Self>,
         headers: &HeaderMap,
@@ -1064,9 +944,6 @@ impl Console {
         Ok(Session::anonymous())
     }
 
-    /// A team operator's teams for a request to `route` by a subject with `groups` and `grant`,
-    /// `operator` when it is the global operator. A team operator reads what a viewer reads: only
-    /// `session` and the writes need the role, so only they read the current version.
     #[cfg(feature = "oidc")]
     fn teams_on(
         self: &Arc<Self>,
@@ -1082,7 +959,6 @@ impl Console {
         }
     }
 
-    /// The token claim naming a user, with `[directory]`.
     #[cfg(feature = "oidc")]
     fn user_claim(&self) -> Option<&str> {
         #[cfg(feature = "directory")]
@@ -1091,14 +967,11 @@ impl Console {
         None
     }
 
-    /// Whether `host`, a request's `Host`, is `public_url`'s host and port, or the bound address
-    /// on loopback.
     fn hosts(&self, host: &str, bound: SocketAddr) -> bool {
         let public = (self.ui.public_url.split_once("://")).map_or("", |(_, authority)| authority);
         host.eq_ignore_ascii_case(public) || (bound.ip().is_loopback() && host == bound.to_string())
     }
 
-    /// The API's answer at `/api/v1/<route>` to `session`.
     fn api(self: &Arc<Self>, request: &Request<Body>, route: &str, session: &Session) -> Answer {
         let method = request.method();
         let read = matches!(*method, Method::GET | Method::HEAD);
@@ -1109,7 +982,6 @@ impl Console {
         if let Some(answer) = self.workspaces(request, route, session) {
             return answer;
         }
-        // An identity holds slashes: everything between `repositories/` and the last `/export`.
         if read
             && let Some(identity) =
                 (route.strip_prefix("repositories/")).and_then(|rest| rest.strip_suffix("/export"))
@@ -1119,10 +991,6 @@ impl Console {
         if route == "query" && *method == Method::POST {
             return self.query(request.body(), session);
         }
-        // Under break glass the first two are the only routes of local accounts: account
-        // administration, agent tokens and login verification do not exist there (ADR 0024). The
-        // password change, agent tokens and the verified login are a local account's own: an
-        // identity provider's session gets the 404.
         #[cfg(feature = "accounts")]
         if let Some(local) = &self.accounts {
             match (route, *method == Method::POST) {
@@ -1130,12 +998,9 @@ impl Console {
                 (accounts::PASSWORD, true) if session.account => {
                     return self.password(local, request.body(), session);
                 }
-                // Agent tokens do not exist under break glass (ADR 0024, #563).
                 (accounts::TOKENS, true) if session.account && !local.break_glass => {
                     return self.agent_token(local, request.body(), session);
                 }
-                // The verified login (#561), with `[accounts.github]` alone: never under break
-                // glass, which refuses the table.
                 (accounts::GITHUB, true) if session.account && !local.break_glass => {
                     return self.verify_github(local, request.body(), session);
                 }
@@ -1180,7 +1045,6 @@ impl Console {
                     self.with_directory_counts(&mut document, session);
                     document
                 });
-                // With `[accounts]`, its mode and key beside, or alone without `[oidc]` (#558).
                 #[cfg(feature = "accounts")]
                 let document = match &self.accounts {
                     Some(local) => Some(self.accounts_admission(local, document, session)),
@@ -1201,39 +1065,27 @@ impl Console {
         }
     }
 
-    /// The console's version and `operations`; with `[proposals]`, `proposals: true`; with
-    /// `[accounts]`, `sign_in: "accounts"`; with `[oidc]`, `sign_in: "oidc"`, `break_glass: true`
-    /// under break glass, and what the browser logs in with: the issuer, `[ui] client_id`, the
-    /// scopes and the audience its token must carry.
-    /// The public URL fixes the browser's callback even when the listener was opened through
-    /// loopback.
     fn config(&self) -> Value {
         let mut config = json!({
             "version": VERSION,
             "operations": self.ui.operations,
             "public_url": self.ui.public_url,
         });
-        // With `[postgres]`, the audit page has its route (#328).
         if self.audit.on() {
             config["audit"] = true.into();
         }
-        // With `[catalog]` (#341), the picker has its routes.
         #[cfg(feature = "workspaces")]
         if self.bootstrap.catalog.is_some() && self.providers.github().is_some() {
             config["catalog"] = true.into();
         }
-        // With `[workspaces]` (#342), the workspaces pages have their routes and the bound the
-        // form checks a selection against.
         #[cfg(feature = "workspaces")]
         if let Some(section) = &self.bootstrap.workspaces {
             config["workspaces"] = json!({"max_entries": section.max_entries});
         }
-        // With `[proposals]` (#562), the profile offers agent tokens for the proposal server.
         #[cfg(feature = "proposals")]
         if self.bootstrap.proposals.is_some() {
             config["proposals"] = true.into();
         }
-        // How the browser signs in (ADR 0024): an identity provider's or the console's own.
         #[cfg(feature = "accounts")]
         match &self.accounts {
             Some(local) if local.break_glass => config["break_glass"] = true.into(),
@@ -1252,25 +1104,17 @@ impl Console {
         config
     }
 
-    /// The bootstrap manifest as loaded at start, the module sections the build has, and the
-    /// errors of the file as it now stands on disk, read again: a mounted file changed since the
-    /// start shows its problems before a restart. For a session that does not read everything,
-    /// the `[[repository]]` entries outside its grant are absent, and so is the text of an error
-    /// that could name one (only its file and line are left).
     fn manifest(&self, session: &Session) -> Value {
         let mut errors: Vec<String> = match Manifest::read(&self.file) {
             Ok(_) => Vec::new(),
             Err(e) => e.to_string().lines().map(String::from).collect(),
         };
         let mut loaded = self.loaded.clone();
-        // The allow list names owners and repositories nobody may have been granted: only the
-        // global operator reads it (#341).
         #[cfg(feature = "workspaces")]
         if !session.operator {
             if let Some(catalog) = loaded.get_mut("catalog").and_then(Value::as_object_mut) {
                 catalog.remove("allow");
             }
-            // The mirrors' root is a physical path of the platform (#342).
             if let Some(section) = loaded.get_mut("workspaces").and_then(Value::as_object_mut) {
                 section.remove("mirrors");
             }
@@ -1314,11 +1158,6 @@ impl Console {
         })
     }
 
-    /// The token check: each check of the pasted token as a node makes it, against the cached
-    /// keys only, and the identities its grant admits among those served that `session` reads;
-    /// with `[oidc.github]`, `sources`: those identities by side, the claims grant's (`*` as
-    /// such) and the GitHub grant's from the cache, each sorted, so the check sends no request.
-    /// The token lives only for this request.
     #[cfg(feature = "oidc")]
     fn check(self: &Arc<Self>, oidc: &crate::oidc::Oidc, body: &Body, session: &Session) -> Answer {
         #[derive(Deserialize)]
@@ -1334,7 +1173,6 @@ impl Console {
             }
             Err(status) => return error(*status, "bad_request", &Msg::UiCheckBody.text()),
         };
-        // Never serde's text: it could quote the body.
         let Ok(pasted) = serde_json::from_slice::<Pasted>(body) else {
             return error(
                 StatusCode::BAD_REQUEST,
@@ -1382,12 +1220,6 @@ impl Console {
         json_answer(StatusCode::OK, &answer)
     }
 
-    /// The playground: `{"repository", "generation", "tool", "arguments"}`, the tool `search`,
-    /// `context` or `trace` with its arguments as the MCP tool takes them, answered by the
-    /// tool's own code at the generation named (the current one when null or absent) as
-    /// `{"text", "generation"}`, `generation` null without `[snapshot]`. A body that is not such
-    /// a query is a fixed 400, never serde's text; the tool's refusal of its arguments (`trace`
-    /// with `changes: uncommitted`) a 400 with the node's text, and a tool error a 422 with it.
     fn query(&self, body: &Body, session: &Session) -> Answer {
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
@@ -1395,7 +1227,6 @@ impl Console {
             repository: String,
             #[serde(default)]
             generation: Option<String>,
-            /// A named workspace to ask through (#342), under the discovery rule.
             #[serde(default)]
             workspace: Option<String>,
             tool: String,
@@ -1440,11 +1271,6 @@ impl Console {
         }
     }
 
-    /// `GET audit?before=<id>&limit=<n>` (#328), the global operator's alone: the records with an
-    /// id below `before`, newest first, at most `limit` (1 to 100, 50 by default), as
-    /// `{"records", "next"}`, `next` the `before` of the following page or null. Any other query is
-    /// a 400; Postgres unreachable a 503 `audit_unavailable`. A row that fails its checks is left
-    /// out with one stderr line naming the table.
     fn audit_page(&self, query: Option<&str>, session: &Session) -> Answer {
         if !session.operator {
             let message = Msg::UiOperatorRequired.text();
@@ -1504,9 +1330,6 @@ impl Console {
         }
     }
 
-    /// The canonical export of `identity` (percent-encoded as the path carries it) at the
-    /// generation `?generation=<id>` names, the current one without it: the bytes `meada export`
-    /// prints.
     fn export(&self, identity: &str, query: Option<&str>, session: &Session) -> Answer {
         let identity = percent_decode_str(identity).decode_utf8_lossy();
         let generation = (query.into_iter().flat_map(|q| q.split('&')))
@@ -1530,12 +1353,6 @@ impl Console {
         }
     }
 
-    /// The engine answering about `repository` for `session`, read only, at `generation` (the
-    /// current one when `None`), and that generation's id (none without `[snapshot]`). Its
-    /// workspace holds only the repositories the session reads, as a node's call does (#290). A
-    /// repository the session may not read is the 404 of one the console does not serve; a
-    /// generation it does not hold, a 404 naming the held ones; nothing servable yet (no pull,
-    /// no index), a 503 whose message names `meada snapshot pull` or `meada index --workspace`.
     fn open(
         &self,
         repository: &str,
@@ -1562,8 +1379,6 @@ impl Console {
         if !session.reads(repository) {
             return Err(unknown());
         }
-        // A named workspace (#342): the one 404 of an unknown id for anything the caller may not
-        // ask through, without `[workspaces]` as before.
         #[cfg(feature = "workspaces")]
         let through = workspace.filter(|_| self.bootstrap.workspaces.is_some());
         #[cfg(not(feature = "workspaces"))]
@@ -1626,10 +1441,6 @@ impl Console {
         }
     }
 
-    /// The file of `[ui] dir` that `path` names: percent-decoded, a 404 for a `..`, `.` or empty
-    /// segment, a path resolving outside the directory (a symbolic link included) or an
-    /// extension outside the table. A path that names no file (a directory included: none is
-    /// listed) answers `index.html`, unless it is under `/api/`.
     fn file(&self, path: &str) -> Answer {
         let Some(relative) = relative(path) else {
             return not_found();
@@ -1646,8 +1457,6 @@ impl Console {
     }
 }
 
-/// The content security policy of every answer: `connect-src` adds `issuer`, the issuer's
-/// origin, with `[oidc]`.
 fn csp(issuer: Option<&str>) -> String {
     let connect = issuer.map_or("'self'".to_string(), |issuer| format!("'self' {issuer}"));
     format!(
@@ -1656,7 +1465,6 @@ fn csp(issuer: Option<&str>) -> String {
     )
 }
 
-/// The origin of `url`, a URL `modules::reachable` passed: its scheme and authority.
 #[cfg(feature = "oidc")]
 fn origin(url: &str) -> &str {
     let after = url.find("://").map_or(0, |at| at + 3);
@@ -1664,11 +1472,8 @@ fn origin(url: &str) -> &str {
     &url[..end]
 }
 
-/// The groups tables of a manifest as JSON: the identity provider's and the local accounts'
-/// (#558), each bounded alike.
 const GROUP_TABLES: [&str; 2] = ["/oidc/groups", "/accounts/groups"];
 
-/// Repository, peer and group identities, including identities not listed as entries.
 fn identities(manifest: &Value) -> impl Iterator<Item = &str> {
     let entries = manifest.get("repository").and_then(Value::as_array);
     let repositories = (entries.into_iter().flatten()).flat_map(|entry| {
@@ -1696,10 +1501,6 @@ fn identities(manifest: &Value) -> impl Iterator<Item = &str> {
     repositories.chain(groups)
 }
 
-/// Each of `errors` that names an identity of `hidden` cut to its position; all of them when
-/// `hidden` is unknown (the file is unreadable). No error `describe` words quotes a written
-/// value now (#545), so this is a second guard for those, and still the guard for the errors
-/// built elsewhere that name an identity (a named workspace's reserved first segment).
 fn cut_named(errors: &mut [String], hidden: Option<&[String]>, file: &str) {
     for line in errors {
         let named = hidden.is_none_or(|h| h.iter().any(|i| line.contains(i.as_str())));
@@ -1709,7 +1510,6 @@ fn cut_named(errors: &mut [String], hidden: Option<&[String]>, file: &str) {
     }
 }
 
-/// The position of the manifest error `line` about `file`: `<file>:<line>`, its text left out.
 fn position(line: &str, file: &str) -> String {
     let rest = line.strip_prefix(file).and_then(|r| r.strip_prefix(':'));
     let number: String = (rest.unwrap_or("").chars())
@@ -1721,8 +1521,6 @@ fn position(line: &str, file: &str) -> String {
     }
 }
 
-/// The version `meada-ui.json` at `root` names; `None` when it is missing, oversized or not
-/// that document.
 fn built_for(root: &Path) -> Option<String> {
     #[derive(Deserialize)]
     struct Built {
@@ -1732,8 +1530,6 @@ fn built_for(root: &Path) -> Option<String> {
     Some(serde_json::from_slice::<Built>(&bytes).ok()?.version)
 }
 
-/// The path of `[ui] dir` a request path names, decoded: `index.html` for `/`, `None` for a
-/// path with a `..`, `.` or empty segment, a NUL or a backslash.
 fn relative(path: &str) -> Option<String> {
     let decoded = percent_decode_str(path).decode_utf8().ok()?;
     let rest = decoded.strip_prefix('/')?;
@@ -1744,7 +1540,6 @@ fn relative(path: &str) -> Option<String> {
     rest.split('/').all(safe).then(|| rest.to_string())
 }
 
-/// The content type of a file with extension `extension`: the fixed table, else none.
 fn content_type(extension: &str) -> Option<&'static str> {
     Some(match extension {
         "html" => "text/html; charset=utf-8",
@@ -1761,8 +1556,6 @@ fn content_type(extension: &str) -> Option<&'static str> {
     })
 }
 
-/// The file at `real`, inside `[ui] dir`: cacheable for a year and immutable when `immutable`
-/// (the front end's content-hashed files under `assets/`), else `no-cache`.
 fn served(real: &Path, immutable: bool) -> Answer {
     let extension = real.extension().and_then(|e| e.to_str()).unwrap_or("");
     let (Some(kind), Ok(bytes)) = (content_type(extension), fs::read(real)) else {
@@ -1791,7 +1584,6 @@ fn not_found() -> Answer {
     plain(StatusCode::NOT_FOUND, "Not Found\n")
 }
 
-/// The API's error: `{"error": {"code": ..., "message": ...}}`.
 fn error(status: StatusCode, code: &str, message: &str) -> Answer {
     json_answer(
         status,
@@ -1865,7 +1657,6 @@ mod tests {
                 "ops/meada.toml: not valid".to_string(),
             ]
         );
-        // With the identities unknown, every error is cut.
         cut_named(&mut errors, None, file);
         assert_eq!(errors, ["ops/meada.toml:7", "ops/meada.toml:7", file]);
     }

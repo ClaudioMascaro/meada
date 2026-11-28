@@ -1,6 +1,3 @@
-//! Terraform and OpenTofu JSON syntax, adapted into the same blocks and expressions as native
-//! HCL. The shared event reader validates and bounds JSON and supplies source locations.
-
 use std::collections::BTreeMap;
 
 use hcl_edit::expr::{Expression, Object, ObjectKey, ObjectValue};
@@ -14,7 +11,6 @@ use super::{
 use crate::config_values;
 use crate::document::events::{self, Step};
 
-/// Work spent constructing expressions from one JSON file, before allocating their ASTs.
 // ponytail: HCL's object AST inserts keys linearly; charging the square of a collection's width
 // and template separators bounds wide hostile objects as well as ordinary linear input.
 const JSON_EXPR_WORK_MAX: usize = 1 << 20;
@@ -70,8 +66,6 @@ impl Read<'_> {
         }
     }
 
-    /// Bodies are consumed as their collection closes, before a repeated JSON property can
-    /// replace an earlier section in the generic value tree. All text stays transient.
     fn block(&mut self, span: events::Collection<'_>, value: &Value) {
         let path = from_section(span.path);
         let Some(Step::Key(section)) = path.first() else {
@@ -159,8 +153,6 @@ impl Read<'_> {
                 let mut refs: BTreeMap<String, Vec<_>> = BTreeMap::new();
                 for (name, value) in body.iter().filter(|(name, _)| name.as_str() != "//") {
                     if name == "dynamic" {
-                        // The references of the blocks it generates go by their type, as a
-                        // native `dynamic "<type>"` block's do (`nested_type`).
                         for (ty, generated) in bodies(value).flatten() {
                             let expr = self.expressions.read(generated, false);
                             refs.entry(ty.clone()).or_default().extend(refs_of(&expr));
@@ -180,8 +172,6 @@ impl Read<'_> {
                         || name == named_arg
                         || matches!(name.as_str(), "count" | "for_each")
                     {
-                        // Unknown fallbacks still occupy model entries. Charge their names and
-                        // containers too, so exhausting AST room cannot retain unlimited ones.
                         let cost = name
                             .len()
                             .saturating_mul(if all_args { 2 } else { 1 })
@@ -236,15 +226,12 @@ impl Read<'_> {
             }
         }
     }
-    /// JSON uses object bodies (or lists of them) where native syntax uses nested blocks.
-    /// Keep the same expression adapter and charge both body containers and ASTs before copies.
     fn nested(
         &mut self,
         body: &serde_json::Map<String, Value>,
     ) -> Option<Vec<hcl_edit::structure::Block>> {
         let mut blocks = Vec::new();
         for (name, value) in body {
-            // A `dynamic` property's keys are the types of native `dynamic "<type>"` blocks.
             let typed: Vec<(Option<&String>, &Value)> = match name.as_str() {
                 "dynamic" => bodies(value).flatten().map(|(t, v)| (Some(t), v)).collect(),
                 _ => vec![(None, value)],
@@ -287,7 +274,6 @@ impl Read<'_> {
     }
 }
 
-/// The bodies of a JSON value where HCL JSON expects one: an object, or each object of an array.
 fn bodies(value: &Value) -> impl Iterator<Item = &serde_json::Map<String, Value>> {
     let items: &[Value] = match value {
         Value::Array(items) => items,
@@ -296,8 +282,6 @@ fn bodies(value: &Value) -> impl Iterator<Item = &serde_json::Map<String, Value>
     items.iter().filter_map(Value::as_object)
 }
 
-/// `path` from its section (`resource`, `variable`, ...): HCL JSON permits an array of bodies at
-/// the root of a file as wherever a body goes, and the index into it is no part of a block's path.
 pub(crate) fn from_section(path: &[Step]) -> &[Step] {
     match path {
         [Step::Index(_), rest @ ..] => rest,
@@ -312,7 +296,6 @@ fn named(expr: Expression) -> Named {
     }
 }
 
-/// An upper bound for a rendered path, before allocating its escaped keys.
 pub(crate) fn path_cost(path: &[Step]) -> usize {
     path.iter().fold(0usize, |sum, step| {
         sum.saturating_add(match step {
@@ -322,10 +305,8 @@ pub(crate) fn path_cost(path: &[Step]) -> usize {
     })
 }
 
-/// The path of a block body at the start of `path`, allowing JSON arrays at each label
-/// level and at the body. Its remaining steps, if any, start with an attribute's key.
 pub(crate) fn body_path(path: &[Step], labels: usize) -> Option<&[Step]> {
-    let mut left = labels + 1; // The section, then its labels.
+    let mut left = labels + 1;
     let mut end = 0;
     for (index, step) in path.iter().enumerate() {
         match step {
@@ -355,7 +336,6 @@ impl Expressions {
     }
 
     fn read(&mut self, value: &Value, literal: bool) -> Expression {
-        // At most three copies survive in the common HCL model (name/count/input plus refs).
         let cost = model_size(value, literal).saturating_mul(3);
         let Some(left) = self.bytes.checked_sub(cost) else {
             return unknown();
@@ -371,7 +351,6 @@ impl Expressions {
         match value {
             Value::Null => Expression::null(),
             Value::Bool(b) => (*b).into(),
-            // `serde_json` kept no digits of a float: it may not be the number Terraform reads.
             Value::Number(n) if n.is_f64() => unknown(),
             Value::Number(n) => n.to_string().parse().unwrap_or_else(|_| unknown()),
             Value::String(s) if literal => s.clone().into(),
@@ -415,7 +394,6 @@ impl Expressions {
         };
         if template.len() == 1 {
             match template.iter().next() {
-                // JSON's single-interpolation rule preserves collections, booleans and numbers.
                 Some(Element::Interpolation(i)) => return i.expr.clone(),
                 Some(Element::Literal(s)) => return s.value().clone().into(),
                 _ => {}
@@ -428,8 +406,6 @@ impl Expressions {
         let Some(items) = value.as_array() else {
             return unknown();
         };
-        // Traversals are expressions rather than string templates. Even a one-byte invalid
-        // element would otherwise allocate one unknown AST node without charging any room.
         let syntax = items.iter().fold(0usize, |sum, value| {
             sum.saturating_add(value.as_str().map_or(0, |text| {
                 text.len().saturating_mul(std::mem::size_of::<Expression>())
@@ -464,7 +440,6 @@ impl Expressions {
     }
 }
 
-/// Conservative room for a JSON value's expression nodes and text, before constructing them.
 fn model_size(value: &Value, literal: bool) -> usize {
     let nested = match value {
         Value::String(s) => text_size(s, literal),
@@ -485,9 +460,6 @@ fn model_size(value: &Value, literal: bool) -> usize {
     std::mem::size_of::<Expression>().saturating_add(nested)
 }
 
-/// A conservative AST estimate without a second template lexer. Plain text stays proportional
-/// to its bytes; text after a possible marker charges each byte for an expression and element.
-/// Counting an escaped marker or literal braces too is conservative, never an undercharge.
 fn text_size(text: &str, literal: bool) -> usize {
     if literal {
         return text.len();

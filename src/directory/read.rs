@@ -1,9 +1,3 @@
-//! The directory's readers (#335, feature `ui`): what the console asks of the users and groups
-//! the identity provider pushed in (`scim`). Each call opens its own connection through
-//! `postgres::connected`, so Postgres unreachable or a schema version this binary does not know
-//! is an `Err` with the scrubbed reason, never the URL. No call caches: the console already
-//! reaches Postgres per write for the audit.
-
 use std::collections::HashSet;
 
 use crate::postgres::Config as Postgres;
@@ -11,21 +5,17 @@ use crate::postgres::Config as Postgres;
 // ponytail: the most groups the owner picker lists; a longer prefix narrows it.
 pub const PICKER_MAX: i64 = 100;
 
-/// The directory as the console reads it.
 pub struct Directory {
     postgres: Postgres,
-    /// The token claim naming a user (`[directory] user_claim`).
     user_claim: String,
     user_attribute: &'static str,
     group_attribute: &'static str,
 }
 
-/// What the admission view shows of the directory.
-#[cfg_attr(not(feature = "oidc"), expect(dead_code))] // only the admission view, an oidc route, shows them
+#[cfg_attr(not(feature = "oidc"), expect(dead_code))]
 pub struct Counts {
     pub users: i64,
     pub groups: i64,
-    /// The time of the last SCIM write, RFC 3339 UTC to the microsecond; none before the first.
     pub last_write: Option<String>,
 }
 
@@ -39,13 +29,11 @@ impl Directory {
         }
     }
 
-    /// The token claim that names a user.
     #[cfg_attr(not(feature = "oidc"), expect(dead_code))]
     pub fn user_claim(&self) -> &str {
         &self.user_claim
     }
 
-    /// The column `group_attribute` names.
     fn group_column(&self) -> &'static str {
         match self.group_attribute {
             "externalId" => "external_id",
@@ -53,8 +41,6 @@ impl Directory {
         }
     }
 
-    /// How long one call (a connection, the version check and one statement of its own) may take,
-    /// all told.
     pub fn bound(&self) -> std::time::Duration {
         self.postgres.bound(1)
     }
@@ -64,12 +50,7 @@ impl Directory {
         Ok((opened, self.postgres.quoted()))
     }
 
-    /// Whether the user `claim` names is deprovisioned: found inactive by `user_attribute` (a
-    /// `userName` ignoring case, as SCIM's uniqueness does; an `externalId` exactly), or deleted
-    /// after it was provisioned, which its revocation marker records until an active write
-    /// clears it. A user the directory never held is not.
     pub async fn deprovisioned(&self, claim: &str) -> Result<bool, String> {
-        // No stored name holds a NUL, and Postgres refuses one.
         if claim.contains('\0') {
             return Ok(false);
         }
@@ -87,8 +68,6 @@ impl Directory {
         row.try_get::<_, bool>(0).map_err(|e| opened.scrub(e))
     }
 
-    /// At most `PICKER_MAX` `group_attribute` values starting with `prefix`, compared exactly,
-    /// sorted by byte.
     pub async fn groups(&self, prefix: &str) -> Result<Vec<String>, String> {
         let (opened, schema) = self.connect().await?;
         let column = self.group_column();
@@ -101,8 +80,6 @@ impl Directory {
         Ok(rows.iter().filter_map(|r| r.try_get(0).ok()).collect())
     }
 
-    /// Which of `owners` name a group, or `None` while no group was ever provisioned: a
-    /// directory whose final group was deleted still answers `Some`, with none of them.
     pub async fn named(&self, owners: &[String]) -> Result<Option<HashSet<String>>, String> {
         let (opened, schema) = self.connect().await?;
         let column = self.group_column();
@@ -124,7 +101,6 @@ impl Directory {
         }
     }
 
-    /// The users and groups held and the time of the last SCIM write.
     #[cfg_attr(not(feature = "oidc"), expect(dead_code))]
     pub async fn counts(&self) -> Result<Counts, String> {
         let (opened, schema) = self.connect().await?;

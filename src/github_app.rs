@@ -52,11 +52,11 @@ const LAST_TTL: u64 = 3600;
 // ponytail: a listing or mint lock is held at most this long, and a `get` waits as long for
 // another run's.
 const LOCK_TTL: u64 = 30;
-/// How often a `get` waiting for another run's listing or mint looks again.
+
 const POLL: Duration = Duration::from_millis(100);
 // ponytail: the longest throttle mark; a `retry-after` or a doubling past it is cut to it.
 const THROTTLE_MAX: u64 = 3600;
-/// A mark with no time given: one minute, doubled on each repeat while the mark holds.
+
 const THROTTLE_FIRST: u64 = 60;
 // ponytail: one REST request, connection to last byte.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
@@ -72,10 +72,8 @@ const PER_PAGE: usize = 100;
 const APP_KEY_MAX: u64 = 16 << 10;
 // ponytail: the most bytes of git's request on stdin; past it the request is refused.
 const INPUT_MAX: u64 = 64 << 10;
-/// The username git sends with an installation token.
+
 const USERNAME: &str = "x-access-token";
-/// Replaces an App's installations in one step: `KEYS[1]` the hash, `ARGV[1]` its TTL, then
-/// owner and installation id pairs.
 const REPLACE: &str = "redis.call('DEL', KEYS[1]) \
     for i = 2, #ARGV, 2 do redis.call('HSET', KEYS[1], ARGV[i], ARGV[i + 1]) end \
     if #ARGV > 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end return 1";
@@ -94,16 +92,13 @@ pub struct File {
 /// A validated block. The key is only named here, so nothing here is a secret.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Config {
-    /// The git host it serves, lowercase, as git's `host` names it (with a port when not 443).
     host: String,
-    /// The REST base URL, with no trailing slash.
     api: String,
     app_id: u64,
     key: Secret,
 }
 
 impl File {
-    /// The block checked; a relative `private_key_file` is relative to `base`.
     fn validate(self, base: &Path) -> Result<Config, Problem> {
         let host = self.host.to_ascii_lowercase();
         let named = !host.is_empty()
@@ -127,9 +122,6 @@ impl File {
     }
 }
 
-/// The `[[github_app]]` blocks of `src`, the content of `file`, checked: a problem names the
-/// file, the line of the key in its own block and the key. Blocks need `[valkey]`
-/// (`has_valkey`), and one App is listed once per host.
 pub(crate) fn validated(
     file: &Path,
     src: &str,
@@ -155,8 +147,6 @@ pub(crate) fn validated(
     Ok(apps)
 }
 
-/// `<file>:<line>: `<key>`: <message>` for `key` of the `n`th block (its first line when the
-/// block lacks the key), as `config::error_at` words one.
 fn error_in(
     file: &Path,
     src: &str,
@@ -189,7 +179,6 @@ pub struct Reply {
     pub notes: Vec<String>,
 }
 
-/// The attributes of git's request the helper reads; the others are ignored.
 #[derive(Default)]
 struct Request {
     protocol: Option<String>,
@@ -198,9 +187,6 @@ struct Request {
     password: Option<String>,
 }
 
-/// git's request on `input`: `key=value` lines up to a blank line or the end, at most
-/// `INPUT_MAX` bytes of UTF-8. Anything else is refused with a fixed message: no byte of the
-/// input reaches an error.
 fn request(input: &mut dyn Read) -> Result<Request, String> {
     let refused = || Msg::GithubAppInput.text();
     let mut bytes = Vec::new();
@@ -224,10 +210,6 @@ fn request(input: &mut dyn Read) -> Result<Request, String> {
     Ok(request)
 }
 
-/// The owner and the repository `path` names (`<owner>/<repo>`, `.git` optional, one leading
-/// `/` allowed), lowercase as GitHub compares them; `None` for any other path. An owner holds
-/// ASCII letters, digits, `-` and `_` (an Enterprise Managed User's `_shortcode`); a repository
-/// those and `.`, and is never `.` or `..`.
 fn repository(path: &str) -> Option<(String, String)> {
     let path = path.strip_prefix('/').unwrap_or(path);
     let (owner, repo) = path.split_once('/')?;
@@ -239,12 +221,10 @@ fn repository(path: &str) -> Option<(String, String)> {
     (owner_ok && repo_ok).then(|| (owner.to_ascii_lowercase(), repo.to_ascii_lowercase()))
 }
 
-/// The seconds since the Unix epoch.
 fn now() -> u64 {
     (SystemTime::now().duration_since(UNIX_EPOCH)).map_or(0, |d| d.as_secs())
 }
 
-/// The Unix time of `text`, GitHub's `YYYY-MM-DDTHH:MM:SSZ`; `None` for any other text.
 fn unix(text: &str) -> Option<u64> {
     let b = text.as_bytes();
     let shaped = b.len() == 20
@@ -258,7 +238,6 @@ fn unix(text: &str) -> Option<u64> {
     if !(1..=12).contains(&m) || !(1..=31).contains(&d) || hh > 23 || mm > 59 || ss > 60 {
         return None;
     }
-    // Days from the civil date (Howard Hinnant's algorithm), years starting in March.
     let y = if m <= 2 { y - 1 } else { y };
     let era = y.div_euclid(400);
     let yoe = y - era * 400;
@@ -267,28 +246,21 @@ fn unix(text: &str) -> Option<u64> {
     u64::try_from(days * 86_400 + hh * 3600 + mm * 60 + ss).ok()
 }
 
-/// Whether `token` can stand on a credential-protocol line: visible ASCII, no space.
 fn printable(token: &str) -> bool {
     !token.is_empty() && token.bytes().all(|b| b.is_ascii_graphic())
 }
 
-/// How a REST call failed.
 enum Failure {
-    /// 403 or 429, with the status and the seconds the answer says to wait, if it says.
     Throttled(
         #[cfg_attr(not(all(feature = "postgres", feature = "oidc")), expect(dead_code))] u16,
         Option<u64>,
     ),
-    /// A 403 that is no rate limit: the quota shows left and the body is GitHub's permission
-    /// message (the App lacks a permission on the resource, #452).
     Forbidden(String),
-    /// 404.
     Missing(String),
     Other(String),
 }
 
 impl Failure {
-    /// Outside a repository's collaborators listing a 403 stays a throttle (ADR 0013).
     fn throttled(self) -> Self {
         match self {
             Failure::Forbidden(_) => Failure::Throttled(403, None),
@@ -297,22 +269,16 @@ impl Failure {
     }
 }
 
-/// The unsigned integer in header `name`, if it holds one.
 fn number(headers: &HeaderMap, name: &str) -> Option<u64> {
     headers.get(name)?.to_str().ok()?.trim().parse().ok()
 }
 
-/// Whether a 403 is a permission failure and no throttle: no `retry-after` (in any form, an
-/// HTTP date included), a `x-ratelimit-remaining` above 0, and GitHub's permission message in
-/// the body.
 fn is_permission_denial(headers: &HeaderMap, body: &[u8]) -> bool {
     !headers.contains_key("retry-after")
         && number(headers, "x-ratelimit-remaining").is_some_and(|left| left > 0)
         && String::from_utf8_lossy(body).contains("Resource not accessible by integration")
 }
 
-/// The seconds a 403 or 429 says to wait: `retry-after`, else until `x-ratelimit-reset` when
-/// `x-ratelimit-remaining` is 0, else nothing.
 fn wait(headers: &HeaderMap, now: u64) -> Option<u64> {
     let number = |name: &str| number(headers, name);
     if let Some(after) = number("retry-after") {
@@ -324,10 +290,6 @@ fn wait(headers: &HeaderMap, now: u64) -> Option<u64> {
     }
 }
 
-/// `GET url` (or `POST`, with no body) with the bearer `jwt` (the App's JWT, or an installation
-/// token): at most `ANSWER_MAX` bytes of a success answer, and its `Link` header; a 403's body up
-/// to `DENIAL_MAX`, to tell a permission denial (`Failure::Forbidden`) from a throttle. No error
-/// carries the bearer.
 fn call(
     agent: &ureq::Agent,
     post: bool,
@@ -348,7 +310,6 @@ fn call(
     let mut response = sent.map_err(other)?;
     let status = response.status().as_u16();
     if status == 403 {
-        // A body that cannot be read (or fills the limit) is no permission message: a throttle.
         let body = response.body_mut().with_config().limit(DENIAL_MAX);
         let body = body.read_to_vec().unwrap_or_default();
         if is_permission_denial(response.headers(), &body) {
@@ -369,13 +330,10 @@ fn call(
     let link = (response.headers().get("link"))
         .and_then(|link| link.to_str().ok())
         .map(str::to_string);
-    // ureq refuses a body that fills its limit, so `max` bytes take a limit one past it.
     let body = response.body_mut().with_config().limit(ANSWER_MAX + 1);
     Ok((body.read_to_vec().map_err(other)?, link))
 }
 
-/// The JWT of `app`, signed now with its key: RS256, `iat` `JWT_BACKDATE` ago, `exp`
-/// `JWT_LIFE` ahead, `iss` the App id. An error names where the key comes from, never the key.
 fn jwt(app: &Config) -> Result<String, String> {
     #[derive(Serialize)]
     struct Claims {
@@ -403,9 +361,6 @@ fn jwt(app: &Config) -> Result<String, String> {
     jsonwebtoken::encode(&Header::new(Algorithm::RS256), &claims, &key).map_err(refused)
 }
 
-/// The installations of `app` that can mint, as owner (lowercase) and id: every page of
-/// `GET /app/installations`, up to `PAGES_MAX`, without suspended ones or accounts with no
-/// login.
 fn list(agent: &ureq::Agent, app: &Config, jwt: &str) -> Result<Vec<(String, u64)>, Failure> {
     #[derive(Deserialize)]
     struct Installation {
@@ -436,7 +391,6 @@ fn list(agent: &ureq::Agent, app: &Config, jwt: &str) -> Result<Vec<(String, u64
     Ok(all)
 }
 
-/// A token minted for installation `id` of `app`, with its Unix expiry.
 fn mint(agent: &ureq::Agent, app: &Config, id: u64, jwt: &str) -> Result<(String, u64), Failure> {
     #[derive(Deserialize)]
     struct Minted {
@@ -454,8 +408,6 @@ fn mint(agent: &ureq::Agent, app: &Config, id: u64, jwt: &str) -> Result<(String
     }
 }
 
-/// One run of the helper: the Valkey connection, the HTTP client, each App's JWT once made,
-/// and the stderr lines so far.
 struct Run<'a> {
     valkey: Valkey,
     config: &'a valkey::Config,
@@ -464,7 +416,6 @@ struct Run<'a> {
     notes: Vec<String>,
 }
 
-/// An installation one of the host's Apps has on an owner.
 #[derive(Clone, Copy)]
 struct Candidate<'a> {
     app: &'a Config,
@@ -482,7 +433,6 @@ impl<'a> Run<'a> {
         })
     }
 
-    /// `<key_prefix>:github-app:<host>:<name>`: every key of the module.
     fn key(&self, host: &str, name: &str) -> String {
         self.config.key(&format!("github-app:{host}:{name}"), false)
     }
@@ -495,7 +445,6 @@ impl<'a> Run<'a> {
         self.key(host, &format!("installation:{id}:{name}"))
     }
 
-    /// Which installation last answered `get` for `owner/repo`, for `throttled`.
     fn last_key(&self, host: &str, owner: &str, repo: &str) -> String {
         self.key(host, &format!("repo:{owner}/{repo}:last"))
     }
@@ -504,7 +453,6 @@ impl<'a> Run<'a> {
         self.valkey.query(cmd("EXISTS").arg(key)).await
     }
 
-    /// Takes the lock `key` for `LOCK_TTL`, if nobody holds it.
     async fn take(&self, key: &str) -> Result<bool, String> {
         let set = cmd("SET")
             .arg(key)
@@ -516,14 +464,10 @@ impl<'a> Run<'a> {
         Ok(self.valkey.query::<Option<String>>(&set).await?.is_some())
     }
 
-    /// Drops `key`. A lock that expired under its holder and was taken by another run is
-    /// dropped all the same: at worst a third run lists or mints too.
     async fn delete(&self, key: &str) -> Result<(), String> {
         self.valkey.query(cmd("DEL").arg(key)).await
     }
 
-    /// Marks `key` throttled for `wait` seconds, or, with none, for one minute doubled on each
-    /// repeat while the mark holds; at most `THROTTLE_MAX`. The seconds marked.
     async fn mark(&self, key: &str, wait: Option<u64>) -> Result<u64, String> {
         let secs = match wait {
             Some(secs) => secs,
@@ -539,7 +483,6 @@ impl<'a> Run<'a> {
         Ok(secs)
     }
 
-    /// The JWT of `app`, made on first use in this run.
     fn jwt(&mut self, app: &Config) -> Result<String, String> {
         let at = (app.host.clone(), app.app_id);
         if let Some(jwt) = self.jwts.get(&at) {
@@ -550,9 +493,6 @@ impl<'a> Run<'a> {
         Ok(jwt)
     }
 
-    /// Lists the installations of `app` again when they are older than `REFRESH_EVERY` and the
-    /// App is not throttled. One run lists under the lock; the others use what Valkey holds,
-    /// waiting for the listing only while it holds nothing yet.
     async fn refresh(&mut self, app: &Config) -> Result<(), String> {
         let (listed, lock) = (self.app_key(app, "listed"), self.app_key(app, "listing"));
         let held = self.app_key(app, "installations");
@@ -574,8 +514,6 @@ impl<'a> Run<'a> {
         }
     }
 
-    /// Lists `app`'s installations into `held`, marking `listed` for `REFRESH_EVERY`, or marks
-    /// the App `throttled` on a 403 or 429.
     async fn list(
         &mut self,
         app: &Config,
@@ -612,9 +550,6 @@ impl<'a> Run<'a> {
         self.valkey.query(&set).await
     }
 
-    /// The installations covering `owner` on the host of `apps`, in a stable order: App id,
-    /// then installation id. With `refresh`, each App's are listed again when due; a listing
-    /// that fails is a stderr line, and what Valkey holds is used.
     async fn candidates<'c>(
         &mut self,
         apps: &[&'c Config],
@@ -636,9 +571,6 @@ impl<'a> Run<'a> {
         Ok(found)
     }
 
-    /// The installations covering `owner` in the order to try them: those not throttled (all
-    /// of them when every one is, with `true`), from the one the owner's round-robin counter
-    /// names. Empty when none covers the owner.
     async fn rotation<'c>(
         &mut self,
         apps: &[&'c Config],
@@ -669,9 +601,6 @@ impl<'a> Run<'a> {
         Ok((open, throttled))
     }
 
-    /// The token of `at` with at least `TOKEN_MARGIN` left and its expiry: from Valkey, or
-    /// minted under the installation's lock, another run's mint awaited up to `LOCK_TTL`.
-    /// `Ok(None)` when the installation is throttled, the mint's 403 or 429 marking it.
     async fn token(&mut self, at: Candidate<'_>) -> Result<Option<(String, u64)>, String> {
         let (host, id) = (&at.app.host, at.id);
         let cached = self.installation_key(host, id, "token");
@@ -705,8 +634,6 @@ impl<'a> Run<'a> {
         }
     }
 
-    /// Mints a token for `at`, caching it in `cached` until `TOKEN_MARGIN` before it expires,
-    /// or marks the installation `throttled` on a 403 or 429.
     async fn mint(
         &mut self,
         at: Candidate<'_>,
@@ -759,7 +686,6 @@ pub fn credential(manifest: &Path, action: &str, input: &mut dyn Read) -> crate:
     let apps: Vec<&Config> = all.iter().filter(|a| a.host == host).collect();
     let path = request.path.as_deref();
     let Some(config) = config.filter(|_| !apps.is_empty()) else {
-        // Not this helper's host: a stderr line only for a repository it could have served.
         if action == "get"
             && let Some((owner, _)) = path.and_then(repository)
         {
@@ -804,9 +730,6 @@ pub fn credential(manifest: &Path, action: &str, input: &mut dyn Read) -> crate:
     Ok(reply)
 }
 
-/// The answer to `get` for `owner/repo`: an installation round robin among those not
-/// throttled (all of them when every one is), the next one when its mint is throttled, and an
-/// error when every mint is. `None` when no installation covers the owner.
 async fn get(
     run: &mut Run<'_>,
     apps: &[&Config],
@@ -841,8 +764,6 @@ async fn get(
     Err(Msg::GithubAppNoToken(&covered).text())
 }
 
-/// Drops the cached token of `owner`'s installation that holds `password`, the token git was
-/// refused with.
 async fn erase(
     run: &mut Run<'_>,
     apps: &[&Config],
@@ -905,8 +826,6 @@ pub fn throttled(manifest: &Path, url: &str, retry_after: Option<u64>) -> crate:
     Ok(reply)
 }
 
-// The role check (#331, ADR 0016): `meada github-app roles`, the job's second REST use.
-
 #[cfg(feature = "workspaces")]
 mod catalog;
 
@@ -915,16 +834,12 @@ mod catalog;
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 const COLLABORATOR_PAGES_MAX: u32 = 1000;
 
-/// One repository's collaborators listing: the REST base, the owner and the repository, and
-/// what its pages have named so far.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 struct Listing<'a> {
     api: &'a str,
     owner: &'a str,
     repo: &'a str,
-    /// The pages requested so far.
     seen: std::collections::HashSet<u32>,
-    /// The repository id a `/repositories/<id>/collaborators` link named first.
     pinned: Option<String>,
 }
 
@@ -940,7 +855,6 @@ impl<'a> Listing<'a> {
         }
     }
 
-    /// The URL of page `page`, always built here: `affiliation=all`, `PER_PAGE` a page.
     fn url(&self, page: u32) -> String {
         let (api, owner, repo) = (self.api, self.owner, self.repo);
         format!(
@@ -948,11 +862,6 @@ impl<'a> Listing<'a> {
         )
     }
 
-    /// The page `link`'s `rel="next"` names, `None` on the last page. The link is hostile and
-    /// never echoed: it must be on the REST base's origin with no user, at this repository's
-    /// collaborators (`/repos/<owner>/<repo>` or the `/repositories/<id>` GitHub links with,
-    /// one id for every page), and name a `page` not requested yet, at most
-    /// `COLLABORATOR_PAGES_MAX` of them. Only the page number is followed.
     fn next(&mut self, link: Option<&str>) -> Result<Option<u32>, String> {
         let next = link
             .into_iter()
@@ -1006,7 +915,6 @@ impl<'a> Listing<'a> {
         Ok(Some(page))
     }
 
-    /// Marks `page` requested, refused past `COLLABORATOR_PAGES_MAX`.
     fn take(&mut self, page: u32) -> Result<(), String> {
         if self.seen.len() as u32 >= COLLABORATOR_PAGES_MAX {
             return Err(Msg::RolesPages(COLLABORATOR_PAGES_MAX).text());
@@ -1016,18 +924,12 @@ impl<'a> Listing<'a> {
     }
 }
 
-/// A collaborator's login and role, as the permissions set holds them.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 type Row = (String, String);
 
-/// An entry of the workspace as the role check reads it: its identity, its `added_by` and when
-/// that was written (#454).
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 type Entry = (String, Option<String>, Option<String>);
 
-/// A collaborator as `role_name`'s row: the login, lowercase, and the role as GitHub spells it;
-/// `None` for one whose login is not a GitHub login (1 to 39 ASCII letters, digits, `-` and `_`,
-/// compared ignoring case) or whose role is not a name `[oidc.github] roles` could hold.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 fn collaborator(value: &serde_json::Value) -> Option<Row> {
     let login = value.get("login")?.as_str()?.to_ascii_lowercase();
@@ -1037,9 +939,6 @@ fn collaborator(value: &serde_json::Value) -> Option<Row> {
     (login_ok && role_ok).then(|| (login, role.to_string()))
 }
 
-/// Every collaborator of `listing` GitHub lists for `token`, every page, with how many it listed
-/// that `collaborator` refused; `None` on a 404. A page that is not a JSON array, or a `Link`
-/// that `Listing::next` refuses, fails the listing.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 fn collaborators(
     agent: &ureq::Agent,
@@ -1069,10 +968,6 @@ fn collaborators(
     }
 }
 
-/// The role rows under every selected spelling of a repository (#508): GitHub lists a repository
-/// once, under the spelling its target keeps, and each other selected spelling that folds to it
-/// on `host` gets the same rows, since a grant matches an identity exactly. Its `source` row
-/// stays the target's alone.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 fn spelled<'a>(
     host: &str,
@@ -1097,16 +992,11 @@ fn spelled<'a>(
     }
 }
 
-/// Where an identity of the permissions set comes from (`permission_repositories.source`): the
-/// text is what Postgres stores and its queries compare with.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Source {
-    /// Only the workspaces select it.
     Selected,
-    /// The workspaces select it and the catalog lists it.
     Both,
-    /// Only the catalog lists it.
     Catalog,
 }
 
@@ -1121,11 +1011,6 @@ impl Source {
     }
 }
 
-/// Where each identity comes from (`source`): the workspace's own in its order, then the
-/// repositories named workspaces select, then the catalog's alone, sorted. Compared as GitHub
-/// compares them (#508): an identity on `host` folds to lowercase, the row keeps the identity as
-/// written, and two spellings of one repository are one `source` row (the first kept); `spelled`
-/// gives the others their role rows.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 fn targets_of<'a>(
     host: &str,
@@ -1152,8 +1037,6 @@ fn targets_of<'a>(
     targets
 }
 
-/// Each operator's eligible identities for the sponsor rule: those on the `prefix` host whose
-/// row for that login holds one of `roles`.
 #[cfg(feature = "workspaces")]
 fn eligible_sets(
     prefix: &str,
@@ -1173,9 +1056,6 @@ fn eligible_sets(
         .collect()
 }
 
-/// What `roles` reads of the workspace: the pulled version's id with `source = "store"` and each
-/// entry's identity, `added_by` and `added_by_time`, whole: the exclusions are this command's to
-/// write. With `[workspaces]` also the named workspaces the pull read (#342) and the digest of their file.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 fn checked_entries(manifest: &Path, read: &crate::workspace::Manifest) -> crate::Result<Checked> {
     #[cfg(feature = "generation-pointer")]
@@ -1185,7 +1065,6 @@ fn checked_entries(manifest: &Path, read: &crate::workspace::Manifest) -> crate:
         let pulled = crate::snapshot::versions::pulled(&dir)?;
         #[cfg(feature = "workspaces")]
         let (pulled, named) = match &read.workspaces {
-            // An empty deployment workspace has no version: its entries are none.
             Some(_) => {
                 let named = crate::workspaces::read_contexts(&dir)?;
                 let missing = || Msg::ContextsMissing(&dir.display().to_string()).text();
@@ -1224,20 +1103,16 @@ fn checked_entries(manifest: &Path, read: &crate::workspace::Manifest) -> crate:
     })
 }
 
-/// What `checked_entries` read.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 struct Checked {
     version: Option<String>,
     entries: Vec<Entry>,
-    /// The named workspaces and the digest of the contexts file they came from (#342).
     #[cfg(feature = "workspaces")]
     contexts: Vec<crate::workspaces::Context>,
     #[cfg(feature = "workspaces")]
     digest: Option<String>,
 }
 
-/// The fence of this run: `MEADA_REFRESH_FENCE` under `[refresh_lock]` (a positive decimal that
-/// Postgres's `bigint` holds), else 0.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 fn run_fence(read: &crate::workspace::Manifest) -> Result<u64, String> {
     #[cfg(feature = "refresh-lock")]
@@ -1266,7 +1141,6 @@ pub fn roles(manifest: &Path) -> crate::Result<Reply> {
     let (Some(valkey), false) = (valkey, apps.is_empty()) else {
         let src = std::fs::read_to_string(manifest).map_err(|e| format!("{shown}: {e}"))?;
         let why = Msg::RolesNoApp(&github.host).text();
-        // The table the provider came from (#561): `[oidc.github]`, else `[accounts.github]`.
         #[cfg_attr(not(feature = "accounts"), expect(unused_mut))]
         let mut table = "oidc.github";
         #[cfg(feature = "accounts")]
@@ -1275,7 +1149,6 @@ pub fn roles(manifest: &Path) -> crate::Result<Reply> {
         }
         return Err(crate::config::error_at(manifest, &src, table, &why));
     };
-    // `Manifest::read` refuses `[oidc.github]` without `[postgres]`.
     let postgres = read
         .postgres
         .clone()
@@ -1323,41 +1196,25 @@ pub fn roles(manifest: &Path) -> crate::Result<Reply> {
     }
 }
 
-/// What one role check reads and where it writes its stderr lines.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 struct Check<'a> {
     postgres: &'a crate::postgres::Config,
     valkey: &'a valkey::Config,
     apps: &'a [&'a Config],
     github: &'a crate::grant::Github,
-    /// `[catalog]` (#341): the repositories listed besides the workspace's own.
     #[cfg(feature = "workspaces")]
     catalog: Option<&'a crate::catalog::Config>,
     fence: u64,
     version: Option<String>,
     entries: Vec<Entry>,
-    /// The named workspaces the last pull read and the digest of their file (#342).
     #[cfg(feature = "workspaces")]
     contexts: Vec<crate::workspaces::Context>,
     #[cfg(feature = "workspaces")]
     digest: Option<String>,
-    /// `<index_dir>/workspace/` with `source = "store"`: where the exclusions file lives.
     dir: Option<std::path::PathBuf>,
     notes: &'a mut Vec<String>,
 }
 
-/// The role check, in this order. Postgres is reached and the fence checked: a run the fence
-/// refuses changes nothing, and one that cannot reach Postgres removes the exclusions file and
-/// stops. The exclusions file is removed, so no reader admits the previous check's exclusions
-/// once this one has started, whatever it ends in. Every identity is listed. Then, holding
-/// `excluded.lock` from here to the end, one transaction, under a lock on the sets that serializes
-/// writers, checks the fence again (a refused run leaves the file as it is), removes the file
-/// again (another run on this machine may have written it meanwhile), inserts the set, its
-/// repositories' coverage, its rows and its exclusions and deletes every older set; the file is written by rename only while the set is
-/// still the newest. Postgres and the file are never written atomically together: a run that
-/// fails after its commit leaves the set and no file, so the readers refuse until a run succeeds
-/// (the local recovery is to run `meada github-app roles` again), and a file on disk is always
-/// that of the last run on this machine to commit. The line it prints on success.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 async fn check(check: Check<'_>) -> Result<String, String> {
     use std::collections::BTreeMap;
@@ -1388,8 +1245,6 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         Ok(())
     };
     let q = postgres.quoted();
-    // The time of the GitHub grant provider's first permissions set (#454), to the second: this
-    // run's start when none was written yet.
     let first = format!(
         "SELECT (SELECT max(fence) FROM {q}.permission_sets), now()::text, \
          to_char(coalesce((SELECT first_started FROM {q}.permission_state), now()) \
@@ -1404,10 +1259,6 @@ async fn check(check: Check<'_>) -> Result<String, String> {
             .map_err(&scrub)?;
         Ok::<_, String>((opened.client, scrub, row))
     };
-    // A check that cannot reach Postgres has failed all the same: the file goes, so a pulled
-    // version that did not change admits no previous check's exclusions.
-    // One statement of its own, the fence's: a Postgres that stops answering after it accepted
-    // the connection must not hold the run (the server's `statement_timeout` does not fire then).
     let one = postgres.bound(1);
     let late = |after: Duration| Msg::PostgresTimeout(after.as_millis() as u64).text();
     let reached = tokio::time::timeout(one, reached);
@@ -1427,11 +1278,8 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let first_set: String = row.get(2);
     remove_excluded()?;
 
-    // Every identity on the host, listed; rows keyed by identity and login, the first kept.
     let mut run = Run::open(valkey).await?;
     let mut rows: BTreeMap<(String, String), String> = BTreeMap::new();
-    // The catalog's candidates (#341): what the installations cover and `[catalog] allow`
-    // admits, listed before any collaborator so a failure writes nothing.
     #[cfg_attr(not(feature = "workspaces"), expect(unused_mut))]
     let mut candidates: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     #[cfg(feature = "workspaces")]
@@ -1451,7 +1299,6 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let named: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     let own: Vec<&str> = entries.iter().map(|(i, _, _)| i.as_str()).collect();
     let targets = targets_of(&github.host, &own, &named, &candidates);
-    // Per identity on the host, what GitHub showed of it: the App and repository coverage.
     let mut coverage: Vec<(&str, &str, Source)> = Vec::new();
     let prefix = format!("{}/", github.host);
     let mut list_all = async || {
@@ -1479,15 +1326,10 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let listing = list_all().await;
     notes.append(&mut run.notes);
     listing?;
-    // Grants match an identity exactly: every selected spelling of a repository gets its roles.
     let selected = own.iter().copied().chain(named.iter().map(String::as_str));
     spelled(&github.host, &targets, selected, &mut rows);
     let role_of = |identity: &str, login: &String| rows.get(&(identity.to_string(), login.clone()));
 
-    // The additions whose `added_by` holds no accepted role on their repository, with
-    // `source = "store"` only (a file's entries have no `added_by`). An `added_by` without a
-    // time, or written by the end of the second the first permissions set started in, was not
-    // the GitHub grant provider's attribution (#454): `unattributed`, whatever its roles.
     let repositories = coverage.iter().filter(|(_, c, _)| *c == "listed").count();
     let mut excluded: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
     for (identity, added_by, time) in &entries {
@@ -1513,9 +1355,6 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         excluded.insert(identity, (login, reason));
     }
 
-    // The sponsor rule (#342, ADR 0021): an entry of a named workspace that no operator of the
-    // workspace holds an accepted role on, in the rows just listed, is left out of that
-    // workspace before the fetch: a policy decision, not a failed fetch.
     #[cfg_attr(not(feature = "workspaces"), expect(unused_mut))]
     let mut named_out: std::collections::BTreeSet<(String, String)> = Default::default();
     #[cfg(feature = "workspaces")]
@@ -1529,17 +1368,11 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         }
     }
 
-    // Held to the end: this machine's runs commit and publish their file one at a time.
     #[cfg(feature = "generation-pointer")]
     let _local = match &dir {
         Some(dir) => Some(crate::snapshot::versions::lock_excluded(dir)?),
         None => None,
     };
-    // Ten statements of its own, after the listing (which has no Postgres in it): begin, the
-    // lock, the fence, the first set's time, the set, its rows, its coverage, its exclusions, the
-    // older sets and commit.
-    // Past the bound the file stays removed, so no reader admits an exclusion of this run or the
-    // one before it.
     let writing = postgres.bound(10);
     let written = async {
         let tx = client.transaction().await.map_err(&scrub)?;
@@ -1547,12 +1380,10 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         tx.batch_execute(&lock).await.map_err(&scrub)?;
         let max = format!("SELECT max(fence) FROM {q}.permission_sets");
         held_fence(tx.query_one(&max, &[]).await.map_err(&scrub)?.get(0))?;
-        // Past the fence, under the local lock: a file another run here wrote meanwhile goes.
         #[cfg(feature = "generation-pointer")]
         if let Some(dir) = &dir {
             crate::snapshot::versions::remove_excluded(dir)?;
         }
-        // The first set's time is written once and never moved (#454).
         let state = format!(
             "INSERT INTO {q}.permission_state (first_started) VALUES ($1::text::timestamptz) \
              ON CONFLICT DO NOTHING"
@@ -1589,8 +1420,6 @@ async fn check(check: Check<'_>) -> Result<String, String> {
         let params: [&(dyn tokio_postgres::types::ToSql + Sync); 4] =
             [&id, &identities, &shown, &sources];
         tx.execute(&insert, &params).await.map_err(&scrub)?;
-        // The deployment workspace's (context ''), then each named workspace's, which have no
-        // `added_by`.
         let mut contexts_col: Vec<&str> = vec![""; excluded.len()];
         let mut identities: Vec<&str> = excluded.keys().copied().collect();
         let mut added: Vec<Option<&str>> =
@@ -1619,8 +1448,6 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let id = id.unwrap_or_else(|_| Err(late(writing)))?;
 
     #[cfg(feature = "generation-pointer")]
-    // An empty deployment workspace under `[workspaces]` has no version: the file names the
-    // sentinel the readers expect.
     #[cfg(feature = "workspaces")]
     let file_version = version.clone().or_else(|| {
         digest
@@ -1631,7 +1458,6 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     let file_version = version.clone();
     if let (Some(dir), Some(version)) = (&dir, &file_version) {
         let newest = format!("SELECT EXISTS (SELECT 1 FROM {q}.permission_sets WHERE id = $1)");
-        // One statement of its own.
         let params: [&(dyn tokio_postgres::types::ToSql + Sync); 1] = [&id];
         let ask = tokio::time::timeout(one, client.query_one(&newest, &params));
         let newest: bool = ask.await.map_err(|_| late(one))?.map_err(&scrub)?.get(0);
@@ -1672,21 +1498,16 @@ async fn check(check: Check<'_>) -> Result<String, String> {
     .text())
 }
 
-/// What GitHub showed of one repository.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 enum Shown {
     Listed(Vec<Row>),
-    /// A 404.
     NotFound,
-    /// A 403 that is a missing permission, not a throttle (#452).
     Forbidden,
-    /// No installation covers the owner.
     Uncovered,
 }
 
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 impl Shown {
-    /// The coverage the set records for it.
     fn coverage(&self) -> &'static str {
         match self {
             Shown::Listed(_) => "listed",
@@ -1697,13 +1518,6 @@ impl Shown {
     }
 }
 
-/// The collaborators of `identity` (`owner/repo` on `host`) and their roles, through the
-/// installations covering the owner in `Run::rotation`'s order: a permission 403 passes to the
-/// next unmarked (another App may hold the permission), a 403 or 429 marks the installation
-/// throttled and passes to the next. `Shown::Forbidden` when every installation answers a
-/// permission 403; `Shown::Uncovered` or `Shown::NotFound`, with a stderr line, when no
-/// installation covers the owner or GitHub answers 404. Every other failure, every installation
-/// throttled (or some throttled and the rest forbidden) included, is the line that fails the run.
 #[cfg(all(feature = "postgres", feature = "oidc"))]
 async fn listed(
     run: &mut Run<'_>,
@@ -1763,8 +1577,6 @@ async fn listed(
     Err(failed(&Msg::RolesThrottled(last).text()))
 }
 
-/// Cached installations and their expiry/throttle state. This reads Valkey only, never a key
-/// or GitHub, and extracts the expiry beside the token before returning anything to its caller.
 #[cfg(feature = "ui")]
 pub(crate) async fn inspect(
     valkey: &Valkey,
@@ -1789,7 +1601,6 @@ pub(crate) async fn inspect(
             if !reads_owner(&app.host, &owner) {
                 continue;
             }
-            // An owner/id read from the cache must not add a key segment.
             let owner_ok = !owner.is_empty()
                 && owner
                     .bytes()
@@ -1799,7 +1610,6 @@ pub(crate) async fn inspect(
                 continue;
             };
             let cached = key(&format!("installation:{id}:token"));
-            // The token never leaves Valkey: the read retains the decimal expiry alone.
             let expires: Option<String> = valkey.query(cmd("EVAL").arg("local v=redis.call('GET',KEYS[1]); if v then return string.match(v,'^(%d+) ') end; return false").arg(1).arg(&cached)).await?;
             let expires = expires.as_deref().and_then(meada_core::ids::fence);
             let throttle: i64 = valkey
@@ -1860,8 +1670,6 @@ mod tests {
             "ghe.example/Acme/X",
         ];
         let targets = targets_of("github.com", &entries, &named, &candidates);
-        // Another host compares exactly: its uppercase entry is `selected` and its lowercase
-        // candidate a `catalog` row of its own.
         assert_eq!(
             targets,
             [
@@ -1873,10 +1681,6 @@ mod tests {
         );
     }
 
-    /// Option (a) of #508: the deployment writes `github.com/Acme/API` and a named workspace
-    /// selected `github.com/acme/api`, so GitHub is listed once, under the first; both spellings
-    /// get its role rows, since a grant matches exactly. A spelling of another host, or of a
-    /// repository nobody listed, gets none.
     #[test]
     #[cfg(all(feature = "postgres", feature = "oidc"))]
     fn every_selected_spelling_of_a_repository_gets_its_role_rows() {
@@ -1891,7 +1695,6 @@ mod tests {
         ];
         let targets = targets_of("github.com", &entries, &named, &candidates);
         let row = |identity: &str, login: &str| (identity.to_string(), login.to_string());
-        // What GitHub showed: two logins on the repository, under the spelling its target keeps.
         let mut rows = std::collections::BTreeMap::from([
             (row("github.com/Acme/API", "ana"), "write".to_string()),
             (row("github.com/Acme/API", "bo"), "admin".to_string()),
@@ -1912,7 +1715,6 @@ mod tests {
                 ("github.com/acme/api", "bo", "admin"),
             ]
         );
-        // One `source` row per repository all the same.
         assert_eq!(
             targets,
             [
@@ -1923,7 +1725,6 @@ mod tests {
         );
     }
 
-    /// The `source` column's text is what the queries compare with.
     #[test]
     #[cfg(all(feature = "postgres", feature = "oidc"))]
     fn each_source_is_its_stored_text() {
@@ -2070,12 +1871,10 @@ mod tests {
     #[test]
     fn a_403_is_a_permission_failure_only_with_quota_left_and_the_permission_message() {
         let body = br#"{"message":"Resource not accessible by integration"}"#;
-        // Permission 403.
         assert!(is_permission_denial(
             &headers(&[("x-ratelimit-remaining", "4999")]),
             body
         ));
-        // Rate-limited 403: quota spent, or `retry-after`, or another message.
         assert!(!is_permission_denial(
             &headers(&[("x-ratelimit-remaining", "0")]),
             body
@@ -2087,13 +1886,11 @@ mod tests {
             &headers(&[("x-ratelimit-remaining", "4999")]),
             secondary
         ));
-        // No rate-limit header: stays a throttle (429 never reaches `permission`).
         assert!(!is_permission_denial(&headers(&[]), body));
     }
 
     #[test]
     fn a_refused_repository_url_is_never_echoed() {
-        // Refused before the manifest is read: a trailing slash, `http`, no repository, garbage.
         for url in [
             "https://x-access-token:ghs_s3cret@github.com/acme/web/",
             "http://x-access-token:ghs_s3cret@github.com/acme/web",
@@ -2148,14 +1945,12 @@ mod tests {
                 "{bad}"
             );
         }
-        // A page requested already is a cycle.
         assert_eq!(
             listing.next(Some(&link(&format!(
                 "{api}/repos/acme/web/collaborators?page=1"
             )))),
             Err(Msg::RolesLinkCycle.text())
         );
-        // Past `COLLABORATOR_PAGES_MAX` pages the listing fails.
         for page in 2..=COLLABORATOR_PAGES_MAX {
             listing.take(page).unwrap();
         }

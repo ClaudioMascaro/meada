@@ -1,12 +1,3 @@
-//! Channels (spec #20): the queues and topics of a broker, identified by
-//! `channel::<broker>::<name>`. This kind owns the forms of the message libraries of each
-//! language (one module per language under `channel/`, each answering for its own pack only, as
-//! the HTTP kind's readers do) and turns the calls they find into contracts and links every
-//! consumer of a channel to every producer of it, in any repository of the workspace, its own
-//! included. Producers are the provider side: messages go from the producing call to the
-//! consumer's handler. A RabbitMQ publish to a named exchange is no channel's side by itself:
-//! the bindings of the workspace route it to queues (`Routes`).
-
 use std::collections::{BTreeMap, HashMap};
 
 use crate::contract::{ContractKind, Found, Level, Link, Related, Role, Site};
@@ -29,10 +20,8 @@ use message::{Handler, Message, Side};
 
 pub struct Channel;
 
-/// The words for a producer and a consumer of a channel in `context`.
 const SIDES: (&str, &str) = ("producer", "consumer");
 
-/// The start of every channel contract identifier.
 const PREFIX: &str = "channel::";
 
 // ponytail: AMQP 0-9-1 exchange/queue names and routing keys are short strings, at most 255 bytes.
@@ -42,7 +31,6 @@ pub(crate) fn amqp_name(name: &str) -> bool {
     !name.is_empty() && name.len() <= AMQP_ROUTING_MAX && !name.chars().any(char::is_control)
 }
 
-/// Operator types are explicit: direct wildcards stay literal and cannot use topic matching.
 pub(crate) fn topology_pattern<'a>(exchange: &str, key: &'a str) -> Option<&'a str> {
     if key.len() > AMQP_ROUTING_MAX {
         return None;
@@ -55,9 +43,6 @@ pub(crate) fn topology_pattern<'a>(exchange: &str, key: &'a str) -> Option<&'a s
     }
 }
 
-/// The contract identifier of the channel `name` of `broker`, kept as evaluated. A side whose
-/// name could not be evaluated is `channel::<broker>`: it names its broker kind, never links
-/// and is not an open item.
 // ponytail: broker clusters are not modelled, so one name of one broker kind is one channel
 // across the workspace; a connection identity in the contract would split them.
 pub fn contract(broker: &str, name: Option<&str>) -> String {
@@ -67,8 +52,6 @@ pub fn contract(broker: &str, name: Option<&str>) -> String {
     }
 }
 
-/// The RabbitMQ routing of the workspace: every binding and every publish to a named
-/// exchange, from any repository, since the broker is shared.
 struct Routes<'a> {
     pub bindings: Vec<&'a Binding>,
     pub publishes: Vec<&'a Publish>,
@@ -84,8 +67,6 @@ impl<'a> Routes<'a> {
         }
     }
 
-    /// The queues `publish` reaches, each with the level and reason of the strongest binding
-    /// that routes it there.
     pub fn reached(&self, publish: &Publish) -> BTreeMap<&'a str, (Level, String)> {
         let mut found = BTreeMap::new();
         for b in self.bindings.iter().copied() {
@@ -97,10 +78,6 @@ impl<'a> Routes<'a> {
     }
 }
 
-/// Whether the topic-exchange `pattern` matches the routing `key`: words split at `.`, `*` is
-/// exactly one word and `#` zero or more.
-// Code-declared bindings retain topic rules; operator bindings first select a supported
-// pattern with topology_pattern. Dynamic programming keeps repeated `#` linear per key word.
 fn pattern_matches(pattern: &str, key: &str) -> bool {
     if pattern.len() > AMQP_ROUTING_MAX || key.len() > AMQP_ROUTING_MAX {
         return false;
@@ -125,7 +102,6 @@ fn pattern_matches(pattern: &str, key: &str) -> bool {
     previous[key.len()]
 }
 
-/// The call a message was made at.
 fn call(m: &Message) -> Site {
     Site::Call {
         path: m.path.clone(),
@@ -133,7 +109,6 @@ fn call(m: &Message) -> Site {
     }
 }
 
-/// The broker kind and the name of a channel contract; no name for an unresolved side.
 fn parse(contract: &str) -> Option<(&str, Option<&str>)> {
     let rest = contract.strip_prefix(PREFIX)?;
     Some(match rest.split_once("::") {
@@ -196,8 +171,6 @@ impl ContractKind for Channel {
         Some(SIDES)
     }
 
-    /// The producers a consumer's wildcard pattern matches and the wildcard consumers that
-    /// match the channel, the publishes its bindings route to it, and the bindings themselves.
     fn related_sides<'e>(
         &self,
         exports: &'e [Export],
@@ -285,7 +258,6 @@ impl ContractKind for Channel {
         name.filter(|n| !n.is_empty()).map(|_| broker)
     }
 
-    /// A line per Client declaration whose `call` made no side of the repository.
     fn status(&self, repository: &Repository, export: &Export, _links: &[Link]) -> Vec<String> {
         let made: std::collections::BTreeSet<&str> = (export.providers.iter())
             .filter_map(|p| p.client.as_deref())
@@ -298,7 +270,6 @@ impl ContractKind for Channel {
     }
 
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
-        // Each reader answers for its own pack only; the order is the order found.
         let messages: Vec<Message> = [
             ts::messages(code, indexed),
             python::messages(code),
@@ -310,8 +281,6 @@ impl ContractKind for Channel {
         .into_iter()
         .flatten()
         .collect();
-        // An inline handler is named after its broker kind and the channels it handles, in
-        // the order found: `kafka orders.created`.
         let mut inline: HashMap<(&str, &str), (&str, Vec<&str>)> = HashMap::new();
         for m in &messages {
             if let Side::Consumer(Handler::Inline { path, def }) = &m.role {
@@ -333,8 +302,6 @@ impl ContractKind for Channel {
                 );
                 let (role, site) = match &m.role {
                     Side::Producer => (Role::Provider, call(m)),
-                    // A publish whose routing key could not be evaluated is an unresolved
-                    // producer.
                     Side::Publish { exchange } => match &m.name {
                         Some(key) => {
                             (contract, via, method) =
@@ -385,11 +352,6 @@ impl ContractKind for Channel {
         found
     }
 
-    /// Adds the channel sides of the repository's AsyncAPI documents (spec #21). A document side
-    /// with the contract of a code side of the same direction merges into it: the code keeps the
-    /// handler or the producing call, and takes the document's payload shape. Any other is a side
-    /// of its own, without a handler, at `<repository>::<document>::<broker> send|receive
-    /// <name>`; a side an earlier document (by path) already lists adds nothing.
     fn declare(&self, _repo: &Repository, export: &mut Export) {
         for doc in &export.documents {
             for side in &doc.summary.channels {
@@ -455,8 +417,6 @@ impl ContractKind for Channel {
     }
 
     fn provision_uses(&self, exports: &[Export]) -> Vec<(usize, crate::contract::ProvisionUse)> {
-        // Earlier code-only workspaces retain their bytes. Infrastructure makes this an
-        // indexed group; each real binding can then project its publish's queue use.
         if !exports
             .iter()
             .flat_map(|e| &e.provisioners)
@@ -484,7 +444,6 @@ impl ContractKind for Channel {
         uses
     }
 
-    /// The publish at `call` and each queue the bindings of the workspace route it to.
     fn at_call(&self, exports: &[Export], export: &Export, call: &str) -> Vec<String> {
         let mut lines: Vec<_> = export
             .providers
@@ -510,8 +469,6 @@ impl ContractKind for Channel {
         lines
     }
 
-    /// The consumer links to every producer that reaches its channel (`reaching`), in any
-    /// repository. Several producers or consumers are fan-in or fan-out, never ambiguity.
     fn link(
         &self,
         consumer: &Consumer,
@@ -541,8 +498,6 @@ impl ContractKind for Channel {
             .collect()
     }
 
-    /// New AWS source channels can start a trace at each producer, so a subscription's
-    /// source can be followed without selecting one producer first.
     fn starts<'a>(&self, from: &str, providers: &[(&'a str, &'a str)]) -> Vec<&'a str> {
         if !matches!(
             parse(from),
@@ -557,15 +512,11 @@ impl ContractKind for Channel {
             .collect()
     }
 
-    /// A consumer is a door, an unresolved side included: the handler still consumes from
-    /// somewhere.
     fn entry(&self, role: Role, contract: &str) -> Option<EntryKind> {
         (role == Role::Consumer && parse(contract).is_some()).then_some(EntryKind::Channel)
     }
 }
 
-/// Gives each code side a document side merges into (`own`, their shapes) the document's
-/// `shape`, unless it has one; whether there was any.
 fn merge<'a>(own: impl Iterator<Item = &'a mut Option<Shape>>, shape: &Option<Shape>) -> bool {
     let mut any = false;
     for own in own {
@@ -577,11 +528,6 @@ fn merge<'a>(own: impl Iterator<Item = &'a mut Option<Shape>>, shape: &Option<Sh
     any
 }
 
-/// How a producer of the channel `produced` reaches a consumer of the channel `consumed`, the
-/// one place a name match is decided: at `exact` when they are the same channel, reason the
-/// contract; at `inferred` when the consumer's name is a wildcard pattern of the same broker
-/// kind that matches the producer's (`wildcard`), reason `<produced> wildcard <pattern>`. An
-/// unresolved side reaches nothing.
 fn fits(produced: &str, consumed: &str) -> Option<(Level, String)> {
     let (Some((broker, Some(name))), Some((kind, Some(pattern)))) =
         (parse(produced), parse(consumed))
@@ -595,9 +541,6 @@ fn fits(produced: &str, consumed: &str) -> Option<(Level, String)> {
     (kind == broker && wildcard(broker, pattern, name)).then(|| (Level::Inferred, reason()))
 }
 
-/// How `binding` routes `publish` to its queue: when the exchanges are the same and the
-/// pattern matches the routing key (`pattern_matches`), at `exact` when the pattern is the
-/// key and `inferred` for a wildcard, reason `<queue contract> binding <exchange> <pattern>`.
 fn routed(publish: &Publish, binding: &Binding) -> Option<(Level, String)> {
     if publish.exchange != binding.exchange || !pattern_matches(&binding.pattern, &publish.key) {
         return None;
@@ -613,9 +556,6 @@ fn routed(publish: &Publish, binding: &Binding) -> Option<(Level, String)> {
     ))
 }
 
-/// The producers that reach the channel `contract`, by site, with the level and reason of
-/// each: the providers that `fit` it, and the publishes its bindings route to it (`routed`).
-/// Of several matches to one producer the strongest wins.
 fn reaching<'p>(
     contract: &str,
     providers: impl IntoIterator<Item = &'p Provider>,
@@ -648,8 +588,6 @@ fn reaching<'p>(
     found
 }
 
-/// A subscription carries the source channel to the target; a filter is evidence of a
-/// possible delivery, never an exact one. Several routes to one producer keep the strongest.
 fn subscribed(source: &str, target: &str, routes: &Routes<'_>) -> Option<(Level, String)> {
     routes
         .subscriptions
@@ -668,7 +606,6 @@ fn subscribed(source: &str, target: &str, routes: &Routes<'_>) -> Option<(Level,
         .min()
 }
 
-/// Keeps the strongest of the matches to `key`.
 fn strongest<'k>(
     found: &mut BTreeMap<&'k str, (Level, String)>,
     key: &'k str,
@@ -679,9 +616,6 @@ fn strongest<'k>(
     }
 }
 
-/// Whether the consumer's `pattern` matches the producer's `name` through a wildcard of the
-/// broker kind. The one place a broker's own matching rules live; RabbitMQ's are the bindings
-/// (`pattern_matches`), which route through an exchange.
 fn wildcard(broker: &str, pattern: &str, name: &str) -> bool {
     match broker {
         "nats" => nats(pattern, name),
@@ -689,9 +623,6 @@ fn wildcard(broker: &str, pattern: &str, name: &str) -> bool {
     }
 }
 
-/// NATS subjects are dot-separated tokens: `*` stands for exactly one token, and `>` as the
-/// last token for one or more. A subject holding a wildcard token is a pattern, which no
-/// message is published to, so it matches nothing.
 fn nats(pattern: &str, subject: &str) -> bool {
     if subject.split('.').any(|t| t == "*" || t == ">") {
         return false;
@@ -741,8 +672,6 @@ mod tests {
         }
     }
 
-    /// What `related_sides` says of `contract` over `exports[0]`, a line per side: its site,
-    /// the side it shows as, its words, then `[<level>: <reason>]` when a name matched it.
     fn related(exports: &[Export], contract: &str) -> Vec<String> {
         let sides = Channel.related_sides(exports, &exports[0], contract);
         (sides.into_iter())
@@ -758,8 +687,6 @@ mod tests {
             .collect()
     }
 
-    /// A NATS producer, a wildcard and a plain consumer of it, and a RabbitMQ publish whose
-    /// exchange a binding routes to the queue `q`.
     fn workspace() -> [Export; 1] {
         let mut binding = Binding::default();
         binding.contract = "channel::rabbitmq::q".into();
@@ -785,9 +712,6 @@ mod tests {
         }]
     }
 
-    /// The sides that reach a channel through another name are the wildcard consumers and
-    /// producers, the publishes its bindings route and the bindings; its own sides are left to
-    /// the engine.
     #[test]
     fn a_channel_is_reached_through_wildcards_publishes_and_bindings() {
         let exports = workspace();
@@ -837,7 +761,6 @@ mod tests {
         assert_eq!(Channel.parts("channel::kafka"), (Some("kafka"), None));
     }
 
-    /// Topic-exchange rules: words split at `.`, `*` is one word, `#` zero or more.
     #[test]
     fn amqp_patterns_follow_topic_exchange_rules() {
         let table = [
@@ -888,8 +811,6 @@ mod tests {
         assert!(super::topology_pattern("headers", "order.created").is_none());
     }
 
-    /// A publish at a call adds its own line and one per queue its bindings route it to; a
-    /// call with no publish adds nothing.
     #[test]
     fn a_publish_at_a_call_adds_the_queues_it_reaches() {
         let exports = workspace();
@@ -937,8 +858,6 @@ mod tests {
         }
     }
 
-    /// An inline handler is named after its broker kind and the channels it consumes, in the
-    /// order the pack found them.
     #[test]
     fn an_inline_handler_is_named_after_its_channels_in_the_order_found() {
         use crate::contract::Site;

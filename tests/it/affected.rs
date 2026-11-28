@@ -1,7 +1,3 @@
-//! `meada trace --affected` over the yarn workspace `trace-affected`: what a change may affect,
-//! file by file, each file carrying the weakest link of its strongest chain, with what the walk
-//! could not place listed in `open`.
-
 use crate::common;
 
 use std::collections::BTreeSet;
@@ -21,19 +17,16 @@ fn affected_repo(case: &str) -> PathBuf {
     )
 }
 
-/// The `path` of each entry of the list `key`.
 fn paths(answer: &Value, key: &str) -> Vec<String> {
     (answer[key].as_array().into_iter().flatten())
         .map(|e| e["path"].as_str().unwrap().to_string())
         .collect()
 }
 
-/// The `files` entry of `path` in the repository where Meada runs.
 fn file<'a>(answer: &'a Value, path: &str) -> Option<&'a Value> {
     in_repo(answer, "example.com/scope/mono", path)
 }
 
-/// The ids of the `iac` list.
 fn iac(answer: &Value) -> Vec<String> {
     (answer["iac"].as_array().into_iter().flatten())
         .map(|e| e["id"].as_str().unwrap().to_string())
@@ -65,7 +58,6 @@ fn open_lists_what_no_symbol_holds() {
     let expected = [
         (".github/workflows/ci.yml", "iac", None),
         ("gone.ts", "deleted", None),
-        // The workspace root's manifest and lockfile affect every package (front 4).
         ("package.json", "all-packages", None),
         ("packages/a/README.md", "no-symbols", Some("packages/a")),
         ("packages/d/package.json", "manifest", Some("packages/d")),
@@ -106,8 +98,6 @@ fn touched_paths_are_affected() {
     }
 }
 
-/// An `import` line rebinds names used in unchanged functions: the file and every symbol of it
-/// are roots.
 #[test]
 fn a_line_in_no_symbol_roots_the_file_and_its_symbols() {
     let repo = affected_repo("affected_import_line");
@@ -124,7 +114,6 @@ fn a_line_in_no_symbol_roots_the_file_and_its_symbols() {
     assert_eq!(answer["changed"][0]["change"], "lines");
     assert!(paths(&answer, "files").contains(&"packages/b/src/g.ts".to_string()));
     assert_eq!(answer["open"], Value::Array(Vec::new()));
-    // `g` is a root although its lines did not change: `routes` holds a use of it.
     assert!(
         file(&answer, "packages/b/src/routes.ts").is_some(),
         "{answer:#}"
@@ -140,7 +129,6 @@ fn a_workspaces_object_marks_the_root() {
     )
     .unwrap();
     let answer = of_files(&repo, &["yarn.lock"]);
-    // A lockfile beside a workspace root affects every package (front 4).
     assert_eq!(answer["open"][0]["reason"], "all-packages");
     assert!(answer["open"][0].get("package").is_none());
 }
@@ -191,7 +179,6 @@ fn the_cli_prints_the_affected_json() {
         "--up",
     ]);
     assert_eq!(up.stdout, out.stdout);
-    // The affected set needs a change start.
     let refused = run(&["trace", "f", "--affected"]);
     assert!(!refused.status.success());
 }
@@ -246,7 +233,6 @@ fn a_row_held_by_a_declaration_climbs_to_its_holder() {
     let answer = edited(&repo, "packages/b/src/g.ts", "f() + 1", "f() + 2");
     let routes = file(&answer, "packages/b/src/routes.ts").expect("routes.ts");
     assert_eq!(routes["level"], "exact");
-    // The test file reaches `g` from its top level: the file is the caller.
     assert!(file(&answer, "packages/c/src/g.test.ts").is_some());
 }
 
@@ -259,13 +245,11 @@ fn a_declarative_client_method_is_affected_by_its_route() {
     assert_eq!(method.expect("the client")["level"], "exact");
 }
 
-/// The chain's gateway writes `resource::postgres::orders` and the worker reads it.
 #[test]
 fn the_reader_of_what_a_writer_writes_is_affected() {
     let (_, gateway, _) = common::chain("affected_writer");
     let answer = of_files(&gateway, &["src/orders.ts"]);
     let reader = in_repo(&answer, "example.com/chain/worker", "src/jobs.ts").expect("the reader");
-    // A declared link is certain.
     assert_eq!(
         (&reader["level"], &reader["tier"]),
         (&json!("declared"), &json!("certain"))
@@ -362,8 +346,6 @@ fn a_provisioner_of_what_the_code_uses_is_not_affected() {
     );
 }
 
-/// A declared key read by an IaC node (no fixture has code reading a config key): the key's
-/// line roots its config site, and the node that reads it is affected.
 #[test]
 fn a_changed_config_key_affects_what_reads_it() {
     let case = "affected_config_key";
@@ -380,7 +362,6 @@ fn a_changed_config_key_affects_what_reads_it() {
     let values = fs::read_to_string(app.join("values.yaml")).unwrap();
     let line = values.lines().nth(10).unwrap().to_string();
     let answer = edited(&app, "values.yaml", &line, &format!("{line} # edited"));
-    // The reading node's file; `iac` lists only the workloads and CI nodes reached.
     let reader = in_repo(&answer, "example.com/resource-via/infra", "main.tf");
     assert_eq!(reader.expect("the reading node")["level"], "declared");
     assert_eq!(answer["iac"], Value::Array(Vec::new()));
@@ -412,7 +393,6 @@ fn an_affected_answer_is_the_same_over_two_runs() {
     assert_eq!(run(), run());
 }
 
-/// The directories a `packages` group lists.
 fn packages(answer: &Value, group: &str) -> Vec<String> {
     (answer["packages"][group].as_array().into_iter().flatten())
         .map(|p| p.as_str().unwrap().to_string())
@@ -431,7 +411,6 @@ fn manifest_only_lists_a_declared_dependent_with_no_import() {
         manifest_only.contains(&"packages/d".to_string()),
         "{manifest_only:?}"
     );
-    // A file's `manifest` says its package is in the closure.
     assert_eq!(
         file(&answer, "packages/b/src/g.ts").unwrap()["manifest"],
         true
@@ -460,7 +439,6 @@ fn a_name_match_only_package_is_inferred() {
     );
 }
 
-/// The chain's catalog reads `resource::postgres::orders` with no `via`: the whole repository.
 #[test]
 fn a_repository_level_side_is_listed_in_sides() {
     let (_, gateway, _) = common::chain("affected_repository_side");
@@ -477,8 +455,6 @@ fn a_repository_level_side_is_listed_in_sides() {
     assert_eq!(catalog, 0, "a repository-level side has no file");
 }
 
-/// A config use is reached only through provisioning, which this walk does not follow: no
-/// fixture form reaches one, so only the document side is listed here.
 #[test]
 fn a_document_side_is_listed_in_sides() {
     let (_, gateway, _) = common::documented_chain("affected_document_side");
@@ -494,13 +470,10 @@ fn a_document_side_is_listed_in_sides() {
     );
 }
 
-/// The queue's criterion at the certain tier: A and B conflict when what A affects meets what
-/// B touches or reads, or the other way round.
 fn conflicts(a: &Value, b: &Value) -> bool {
     let at = |x: &Value, key: &str, certain: bool| -> BTreeSet<(String, String)> {
         (x[key].as_array().into_iter().flatten())
             .filter(|e| !certain || e["tier"] == "certain")
-            // A lockfile read meets a lockfile change by name (`moved`), not by path.
             .filter(|e| e.get("name").is_none())
             .map(|e| {
                 (
@@ -519,7 +492,6 @@ fn conflicts(a: &Value, b: &Value) -> bool {
     one_way(a, b) || one_way(b, a)
 }
 
-/// The lockfile reads of an answer: `(repo, lockfile, name)`.
 fn lockfile_reads(x: &Value) -> BTreeSet<(String, String, String)> {
     (x["reads"].as_array().into_iter().flatten())
         .filter_map(|e| {
@@ -530,8 +502,6 @@ fn lockfile_reads(x: &Value) -> BTreeSet<(String, String, String)> {
         .collect()
 }
 
-/// What an answer's lockfiles move, `(repo, lockfile, name)`: the names of the entries that moved
-/// and the dependencies that lead there.
 fn moved(x: &Value) -> BTreeSet<(String, String, String)> {
     let mut out = BTreeSet::new();
     for l in x["lockfiles"].as_array().into_iter().flatten() {
@@ -553,7 +523,6 @@ fn moved(x: &Value) -> BTreeSet<(String, String, String)> {
     out
 }
 
-/// Whether the certain `files` of `a` and `b` meet: the plain intersection.
 fn files_meet(a: &Value, b: &Value) -> bool {
     let certain = |x: &Value| -> BTreeSet<String> {
         (x["files"].as_array().into_iter().flatten())
@@ -564,14 +533,11 @@ fn files_meet(a: &Value, b: &Value) -> bool {
     !certain(a).is_disjoint(&certain(b))
 }
 
-/// The answers of two changes made on one base, each its own commit checked out in turn and
-/// answered as a range.
 fn pair(case: &str, a: impl FnOnce(&Path), b: impl FnOnce(&Path)) -> (Value, Value) {
     let repo = affected_repo(case);
     (side(&repo, "a", a), side(&repo, "b", b))
 }
 
-/// The answer of `edit` committed on a branch `branch` from `main`, as a range.
 fn side(repo: &Path, branch: &str, edit: impl FnOnce(&Path)) -> Value {
     common::git(repo, &["checkout", "-q", "main"]);
     common::git(repo, &["checkout", "-q", "-b", branch]);
@@ -710,7 +676,6 @@ fn a_batch_answers_each_block_as_one_line() {
         single["label"] = json!(label);
         assert_eq!(line, single, "{label}");
     }
-    // Paths before any label form a block labelled "", with CRLF and blank lines read.
     fs::write(&batch, "packages/a/src/f.ts\r\n\r\n").unwrap();
     let run = |batch: &Path| {
         Command::new(env!("CARGO_BIN_EXE_meada"))
@@ -748,7 +713,6 @@ fn a_changed_line_reads_the_candidates_of_its_call() {
         (&runners["tier"], &runners["candidates"]),
         (&json!("ambiguous"), &json!(2))
     );
-    // `x.uniqueName()` sits on a line the change left alone.
     assert!(
         !reads.iter().any(|r| r["path"] == "packages/a/src/named.ts"),
         "{answer:#}"
@@ -764,7 +728,6 @@ fn a_manifest_others_depend_on_stays_open() {
     assert_eq!(answer["open"], json!([manifest]), "{answer:#}");
 }
 
-/// The worker's `settleOrders` reads `resource::postgres::orders` as a symbol, not a call.
 #[test]
 fn a_changed_reader_reads_the_writer_of_what_it_reads() {
     let (web, _, _) = common::chain("affected_reads_writer");
@@ -776,7 +739,6 @@ fn a_changed_reader_reads_the_writer_of_what_it_reads() {
     assert!(reads.iter().any(|r| writer(&r)), "{answer:#}");
 }
 
-/// The web's `shipment` calls a route only the gateway's document lists.
 #[test]
 fn a_call_to_a_documented_route_reads_its_document() {
     let (web, _, _) = common::documented_chain("affected_reads_document");
@@ -787,8 +749,6 @@ fn a_call_to_a_documented_route_reads_its_document() {
     assert!(reads.iter().any(|r| document(&r)), "{answer:#}");
 }
 
-/// `packages/app` names `@scope/d` in its manifest and imports nothing; `@scope/d` does the
-/// same with `@scope/a`.
 #[test]
 fn manifest_only_follows_dependents_past_one_step() {
     let repo = affected_repo("affected_manifest_two_steps");
@@ -802,8 +762,6 @@ fn manifest_only_follows_dependents_past_one_step() {
     }
 }
 
-// Lockfiles (front 4): a Yarn Berry `yarn.lock` change roots the files that load what moved.
-
 const WEB: &str = "example.com/scope/web";
 
 fn lockfile_repo(case: &str) -> PathBuf {
@@ -814,14 +772,12 @@ fn lockfile_repo(case: &str) -> PathBuf {
     )
 }
 
-/// The lines of one `yarn.lock` entry as the fixture writes them: version, resolution, checksum.
 fn entry(name: &str, version: &str, checksum: &str) -> String {
     format!(
         "  version: {version}\n  resolution: \"{name}@npm:{version}\"\n  checksum: 10c0/{checksum}\n"
     )
 }
 
-/// The answer of a commit that bumps `name` in `web/yarn.lock` from one entry to another.
 fn bumped(repo: &Path, name: &str, from: (&str, &str), to: (&str, &str)) -> Value {
     edited(
         repo,
@@ -834,7 +790,6 @@ fn bumped(repo: &Path, name: &str, from: (&str, &str), to: (&str, &str)) -> Valu
 const LODASH: (&str, &str) = ("4.17.20", "lodash41720");
 const LODASH_NEXT: (&str, &str) = ("4.17.21", "lodash41721");
 
-/// The paths of `files` a lockfile rooted, each with its lockfile.
 fn locked(answer: &Value) -> Vec<(String, String)> {
     (answer["files"].as_array().into_iter().flatten())
         .filter_map(|f| {
@@ -848,7 +803,6 @@ fn locked_paths(answer: &Value) -> Vec<String> {
     locked(answer).into_iter().map(|(p, _)| p).collect()
 }
 
-/// The `open` entries as `(path, reason, package)`.
 fn opened(answer: &Value) -> Vec<(String, String, Option<String>)> {
     (answer["open"].as_array().into_iter().flatten())
         .map(|e| {
@@ -877,7 +831,6 @@ fn a_direct_bump_roots_only_the_importing_files() {
             (Some("certain"), Some("exact"))
         );
         assert_eq!(f["lockfile"], "web/yarn.lock");
-        // The link that reached a file keeps its own field.
         assert!(f.get("reason").is_none(), "{f}");
     }
     assert!(in_repo(&answer, WEB, "web/packages/a/src/plain.ts").is_none());
@@ -891,10 +844,8 @@ fn a_direct_bump_roots_only_the_importing_files() {
         lockfile["entries"],
         json!([{"descriptor": "lodash@npm:^4.17.0", "before": "4.17.20", "after": "4.17.21"}])
     );
-    // Attributed, the lockfile is touched and roots, so it is not open.
     assert!(opened(&answer).is_empty(), "{:?}", opened(&answer));
     assert!(in_repo(&answer, WEB, "web/yarn.lock").is_some());
-    // The dependent `b` is reached through the code graph, not through the lockfile.
     assert!(
         !locked_paths(&answer)
             .iter()
@@ -1030,7 +981,6 @@ fn an_aliased_dependency_roots_files_importing_the_alias() {
     );
 }
 
-/// The one `lockfiles` entry's `unread`, and the `open` entry of `web/yarn.lock`.
 fn unread(answer: &Value) -> (String, Option<(String, String, Option<String>)>) {
     let lockfiles = answer["lockfiles"].as_array().unwrap();
     assert_eq!(lockfiles.len(), 1, "{lockfiles:?}");
@@ -1180,7 +1130,6 @@ fn a_root_only_tooling_bump_is_all_packages() {
             None
         )]
     );
-    // Still attributed.
     assert_eq!(
         answer["lockfiles"][0]["packages"],
         json!([{"package": "web", "via": ["eslint"], "whole": true}])
@@ -1199,7 +1148,6 @@ fn a_hoisted_import_of_a_reached_name_is_rooted() {
         "{:?}",
         locked(&answer)
     );
-    // `b` does not load `lodash`: nothing of it is rooted.
     assert!(
         !locked_paths(&answer)
             .iter()
@@ -1207,8 +1155,6 @@ fn a_hoisted_import_of_a_reached_name_is_rooted() {
     );
 }
 
-/// A commit that bumps `lodash` to `^4.17.21` in `a`'s manifest and the lockfile, with
-/// `also` replacing more of the manifest.
 fn range_bump(repo: &Path, also: Option<(&str, &str)>) -> Value {
     let manifest = "web/packages/a/package.json";
     replace(
@@ -1288,7 +1234,6 @@ fn lockfile_roots_seed_the_manifest_tier() {
     );
 }
 
-/// The answers of two changes on one base of the lockfile fixture.
 fn lockfile_pair(case: &str, a: impl FnOnce(&Path), b: impl FnOnce(&Path)) -> (Value, Value) {
     let repo = lockfile_repo(case);
     (side(&repo, "a", a), side(&repo, "b", b))
@@ -1356,7 +1301,6 @@ fn an_unchanged_line_reads_no_lockfile_entry() {
     let repo = lockfile_repo("lockfile_unchanged_import");
     let answer = edited(&repo, "web/packages/a/src/uses.ts", "x * 2", "x * 3");
     assert!(lockfile_reads(&answer).is_empty(), "{}", answer["reads"]);
-    // A workspace package is read through the code graph, never through the lockfile.
     let answer = edited(
         &repo,
         "web/packages/a/src/plain.ts",
@@ -1512,7 +1456,6 @@ fn a_patch_rehash_roots_hoisted_importers_through_the_wrapped_range() {
         "\"lodash\": \"^4.17.0\"",
         "\"lodash\": \"^4.17.0\", \"resolve\": \"^1.22.0\"",
     );
-    // The member's edge goes to the `npm:` range the patch wraps, none to the `patch:` key.
     replace(
         &repo,
         "web/yarn.lock",
@@ -1537,7 +1480,6 @@ fn a_patch_rehash_roots_hoisted_importers_through_the_wrapped_range() {
     commit_all(&repo, "patched resolve");
     replace(&repo, "web/yarn.lock", "hash=c3c19d", "hash=c3c19e");
     let answer = edited(&repo, "web/yarn.lock", "resolvepatch1", "resolvepatch2");
-    // `d` loads `resolve` without declaring it: the patch it gets changed.
     assert!(
         locked_paths(&answer).contains(&"web/packages/d/src/res.ts".to_string()),
         "{:?}",
@@ -1564,7 +1506,6 @@ fn a_checksum_alone_moving_roots_hoisted_importers() {
 #[test]
 fn a_member_declaring_its_own_resolution_is_not_hoisted() {
     let repo = lockfile_repo("lockfile_own_resolution");
-    // `c` declares `lodash@^3`, its own entry; `a` declares `lodash@^4.17.0`, which does not move.
     replace(
         &repo,
         "web/packages/c/package.json",
@@ -1592,7 +1533,6 @@ fn a_member_declaring_its_own_resolution_is_not_hoisted() {
         ("3.10.2", "lodash3102"),
     );
     let locked = locked_paths(&answer);
-    // The undeclared importer is rooted; `a`, which declares its own lodash, is not.
     assert!(
         locked.contains(&"web/packages/d/src/hoisted.ts".to_string()),
         "{locked:?}"

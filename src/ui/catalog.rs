@@ -1,11 +1,3 @@
-//! The catalog's reads (#341, ADR 0021 contract 1, feature `workspaces`): `GET /api/v1/catalog`
-//! and `POST /api/v1/catalog/check`, the picker's data. Both answer from the newest permissions
-//! set the OIDC module's cache holds, never from GitHub or Postgres, and only about the
-//! repositories the session may select: an identity that is not selectable is absent from the
-//! list and `unavailable` in a check, with no reason, so neither reads as an oracle on the
-//! catalog. While the platform or the caller is not ready (no set, a stale one, no login) the
-//! answer says `pending` and why, for every identity alike.
-
 use meada_core::manifest::identity_problem;
 
 use super::*;
@@ -25,10 +17,8 @@ pub(super) const PREFIX_MAX: usize = 128;
 // ponytail: the most characters of `after`, the opaque cursor.
 pub(super) const CURSOR_MAX: usize = 256;
 
-/// The cursor's alphabet: base64url, no padding.
 const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-/// `bytes` in base64url without padding.
 fn encode(bytes: &[u8]) -> String {
     let mut text = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
@@ -44,7 +34,6 @@ fn encode(bytes: &[u8]) -> String {
     text
 }
 
-/// The bytes `text` encodes; `None` for anything but the canonical encoding of some bytes.
 fn decode(text: &str) -> Option<Vec<u8>> {
     let mut bytes = Vec::with_capacity(text.len() / 4 * 3 + 2);
     for chunk in text.as_bytes().chunks(4) {
@@ -63,7 +52,6 @@ fn decode(text: &str) -> Option<Vec<u8>> {
     (encode(&bytes) == text).then_some(bytes)
 }
 
-/// The identity a cursor names: 1 to `CURSOR_MAX` characters that decode to an identity.
 fn cursor(text: &str) -> Option<String> {
     if text.is_empty() || text.len() > CURSOR_MAX {
         return None;
@@ -72,7 +60,6 @@ fn cursor(text: &str) -> Option<String> {
     identity_ok(&identity).then_some(identity)
 }
 
-/// Whether `identity` is one a caller may name: an identity with no control character or space.
 pub(super) fn identity_ok(identity: &str) -> bool {
     identity_problem(identity).is_none()
         && !identity
@@ -80,7 +67,6 @@ pub(super) fn identity_ok(identity: &str) -> bool {
             .any(|c| c.is_control() || c.is_whitespace())
 }
 
-/// The catalog query: `limit`, `after` and `q`, each at most once and nothing else.
 struct Query {
     limit: usize,
     after: Option<String>,
@@ -128,7 +114,6 @@ impl Query {
     }
 }
 
-/// The answer's `state`, `reason` and, when the set is known, `set`.
 pub(super) fn header(catalog: &Catalog) -> Value {
     let state = if catalog.reason.is_some() {
         "pending"
@@ -146,18 +131,11 @@ pub(super) fn header(catalog: &Catalog) -> Value {
 }
 
 impl Console {
-    /// The catalog `session` may select from: none unless `[catalog]` is configured and the
-    /// GitHub grant provider keeps the permissions cache.
     pub(super) fn catalog_of(&self, session: &Session) -> Option<Catalog> {
         self.bootstrap.catalog.as_ref()?;
         (self.providers).catalog(session.login.as_deref(), session.operator)
     }
 
-    /// `GET catalog?limit=&after=&q=`: `{"state", "reason", "set", "repositories": [{"identity"}],
-    /// "next"}`, the identities the session may select, ordered by identity, at most `limit`
-    /// (1 to 100, default 50) after the identity `after` names and starting with `q`; `next` is
-    /// the cursor of the following page or null. Any other query is a 400. A pending catalog
-    /// lists nothing.
     pub(super) fn catalog(&self, query: Option<&str>, session: &Session) -> Answer {
         let Some(catalog) = self.catalog_of(session) else {
             return error(StatusCode::NOT_FOUND, "not_found", &Msg::UiNoRoute.text());
@@ -174,9 +152,6 @@ impl Console {
         json_answer(StatusCode::OK, &document)
     }
 
-    /// `POST catalog/check` with `{"identities": [...]}`, at most `CHECK_IDENTITIES`, each an
-    /// identity: `{"state", "reason", "results": [{"identity", "state"}]}` in the order asked,
-    /// each `selectable` or `unavailable`, or `pending` for all of them while the catalog is.
     pub(super) fn catalog_check(&self, body: &Body, session: &Session) -> Answer {
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
@@ -209,9 +184,6 @@ impl Console {
     }
 }
 
-/// One page of what `catalog` makes selectable: at most `limit` identities after `after` that
-/// start with `prefix`, compared as GitHub compares them on the host (#508), and whether more
-/// follow.
 fn page<'a>(
     catalog: &'a Catalog,
     after: Option<&str>,
@@ -229,12 +201,8 @@ fn page<'a>(
     (page, more)
 }
 
-/// The check of `identities` against `catalog`: `{"state", "reason", "results": [{"identity",
-/// "state"}]}` in the order given, each once, `selectable` or `unavailable`, or `pending` for all
-/// of them while the catalog is. The console's check and a proposal's eligibility (ADR 0022).
 pub(super) fn checked(catalog: &Catalog, identities: &[String]) -> Value {
     let mut seen = std::collections::HashSet::new();
-    // GitHub compares names without case, so an identity on the host matches its lowercase row.
     let folded: std::collections::HashSet<String> = (catalog.selectable.iter())
         .map(|i| crate::modules::fold(&catalog.host, i))
         .collect();
@@ -305,7 +273,6 @@ mod tests {
             page(&catalog, None, "github.com/ACME/", 1),
             (vec![&api], true)
         );
-        // Another host compares exactly, as before.
         assert!(page(&catalog, None, "ghe.example/Acme", 10).0.is_empty());
     }
 

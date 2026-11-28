@@ -5,8 +5,6 @@ import table from '../../tests/fixtures/named-workspaces.json';
 import effectiveTable from '../../tests/fixtures/effective-configuration.json';
 import { initSync, init, namedAuthorize, namedEntriesJson, namedEffective, namedDescriptionProblem, namedEntriesText, namedMessageProblem, namedNameProblem, namedVersionId, namedVisible, resourceRoles } from '../wasm/meada_core';
 
-// The Y/A/B table (ADR 0020) the Rust tests read, through the actual WebAssembly bundle: the browser
-// marks what a selection may not include exactly as the server's `meada_core::named` decides it.
 type Caller = { rows: { identity: string; role: string }[]; claims_grant?: string[]; platform_administrator?: boolean; login: string | null };
 const callers = table.callers as Record<string, Caller>;
 const identities = table.identities as Record<string, string>;
@@ -46,7 +44,6 @@ test('a named text is validated and written canonically, with no path, owner or 
   expect(text).not.toContain('path');
   expect(JSON.parse(namedEntriesJson(text, 5))).toEqual([{ repo: y }, { repo: a }]);
   expect(namedVersionId(text, 5)).toMatch(/^[0-9a-f]{16}$/);
-  // Whitespace and key order are not the version: the same entries are one version.
   expect(namedVersionId(`[[repository]]\n\nrepo = "${y}"\n\n\n[[repository]]\nrepo = "${a}"\n`, 5)).toBe(namedVersionId(text, 5));
   for (const bad of [`[[repository]]\nrepo = "${y}"\npath = "p"\n`, `[[repository]]\nrepo = "${y}"\nowner = "g"\n`]) {
     expect(() => namedEntriesJson(bad, 5)).toThrow(/reserved/);
@@ -54,9 +51,6 @@ test('a named text is validated and written canonically, with no path, owner or 
   expect(() => namedEntriesJson(text, 1)).toThrow();
 });
 
-// The effective-configuration table (ADR 0021 contract 6) the Rust tests read, through the actual
-// WebAssembly bundle: the browser and the server decide which source wins, what is ignored and what
-// is not yet in effect with one function.
 const ids = effectiveTable.identities as Record<string, string>;
 type Row = { name: string; entries: Record<string, unknown>[]; facts: Record<string, Record<string, boolean>>;
   expect: { repo: string; source: string; coverage: string; ignored: string[]; diagnostics: string[] }[] };
@@ -80,18 +74,15 @@ test('two contexts sharing a repository read only their own blocks, and the view
   const first = view(row.first, row.facts)[0]!, second = view(row.second, row.facts)[0]!;
   expect(first.blocks).toEqual(spelled(row.blocks.first));
   expect(second.blocks).toEqual(spelled(row.blocks.second));
-  // The annotations are computed and never enter canonical text or an id: the text of the entries is the same with or without them.
   const text = namedEntriesText(json(spelled(row.first)));
   expect(text).not.toMatch(/source|coverage|diagnostic|ignored/);
   expect(namedVersionId(text, 5)).toBe(namedVersionId(namedEntriesText(json(JSON.parse(namedEntriesJson(text, 5)))), 5));
 });
 
-// The text rule is the core's (`meada_core::named`), so the browser and the server give one verdict.
 test('names, descriptions and messages are bounded and plain, as the core says', () => {
   expect(namedNameProblem('Payments')).toBeUndefined();
   for (const bad of ['', ' x', 'x ', 'a\nb', 'x'.repeat(81), '\u3000x']) expect(namedNameProblem(bad), JSON.stringify(bad)).toContain('1 to 80');
   expect(namedNameProblem('x'.repeat(80))).toBeUndefined();
-  // U+FEFF is no whitespace to Rust.
   expect(namedNameProblem('\uFEFFx')).toBeUndefined();
   expect(namedDescriptionProblem('')).toBeUndefined();
   expect(namedDescriptionProblem('\tx')).toContain('500');

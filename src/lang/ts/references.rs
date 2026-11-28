@@ -1,10 +1,3 @@
-//! The non-call uses of names in the TypeScript and JavaScript pack (`Facts::references`): a
-//! name rendered as a JSX element, written as a type, read as a value or a member, extended or
-//! implemented, re-exported, or taken off a dynamic `import()`. One per scope, name and kind
-//! (and specifier, for a re-export or a dynamic one), the first occurrence's range kept. The
-//! pack records them whatever binds the name (a local, a parameter, a global): resolution drops
-//! what binds no declaration.
-
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
@@ -13,13 +6,10 @@ use tree_sitter::Node;
 use super::{Parents, callee, children, dynamic_import, named, text, unquote, value};
 use crate::lang::{Reference, Use};
 
-/// The references of one file, as the walk visits its nodes.
 #[derive(Default)]
 pub(super) struct References<'t> {
     seen: HashSet<(String, String, Use, Option<String>)>,
     found: Vec<Reference>,
-    /// The type parameters (and `infer` and mapped names) declared so far, by name, with the
-    /// range of the node they are in scope in: a type use inside it names no declaration.
     params: HashMap<&'t str, Vec<Range<usize>>>,
 }
 
@@ -36,7 +26,6 @@ impl<'t> References<'t> {
         range: Range<usize>,
         from: Option<String>,
     ) {
-        // A name a type parameter or a block's own type declares there is no file-level name.
         let head = name.split('.').next().unwrap_or(&name);
         let hidden =
             (self.params.get(head)).is_some_and(|rs| rs.iter().any(|r| r.contains(&range.start)));
@@ -57,7 +46,6 @@ impl<'t> References<'t> {
         }
     }
 
-    /// The references `node` makes, visited at `scope`.
     pub(super) fn visit(&mut self, node: Node<'t>, scope: &str, src: &'t [u8], up: &Parents<'t>) {
         let parent = up.of(node);
         let field_of = |p: Node, field: &str| {
@@ -98,8 +86,6 @@ impl<'t> References<'t> {
                     self.declare(text(name, src), owner.byte_range());
                 }
             }
-            // An interface, type or enum declared inside a block is the block's: no symbol, and
-            // it hides a file-level one of its name there. (A use before it in the block slips.)
             "interface_declaration" | "type_alias_declaration" | "enum_declaration"
                 if parent.is_some_and(|p| !matches!(p.kind(), "program" | "export_statement")) =>
             {
@@ -114,7 +100,6 @@ impl<'t> References<'t> {
             }
             "type_identifier" | "nested_type_identifier" => {
                 let Some(p) = parent else { return };
-                // A declared name, a part of a dotted one, or a type parameter's own.
                 if p.kind() == "nested_type_identifier"
                     || field_of(p, "name") && p.kind() != "generic_type"
                     || matches!(p.kind(), "type_parameter" | "infer_type")
@@ -143,7 +128,6 @@ impl<'t> References<'t> {
                 self.push(scope, name, kind, node.byte_range(), None);
             }
             "export_statement" => {
-                // A re-export keeps its source: `export *` of two modules are two uses.
                 let Some(source) = node.child_by_field_name("source") else {
                     return;
                 };
@@ -164,7 +148,6 @@ impl<'t> References<'t> {
                                 }
                             }
                         }
-                        // `export * as ns from`.
                         "namespace_export" => self.push(
                             "",
                             "*".into(),
@@ -183,7 +166,6 @@ impl<'t> References<'t> {
             "identifier" | "shorthand_property_identifier" => self.read(node, parent, scope, src),
             "call_expression" => self.dynamic(node, scope, src, up),
             "variable_declarator" => {
-                // `const { X, Y: z } = await import('x')`.
                 let (Some(pattern), Some(from)) = (
                     node.child_by_field_name("name")
                         .filter(|n| n.kind() == "object_pattern"),
@@ -222,8 +204,6 @@ impl<'t> References<'t> {
         self.params.entry(name).or_default().push(range);
     }
 
-    /// A member read: its dotted name, or, as the callee of a call, a member of its head alone;
-    /// `(await import('x')).X` a dynamic use of `X`.
     fn member(
         &mut self,
         node: Node<'t>,
@@ -256,7 +236,6 @@ impl<'t> References<'t> {
             );
             return;
         }
-        // The outer member of a chain, the name of a JSX element and a written member say nothing.
         if p.kind() == "member_expression" && is("object")
             || matches!(
                 p.kind(),
@@ -287,7 +266,6 @@ impl<'t> References<'t> {
         self.push(scope, name, kind, node.byte_range(), None);
     }
 
-    /// An identifier read in expression position.
     fn read(&mut self, node: Node<'t>, parent: Option<Node<'t>>, scope: &str, src: &'t [u8]) {
         let Some(p) = parent else { return };
         let is = |field: &str| {
@@ -298,11 +276,9 @@ impl<'t> References<'t> {
         let kind = match p.kind() {
             "extends_clause" | "class_heritage" => Use::Extends,
             "type_query" => Use::Type,
-            // A callee, a member's object (the member is the use), a JSX element's name.
             "call_expression" | "new_expression" if is("function") || is("constructor") => return,
             "member_expression" if is("object") => return,
             "jsx_opening_element" | "jsx_self_closing_element" | "jsx_closing_element" => return,
-            // What declares or binds a name, and what writes one.
             "variable_declarator"
             | "function_declaration"
             | "function_expression"
@@ -343,7 +319,6 @@ impl<'t> References<'t> {
             | "namespace_export"
             | "import_alias"
             | "import_require_clause"
-            // A part of a dotted type or namespace name (the whole is the use).
             | "nested_type_identifier"
             | "nested_identifier"
             | "jsx_namespace_name" => return,
@@ -352,8 +327,6 @@ impl<'t> References<'t> {
         self.push(scope, name.to_string(), kind, node.byte_range(), None);
     }
 
-    /// `import('x').then(m => m.X)` and `.then(m => ({ default: m.X }))`: a dynamic use of each
-    /// member read off `m`, the callback's first parameter.
     fn dynamic(&mut self, node: Node<'t>, scope: &str, src: &'t [u8], up: &Parents<'t>) {
         let Some(function) = node
             .child_by_field_name("function")
@@ -394,7 +367,6 @@ impl<'t> References<'t> {
             return;
         };
         let m = text(param, src);
-        // The members read off `m` in the callback's body; explicit stack, as the walk.
         let mut stack = vec![body];
         while let Some(n) = stack.pop() {
             if n.kind() == "member_expression"
@@ -418,8 +390,6 @@ impl<'t> References<'t> {
     }
 }
 
-/// The specifier of `import('<literal>')`, when `node` is that call and the literal has no
-/// template hole (`dynamic_import` decides, on the call's value).
 fn imported(node: Node, src: &[u8], scope: &str, up: &Parents) -> Option<String> {
     let function = node
         .child_by_field_name("function")
@@ -430,8 +400,6 @@ fn imported(node: Node, src: &[u8], scope: &str, up: &Parents) -> Option<String>
     dynamic_import(&value(node, src, scope, up)).map(str::to_string)
 }
 
-/// The dotted name of a member chain whose head is an identifier (`config.url`, `Ns.Comp`);
-/// `None` for one on `this`, a call or any other expression.
 fn dotted(node: Node, src: &[u8]) -> Option<String> {
     let name = match node.kind() {
         "nested_identifier" | "nested_type_identifier" => {

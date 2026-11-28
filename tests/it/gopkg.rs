@@ -1,7 +1,3 @@
-//! Go packages (spec #25): a `go.mod` of a workspace repository provides
-//! `package::go::<module path>`, its `require` entries and local `replace` directives consume
-//! it, and an import of one of its packages crosses into the exported symbols there.
-
 use crate::common;
 
 use std::fs;
@@ -11,7 +7,6 @@ use common::{age, assert_golden, fixture_repo, git, without_processes};
 use meada::engine::{Direction, Engine, Start};
 use serde_json::Value;
 
-/// The shared module and its consumer as siblings: `web` names `lib` as its peer.
 fn pair(case: &str) -> (PathBuf, PathBuf) {
     let repo = |name: &str| {
         let origin = format!("https://example.com/gopkg/{name}.git");
@@ -29,8 +24,6 @@ const WEB: &str = "example.com/gopkg/web::";
 const GREET: &str = "example.com/gopkg/lib::text/text.go::Greet";
 const WELCOME_GREET: &str = "example.com/gopkg/web::main.go::welcome::k.Greet#0";
 
-/// The `(consumer, provider, level, reason)` of every link of `json` whose consumer starts
-/// with `site`.
 fn links<'j>(json: &'j Value, site: &str) -> Vec<(&'j str, &'j str, &'j str, &'j str)> {
     (json["links"].as_array().into_iter().flatten())
         .filter(|l| l["consumer"].as_str().unwrap().starts_with(site))
@@ -41,7 +34,6 @@ fn links<'j>(json: &'j Value, site: &str) -> Vec<(&'j str, &'j str, &'j str, &'j
         .collect()
 }
 
-/// The `(provider, level)` pairs of the links of `json` whose consumer starts with `site`.
 fn ends<'j>(json: &'j Value, site: &str) -> Vec<(&'j str, &'j str)> {
     let found = links(json, site);
     found.into_iter().map(|(_, p, l, _)| (p, l)).collect()
@@ -61,7 +53,6 @@ fn a_require_and_a_local_replace_link_to_the_module_they_name() {
     let json: Value = serde_json::from_str(&export(&web)).unwrap();
     let at = |site: &str| links(&json, &format!("{WEB}{site}"));
 
-    // A `require`: the version as the range, `(local none)` since a `go.mod` has no version.
     let kit = "package::go::example.com/shared/kit v1.2.0 (local none), range unchecked";
     assert_eq!(
         at("go.mod::require::example.com/shared/kit"),
@@ -72,7 +63,6 @@ fn a_require_and_a_local_replace_link_to_the_module_they_name() {
             kit
         )]
     );
-    // A `require` with a `replace` to a directory of a sibling workspace repository.
     let extras = "package::go::example.com/shared/extras v0.0.0 (local none), range unchecked";
     assert_eq!(
         at("worker/go.mod::require::example.com/shared/extras"),
@@ -83,7 +73,6 @@ fn a_require_and_a_local_replace_link_to_the_module_they_name() {
             extras
         )]
     );
-    // A module outside the workspace links to nothing: `go.sum` and the proxy are never read.
     assert!(at("go.mod::require::example.com/outside/lib").is_empty());
 }
 
@@ -97,10 +86,8 @@ fn an_import_reaches_the_exported_symbol_of_the_package_directory() {
     let kit = said("example.com/shared/kit v1.2.0 (local none)");
     let extras = said("example.com/shared/extras v0.0.0 (local none)");
     for (caller, target, reason) in [
-        // Under a local name.
         ("main.go::welcome::", "text/text.go::Greet", &kit),
         ("main.go::connect::", "api/client.go::NewClient", &kit),
-        // Through a `replace` to a directory outside the repository.
         (
             "worker/worker.go::Run::",
             "extras/extras.go::Boost",
@@ -118,9 +105,6 @@ fn an_import_reaches_the_exported_symbol_of_the_package_directory() {
             "{caller}"
         );
     }
-    // A directory the provider lacks, a module outside the workspace, a local that hides the
-    // import, a name only a test file or a file built for another target defines, a directory of
-    // a nested module of the provider and a name two files of the directory define add nothing.
     let none = [
         "peek", "encode", "shadowed", "testOnly", "windows", "nested", "dup",
     ];
@@ -150,7 +134,6 @@ fn trace_down_crosses_the_package_hop_and_onward() {
     assert_golden("gopkg-web.trace-down.txt", &down);
 }
 
-/// Bumps the required version of the kit and renames the required module of `worker`.
 fn edit(web: &Path) {
     let replace = |file: &str, from: &str, to: &str| {
         let text = fs::read_to_string(web.join(file)).unwrap();
@@ -180,7 +163,6 @@ fn an_edited_go_mod_relinks_like_a_cold_export() {
     edit(&cold_web);
     assert_ne!(refreshed, before);
     assert_eq!(refreshed, both(&cold_lib, &cold_web));
-    // The replace now names a directory of its own repository: the call crosses no more.
     let json: Value = serde_json::from_str(&refreshed[0]).unwrap();
     assert!(links(&json, &format!("{WEB}worker/worker.go::Run::")).is_empty());
 }
@@ -216,7 +198,6 @@ fn a_require_on_a_module_two_repositories_provide_is_ambiguous() {
     );
 }
 
-/// Replaces `from` by `to` in `file` of `repo`, which must hold it.
 fn replace(repo: &Path, file: &str, from: &str, to: &str) {
     let text = fs::read_to_string(repo.join(file)).unwrap();
     assert!(text.contains(from), "{file} lacks {from}");
@@ -234,7 +215,6 @@ fn a_replace_by_another_module_leaves_the_module_out_of_the_workspace() {
 
     assert!(links(&json, &format!("{WEB}go.mod")).is_empty());
     assert!(links(&json, &format!("{WEB}main.go")).is_empty());
-    // The module `worker` requires is still the sibling's.
     assert_eq!(links(&json, &format!("{WEB}worker/")).len(), 2);
 }
 
@@ -282,8 +262,6 @@ fn a_module_path_without_a_dot_links_through_its_local_replace() {
     );
 }
 
-/// The consumer that replaces `example.com/orig/lib` by the fork, and the two repositories that
-/// declare it, as siblings; the consumer (`example.com/gopkg/app`) is the one returned.
 fn replaced(case: &str) -> PathBuf {
     let repo = |fixture: &str, origin: &str| fixture_repo(case, fixture, Some(origin));
     repo("gopkg-replace-orig", "https://example.com/orig/lib.git");
@@ -375,8 +353,6 @@ fn a_replace_by_a_module_no_repository_holds_keeps_the_dependency_out() {
     assert!(links(&json, &format!("{APP}main.go")).is_empty());
 }
 
-/// A service whose `testdata/` and `_gen/` hold Go programs with a route and a call each, as
-/// `<CARGO_TARGET_TMPDIR>/<case>/svc`, a repository with one commit; `main` is `main.go`.
 fn service(case: &str, main: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
         .join(case)
@@ -415,7 +391,6 @@ fn service(case: &str, main: &str) -> PathBuf {
     dir
 }
 
-/// The sites of every HTTP provider and consumer of an export.
 fn http_sides(export: &str) -> Vec<String> {
     let json: Value = serde_json::from_str(export).unwrap();
     let sides = ["providers", "consumers"].map(|k| json[k].as_array().unwrap().clone());
@@ -425,8 +400,6 @@ fn http_sides(export: &str) -> Vec<String> {
         .collect()
 }
 
-/// `go build ./...` builds no package under `testdata` or an `_` directory, but one a built
-/// package imports: a program kept there that nothing imports serves and calls nothing.
 #[test]
 fn a_program_under_testdata_is_a_side_only_once_a_built_package_imports_it() {
     const ROUTE: &str = "mux := http.NewServeMux()\n\t\

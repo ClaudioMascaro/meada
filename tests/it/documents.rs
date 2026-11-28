@@ -1,7 +1,3 @@
-//! Provider documents (spec #21): OpenAPI routes of a repository with a `[serve]` table become
-//! provider contracts, merged with the code routes they match, over the documented chain
-//! (`common::documented_chain`).
-
 use crate::common;
 
 use std::fs;
@@ -59,9 +55,6 @@ fn context_on_a_merged_route_shows_its_handler_and_documented_fields() {
     assert_golden("chain-documents.context-orders.txt", &answer);
 }
 
-/// `documents-shapes`: an OpenAPI 3.0 JSON document with local `$ref`s into `components`,
-/// `allOf`, `oneOf`, an array response, `additionalProperties: true`, a reference cycle and an
-/// external `$ref`, plus a later document listing one of its routes again.
 #[test]
 fn response_schemas_are_exported_as_shapes() {
     let repo = fixture_repo(
@@ -101,8 +94,6 @@ fn status_reports_the_documents_it_ignored() {
     );
 }
 
-/// The `(level, reason)` of the link from the web call in `function`, or `None` when it has
-/// none.
 fn link_of(web: &std::path::Path, function: &str) -> Option<(String, String)> {
     let export = Engine::open(web).unwrap().export().unwrap();
     let export: serde_json::Value = serde_json::from_str(&export).unwrap();
@@ -123,16 +114,12 @@ fn servers_urls_add_hosts_and_server_paths() {
     let link = |function| link_of(&web, function);
     let inferred = |reason: &str| Some(("inferred".to_string(), reason.to_string()));
 
-    // The public URL of the document: its host and its server path.
     assert_eq!(link("edgeShipment"), inferred("gateway prefix /gw"));
-    // A server variable takes its default.
     assert_eq!(link("euShipment"), inferred("gateway prefix /v3"));
-    // A relative URL gives only its path, whatever the host.
     assert_eq!(
         link("relativeShipment"),
         inferred("gateway prefix /relative/base")
     );
-    // A variable without a default contributes nothing, not even its path.
     assert_eq!(link("unsetShipment"), None);
 }
 
@@ -151,10 +138,8 @@ fn listed_documents_are_read_even_when_ignored_or_oddly_named() {
             .collect()
     };
     let documents = strings("documents", "path");
-    // Listed and gitignored; listed under a name discovery does not know.
     assert!(documents.contains(&"generated/openapi.yaml".into()));
     assert!(documents.contains(&"docs/api-contract.yaml".into()));
-    // Listed and missing: no document, no error.
     assert!(!documents.contains(&"docs/missing.yaml".into()));
     let providers = strings("providers", "contract");
     assert!(providers.contains(&"http::GET::/api/generated".into()));
@@ -174,8 +159,6 @@ fn search_finds_a_document_by_path_or_title() {
     );
     assert_golden("chain-documents.search-document-title.txt", &by("CARRIERS"));
     assert_eq!(by("nothing"), "no matches for `nothing`\n");
-    // The workspace's documents, from any repository; the vendored copy of a repository
-    // without `[serve]` is none.
     let answer = Engine::open(&web)
         .unwrap()
         .search("openapi", Some("document"), None)
@@ -184,8 +167,6 @@ fn search_finds_a_document_by_path_or_title() {
     assert!(!answer.contains("vendor"), "{answer}");
 }
 
-/// A repository written from `files` (path, text) at `<CARGO_TARGET_TMPDIR>/<case>/<name>`,
-/// with the origin `https://example.com/acme/<name>.git` and one commit.
 fn repo(case: &str, name: &str, files: &[(&str, &str)]) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(case).join(name);
     let _ = fs::remove_dir_all(&dir);
@@ -202,8 +183,6 @@ fn repo(case: &str, name: &str, files: &[(&str, &str)]) -> PathBuf {
     dir
 }
 
-/// A client that calls each path of `paths` from a function `call<n>`, next to its peer
-/// `shop`.
 fn client(case: &str, paths: &[&str]) -> PathBuf {
     let calls: String = (paths.iter().enumerate())
         .map(|(n, path)| format!("export const call{n} = () => fetch(\"{path}\");\n"))
@@ -216,7 +195,6 @@ fn client(case: &str, paths: &[&str]) -> PathBuf {
     )
 }
 
-/// An OpenAPI 3.1 document with a GET of each path, served at each of `servers`.
 fn openapi(servers: &[&str], paths: &[&str]) -> String {
     let servers: String = servers.iter().map(|s| format!("  - url: {s}\n")).collect();
     let paths: String = paths
@@ -246,7 +224,6 @@ fn each_document_gives_its_own_gateway_forms() {
             ),
             ("a.openapi.yaml", &a),
             ("b.openapi.yaml", &b),
-            // A code route: it merges with the route of `a.openapi.yaml`.
             ("app/v1/orders/route.ts", route),
         ],
     );
@@ -267,24 +244,16 @@ fn each_document_gives_its_own_gateway_forms() {
     let inferred = |reason: &str| Some(("inferred".to_string(), reason.to_string()));
     let edge = inferred("gateway prefix /edge, gateway strip /v1");
     let shop = inferred("gateway prefix /shop, gateway strip /v1");
-    // A route two documents list: the server path of one, the `[serve]` prefix of the other,
-    // which has no server path.
     assert_eq!(link(0), edge);
     assert_eq!(link(1), shop);
-    // Only a document with a server path lists it: the server path replaces the prefix.
     assert_eq!(link(2), edge);
     assert_eq!(link(3), None);
-    // Only a document without server paths lists it: the `[serve]` prefix.
     assert_eq!(link(4), shop);
     assert_eq!(link(5), None);
-    // A code route keeps its `[serve]` form and adds the document's.
     assert_eq!(link(6), shop);
     assert_eq!(link(7), edge);
 }
 
-/// A refresh finds documents by the `[serve]` table on disk (#758): an engine opened before an
-/// edit that lists a document refreshes after one opened after the edit, as one call's refresh
-/// can run between another call's refresh and its query, and the index keeps that document.
 #[test]
 fn a_refresh_by_an_engine_opened_before_a_serve_edit_keeps_the_edited_documents() {
     let shop = repo(
@@ -303,7 +272,6 @@ fn a_refresh_by_an_engine_opened_before_a_serve_edit_keeps_the_edited_documents(
     newer.refresh().unwrap();
     older.refresh().unwrap();
 
-    // What a query of the newer engine reads after its refresh, with no refresh of its own.
     let db = rusqlite::Connection::open(shop.join(".meada/index.db")).unwrap();
     let listed = "SELECT count(*) FROM documents WHERE path = 'spec/contract.yaml'";
     assert_eq!(db.query_row(listed, [], |r| r.get::<_, i64>(0)).unwrap(), 1);

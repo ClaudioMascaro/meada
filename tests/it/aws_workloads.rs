@@ -1,5 +1,3 @@
-//! AWS function/task execution and scoped environment resolution (#664).
-
 use crate::common::{assert_golden, fixture_repo};
 use meada::engine::{Direction, Engine, Start};
 use serde_json::{Value, json};
@@ -69,8 +67,6 @@ fn terraform_lambda_runs_its_image_and_resolves_only_its_code_environment() {
     assert_golden("aws-workloads.lambda.trace.txt", &format!("{down}\n{up}"));
 }
 
-/// An override file's `dynamic "environment"` block replaces the environment blocks of the
-/// function it merges into, in JSON as in native syntax; what it generates is not read.
 #[test]
 fn a_dynamic_override_environment_replaces_the_written_one() {
     let json = r#"{"resource": {"aws_lambda_function": {"worker": {"dynamic": {"environment": {"for_each": [1], "content": {"variables": {"QUEUE_NAME": "orders"}}}}}}}}"#;
@@ -408,8 +404,6 @@ fn ecs_encoded_containers_run_images_independently_and_scope_environment_to_each
         .flatten()
         .collect::<Vec<_>>()
         .join("\n");
-    // `ghcr.io/acme` builds `aws-worker`, so `aws-sidecar` lacks a builder there; nothing of
-    // `docker.io/library` is built, so `redis` is no orphan (ADR 0026, "Orphan sides").
     assert!(
         status.contains("orphan image::ghcr.io/acme/aws-sidecar: no builder")
             && !status.contains("orphan image::docker.io/"),

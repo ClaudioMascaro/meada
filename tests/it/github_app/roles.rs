@@ -1,11 +1,3 @@
-//! The role check (#331, ADR 0016): `meada github-app roles` against the fake GitHub API of
-//! `super` (its collaborators listing), the local Valkey `MEADA_TEST_VALKEY_URL` names and the
-//! local Postgres `MEADA_TEST_POSTGRES_URL` names, each test in a schema and a key prefix of its
-//! own; and the readers of the pulled version honoring the exclusions file it writes. No test
-//! reads the module's tables: the set is seen through the command's line, its fence refusal and
-//! the readers. Without a service the tests that need it print why and skip; with
-//! `MEADA_TEST_SERVICES_REQUIRED=1` they fail.
-
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -16,15 +8,10 @@ use super::{Api, fixture, prefix};
 use crate::generations::Fleet;
 use crate::manifest::{CHAIN, MANIFEST, chain_manifest};
 
-/// The bootstrap manifest of a managed workspace, beside the chain's own.
 const BOOTSTRAP: &str = "ops/bootstrap.toml";
-/// Where its pulled version lives.
 const PULLED: &str = "store-indexes/workspace";
-/// The git host of the chain's identities, and of `[oidc.github]`.
 const HOST: &str = "example.com";
 
-/// The `added_by_time` of every attributed entry here (#454): after any permissions set a test
-/// writes, so the entry is checked by its roles.
 const AFTER: &str = "2999-01-01T00:00:00Z";
 
 const WEB: &str = "example.com/chain/web";
@@ -32,9 +19,6 @@ const GATEWAY: &str = "example.com/chain/gateway";
 const CATALOG: &str = "example.com/chain/catalog";
 const WORKER: &str = "example.com/chain/worker";
 
-/// A case of the role check: the chain's mirrors in `dir`, the fake API with an installation
-/// per App of `apps` on the owner `chain` (installation `10 * app + 1`), and the Postgres URL
-/// and schema of its own.
 struct Case {
     dir: PathBuf,
     api: Api,
@@ -69,8 +53,6 @@ impl Case {
         })
     }
 
-    /// `[postgres]`, `[oidc]` with `[oidc.github]` (`roles` as given, else the default) and a
-    /// `[[github_app]]` block per App, `with_valkey` adding the case's `[valkey]`.
     fn sections(&self, roles: Option<&str>, with_valkey: bool) -> String {
         let mut toml = String::new();
         if with_valkey {
@@ -99,8 +81,6 @@ impl Case {
         toml
     }
 
-    /// `ops/bootstrap.toml`: `[workspace] source = "store"` over `../store-indexes`, a
-    /// `[snapshot]` nothing connects to, `[generations]` and, with `fenced`, `[refresh_lock]`.
     fn bootstrap(&self, roles: Option<&str>, fenced: bool) {
         let lock = if fenced {
             "\n[refresh_lock]\nttl_seconds = 10\n"
@@ -123,7 +103,6 @@ impl Case {
         assert_eq!(migrated.2, Some(0), "{}", migrated.1);
     }
 
-    /// `[catalog]` (#341) appended to the bootstrap: `allow` patterns and the cap `max`.
     #[cfg(feature = "workspaces")]
     fn catalog(&self, allow: &[&str], max: usize) {
         let path = self.dir.join(BOOTSTRAP);
@@ -135,15 +114,12 @@ impl Case {
         fs::write(&path, fs::read_to_string(&path).unwrap() + &section).unwrap();
     }
 
-    /// The fake lists `repos` (`<owner>/<repo>`) among the repositories installation `id`
-    /// covers.
     #[cfg(feature = "workspaces")]
     fn cover(&self, id: u64, repos: &[&str]) {
         let repos = repos.iter().map(|r| r.to_string()).collect();
         self.api.with(|s| s.covered.insert(id, repos));
     }
 
-    /// Lists `collaborators` (login, role) for `<owner>/<repo>`.
     fn list(&self, repo: &str, collaborators: &[(&str, &str)]) {
         let rows = (collaborators.iter())
             .map(|(l, r)| (l.to_string(), r.to_string()))
@@ -152,8 +128,6 @@ impl Case {
             .with(|s| s.collaborators.insert(repo.to_string(), rows));
     }
 
-    /// `meada github-app roles --workspace <manifest>` with `fence` as `MEADA_REFRESH_FENCE`,
-    /// its stderr checked for leaks.
     fn roles(&self, manifest: &str, fence: Option<u64>) -> (String, String, Option<i32>) {
         let fence = fence.map(|f| f.to_string());
         let env: Vec<(&str, &str)> = fence
@@ -169,7 +143,6 @@ impl Case {
         out
     }
 
-    /// `roles` that succeeds: the set's id from its line, which must read `counts`.
     fn checked(&self, manifest: &str, fence: Option<u64>, counts: &str) -> (String, String) {
         let (stdout, stderr, code) = self.roles(manifest, fence);
         assert_eq!(code, Some(0), "{stderr}");
@@ -184,8 +157,6 @@ impl Case {
         (id.to_string(), stderr)
     }
 
-    /// Asserts `stderr` holds no token, JWT or key (`Api::clean`), no login GitHub lists or an
-    /// entry is attributed to, and neither the Postgres URL nor its password.
     fn clean(&self, stderr: &str) {
         self.api.clean(stderr);
         let lower = stderr.to_lowercase();
@@ -207,18 +178,15 @@ impl Case {
         }
     }
 
-    /// The exclusions file of the pulled version, when there is one.
     fn excluded(&self) -> Option<String> {
         fs::read_to_string(self.dir.join(PULLED).join("excluded")).ok()
     }
 
-    /// Every listing request the fake saw, as installation and path.
     fn listings(&self) -> Vec<(u64, String)> {
         self.api.with(|s| s.listings.clone())
     }
 }
 
-/// `meada <args>` in `dir` with `env`, in English, no fence or Postgres URL inherited.
 fn meada(dir: &Path, args: &[&str], env: &[(&str, &str)]) -> (String, String, Option<i32>) {
     let out = command(dir, args, env).output().expect("meada runs");
     let text = |bytes: &[u8]| String::from_utf8_lossy(bytes).into_owned();
@@ -241,13 +209,10 @@ fn command(dir: &Path, args: &[&str], env: &[(&str, &str)]) -> Command {
     command
 }
 
-/// `meada <args> --workspace ops/bootstrap.toml` in `dir`.
 fn on_bootstrap(dir: &Path, args: &[&str]) -> (String, String, Option<i32>) {
     meada(dir, &[args, &["--workspace", BOOTSTRAP]].concat(), &[])
 }
 
-/// `entries` (identity, path, `added_by`) as the workspace version pulled into `<dir>/PULLED`
-/// at fence 1, as `meada workspace pull` leaves it: its id. An exclusions file stays.
 fn pull_version(dir: &Path, entries: &[(&str, &str, Option<&str>)]) -> String {
     let blocks = serde_json::json!({});
     let hashed: Vec<meada_core::ids::VersionEntry> = (entries.iter())
@@ -275,7 +240,6 @@ fn pull_version(dir: &Path, entries: &[(&str, &str, Option<&str>)]) -> String {
     id
 }
 
-/// The chain's entries, `logins[n]` the `added_by` of the n-th.
 fn chain(
     logins: [Option<&'static str>; 4],
 ) -> Vec<(&'static str, &'static str, Option<&'static str>)> {
@@ -290,17 +254,10 @@ fn chain(
         .collect()
 }
 
-/// `n` collaborators `u0000`, `u0001`... with `role`.
 fn many(n: usize, role: &'static str) -> Vec<(String, &'static str)> {
     (0..n).map(|i| (format!("u{i:04}"), role)).collect()
 }
 
-/// `roles` lists every page of a 250-collaborator repository, each request with
-/// `affiliation=all` and `per_page=100`, and writes one set with every row whatever its role and
-/// a login checked ignoring case; a 404 and an owner no installation covers each give a warning
-/// naming the identity and no rows, and the run succeeds. With nothing to exclude the exclusions
-/// file holds the version id alone. A second run on the same version replaces the set (another
-/// id) and writes the same file.
 #[test]
 fn the_role_check_lists_every_page_and_replaces_the_set() {
     let Some(case) = Case::new("roles_pages", &[1]) else {
@@ -345,12 +302,6 @@ fn the_role_check_lists_every_page_and_replaces_the_set() {
     assert_eq!(case.excluded(), Some(format!("{version}\n")));
 }
 
-/// With `source = "file"` the role check lists the file's entries, writes no exclusions file
-/// and reads none. Under `[refresh_lock]` it needs `MEADA_REFRESH_FENCE`, a set is replaced at an
-/// equal or higher fence and refused at a lower one, naming the higher. A 403 on one
-/// installation marks it and passes to the next covering the owner; with every one throttled,
-/// or on a 5xx, the run exits 1 with one line naming the identity and the status, and the set
-/// stays: a lower fence is still refused naming its fence.
 #[cfg(feature = "refresh-lock")]
 #[test]
 fn a_set_is_never_replaced_by_a_lower_fence_or_a_failed_listing() {
@@ -396,14 +347,12 @@ fn a_set_is_never_replaced_by_a_lower_fence_or_a_failed_listing() {
         );
     };
     below(5);
-    // In Portuguese too, like every line of the role check.
     let pt = [("LANG", "pt_BR.UTF-8"), ("MEADA_REFRESH_FENCE", "4")];
     let (_, stderr, _) = meada(dir, &["github-app", "roles", "--workspace", MANIFEST], &pt);
     let line = "meada: o conjunto de permissões mais novo tem fence 5, acima do 4 desta execução: \
                 um refresh mais novo o gravou; nada foi gravado\n";
     assert_eq!(stderr, line);
 
-    // A 403 without `retry-after` marks installation 11 for a minute; the listing passes to 21.
     case.api
         .with(|s| s.listing_throttled.insert(11, (403, None)));
     let by = |id: u64| case.listings().iter().filter(|(i, _)| *i == id).count();
@@ -414,7 +363,6 @@ fn a_set_is_never_replaced_by_a_lower_fence_or_a_failed_listing() {
         "{stderr}"
     );
     assert_eq!(by(11), tried + 1);
-    // A 429 with `retry-after` on 21, 11 still marked: every one is throttled.
     case.api
         .with(|s| s.listing_throttled.insert(21, (429, Some(30))));
     let (stdout, stderr, code) = case.roles(MANIFEST, Some(7));
@@ -428,7 +376,6 @@ fn a_set_is_never_replaced_by_a_lower_fence_or_a_failed_listing() {
         )
     );
     below(6);
-    // Both marked: the run fails before any listing.
     let before = case.listings().len();
     let (_, stderr, code) = case.roles(MANIFEST, Some(7));
     assert_eq!(code, Some(1));
@@ -441,7 +388,6 @@ fn a_set_is_never_replaced_by_a_lower_fence_or_a_failed_listing() {
     );
     assert_eq!(case.listings().len(), before);
 
-    // The marks gone, a 5xx fails the run alike.
     let mut valkey = super::admin(&case.valkey);
     for id in [11, 21] {
         let key = format!(
@@ -465,9 +411,6 @@ fn a_set_is_never_replaced_by_a_lower_fence_or_a_failed_listing() {
     );
     below(6);
 
-    // A 403 with quota left and the permission message is no throttle: each installation is
-    // asked in turn (another App may hold the permission), the repository gets a warning and no
-    // rows, both installations stay unmarked and the run goes on.
     case.api.with(|s| {
         s.listing_status = None;
         s.listing_forbidden = Some("chain/web".into());
@@ -495,18 +438,12 @@ fn a_set_is_never_replaced_by_a_lower_fence_or_a_failed_listing() {
         .unwrap();
     assert!(!marked);
 
-    // The same 403 with a body past `DENIAL_MAX` is read as a throttle.
     case.api.with(|s| s.forbidden_padding = 5000);
     let (_, stderr, code) = case.roles(MANIFEST, Some(10));
     assert_eq!(code, Some(1), "{stderr}");
     assert!(stderr.contains("throttled"), "{stderr}");
 }
 
-/// An addition whose `added_by` GitHub lists with no role, or only with one outside `roles`,
-/// is excluded: named with the reason on stderr (never the login), counted in the set, in the
-/// exclusions file, absent from `show --pulled`, not indexed and absent from `status` and
-/// `export`. An entry without `added_by` is never excluded. Once GitHub lists an accepted role
-/// for each, a custom role `roles` names included, the next check includes them.
 #[test]
 fn an_addition_without_an_accepted_role_is_left_out_by_every_reader() {
     let Some(case) = Case::new("roles_excluded", &[1]) else {
@@ -557,7 +494,6 @@ fn an_addition_without_an_accepted_role_is_left_out_by_every_reader() {
     let listed = |repo: &str| status.lines().any(|l| l.starts_with(&format!("{repo} (")));
     assert!(listed(WEB) && listed(WORKER), "{status}");
     assert!(!listed(GATEWAY) && !listed(CATALOG), "{status}");
-    // Absent as an entry the workspace does not list: a peer that names it misses it.
     let missing = format!("missing peer: {GATEWAY}, named by {WEB}\n");
     assert!(status.contains(&missing), "{status}");
     let (_, stderr, code) = on_bootstrap(dir, &["export", "--repo", GATEWAY]);
@@ -567,7 +503,6 @@ fn an_addition_without_an_accepted_role_is_left_out_by_every_reader() {
     );
     assert_eq!(stderr, absent);
 
-    // GitHub now lists an accepted role for both, the custom one included.
     case.list("chain/gateway", &[("bia_acme", "release-manager")]);
     case.list("chain/catalog", &[("u0002", "admin"), ("caio", "read")]);
     let (_, stderr) = case.checked(BOOTSTRAP, None, "3 repositories, 5 rows, 0 exclusions");
@@ -583,13 +518,6 @@ fn an_addition_without_an_accepted_role_is_left_out_by_every_reader() {
     assert!(indexed(GATEWAY) && indexed(CATALOG));
 }
 
-/// Every reader of the pulled version under `[oidc.github]` (`index`, `status`, `export`,
-/// `snapshot publish` and `workspace show --pulled`) refuses, naming `meada github-app roles`,
-/// at the first pull, with no exclusions file, after a new pull, with the file of the previous
-/// version, and refuses a file with a malformed line naming the file and the line. With a file
-/// of the pulled version, `index` indexes and records no connection on the loopback listeners of
-/// the store, Valkey and Postgres. `--pulled` with a version is a usage error, and without
-/// `[oidc.github]` it prints the pulled version whole. None of this needs a service.
 #[test]
 fn every_reader_refuses_a_missing_stale_or_malformed_exclusions_file() {
     let listeners: Vec<std::net::TcpListener> = (0..3)
@@ -642,7 +570,6 @@ fn every_reader_refuses_a_missing_stale_or_malformed_exclusions_file() {
     fs::write(&excluded, format!("{v1}\n{WEB}\n")).unwrap();
     let (shown, _, _) = on_bootstrap(&dir, &["workspace", "show", "--pulled"]);
     assert!(!shown.contains(WEB) && shown.contains(GATEWAY), "{shown}");
-    // A new pull: the file names the version before.
     let v2 = pull_version(&dir, &entries[1..]);
     refused(&format!(
         "{file} names version {v1}, not the pulled version {v2}: run `meada github-app roles`"
@@ -671,7 +598,6 @@ fn every_reader_refuses_a_missing_stale_or_malformed_exclusions_file() {
     let (_, stderr, code) = on_bootstrap(&dir, &["workspace", "show", "--pulled", &v2]);
     assert_eq!(code, Some(2), "{stderr}");
     assert!(stderr.contains("--pulled"), "{stderr}");
-    // Without `[oidc.github]` the version is printed whole and no file is read.
     fs::remove_file(&excluded).unwrap();
     write("");
     let (shown, stderr, code) = on_bootstrap(&dir, &["workspace", "show", "--pulled"]);
@@ -682,12 +608,6 @@ fn every_reader_refuses_a_missing_stale_or_malformed_exclusions_file() {
     );
 }
 
-/// The local publication of a check (amendment of 2026-10-23): a failed check (a listing that
-/// fails or Postgres unreachable), a commit whose exclusions file cannot be written and a check
-/// killed mid-listing each leave no exclusions file, so a reader refuses rather than admit the previous check's exclusions for the same
-/// version, and the next check that succeeds writes it. Two checks at once: a low fence held
-/// mid-listing while a high one completes is refused at its commit, naming the high fence, and
-/// leaves the high check's file as it wrote it.
 #[cfg(feature = "refresh-lock")]
 #[test]
 fn a_failed_or_stale_check_never_leaves_exclusions_a_reader_admits() {
@@ -713,7 +633,6 @@ fn a_failed_or_stale_check_never_leaves_exclusions_a_reader_admits() {
     case.checked(BOOTSTRAP, Some(1), rows);
     assert_eq!(case.excluded().as_deref(), Some(excluding.as_str()));
 
-    // A failed check: the file of the same version is gone.
     case.api.with(|s| s.listing_status = Some(500));
     assert_eq!(case.roles(BOOTSTRAP, Some(1)).2, Some(1));
     assert_eq!(case.excluded(), None);
@@ -722,7 +641,6 @@ fn a_failed_or_stale_check_never_leaves_exclusions_a_reader_admits() {
     case.checked(BOOTSTRAP, Some(1), rows);
     assert_eq!(case.excluded().as_deref(), Some(excluding.as_str()));
 
-    // Postgres unreachable fails the check all the same: the file is gone.
     let pg_url = dir.join("ops/pg-url");
     fs::write(&pg_url, "postgres://meada:closed@127.0.0.1:9/meada").unwrap();
     assert_eq!(case.roles(BOOTSTRAP, Some(1)).2, Some(1));
@@ -732,7 +650,6 @@ fn a_failed_or_stale_check_never_leaves_exclusions_a_reader_admits() {
     case.checked(BOOTSTRAP, Some(1), rows);
     assert_eq!(case.excluded().as_deref(), Some(excluding.as_str()));
 
-    // The commit passes and the file cannot be written: exit 1 naming it, no file.
     let blocked = dir.join(PULLED).join("excluded.new");
     fs::create_dir_all(blocked.join("x")).unwrap();
     let (stdout, stderr, code) = case.roles(BOOTSTRAP, Some(2));
@@ -744,7 +661,6 @@ fn a_failed_or_stale_check_never_leaves_exclusions_a_reader_admits() {
     assert_eq!(case.excluded(), None);
     refused(dir);
     fs::remove_dir_all(&blocked).unwrap();
-    // The set it committed stands: a lower fence is refused, naming it.
     let (_, stderr, _) = case.roles(BOOTSTRAP, Some(1));
     assert!(
         stderr.contains("has fence 2, above this run's 1"),
@@ -752,7 +668,6 @@ fn a_failed_or_stale_check_never_leaves_exclusions_a_reader_admits() {
     );
     case.checked(BOOTSTRAP, Some(2), rows);
 
-    // Killed mid-listing: no file until a check completes again.
     case.api.with(|s| s.hold_next = true);
     let mut held = spawn_roles(dir, 3);
     wait(|| case.api.with(|s| s.holding));
@@ -763,8 +678,6 @@ fn a_failed_or_stale_check_never_leaves_exclusions_a_reader_admits() {
     refused(dir);
     case.checked(BOOTSTRAP, Some(3), rows);
 
-    // A low fence held mid-listing while a high one completes, with GitHub then listing the
-    // gateway's adder: the low check, which would exclude nothing, is refused at its commit.
     case.api.with(|s| s.hold_next = true);
     let low = spawn_roles(dir, 4);
     wait(|| case.api.with(|s| s.holding));
@@ -788,11 +701,6 @@ fn a_failed_or_stale_check_never_leaves_exclusions_a_reader_admits() {
     assert_eq!(case.excluded().as_deref(), Some(high.as_str()));
 }
 
-/// A Postgres that takes the connection and then answers nothing (the server's own
-/// `statement_timeout` never fires on it): the role check ends with exit 1 once its bound passes,
-/// one connect timeout and three statements (the version check's two and the fence's) of one
-/// second each, naming the wait, and the exclusions file of the pulled version is gone. None of
-/// this needs a service.
 #[test]
 fn a_postgres_that_stops_answering_fails_the_role_check_within_its_bound() {
     let stalled = crate::postgres::Stalled::start();
@@ -828,7 +736,6 @@ fn a_postgres_that_stops_answering_fails_the_role_check_within_its_bound() {
     assert!(!excluded.exists());
 }
 
-/// `meada github-app roles --workspace ops/bootstrap.toml` at `fence`, started.
 fn spawn_roles(dir: &Path, fence: u64) -> std::process::Child {
     let fence = fence.to_string();
     let args = ["github-app", "roles", "--workspace", BOOTSTRAP];
@@ -839,7 +746,6 @@ fn spawn_roles(dir: &Path, fence: u64) -> std::process::Child {
         .expect("meada runs")
 }
 
-/// Waits up to 30 s for `done`.
 fn wait(done: impl Fn() -> bool) {
     let start = Instant::now();
     while !done() {
@@ -848,8 +754,6 @@ fn wait(done: impl Fn() -> bool) {
     }
 }
 
-/// `roles` exits 1 on a schema it does not know: one never migrated, naming `meada postgres
-/// migrate`, and one a newer Meada migrated, naming both versions; neither lists anything.
 #[test]
 fn the_role_check_refuses_a_schema_version_it_does_not_know() {
     let Some(case) = Case::new("roles_schema", &[1]) else {
@@ -877,9 +781,6 @@ fn the_role_check_refuses_a_schema_version_it_does_not_know() {
     assert!(case.listings().is_empty());
 }
 
-/// A `Link` header the role check refuses fails the run before any further request: another
-/// origin, a user in it, another repository, a page listed already. The token goes nowhere else.
-/// An answer past the size cap fails the run too.
 #[test]
 fn a_hostile_pagination_link_fails_the_run_and_is_never_followed() {
     let Some(case) = Case::new("roles_links", &[1]) else {
@@ -929,8 +830,6 @@ fn a_hostile_pagination_link_fails_the_run_and_is_never_followed() {
     foreign.set_nonblocking(true).unwrap();
     let accepted = foreign.accept().map(drop).map_err(|e| e.kind());
     assert_eq!(accepted, Err(std::io::ErrorKind::WouldBlock));
-    // An answer past the size cap of the module's REST answers (4 MiB) fails the run alike; one
-    // at the cap is read.
     case.api.with(|s| {
         s.link = None;
         s.listing_bytes = Some((4 << 20) + 1);
@@ -946,9 +845,6 @@ fn a_hostile_pagination_link_fails_the_run_and_is_never_followed() {
     case.checked(BOOTSTRAP, None, "4 repositories, 0 rows, 0 exclusions");
 }
 
-/// The fleet's chain in `fleet.dir` as a managed workspace: `BOOTSTRAP` takes the fleet's store,
-/// Valkey and lock and the role check's sections and is migrated, and the fake lists one
-/// collaborator per chain repository.
 #[cfg(feature = "refresh-lock")]
 fn managed(case: &Case, fleet: &Fleet) {
     let dir = &fleet.dir;
@@ -962,14 +858,12 @@ fn managed(case: &Case, fleet: &Fleet) {
     fs::write(dir.join(BOOTSTRAP), bootstrap).unwrap();
     let _ = fs::remove_dir_all(dir.join("store-indexes"));
     assert_eq!(on_bootstrap(dir, &["postgres", "migrate"]).2, Some(0));
-    // The fleet's Valkey holds the installations under its own prefix: the fake's App 1.
     case.list("chain/web", &[("ana-souza", "write")]);
     case.list("chain/gateway", &[("u0001", "write")]);
     case.list("chain/catalog", &[("u0002", "write")]);
     case.list("chain/worker", &[("u0003", "write")]);
 }
 
-/// `text`'s entries with `logins` as their `added_by`, imported as `name` and applied: its id.
 #[cfg(feature = "refresh-lock")]
 fn apply_version(dir: &Path, text: &str, name: &str, logins: [Option<&str>; 4]) -> String {
     let file = format!("ops/{name}.toml");
@@ -992,7 +886,6 @@ fn apply_version(dir: &Path, text: &str, name: &str, logins: [Option<&str>; 4]) 
     id
 }
 
-/// The identities of generation `generation` in the fleet's store, sorted.
 #[cfg(feature = "refresh-lock")]
 fn held_by(fleet: &Fleet, generation: &str) -> Vec<String> {
     let s3 = crate::snapshot::bucket(&fleet.endpoint, &fleet.bucket);
@@ -1006,14 +899,6 @@ fn held_by(fleet: &Fleet, generation: &str) -> Vec<String> {
     held
 }
 
-/// The job's refresh under `meada snapshot lock` (pull, the role check, the fetch list
-/// `show --pulled` gives, index, publish) against the local store: an addition without an
-/// accepted role is absent from the published generation; one that stops at the role check
-/// publishes nothing. `import` and `show` carry `added_by`, and the output imports to the same
-/// id. Once the global operator clears the adder (adopting the entry), a refresh whose index
-/// fails keeps the current generation (#316), and the next complete one publishes the entry in
-/// a new generation. A change of `added_by` alone, eligibility unchanged, publishes the same
-/// generation.
 #[cfg(feature = "refresh-lock")]
 #[test]
 fn a_refresh_publishes_only_eligible_additions_and_an_adopted_one_after_its_check() {
@@ -1028,7 +913,6 @@ fn a_refresh_publishes_only_eligible_additions_and_an_adopted_one_after_its_chec
     let text = fs::read_to_string(dir.join(MANIFEST)).unwrap();
     let version = |name: &str, logins: [Option<&str>; 4]| apply_version(dir, &text, name, logins);
     let v1 = version("v1", [Some("ana-souza"), Some("bia_acme"), None, None]);
-    // `show` carries `added_by`, and its output imports to the same id.
     let (shown, stderr, code) = meada(
         dir,
         &["workspace", "show", &v1, "--workspace", MANIFEST],
@@ -1083,7 +967,6 @@ fn a_refresh_publishes_only_eligible_additions_and_an_adopted_one_after_its_chec
     let list = fs::read_to_string(dir.join("ops/fetch.list")).unwrap();
     assert!(!list.contains(GATEWAY) && list.contains(WEB), "{list}");
 
-    // A refresh that stops at the role check publishes nothing.
     case.api.with(|s| s.listing_status = Some(502));
     let (_, stderr, code) = refresh();
     assert_eq!(code, Some(1), "{stderr}");
@@ -1091,7 +974,6 @@ fn a_refresh_publishes_only_eligible_additions_and_an_adopted_one_after_its_chec
     assert_eq!(current(), g1);
     case.api.with(|s| s.listing_status = None);
 
-    // Adopted: the gateway's adder cleared. Its index cannot be written: nothing is published.
     version("v2", [Some("ana-souza"), None, None, None]);
     let indexes = dir.join("store-indexes/example.com/chain");
     let Some(locked) = crate::manifest::ReadOnly::lock(&indexes) else {
@@ -1108,8 +990,6 @@ fn a_refresh_publishes_only_eligible_additions_and_an_adopted_one_after_its_chec
     assert_eq!(current(), g2);
     assert_eq!(held(&g2), [CATALOG, GATEWAY, WEB, WORKER]);
 
-    // Attribution alone changes: the same eligible entries, commits and blocks, the same
-    // generation.
     case.list("chain/catalog", &[("u0002", "write"), ("caio", "read")]);
     version("v3", [Some("ana-souza"), None, Some("caio"), None]);
     let (g3, stderr, code) = refresh();
@@ -1117,13 +997,6 @@ fn a_refresh_publishes_only_eligible_additions_and_an_adopted_one_after_its_chec
     assert_eq!(g3, g2);
 }
 
-/// `deploy/compose/managed-refresh.sh` itself, under `meada snapshot lock`, with its paths moved
-/// into a case directory and `fetch-pulled.sh` (tested on its own) replaced by a stub that keeps
-/// the list it is given: a successful role check with one excluded entry (the gateway, whose
-/// adder GitHub lists no role for) hands the fetch the eligible entries and publishes them,
-/// exit 0. A failed role check exits 1 with the check's line before the script lists the pulled
-/// version or reaches the fetch, and the pointer keeps the last generation; the check repaired,
-/// the next run publishes the same generation.
 #[cfg(feature = "refresh-lock")]
 #[test]
 fn the_compose_managed_refresh_stops_at_a_failed_role_check_and_publishes_the_eligible_set() {
@@ -1142,7 +1015,6 @@ fn the_compose_managed_refresh_stops_at_a_failed_role_check_and_publishes_the_el
         "v1",
         [Some("ana-souza"), Some("bia_acme"), None, None],
     );
-    // The script reads its bootstrap where the compose profile mounts it.
     fs::copy(dir.join(BOOTSTRAP), dir.join(MANIFEST)).unwrap();
     crate::refresh_lock::compose_managed(dir);
     fs::write(
@@ -1178,8 +1050,6 @@ fn the_compose_managed_refresh_stops_at_a_failed_role_check_and_publishes_the_el
     let list = fs::read_to_string(dir.join("ops/fetched.toml")).unwrap();
     assert!(!list.contains(GATEWAY) && list.contains(WEB), "{list}");
 
-    // The role check fails: the script exits 1 before it lists the pulled version, so the fetch
-    // never runs, and nothing is published.
     case.api.with(|s| s.listing_status = Some(502));
     let (_, stderr, code) = refresh();
     assert_eq!(code, Some(1), "{stderr}");
@@ -1187,18 +1057,12 @@ fn the_compose_managed_refresh_stops_at_a_failed_role_check_and_publishes_the_el
     assert!(!dir.join("ops/pulled.toml").exists() && !dir.join("ops/fetched.toml").exists());
     assert_eq!(current(), g1);
 
-    // Repaired: the eligible set is the same, so is its generation.
     case.api.with(|s| s.listing_status = None);
     let (g2, stderr, code) = refresh();
     assert_eq!(code, Some(0), "{stderr}");
     assert_eq!(g2, g1);
 }
 
-/// With `[catalog]` the role check lists, per installation whose owner a pattern names, every
-/// page of the repositories it covers, keeps those the allow list admits (names compared
-/// lowercase) and lists the collaborators of each beside the workspace's own: an installation on
-/// an owner no pattern names is never asked, and neither is a repository the list refuses.
-/// Selected and allowed repositories are counted once.
 #[cfg(feature = "workspaces")]
 #[test]
 fn the_catalog_adds_the_covered_and_allowed_repositories_to_the_set() {
@@ -1248,9 +1112,6 @@ fn the_catalog_adds_the_covered_and_allowed_repositories_to_the_set() {
     assert!(listings.iter().all(|(id, _)| *id != 13), "{listings:?}");
 }
 
-/// The catalog lists every page of an installation, and a candidate set above `max_repositories`
-/// (the selected repositories not counted) fails the run with the count and the cap, in both
-/// languages.
 #[cfg(feature = "workspaces")]
 #[test]
 fn the_catalog_lists_every_page_and_refuses_a_set_above_its_cap() {
@@ -1306,10 +1167,6 @@ fn the_catalog_lists_every_page_and_refuses_a_set_above_its_cap() {
     );
 }
 
-/// A catalog listing that fails (a cap exceeded, a throttled installation, a 5xx, a page that is
-/// not the documented object) fails the run and writes nothing: after each one the set of the
-/// run before still stands, so a run at a fence between them is accepted. The throttled
-/// installation is marked, as every other REST use of the module marks it.
 #[cfg(all(feature = "workspaces", feature = "refresh-lock"))]
 #[test]
 fn a_failed_catalog_listing_writes_nothing() {
@@ -1350,7 +1207,6 @@ fn a_failed_catalog_listing_writes_nothing() {
         "meada: installation 11: throttled for 30 s\nmeada: installation 11: listing its \
          repositories for the catalog failed: throttled (http status 429); nothing was written\n"
     );
-    // The mark holds: the next run does not ask the installation at all.
     let before = case.listings().len();
     let stderr = failed(7);
     assert_eq!(
@@ -1391,8 +1247,6 @@ fn a_failed_catalog_listing_writes_nothing() {
         case.clean(&stderr);
     }
 
-    // An App whose installations cannot be listed fails the run too, though Valkey still holds
-    // the last listing: skipping its owners would empty their repositories from the catalog.
     case.api.with(|s| {
         s.covered_body = None;
         s.installations_status = Some(500);
@@ -1409,7 +1263,6 @@ fn a_failed_catalog_listing_writes_nothing() {
     );
     case.api.with(|s| s.installations_status = None);
 
-    // An App throttled with nothing held and no recent listing fails it as well, without asking.
     let app = |name: &str| format!("{}:github-app:{HOST}:app:1:{name}", prefix(case.case));
     let mut send = |args: &[&str]| {
         let _: () = redis::cmd(args[0])
@@ -1428,6 +1281,5 @@ fn a_failed_catalog_listing_writes_nothing() {
     assert_eq!(case.listings().len(), before);
     send(&["DEL", &app("throttled")]);
 
-    // None of them wrote a set at fence 7: a run at 6 is accepted.
     case.checked(BOOTSTRAP, Some(6), counts);
 }

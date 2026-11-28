@@ -141,7 +141,6 @@ class Smoke:
         step = f'checkout/{label}/{name}-{sha}'
         result = self.command(step, target, ['git', 'checkout', '-q', '--detach', sha], check=False)
         if result.returncode:
-            # A checkout can fail with the object present (e.g. a worktree lock).
             probe = self.command(step + '-object', target, ['git', 'cat-file', '--batch-check'], stdin=sha + '\n')
             if probe.stdout == f'{sha} missing\n':
                 raise FileNotFoundError(f'{origin} at {sha}: {result.stderr.strip()}')
@@ -314,8 +313,6 @@ def client_site(path, symbol, call):
     return f'{APP}::orders/clients/{path}::{symbol}::{call}'
 
 
-# The pinned sources' search locations, including clients added before the eight-pack
-# corpus. The four version-sensitive requests have independent export source keys.
 SEARCH_LINES = (20, 24, 30, 26, 11, 7, 11, 8, 13, 6)
 STABLE_ORDERS = tuple(f'orders/evidence/client.go:{line}' for line in (13, 20, 24, 31, 39)) + tuple(
     f'orders/{name}/client.go:17' for name in ('httpkey', 'neutral', 'oskey'))
@@ -335,7 +332,6 @@ def sqs(rig, data, binary, *, historical=False):
                 'provisions': [row for row in data['provisions'] if row['side'] == site]}
         expected = [QUEUE, QUEUE_NODE, 'exact'] if known else 'no selected queue at runtime choice'
         if historical:
-            # The inherited SDK regression drops the single-return helper at this tier.
             known = name == 'publishLiteral'
         providers = rows['providers']
         matches = (len(providers) == 1 and providers[0]['contract'] == (QUEUE if known else 'channel::sqs')
@@ -451,8 +447,6 @@ def score_http(rig, binary, data):
 
 def score_http_mcp(rig, binary, data, texts):
     known = {row['site'] for row in data['consumers'] if row['contract'] == ROUTE}
-    # Check by location. The two overridden calls and two JVM calls can legitimately
-    # differ between slots. Their own export oracles decide those four rows.
     callers = list(STABLE_ORDERS)
     for (path, symbol, call, issue), line in zip(HTTP, SEARCH_LINES, strict=True):
         if not issue or client_site(path, symbol, call) in known:

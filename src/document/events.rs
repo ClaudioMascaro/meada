@@ -1,42 +1,15 @@
-//! The event reader: YAML and JSON read one event at a time into the JSON value model, so every
-//! reader sees one tree whatever the syntax, and a caller that asks is handed every scalar with
-//! its 1-based line and its position in its document. `read` reads every document of a stream,
-//! `first` the first one and nothing past it.
-//!
-//! YAML: `yaml-rust2`'s event parser. A mapping key is the scalar text as written (`200:` is the
-//! key `"200"`); a plain scalar is typed by the YAML 1.2 core schema, a quoted or block one is a
-//! string; tags are not read, except by `read_keyed` with `tags`, which turns a node tagged `!Name` into the
-//! mapping `{"Fn::Name": node}` (`!Ref` into `{"Ref": node}`, `!Condition` into `{"Condition":
-//! node}`), the long form CloudFormation gives its intrinsic functions. An alias repeats the node
-//! its anchor holds in the same document, its scalars handed out again at the alias's line.
-//!
-//! JSON: `serde_json` reads the text first, so a JSON file reads, or fails with the same line and
-//! reason, as `serde_json` has it; a lexer then walks the text it accepted, each string and
-//! literal decoded by `serde_json`. One document.
-//!
-//! Every node built, aliases included, and every document is charged to a budget proportional to
-//! the source, so a small file cannot expand into a huge tree ("billion laughs"). Nothing recurses
-//! per level of nesting: the collections being read are an explicit stack, and a document nested
-//! deeper than `MAX_NESTING`, an alias's node counted at the depth it lands, is unreadable.
-
 use std::collections::HashMap;
 
 use serde_json::{Map, Number, Value};
 use yaml_rust2::parser::{Event, Parser, Tag};
 use yaml_rust2::scanner::TScalarStyle;
 
-/// What a node costs, besides the bytes of its text: the budget is `EXPANSION` times the
-/// source length plus `SLACK`, far above what a document without aliases uses.
 const EXPANSION: usize = 4;
 const SLACK: usize = 1 << 16;
 
-/// How many collections may be open inside each other, the same limit `serde_json` puts on a
-/// JSON document. Deeper, the document is unreadable: the tree a reader walks, and drops,
-/// recursively stays shallow.
 // ponytail: real documents nest a few dozen levels; 128 matches JSON's limit.
 const MAX_NESTING: usize = 128;
 
-/// The syntax a text is read with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Syntax {
     Yaml,
@@ -44,7 +17,6 @@ pub enum Syntax {
 }
 
 impl Syntax {
-    /// JSON by the extension of `path`, YAML otherwise.
     pub fn of(path: &str) -> Syntax {
         if path.ends_with(".json") {
             Syntax::Json
@@ -54,34 +26,22 @@ impl Syntax {
     }
 }
 
-/// A step from a collection to the node it holds: a mapping's key, or a sequence's 0-based
-/// index.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Step {
     Key(String),
     Index(usize),
 }
 
-/// A scalar as the reader meets it.
 #[derive(Debug, PartialEq)]
 pub struct Scalar<'a> {
-    /// The 0-based index of its document in the stream.
     pub document: usize,
-    /// Its position in its document, from the root, the steps its key path is written from;
-    /// empty when the document is the scalar.
     pub path: &'a [Step],
-    /// A string, a number, a boolean or null.
     pub value: &'a Value,
-    /// 1-based; for a scalar an alias repeats, the alias's.
     pub line: usize,
 }
 
-/// The line and the reason a text cannot be read.
 pub type Error = (usize, String);
 
-/// Every document of `src`, handing each scalar to `each` as it is read, in the order of the
-/// text (an aliased mapping's scalars in key order). A document that cannot be read fails the
-/// stream.
 pub fn read(
     syntax: Syntax,
     src: &[u8],
@@ -95,21 +55,13 @@ pub fn read(
     Ok(documents)
 }
 
-/// The line of a key of the first document's second level: `section` is its top-level key and `key`
-/// its own (`Resources` and a logical id, `services` and a service name).
 #[derive(Debug, PartialEq)]
 pub struct KeyLine {
     pub section: String,
     pub key: String,
-    /// 1-based.
     pub line: usize,
 }
 
-/// `read` that also gives the line of every second-level key of the first document, and, with
-/// `tags`, keeps CloudFormation's short-form tags: a node tagged `!Name` is read as the mapping
-/// `{"Fn::Name": node}` (`Ref` and `Condition` without the prefix). The scalars handed to `each`
-/// are the nodes' own, at the path of the tagged node, so a line is the one of the text. A JSON
-/// text has no tags and reads as `read` does.
 pub fn read_keyed(
     syntax: Syntax,
     src: &[u8],
@@ -126,18 +78,13 @@ pub fn read_keyed(
     Ok((documents, std::mem::take(&mut reader.builder.keys)))
 }
 
-/// A collection's source location. `path` is borrowed from the reader, and a mapping value
-/// starts at its key, including when the opening bracket is on a later line.
 pub(crate) struct Collection<'a> {
-    /// The 0-based index of its document in the stream.
     pub document: usize,
     pub path: &'a [Step],
     pub line: usize,
     pub end_line: usize,
 }
 
-/// Reads JSON through the shared bounded reader, handing each collection's location to
-/// `each` when it closes. No source paths or locations are allocated by this callback seam.
 pub(crate) fn json_spanned(
     src: &[u8],
     each: impl FnMut(Collection<'_>, &Value),
@@ -148,8 +95,6 @@ pub(crate) fn json_spanned(
         .unwrap_or(Value::Null))
 }
 
-/// `read` with a borrowed completed collection beside its span. The callback sees repeated
-/// JSON properties before a later property replaces one in the generic value tree.
 pub(crate) fn read_located(
     syntax: Syntax,
     src: &[u8],
@@ -165,15 +110,12 @@ pub(crate) fn read_located(
     Ok(documents)
 }
 
-/// The first document of `src`, null when the stream has none. Nothing past it is read, so a
-/// later document that cannot be read changes nothing.
 pub fn first(syntax: Syntax, src: &[u8]) -> Result<Value, Error> {
     let mut ignore = |_: Scalar<'_>| {};
     let mut reader = Reader::new(syntax, src, &mut ignore)?;
     Ok(reader.document()?.unwrap_or(Value::Null))
 }
 
-/// `src` as text, or the line of its first byte that is not UTF-8.
 fn text(src: &[u8]) -> Result<&str, Error> {
     std::str::from_utf8(src).map_err(|e| {
         let line = src[..e.valid_up_to()]
@@ -187,7 +129,6 @@ fn text(src: &[u8]) -> Result<&str, Error> {
 
 enum Source<'s> {
     Yaml(Box<Parser<std::str::Chars<'s>>>),
-    /// The text `serde_json` accepted, until its one document is read.
     Json(Option<&'s str>),
 }
 
@@ -202,14 +143,12 @@ impl<'s, 'f> Reader<'s, 'f> {
         src: &'s [u8],
         each: &'f mut dyn FnMut(Scalar<'_>),
     ) -> Result<Self, Error> {
-        // A byte order mark some editors write first is no part of the first key (YAML 1.2 §5.2).
         let src = src.strip_prefix("\u{feff}".as_bytes()).unwrap_or(src);
         let source = match syntax {
             Syntax::Yaml => Source::Yaml(Box::new(Parser::new_from_str(text(src)?))),
             Syntax::Json => {
                 serde_json::from_slice::<Value>(src).map_err(|e| {
                     let error = e.to_string();
-                    // The position is the line; the column is noise in a status line.
                     let error = error.split(" at line ").next().unwrap_or(&error);
                     (e.line(), error.to_string())
                 })?;
@@ -233,7 +172,6 @@ impl<'s, 'f> Reader<'s, 'f> {
         Ok(Reader { source, builder })
     }
 
-    /// The next document, or `None` past the last.
     fn document(&mut self) -> Result<Option<Value>, Error> {
         let b = &mut self.builder;
         let done = match &mut self.source {
@@ -252,8 +190,6 @@ impl<'s, 'f> Reader<'s, 'f> {
     }
 }
 
-/// Reads the events of one document into `b`; true when the stream ended instead. The parser's
-/// events are taken one at a time: its own `load` recurses once per level of nesting.
 fn yaml(parser: &mut Parser<std::str::Chars<'_>>, b: &mut Builder) -> Result<bool, Error> {
     loop {
         let (event, mark) = parser
@@ -267,8 +203,6 @@ fn yaml(parser: &mut Parser<std::str::Chars<'_>>, b: &mut Builder) -> Result<boo
                 b.charge(1, line);
             }
             Event::Scalar(mut text, style, anchor, tag) => {
-                // Files joined into one stream carry their byte order marks into later documents,
-                // where the parser reads one into the first key.
                 if matches!(style, TScalarStyle::Plain) && text.starts_with('\u{feff}') {
                     text.remove(0);
                 }
@@ -298,9 +232,6 @@ fn yaml(parser: &mut Parser<std::str::Chars<'_>>, b: &mut Builder) -> Result<boo
     }
 }
 
-/// Reads the one document of `text`, which `serde_json` accepted, into `b`: brackets open and
-/// close, each string or literal is decoded by `serde_json`, and a mapping's keys and values
-/// alternate, so `,` and `:` are separators.
 fn json(text: &str, b: &mut Builder) -> Result<bool, Error> {
     let bytes = text.as_bytes();
     let (mut at, mut line) = (0, 1);
@@ -340,8 +271,6 @@ fn json(text: &str, b: &mut Builder) -> Result<bool, Error> {
     Ok(false)
 }
 
-/// A collection being read, with its anchor, the cost of what it holds so far, how many
-/// collections deep it is, itself included, and whether it is, or is inside, a mapping key.
 struct Open {
     node: Node,
     anchor: usize,
@@ -350,17 +279,14 @@ struct Open {
     in_key: bool,
     line: usize,
     key_line: Option<usize>,
-    /// The key the node is wrapped in when it closes: its tag's, under `read_keyed` with `tags`.
     wrap: Option<String>,
 }
 
 enum Node {
     Sequence(Vec<Value>),
-    /// The entries so far, and the key waiting for its value.
     Mapping(Map<String, Value>, Option<String>),
 }
 
-/// An anchored node, with its cost and depth, charged again at every alias.
 #[derive(Clone)]
 struct Anchored {
     value: Value,
@@ -372,19 +298,14 @@ type CollectionCallback<'f> = &'f mut dyn FnMut(Collection<'_>, &Value);
 
 struct Builder<'f> {
     stack: Vec<Open>,
-    /// The position of the node being read: for each open collection, the step to the node
-    /// being read in it.
     path: Vec<Step>,
     anchors: HashMap<usize, Anchored>,
     budget: usize,
-    /// The index of the document being read.
     document: usize,
     root: Option<Value>,
     error: Option<Error>,
     each: &'f mut dyn FnMut(Scalar<'_>),
-    /// Whether a node's tag wraps it (`read_keyed` with `tags`).
     tags: bool,
-    /// Whether the second-level keys of the first document are recorded (`read_keyed`).
     keyed: bool,
     keys: Vec<KeyLine>,
     collections: Option<CollectionCallback<'f>>,
@@ -412,7 +333,6 @@ impl Builder<'_> {
         self.fail(line, &format!("nested deeper than {MAX_NESTING} levels"));
     }
 
-    /// Whether the next node is a mapping key.
     fn at_key(&self) -> bool {
         matches!(
             self.stack.last(),
@@ -423,8 +343,6 @@ impl Builder<'_> {
         )
     }
 
-    /// Points the path at the node about to be read: in a sequence, the next index. In a
-    /// mapping the key did, when it was placed.
     fn begin(&mut self) {
         if let (
             Some(Open {
@@ -438,8 +356,6 @@ impl Builder<'_> {
         }
     }
 
-    /// The key a node tagged `tag` is wrapped in: under `read_keyed` with `tags`, `Fn::<name>` for `!<name>`
-    /// (`Ref` and `Condition` as they are), and never a mapping key.
     fn wrapper(&self, tag: &Option<Tag>) -> Option<String> {
         let tag = tag.as_ref().filter(|t| self.tags && t.handle == "!")?;
         if tag.suffix.is_empty() || self.at_key() || self.stack.last().is_some_and(|o| o.in_key) {
@@ -451,7 +367,6 @@ impl Builder<'_> {
         })
     }
 
-    /// Wraps `value` in `{wrap: value}` when it has a wrapper, charging the node.
     fn wrapped(
         &mut self,
         value: Value,
@@ -487,7 +402,6 @@ impl Builder<'_> {
         self.place(value, cost, depth, line);
     }
 
-    /// An alias: its node's copy is charged before it is made.
     fn alias(&mut self, anchor: usize, line: usize) {
         let Some(&Anchored { cost, depth, .. }) = self.anchors.get(&anchor) else {
             return self.fail(line, "an alias to no anchor");
@@ -558,9 +472,6 @@ impl Builder<'_> {
         self.place(value, cost, depth, line);
     }
 
-    /// Hands every scalar of `value`, read at the path, to `each`, unless it is a mapping key or
-    /// inside one, which is no value. A walk over an explicit stack: an aliased node is as deep
-    /// as `MAX_NESTING` allows.
     fn hand_out(&mut self, value: &Value, line: usize) {
         if self.at_key() || self.stack.last().is_some_and(|open| open.in_key) {
             return;
@@ -592,7 +503,6 @@ impl Builder<'_> {
         self.path.truncate(base);
     }
 
-    /// Places a finished node in the collection that holds it, or as the root.
     fn place(&mut self, value: Value, cost: usize, depth: usize, line: usize) {
         let Some(open) = self.stack.last_mut() else {
             self.root = Some(value);
@@ -628,8 +538,6 @@ impl Builder<'_> {
         }
     }
 
-    /// Keeps a copy of an anchored node for its aliases, charged like an alias: anchors nested
-    /// around a large node copy it once per level.
     fn remember(&mut self, anchor: usize, value: &Value, cost: usize, depth: usize, line: usize) {
         if anchor != 0 && self.charge(cost, line) {
             let value = value.clone();
@@ -638,8 +546,6 @@ impl Builder<'_> {
     }
 }
 
-/// A plain scalar by the YAML 1.2 core schema: null, a boolean, a number JSON can hold, or
-/// else the text.
 fn plain(text: String) -> Value {
     match text.as_str() {
         "" | "~" | "null" | "Null" | "NULL" => return Value::Null,
@@ -668,10 +574,8 @@ mod tests {
 
     use super::{Step, Syntax, first, read};
 
-    /// A scalar handed out, as `(document, path, value, line)` with the path written `a.[0].b`.
     type Row = (usize, String, Value, usize);
 
-    /// The documents of `src` and every scalar handed out.
     fn scalars(syntax: Syntax, src: &str) -> (Vec<Value>, Vec<Row>) {
         let mut out = Vec::new();
         let documents = read(syntax, src.as_bytes(), |s| {
@@ -702,19 +606,15 @@ mod tests {
     #[test]
     fn yaml_reads_as_the_json_value_model() {
         for (src, expected) in [
-            // Keys as written, plain scalars typed, quoted ones strings.
             (
                 "200: ok\n'n': 1\nf: 1.5\nb: true\nz: ~\ns: '3.0'\nv: 3.1.0\n",
                 json!({"200": "ok", "n": 1, "f": 1.5, "b": true, "z": null, "s": "3.0", "v": "3.1.0"}),
             ),
-            // `true:` is the key "true"; a block scalar is text.
             ("true: |\n  a\n", json!({"true": "a\n"})),
-            // An alias repeats its anchor's node.
             (
                 "a: &x {k: [1, 2]}\nb: *x\n",
                 json!({"a": {"k": [1, 2]}, "b": {"k": [1, 2]}}),
             ),
-            // The first document only.
             ("a: 1\n---\nb: 2\n", json!({"a": 1})),
             ("", json!(null)),
         ] {
@@ -743,7 +643,6 @@ mod tests {
                 row(0, "ports.[0]", json!(80), 3),
                 row(0, "ports.[1].host", json!(8080), 4),
                 row(0, "ports.[1].tls", json!(false), 4),
-                // A block scalar's line is its text's first.
                 row(0, "note", json!("two\nlines\n"), 6),
                 row(0, "empty", json!(null), 8),
                 row(0, "tags.[0]", json!("a"), 9),
@@ -771,12 +670,10 @@ mod tests {
                 row(0, "a", json!(1), 1),
                 row(1, "[0]", json!("x"), 3),
                 row(1, "[1]", json!("y"), 4),
-                // A document that is one scalar has no path.
                 row(2, "", json!("just text"), 5),
                 row(3, "", json!(null), 7),
             ]
         );
-        // `first` stops at the first document: a broken second one is never read.
         assert_eq!(
             first(Syntax::Yaml, b"a: 1\n---\nb: [unclosed\n"),
             Ok(json!({"a": 1}))
@@ -800,7 +697,6 @@ mod tests {
                 row(0, "also", json!("api"), 6),
             ]
         );
-        // Anchors belong to their document.
         let other = read(Syntax::Yaml, b"a: &x 1\n---\nb: *x\n", |_| {});
         assert_eq!(other, Err((3, "an alias to no anchor".into())));
     }
@@ -822,7 +718,6 @@ mod tests {
                 row(0, "t", json!(true), 4),
             ]
         );
-        // What `serde_json` refuses fails with its line and reason, YAML-only syntax included.
         for (src, line, reason) in [
             ("{\"a\": 1,}\n", 1, "trailing comma"),
             ("{a: 1}", 1, "key must be a string"),
@@ -840,7 +735,6 @@ mod tests {
     fn unreadable_yaml_gives_its_line_and_reason() {
         let (line, _) = first(Syntax::Yaml, b"a: 1\nb: [unclosed\n").unwrap_err();
         assert_eq!(line, 3);
-        // A collection as a key: no scalar of it is handed out as a value.
         let mut handed = Vec::new();
         let result = read(Syntax::Yaml, b"? [a, {b: c}]\n: 1\n", |s| {
             handed.push(s.value.clone())
@@ -858,27 +752,22 @@ mod tests {
 
     #[test]
     fn nesting_past_the_limit_is_unreadable_not_a_crash() {
-        // 200,000 block sequences inside each other in 400 KB: a recursive reader overflows
-        // the stack long before the end.
         let src = format!("{}x\n", "- ".repeat(200_000));
         let (line, reason) = first(Syntax::Yaml, src.as_bytes()).unwrap_err();
         assert_eq!(
             (line, reason.as_str()),
             (1, "nested deeper than 128 levels")
         );
-        // A block mapping on its own lines gives the line the limit is reached on.
         let mut src = String::new();
         for depth in 0..200 {
             src += &format!("{}k:\n", " ".repeat(depth));
         }
         let (line, _) = first(Syntax::Yaml, src.as_bytes()).unwrap_err();
         assert_eq!(line, 129);
-        // At the limit it still reads, and hands out its scalar at the full depth.
         let src = format!("{}x\n", "- ".repeat(128));
         let (_, scalars) = scalars(Syntax::Yaml, &src);
         assert_eq!(scalars.len(), 1);
         assert_eq!(scalars[0].1, vec!["[0]"; 128].join("."));
-        // JSON stops at `serde_json`'s own limit.
         let src = format!("{}1{}", "[".repeat(200), "]".repeat(200));
         let (_, reason) = first(Syntax::Json, src.as_bytes()).unwrap_err();
         assert_eq!(reason, "recursion limit exceeded");
@@ -886,7 +775,6 @@ mod tests {
 
     #[test]
     fn an_alias_counts_its_nodes_depth_where_it_lands() {
-        // Each anchor is 100 deep and holds the one before: 100 more levels at every alias.
         let deep = |n: usize| {
             let mut src = String::new();
             for i in 0..n {
@@ -913,7 +801,6 @@ mod tests {
 
     #[test]
     fn aliases_cannot_expand_past_the_budget() {
-        // Nine levels of ten aliases each: 10^9 nodes from a few hundred bytes.
         let mut src = String::from("l0: &l0 [x, x, x, x, x, x, x, x, x, x]\n");
         for n in 1..=9 {
             let p = n - 1;
@@ -924,7 +811,6 @@ mod tests {
         let mut handed = 0;
         let (_, reason) = read(Syntax::Yaml, src.as_bytes(), |_| handed += 1).unwrap_err();
         assert_eq!(reason, "anchors and aliases expand beyond the size limit");
-        // What was handed out before the budget ran out stays within it.
         assert!(
             handed < src.len() * super::EXPANSION + super::SLACK,
             "{handed}"
@@ -944,7 +830,6 @@ mod tests {
             .map(|k| (k.section.as_str(), k.key.as_str(), k.line))
             .collect();
         assert_eq!(shown, [("a", "x", 2), ("a", "y", 3)]);
-        // JSON: a key's colon on a later line, and everything on one line.
         let json = "{\"a\": {\"k\"\n  : 1,\n \"m\": 2}}";
         let (_, keys) = super::read_keyed(Syntax::Json, json.as_bytes(), false, |_| {}).unwrap();
         let shown: Vec<_> = keys.iter().map(|k| (k.key.as_str(), k.line)).collect();
@@ -970,12 +855,9 @@ mod tests {
                 "g": {"Fn::Join": ["", ["a"]]},
             })
         );
-        // The scalars handed out are the nodes' own, at the path and line of the text.
         assert_eq!(seen[0], (1, json!("X"), 1));
-        // A tag a plain read ignores.
         let (plain, _) = scalars(Syntax::Yaml, "a: !Ref X\nb: !Sub [x]\n");
         assert_eq!(plain[0], json!({"a": "X", "b": ["x"]}));
-        // A tag on a mapping key is no wrapper, and JSON has no tags.
         let read = tagged(Syntax::Yaml, b"!Ref k: v\n").unwrap();
         assert_eq!(read[0], json!({"k": "v"}));
         let json = tagged(Syntax::Json, br#"{"Ref": "X"}"#).unwrap();
@@ -984,12 +866,10 @@ mod tests {
 
     #[test]
     fn tagged_nodes_count_against_the_budget_and_the_nesting_like_any_other() {
-        // A tag on every node of a deep flow sequence is still read within the nesting limit.
         let nest = |n: usize| "!Join [".repeat(n) + "x" + &"]".repeat(n);
         assert!(tagged(Syntax::Yaml, nest(100).as_bytes()).is_ok());
         let (_, reason) = tagged(Syntax::Yaml, nest(200).as_bytes()).unwrap_err();
         assert_eq!(reason, "nested deeper than 128 levels");
-        // Aliases of tagged nodes expand within the same budget.
         let mut src = String::from("l0: &l0 !Ref [x, x, x, x, x, x, x, x, x, x]\n");
         for n in 1..=9 {
             let p = n - 1;
@@ -1003,8 +883,6 @@ mod tests {
 
     #[test]
     fn anchors_nested_around_a_large_node_cannot_copy_it_past_the_budget() {
-        // A hundred anchors, each around the next, then a list of most of the file: each anchor
-        // would keep its own copy of the list.
         let list = vec!["1"; 100_000].join(",");
         let nest = |n: usize| {
             let open: String = (0..n).map(|i| format!("&a{i} [")).collect();
@@ -1012,7 +890,6 @@ mod tests {
         };
         let (_, reason) = read(Syntax::Yaml, nest(100).as_bytes(), |_| {}).unwrap_err();
         assert_eq!(reason, "anchors and aliases expand beyond the size limit");
-        // One anchor around it reads.
         assert!(read(Syntax::Yaml, nest(1).as_bytes(), |_| {}).is_ok());
     }
 }

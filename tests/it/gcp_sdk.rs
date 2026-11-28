@@ -1,4 +1,3 @@
-//! Constructor-backed GCP SDK use sides (#668).
 use crate::common::fixture_repo;
 use meada::engine::Engine;
 use serde_json::Value;
@@ -604,8 +603,6 @@ fn named_requests_reject_prior_mutations_but_keep_other_objects_fields_and_later
     assert_golden("gcp-sdk-mutations.export.json", &text);
 }
 
-/// A named request read again after a write: through a computed key or a spread of another
-/// object, and in a loop whose later turns read what an earlier turn wrote after the call.
 #[test]
 fn named_requests_written_through_computed_keys_spreads_or_later_loop_turns_name_nothing() {
     let repo = fixture_repo("gcp_sdk_more_mutations", "gcp-sdk-mutations", None);

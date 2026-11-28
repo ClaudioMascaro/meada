@@ -1,26 +1,3 @@
-//! Kubernetes objects and Kustomize trees as IaC nodes (#651, ADR 0025): every YAML or JSON
-//! document with an `apiVersion`, a `kind` and a `metadata.name` is a node addressed
-//! `<Kind>[.<group>]/<namespace>/<name>` (no namespace for a cluster-scoped kind, and none for an
-//! object that has none), with the references between nodes stored like calls and the root that
-//! roots its evaluation. They share the `iac_nodes` and `iac_references` tables, `search` kind
-//! `iac`, `context` and `trace` with the Terraform nodes (`iac`). Never exported.
-//!
-//! A directory with a `kustomization.yaml` that no other kustomization names as a base is an
-//! overlay, labelled by its path, and an evaluation unit: its `resources`, `bases` and
-//! `components` that name a file or another kustomization directory inside the repository are
-//! instantiated under it, base first and a component over what the kustomization that lists it
-//! holds so far, with each `kustomization.yaml` on the way applying `namePrefix`, `nameSuffix`,
-//! `namespace` and `images` to what it holds. An entry that is
-//! remote, outside the repository or not there is not followed and is counted as unresolved. A
-//! manifest no kustomization lists (nor patches with) is a plain one: the manifests of a
-//! directory are one unit, labelled by the directory.
-//!
-//! A Service selects the pod template owners whose pod labels hold its selector, a pod template
-//! references the ConfigMaps and Secrets of its `env`, `envFrom` and volumes and its service
-//! account, and an Ingress its backend Services, all in the same namespace and unit. A ConfigMap
-//! or Secret name is renamed with its target at each stage; a ServiceAccount or Service name
-//! resolves as Kustomize's name reference resolves it once the tree is built (`Obj::resolve`).
-
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use rusqlite::{Connection, Transaction, params};
@@ -39,66 +16,40 @@ mod environment;
 mod routing;
 mod topology;
 
-/// How deep kustomizations name each other as bases; a base deeper is not followed and is
-/// counted as unresolved.
 // ponytail: real trees nest a base or two under an overlay; 16 stops a chain built to run on.
 const OVERLAY_DEPTH_MAX: usize = 16;
 
-/// The objects one overlay instantiates, bases included; past it the rest of the overlay is left
-/// out. A file or base one kustomization names twice instantiates once; one that several of its
-/// bases name, once through each.
 // ponytail: a large overlay holds a few thousand objects; 10,000 is past real ones.
 const OBJECTS_MAX: usize = 10_000;
 
-/// The bytes of objects one overlay may copy, bases included, by their `weight`; past it the rest
-/// of the overlay is left out. A base reached along many paths is copied once along each, which
-/// `OBJECTS_MAX` alone leaves a large object's size times the count.
 // ponytail: a large overlay copies a few MiB; sixteen times the per-file ceiling stops a large
 // ConfigMap reached along thousands of paths.
 const OVERLAY_BYTES_MAX: usize = 16 * MAX_BYTES;
 
-/// The entries of kustomizations one overlay walks, bases that name each other included, and each
-/// object a component is handed; past it the rest of the overlay is left out. Bases and components
-/// can reach one another along many paths (each of a few entries naming a few more), which the
-/// depth ceiling alone leaves exponential.
 // ponytail: a real overlay walks tens of entries; 50,000 is past any, and cheap.
 const WALK_MAX: usize = 50_000;
 
-/// The references one object keeps, in address order; past it the rest are left out.
 // ponytail: a Service selects a handful of workloads; 64 is past a wide selector.
 const OBJECT_REFERENCES_MAX: usize = 64;
 
-/// The bytes of addresses, references, images and unresolved entries one unit may store; past it
-/// the rest of the unit is left out.
 // ponytail: four times the per-file ceiling holds a unit of a few thousand objects; past it the
 // tree is built to explode.
 const UNIT_STORED_MAX: usize = 4 * MAX_BYTES;
 
-/// The same, across every unit of the repository; past it the rest is left out.
 // ponytail: sixteen times the per-file ceiling holds a monorepo of overlays; many overlays over
 // one exploding base would pass it.
 const KUBE_STORED_MAX: usize = 16 * MAX_BYTES;
 
-/// What each node counts against those budgets besides its strings: a node holds a kilobyte or
-/// so in memory however short its names, so many overlays over one base of short names would
-/// otherwise keep a million of them.
 // ponytail: 128 bytes keeps a repository to about 120,000 nodes, a couple of hundred MiB, and
 // leaves a unit of `OBJECTS_MAX` objects within `UNIT_STORED_MAX`.
 const NODE_BYTES: usize = 128;
 
-/// The longest host an Ingress rule may name, and the longest name a volume may have; a rule or a
-/// volume past it is invalid and left out, so its paths or its projected sources do not copy it
-/// each.
 // ponytail: DNS limits a host to 253 bytes and Kubernetes a volume name to a 63-byte label.
 const HOST_MAX: usize = 253;
 const VOLUME_NAME_MAX: usize = 63;
-/// Kubernetes names an object with a DNS subdomain of at most 253 bytes: a longer final name is
-/// no object a cluster holds, so no reference names it so.
 // ponytail: a reference still reaches a longer final name through the name a stage renamed.
 const OBJECT_NAME_MAX: usize = 253;
 
-/// The kinds that live outside any namespace: a Kustomize `namespace` leaves them alone, and the
-/// address has no namespace.
 const CLUSTER_SCOPED: &[&str] = &[
     "APIService",
     "CSIDriver",
@@ -128,16 +79,12 @@ const CLUSTER_SCOPED: &[&str] = &[
     "VolumeAttachment",
 ];
 
-/// Whether objects of `kind` in `group` live outside any namespace: a kind of the fixed list, or
-/// one of Crossplane's own (#655).
 fn cluster_scoped(kind: &str, group: &str) -> bool {
     CLUSTER_SCOPED.contains(&kind) || crossplane::cluster_scoped(group)
 }
 
-/// The kinds a `namePrefix` and a `nameSuffix` leave alone, as Kustomize does.
 const UNPREFIXED: &[&str] = &["APIService", "CustomResourceDefinition", "Namespace"];
 
-/// Whether the file at `path` may hold objects: a YAML or JSON one.
 pub(crate) fn is_source(path: &str) -> bool {
     [".yaml", ".yml", ".json"].iter().any(|e| path.ends_with(e))
 }
@@ -146,42 +93,28 @@ fn file_name(path: &str) -> &str {
     path.rsplit_once('/').map_or(path, |(_, name)| name)
 }
 
-/// Whether `path` is a kustomization file.
 pub(crate) fn is_kustomization(path: &str) -> bool {
     matches!(file_name(path), "kustomization.yaml" | "kustomization.yml")
 }
 
-/// Whether the file `path` with bytes `src` is read for objects: a kustomization, or a file that
-/// says `apiVersion` somewhere. The rest cannot hold an object.
 pub(crate) fn wanted(path: &str, src: &[u8]) -> bool {
     is_source(path) && (is_kustomization(path) || src.windows(10).any(|w| w == b"apiVersion"))
 }
 
-/// Whether the file `path` with bytes `src` is a kustomization or holds an object: then it keeps
-/// every config value (`config_values::kind_file`). A file that only says `apiVersion`, such as
-/// a schema snapshot, holds none.
 pub(crate) fn takes(path: &str, src: &[u8]) -> bool {
     let mappings = crate::iac::mapping::Config::default();
     wanted(path, src) && (is_kustomization(path) || !read(path, src, &mappings).objects.is_empty())
 }
 
-/// What a pod template owner offers the references: its pod labels, and what its pod spec names.
 #[derive(Debug, Clone, Default, PartialEq)]
 struct Facts {
-    /// The labels of its pod template (a Pod's own), `None` for an object that runs no pod.
     labels: Option<BTreeMap<String, String>>,
-    /// A Service's selector.
     selector: BTreeMap<String, String>,
-    /// The ConfigMaps and Secrets its pods mount: kind, transformed name, and how it names it.
     mounts: Vec<(&'static str, String, String)>,
-    /// Its pod spec's service account: the field that names it, and the name.
     account: Option<(&'static str, String)>,
-    /// An Ingress's backend Services: name as written and the rule that names it.
     backends: Vec<(String, String)>,
     ingress: Vec<crate::iac::Ingress>,
-    /// Its containers' images: container name and image.
     images: Vec<(String, String)>,
-    /// What it offers Crossplane's roles and references (#655).
     xp: crossplane::Facts,
     environment: Vec<environment::Input>,
     data: BTreeMap<String, Option<String>>,
@@ -189,20 +122,14 @@ struct Facts {
     topology: Option<topology::Facts>,
 }
 
-/// One Kubernetes object, as read and as a kustomization on the way changed it.
 #[derive(Debug, Clone, PartialEq)]
 struct Obj {
     group: String,
     kind: String,
-    /// The name as written, which the references to it use.
     orig: String,
     name: String,
-    /// The lengths of the non-empty prefixes and suffixes the stages on the way added to `orig`,
-    /// innermost first: Kustomize compares these lists to pick among objects of one name.
     prefixes: Vec<usize>,
     suffixes: Vec<usize>,
-    /// Whether a stage renamed it or set its namespace: only then is it a Kustomize candidate
-    /// for the references that use `orig`.
     moved: bool,
     ns: Option<String>,
     path: String,
@@ -210,11 +137,9 @@ struct Obj {
     end_line: usize,
     block: String,
     facts: Facts,
-    /// About the bytes a copy holds (`weight`), what an overlay copying it spends.
     weight: usize,
 }
 
-/// The kinds whose `serviceAccountName` Kustomize renames with the account it names.
 const ACCOUNT_RENAMED: [&str; 7] = [
     "Pod",
     "StatefulSet",
@@ -225,14 +150,10 @@ const ACCOUNT_RENAMED: [&str; 7] = [
     "DaemonSet",
 ];
 
-/// The namespace a name reference looks in: Kubernetes defaults none to `default`, and
-/// Kustomize takes the two as one.
 fn nameref_ns(ns: Option<&str>) -> Option<&str> {
     ns.filter(|&n| n != "default")
 }
 
-/// Kustomize's `SameEndingSubSlice` of two lists given outermost first: whether one ends the
-/// other, two empty ones included; `lax`, an empty list matches any.
 fn ends_alike<'s>(
     a: impl ExactSizeIterator<Item = &'s str>,
     b: impl ExactSizeIterator<Item = &'s str>,
@@ -244,7 +165,6 @@ fn ends_alike<'s>(
     }
 }
 
-/// The bytes `facts` writes as `Debug`, counted without keeping them.
 fn weight(facts: &Facts) -> usize {
     struct Count(usize);
     impl std::fmt::Write for Count {
@@ -259,7 +179,6 @@ fn weight(facts: &Facts) -> usize {
 }
 
 impl Obj {
-    /// Its prefixes, outermost first.
     fn outer_prefixes(&self) -> impl ExactSizeIterator<Item = &str> {
         let mut at = 0;
         (self.prefixes.iter().rev()).map(move |&n| {
@@ -268,7 +187,6 @@ impl Obj {
         })
     }
 
-    /// Its suffixes, outermost first.
     fn outer_suffixes(&self) -> impl ExactSizeIterator<Item = &str> {
         let mut end = self.name.len();
         (self.suffixes.iter().rev()).map(move |&n| {
@@ -277,18 +195,11 @@ impl Obj {
         })
     }
 
-    /// Whether `other`'s prefix and suffix stages end as `self`'s do, Kustomize's
-    /// `PrefixesSuffixesEquals`: `lax`, an empty list matches any.
     fn renamed_alike(&self, other: &Obj, lax: bool) -> bool {
         ends_alike(self.outer_prefixes(), other.outer_prefixes(), lax)
             && ends_alike(self.outer_suffixes(), other.outer_suffixes(), lax)
     }
 
-    /// The objects a reference from `self` resolves to once Kustomize has built the tree, as
-    /// its `selectReferral` picks: of those a stage renamed or moved from the name as written
-    /// (`written`), the only one, else the ones whose stages end as `self`'s do. With none left
-    /// the reference stays as written and names the object called so (`named`); several left is
-    /// a tree Kustomize refuses to build, which resolves to none.
     fn resolve(&self, objs: &[Obj], written: &[usize], named: &[usize]) -> Vec<usize> {
         let mut chosen = written.to_vec();
         for lax in [true, false] {
@@ -315,7 +226,6 @@ impl Obj {
     }
 }
 
-/// How a kustomization rewrites an image: an entry of its `images`.
 #[derive(Debug, Clone)]
 struct ImageRule {
     new_name: Option<String>,
@@ -323,19 +233,14 @@ struct ImageRule {
     digest: Option<String>,
 }
 
-/// The kustomization at `path`: what it names and what it changes.
 #[derive(Debug, Default)]
 struct Kustomization {
     prefix: String,
     suffix: String,
     namespace: Option<String>,
-    /// The rule for each image name, the first that names it.
     images: HashMap<String, ImageRule>,
-    /// `resources`, `bases` and `components`, in order.
     entries: Vec<String>,
-    /// Where `entries` turns to `components`.
     components: usize,
-    /// The files its patches name, which are fragments and no objects.
     patches: Vec<String>,
 }
 
@@ -347,7 +252,6 @@ fn text<'a>(v: &'a Value, path: &[&str]) -> Option<&'a str> {
     at(v, path)?.as_str()
 }
 
-/// A scalar as the text a label or an image tag shows.
 fn scalar(v: &Value) -> Option<String> {
     match v {
         Value::String(s) => Some(s.clone()),
@@ -370,13 +274,10 @@ fn list<'a>(v: &'a Value, path: &[&str]) -> impl Iterator<Item = &'a Value> {
         .flat_map(|a| a.iter())
 }
 
-/// A name that is a plain one: a Helm template's `{{ .Release.Name }}` is not.
 fn plain(name: &str) -> bool {
     !name.is_empty() && !name.contains("{{")
 }
 
-/// The pod template of a workload (`metadata` and `spec`): a Pod's own, a `spec.template` or a
-/// CronJob's `spec.jobTemplate.spec.template` whose spec holds containers.
 fn template<'a>(value: &'a Value, kind: &str) -> Option<&'a Value> {
     if kind == "Pod" {
         return Some(value);
@@ -505,11 +406,8 @@ fn facts(value: &Value, kind: &str, group: &str) -> Facts {
     facts
 }
 
-/// The lines of a resource of a composition: its step in the pipeline, if any, and its index.
 type Span<'a> = &'a dyn Fn(Option<usize>, usize) -> Option<(usize, usize)>;
 
-/// The object a document is, or `None` when it is no object (a kustomization, a fragment with no
-/// name, a Helm template's placeholder). `span` gives the lines of a composition's resources.
 fn object(
     path: &str,
     (line, end_line): (usize, usize),
@@ -525,7 +423,6 @@ fn object(
         return None;
     }
     let group = api.rsplit_once('/').map_or("", |(g, _)| g);
-    // A namespace that is a template placeholder makes the document a Helm template, no object.
     let ns = match text(value, &["metadata", "namespace"]) {
         Some(ns) if !plain(ns) => return None,
         ns => ns,
@@ -600,15 +497,12 @@ fn kustomization(value: &Value) -> Kustomization {
     k
 }
 
-/// What a file holds: its objects, and its kustomization when it is one.
 #[derive(Default)]
 struct Parsed {
     objects: Vec<Obj>,
     kustomization: Option<Kustomization>,
 }
 
-/// The resource of a composition the key path `path` lies under: its step in the pipeline (in
-/// `spec.pipeline[j].input.resources[i]`), if any, and its index `i`.
 fn resource(path: &[Step]) -> Option<(Option<usize>, usize)> {
     use Step::{Index, Key};
     let key = |s: &Step, k: &str| matches!(s, Key(x) if x == k);
@@ -626,16 +520,11 @@ fn resource(path: &[Step]) -> Option<(Option<usize>, usize)> {
     }
 }
 
-/// Reads the file at `path`. A file that does not parse, holds more than `DOCUMENTS_MAX`
-/// documents or is no UTF-8 holds nothing (config values count it unreadable); an empty `src` is
-/// a file that exists and holds nothing.
 fn read(path: &str, src: &[u8], mappings: &crate::iac::mapping::Config) -> Parsed {
     let mut parsed = Parsed::default();
     if src.is_empty() || std::str::from_utf8(src).is_err() {
         return parsed;
     }
-    // The first and last line of each document's scalars, and of each resource a composition of
-    // the document may create (#655): its document, its step in the pipeline and its index.
     let mut spans: Vec<(usize, usize)> = Vec::new();
     let mut resources: HashMap<(usize, Option<usize>, usize), (usize, usize)> = HashMap::new();
     let widen = |span: &mut (usize, usize), line: usize| {
@@ -678,13 +567,11 @@ fn read(path: &str, src: &[u8], mappings: &crate::iac::mapping::Config) -> Parse
     parsed
 }
 
-/// The image `image` becomes under the kustomization's rules: the first rule that names it.
 fn retag(image: &str, rules: &HashMap<String, ImageRule>) -> String {
     let (rest, digest) = match image.split_once('@') {
         Some((rest, digest)) => (rest, Some(digest)),
         None => (image, None),
     };
-    // A colon after the last slash is a tag; before it, a registry's port.
     let (name, tag) = match rest.rfind(':').filter(|&i| !rest[i..].contains('/')) {
         Some(i) => (&rest[..i], Some(&rest[i + 1..])),
         None => (rest, None),
@@ -696,7 +583,6 @@ fn retag(image: &str, rules: &HashMap<String, ImageRule>) -> String {
     match (&rule.digest, &rule.new_tag) {
         (Some(digest), _) => format!("{name}@{digest}"),
         (None, Some(tag)) => format!("{name}:{tag}"),
-        // Only a new name: the tag and the digest it had stay.
         (None, None) => {
             let tag = tag.map_or(String::new(), |t| format!(":{t}"));
             let digest = digest.map_or(String::new(), |d| format!("@{d}"));
@@ -705,7 +591,6 @@ fn retag(image: &str, rules: &HashMap<String, ImageRule>) -> String {
     }
 }
 
-/// An image of an object once its overlay is evaluated, as stored.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Image {
     pub root: String,
@@ -714,19 +599,14 @@ pub(crate) struct Image {
     pub image: String,
 }
 
-/// An entry of a kustomization that is not followed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Unresolved {
     pub root: String,
-    /// The kustomization file that names it.
     pub path: String,
     pub entry: String,
-    /// `remote`, `outside` (above the repository or absolute), `missing` (no file or
-    /// kustomization there, a symlink included), `cycle` or `depth`.
     pub reason: &'static str,
 }
 
-/// What the Kubernetes files of a repository give.
 #[derive(Debug, Default)]
 pub(crate) struct Output {
     pub nodes: Vec<Node>,
@@ -735,7 +615,6 @@ pub(crate) struct Output {
     pub unresolved: Vec<Unresolved>,
 }
 
-/// Where an entry of a kustomization leads.
 enum Entry<'m> {
     File(&'m str, &'m [Obj]),
     Dir(&'m str),
@@ -744,19 +623,14 @@ enum Entry<'m> {
 
 struct Eval<'m> {
     files: &'m BTreeMap<String, Parsed>,
-    /// The directories that hold a kustomization.
     dirs: BTreeMap<&'m str, (&'m str, &'m Kustomization)>,
     root: String,
-    /// The objects the overlay may still instantiate, the bytes it may still copy, and the entries
-    /// it may still walk.
     room: usize,
     bytes: usize,
     steps: usize,
-    /// The files an overlay instantiated: no plain unit holds them.
     reached: HashSet<&'m str>,
     root_left: usize,
     left: usize,
-    /// The composite and claim kinds the repository's XRDs define (#655).
     kinds: crossplane::Kinds,
     out: Output,
 }
@@ -771,7 +645,6 @@ fn remote(entry: &str) -> bool {
 }
 
 impl<'m> Eval<'m> {
-    /// Whether `bytes` more fit both budgets, taking them when they do.
     fn charge(&mut self, bytes: usize) -> bool {
         match (
             self.root_left.checked_sub(bytes),
@@ -788,7 +661,6 @@ impl<'m> Eval<'m> {
         }
     }
 
-    /// Where `entry` of the kustomization in `dir` leads.
     fn entry(&self, dir: &str, entry: &str) -> Entry<'m> {
         if remote(entry) {
             return Entry::Unresolved("remote");
@@ -807,9 +679,6 @@ impl<'m> Eval<'m> {
         }
     }
 
-    /// The objects of the kustomization in `dir`, the bases' first, once it has changed them.
-    /// `stack` holds the directories above it; `objs`, what the kustomization that lists `dir`
-    /// as a component holds so far, which a component changes and adds to.
     fn objects(
         &mut self,
         dir: &'m str,
@@ -818,9 +687,6 @@ impl<'m> Eval<'m> {
         mut objs: Vec<Obj>,
     ) -> Vec<Obj> {
         let (path, k) = self.dirs[dir];
-        // The files and bases this kustomization named already: a second entry for one adds
-        // nothing (Kustomize refuses the duplicate objects). A component listed again applies
-        // again, as Kustomize's does, unless it was listed as a base too.
         let mut listed: HashSet<&'m str> = HashSet::new();
         for (i, entry) in k.entries.iter().enumerate() {
             if self.steps == 0 {
@@ -847,9 +713,6 @@ impl<'m> Eval<'m> {
             match found {
                 Entry::Dir(base) => {
                     stack.push(base);
-                    // Components come after the resources, and change them. Each object a component
-                    // is handed counts as an entry walked: components reached along many paths
-                    // hand the same objects on again.
                     let given = match i >= k.components {
                         true => {
                             self.steps = self.steps.saturating_sub(objs.len());
@@ -898,10 +761,8 @@ impl<'m> Eval<'m> {
         objs
     }
 
-    /// The nodes, references and images of the unit `root` holds `objs` of.
     fn unit(&mut self, mut objs: Vec<Obj>) {
         objs.truncate(OBJECTS_MAX);
-        // Reject duplicate config targets before address deduplication can conceal them.
         environment::transform(&mut objs, "", "", None);
         objs.sort_by_cached_key(Obj::address);
         let duplicates = objs
@@ -930,7 +791,6 @@ impl<'m> Eval<'m> {
             .collect::<HashSet<_>>();
         objs.dedup_by_key(|o| o.address());
         let addresses: Vec<String> = objs.iter().map(Obj::address).collect();
-        // The Services by namespace and the name a stage renamed them from, and by their own.
         let mut service_names = HashMap::<_, Vec<_>>::new();
         let mut services_named = HashMap::<_, Vec<_>>::new();
         for (j, (object, address)) in objs.iter().zip(&addresses).enumerate() {
@@ -942,7 +802,6 @@ impl<'m> Eval<'m> {
                 if object.moved {
                     (service_names.entry((ns, object.orig.as_str())).or_default()).push(j);
                 }
-                // Hashing a final name past the limit would cost every long chain of prefixes.
                 if object.name.len() <= OBJECT_NAME_MAX {
                     let key = (ns, object.name.as_str());
                     services_named.entry(key).or_default().push(j);
@@ -958,7 +817,6 @@ impl<'m> Eval<'m> {
         let mut kept = 0;
         for (o, address) in objs.iter().zip(&addresses) {
             let environment = environment::resolve(o, &configs);
-            // Resolve before copying strings: an unknown or duplicated backend is no route.
             let ingress = o
                 .facts
                 .ingress
@@ -1026,7 +884,6 @@ impl<'m> Eval<'m> {
                 address: address.clone(),
                 root: self.root.clone(),
                 ty: o.kind.clone(),
-                // A managed resource's name in the provider's API is its external name.
                 name: Some(
                     o.facts
                         .custom
@@ -1078,10 +935,7 @@ impl<'m> Eval<'m> {
         }
         let (objs, addresses, roles) = (&objs[..kept], &addresses[..kept], &roles[..kept]);
         let customs = custom::Targets::new(objs);
-        // The resources each composition creates, under its address: its index, the address, and
-        // the resource.
         let mut composed: Vec<(usize, String, &crossplane::Base)> = Vec::new();
-        // The entries of `composed` each composition holds, by its index.
         let mut held: HashMap<usize, Vec<usize>> = HashMap::new();
         let mut seen: HashSet<String> = HashSet::new();
         for (i, o) in objs.iter().enumerate() {
@@ -1161,14 +1015,10 @@ impl<'m> Eval<'m> {
             }
         }
         let crossplane = crossplane::Targets::new(objs);
-        // What a reference names, by kind, namespace and the name a stage renamed or moved it
-        // from (`written`) or its own (`named`); a ConfigMap or a Secret, renamed with its
-        // references at each stage, only by its own.
         // ponytail: the name as written is its only previous name, so a reference by the name a
         // middle stage gave names the object called so; keep each stage's name if overlays do.
         let mut written: HashMap<(&str, &str, Option<&str>), Vec<usize>> = HashMap::new();
         let mut named: HashMap<(&str, &str, Option<&str>), Vec<usize>> = HashMap::new();
-        // The pod template owners that carry a label, by namespace.
         let mut labelled: HashMap<(Option<&str>, &str, &str), Vec<usize>> = HashMap::new();
         for (i, o) in objs.iter().enumerate() {
             if o.group.is_empty() {
@@ -1180,8 +1030,6 @@ impl<'m> Eval<'m> {
                     );
                     written.entry(key).or_default().push(i);
                 }
-                // A ConfigMap or a Secret is found by its final name, which its references follow
-                // at each stage, whatever its length.
                 if o.name.len() <= OBJECT_NAME_MAX
                     || matches!(o.kind.as_str(), "ConfigMap" | "Secret")
                 {
@@ -1200,7 +1048,6 @@ impl<'m> Eval<'m> {
         for (i, o) in objs.iter().enumerate() {
             let mut targets: BTreeSet<(&str, String)> = BTreeSet::new();
             let ns = o.ns.as_deref();
-            // `renamed`: whether Kustomize renames the reference with its target.
             let find = |kind: &str, name: &str, renamed: bool| {
                 let key = (kind, name, nameref_ns(ns));
                 let written = written.get(&key).filter(|_| renamed);
@@ -1238,7 +1085,6 @@ impl<'m> Eval<'m> {
                 }
             }
             if let Some((field, name)) = &o.facts.account {
-                // Kustomize's name reference renames only these kinds' `serviceAccountName`.
                 let renamed =
                     *field == "serviceAccountName" && ACCOUNT_RENAMED.contains(&o.kind.as_str());
                 for j in find("ServiceAccount", name, renamed) {
@@ -1260,7 +1106,6 @@ impl<'m> Eval<'m> {
                     targets.insert((&addresses[j], via));
                 }
             }
-            // Each resource a composition creates is one reference past the ceiling's.
             let own = held.get(&i).map_or(&[][..], Vec::as_slice);
             for &c in own {
                 let (_, address, b) = &composed[c];
@@ -1345,7 +1190,6 @@ impl<'m> Eval<'m> {
         for reference in &self.out.references[references_start..] {
             *references.entry(&reference.source).or_default() += 1;
         }
-        // Counts own their keys before the stored references grow.
         let mut references = references
             .into_iter()
             .map(|(k, v)| (k.to_string(), v))
@@ -1385,13 +1229,10 @@ impl<'m> Eval<'m> {
         }
     }
 
-    /// How many of `objects` the overlay may still instantiate, taking their room and their bytes;
-    /// once the bytes run out it instantiates nothing more.
     fn fit(&mut self, objects: &[Obj]) -> usize {
         let mut take = 0;
         for o in objects.iter().take(self.room) {
             let Some(left) = self.bytes.checked_sub(o.weight) else {
-                // No room is left once the `take` below is taken.
                 self.room = take;
                 break;
             };
@@ -1411,9 +1252,6 @@ impl<'m> Eval<'m> {
     }
 }
 
-/// The IaC nodes, references, images and unresolved entries of the YAML and JSON files `files`
-/// (path and bytes; empty bytes for a file that exists and cannot hold an object) of one
-/// repository, each overlay and each directory of plain manifests evaluated alone, in label order.
 #[cfg(test)]
 pub(crate) fn evaluate(files: &[(String, Vec<u8>)]) -> Output {
     evaluate_with(files, &crate::iac::mapping::Config::default())
@@ -1447,7 +1285,6 @@ pub(crate) fn evaluate_with(
         kinds: crossplane::Kinds::of(parsed.values().flat_map(|p| &p.objects)),
         out: Output::default(),
     };
-    // The directories that are bases, and the files that patch, which no plain unit holds.
     let mut called: HashSet<&str> = HashSet::new();
     let mut consumed: HashSet<&str> = HashSet::new();
     for (&dir, (_, k)) in &eval.dirs {
@@ -1474,7 +1311,6 @@ pub(crate) fn evaluate_with(
         let objs = eval.objects(dir, 0, &mut vec![dir], Vec::new());
         eval.unit(objs);
     }
-    // A file only a kustomization nobody evaluates lists (a cycle of bases) is plain.
     consumed.extend(eval.reached.iter().copied());
     let mut plain: BTreeMap<&str, Vec<Obj>> = BTreeMap::new();
     for (path, p) in &parsed {
@@ -1492,13 +1328,10 @@ pub(crate) fn evaluate_with(
     eval.out
 }
 
-/// Whether a refresh that read `path` again (or lost it) must evaluate the objects again: a
-/// kustomization, a file that may hold an object, or one that held a node.
 pub(crate) fn changed(tx: &Transaction, path: &str, src: Option<&[u8]>) -> Result<bool> {
     if !is_source(path) {
         return Ok(false);
     }
-    // `wanted` holds for a kustomization too, which a file that left is known by its name.
     if src.map_or_else(|| is_kustomization(path), |src| wanted(path, src)) {
         return Ok(true);
     }
@@ -1510,8 +1343,6 @@ pub(crate) fn changed(tx: &Transaction, path: &str, src: Option<&[u8]>) -> Resul
     Ok(held)
 }
 
-/// Replaces every stored Kubernetes node, reference, image and unresolved entry with `output`'s;
-/// the Terraform rows stay.
 pub(crate) fn refresh(tx: &Transaction, output: &Output) -> Result<()> {
     crate::iac::forget(tx, None, crate::iac::Owner::Kubernetes)?;
     crate::iac::insert(tx, &output.nodes, &output.references)?;
@@ -1527,8 +1358,6 @@ pub(crate) fn refresh(tx: &Transaction, output: &Output) -> Result<()> {
     Ok(())
 }
 
-/// The images of the node `address` of `root`, one `<container>: <image>` line each, in the
-/// order of the pod spec.
 pub(crate) fn images(db: &Connection, root: &str, address: &str) -> Result<Vec<String>> {
     let mut statement = db.prepare(
         "SELECT container, image FROM iac_images WHERE root = ?1 AND address = ?2 ORDER BY rowid",
@@ -1543,7 +1372,6 @@ pub(crate) fn images(db: &Connection, root: &str, address: &str) -> Result<Vec<S
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
-/// The `meada status` line of the kustomization entries not followed; `None` with none.
 pub(crate) fn status(db: &Connection) -> Result<Option<String>> {
     let (count, remote): (i64, i64) = db.query_row(
         "SELECT count(*), coalesce(sum(reason = 'remote'), 0) FROM iac_unresolved",
@@ -1641,7 +1469,6 @@ mod tests {
             ("k/deploy.yaml", "")
         );
         assert_eq!(deployment.line, 1);
-        // A stream of several documents starts its key paths with the document's index.
         let secret = (out.nodes.iter()).find(|n| n.ty == "Secret").unwrap();
         assert_eq!(secret.block, "[2]");
     }
@@ -1651,7 +1478,6 @@ mod tests {
         let out = evaluate(&files(&[
             ("k/deploy.yaml", DEPLOYMENT),
             ("k/rest.yaml", REST),
-            // The same names in another namespace are no targets.
             (
                 "k/other.yaml",
                 &REST.replace("namespace: shop", "namespace: other"),
@@ -1767,14 +1593,12 @@ mod tests {
                 "Namespace/shop [overlays/dev]",
             ]
         );
-        // The base's images rule runs first, the overlay's on its result.
         assert_eq!(
             (out.images.iter())
                 .map(|i| i.image.as_str())
                 .collect::<Vec<_>>(),
             ["registry.example.com/api:2.0"]
         );
-        // The reference is renamed with the object it names.
         assert_eq!(
             shown(&out),
             [
@@ -1784,8 +1608,6 @@ mod tests {
         );
     }
 
-    /// A component changes what the kustomization that lists it holds, its bases' objects
-    /// included, and adds its own; that kustomization's changes then apply to all of them.
     #[test]
     fn a_component_changes_the_objects_of_the_kustomization_that_lists_it() {
         let out = evaluate(&files(&[
@@ -1821,7 +1643,6 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["ghcr.io/acme/api-ha:1.0"]
         );
-        // A component listed twice applies twice, as Kustomize does not merge the entries.
         let out = evaluate(&files(&[
             ("base/kustomization.yaml", "resources:\n  - extra.yaml\n"),
             (
@@ -1838,8 +1659,6 @@ mod tests {
             ),
         ]));
         assert_eq!(addresses(&out), ["ConfigMap/ha-ha-settings [o]"]);
-        // A file or a component named both as a resource and as a component adds its objects
-        // once, as a resource (Kustomize refuses both).
         let config =
             |name: &str| format!("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: {name}\n");
         let out = evaluate(&files(&[
@@ -1860,9 +1679,6 @@ mod tests {
         );
     }
 
-    /// Components that each list the next level's three, eight levels deep, hand the overlay's
-    /// objects along 3^8 paths: each object a component is handed counts as an entry walked, so
-    /// the walk stops within `WALK_MAX` and a component listed after them is left out.
     #[test]
     fn components_reached_along_many_paths_are_walked_within_the_entry_ceiling() {
         let mut list: Vec<(String, String)> = Vec::new();
@@ -1905,10 +1721,6 @@ mod tests {
         );
     }
 
-    /// Kustomize renames a reference with the object it names: with two bases of their own
-    /// prefixes that write the same names, each Deployment uses its own base's account and
-    /// configuration and each Ingress routes to its own base's Service. A Service's selector
-    /// still selects the pods of both, whose labels no prefix changes.
     #[test]
     fn a_reference_follows_the_prefix_of_the_base_that_holds_its_target() {
         let base = |prefix: &str| {
@@ -1959,9 +1771,6 @@ mod tests {
         );
     }
 
-    /// A reference names the only object written with its name, whichever kustomization renamed
-    /// it and whatever namespace a base set before the overlay's: Kustomize renames references
-    /// once the whole tree is built.
     #[test]
     fn a_reference_follows_the_only_object_written_with_its_name() {
         let out = evaluate(&files(&[
@@ -2007,9 +1816,6 @@ mod tests {
         );
     }
 
-    /// Kustomize renames only a `serviceAccountName` of the kinds its name reference lists: a
-    /// ReplicaSet's, or the deprecated `serviceAccount`, stays as written and names the account
-    /// called so.
     #[test]
     fn an_account_reference_kustomize_leaves_keeps_its_name_as_written() {
         let accounts = |deploy: &str| {
@@ -2042,10 +1848,6 @@ mod tests {
         assert_eq!(accounts(&deprecated), Vec::<String>::new());
     }
 
-    /// Kustomize picks among the objects a stage renamed or moved from the name a reference
-    /// uses: the only one, else those whose prefix and suffix stages end as the referrer's do
-    /// (an empty list matching any, then strictly). With none left the reference stays as
-    /// written and names the object called so, if any; several left is a tree it refuses.
     #[test]
     fn a_reference_picks_among_renamed_objects_by_their_outermost_stages() {
         let kust = |resources: &[&str], prefix: &str| {
@@ -2064,7 +1866,6 @@ mod tests {
                  pathType: Prefix\n            backend:\n              service:\n                name: {target}\n"
             )
         };
-        // The Service an Ingress routes to and the ones it references.
         let routed = |tree: &[(&str, String)]| {
             let tree = (tree.iter())
                 .map(|(p, t)| (p.to_string(), t.as_bytes().to_vec()))
@@ -2085,7 +1886,6 @@ mod tests {
             (one.clone(), one)
         };
         let none = (BTreeSet::from([String::new()]), BTreeSet::new());
-        // An Ingress in base b- under a-, a Service in a- and one in a sibling c-.
         let nested = [
             ("top/kustomization.yaml", kust(&["../mid", "../c"], "")),
             ("mid/kustomization.yaml", kust(&["../b", "svc.yaml"], "a-")),
@@ -2096,7 +1896,6 @@ mod tests {
             ("c/svc.yaml", svc.into()),
         ];
         assert_eq!(routed(&nested), to("Service/a-x"));
-        // An Ingress in m- over its base a-, the same Service in a sibling b-.
         let over = [
             ("top/kustomization.yaml", kust(&["../mid", "../b"], "")),
             ("mid/kustomization.yaml", kust(&["../a", "edge.yaml"], "m-")),
@@ -2107,7 +1906,6 @@ mod tests {
             ("b/svc.yaml", svc.into()),
         ];
         assert_eq!(routed(&over), to("Service/m-a-x"));
-        // Stages compare as lists: one `a-b-` is not `b-` then `a-`, so nothing is left.
         let joined = [
             (
                 "top/kustomization.yaml",
@@ -2122,7 +1920,6 @@ mod tests {
             ("c/svc.yaml", svc.into()),
         ];
         assert_eq!(routed(&joined), none);
-        // Neither base's stages end as the referrer's: the reference names no object.
         let sibling = |second: &str| {
             [
                 (
@@ -2138,10 +1935,7 @@ mod tests {
             ]
         };
         assert_eq!(routed(&sibling("b-")), none);
-        // An object no stage renamed or moved is no candidate: the renamed one is the only one.
         assert_eq!(routed(&sibling("")), to("Service/a-x"));
-        // A reference by the final name stays as written and names that object, unless that
-        // name is longer than Kubernetes allows one: no cluster holds it.
         let written = |prefix: &str| {
             [
                 ("top/kustomization.yaml", kust(&["../web", "edge.yaml"], "")),
@@ -2153,7 +1947,6 @@ mod tests {
         assert_eq!(routed(&written("frontend-")), to("Service/frontend-x"));
         let long = format!("{}-", "p".repeat(OBJECT_NAME_MAX));
         assert_eq!(routed(&written(&long)), none);
-        // A name reference holds no namespace and `default` one, as Kubernetes defaults it.
         let defaulted = [
             ("top/kustomization.yaml", kust(&["../r", "../a"], "")),
             (
@@ -2165,7 +1958,6 @@ mod tests {
             ("a/svc.yaml", svc.into()),
         ];
         assert_eq!(routed(&defaulted), to("Service/a-x"));
-        // An empty `namespace` is no stage: the object keeps none.
         let out = evaluate(&files(&[
             (
                 "o/kustomization.yaml",
@@ -2308,7 +2100,6 @@ mod tests {
                 ("gone.yaml", "missing"),
             ]
         );
-        // A `..` that stays inside the repository is followed.
         assert_eq!(addresses(&out), ["ConfigMap/ok [o]"]);
     }
 
@@ -2325,7 +2116,6 @@ mod tests {
             ),
             ("a/kustomization.yaml", "resources:\n  - ../b\n"),
             ("b/kustomization.yaml", "resources:\n  - ../a\n"),
-            // Naming each other only: no root at all.
             (
                 "x/kustomization.yaml",
                 "resources:\n  - ../y\n  - lost.yaml\n",
@@ -2336,7 +2126,6 @@ mod tests {
             ),
             ("y/kustomization.yaml", "resources:\n  - ../x\n"),
         ]));
-        // The only file the cycle of x and y lists is no one's, so it is a plain object.
         assert_eq!(
             addresses(&out),
             ["ConfigMap/lost [x]", "ConfigMap/r [root]"]
@@ -2367,14 +2156,12 @@ mod tests {
         }
         let list: Vec<(&str, &str)> = list.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
         let out = evaluate(&files(&list));
-        // What the walk never reached is plain, in the unit of its directory.
         let overlay = out.nodes.iter().filter(|n| n.root == "d0");
         assert_eq!(overlay.count(), OVERLAY_DEPTH_MAX);
         let past: Vec<_> = out.unresolved.iter().map(|u| u.reason).collect();
         assert_eq!(past, ["depth"]);
     }
 
-    /// Each base names the next three, a dozen levels deep: 3^12 paths an unbounded walk takes.
     #[test]
     fn bases_reaching_one_another_along_many_paths_are_walked_within_the_entry_ceiling() {
         let mut list: Vec<(String, String)> = Vec::new();
@@ -2395,7 +2182,6 @@ mod tests {
         ));
         let list: Vec<(&str, &str)> = list.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
         let out = evaluate(&files(&list));
-        // The walk stopped: the entries past the ceiling were never looked at.
         assert!(out.unresolved.len() < WALK_MAX, "{}", out.unresolved.len());
         assert!(
             out.unresolved
@@ -2409,7 +2195,6 @@ mod tests {
         let docs: String = (0..OBJECTS_MAX + 5)
             .map(|i| format!("---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: c{i}\n"))
             .collect();
-        // One file holds at most `DOCUMENTS_MAX` documents; several give the count.
         let per = DOCUMENTS_MAX;
         let mut list: Vec<(String, String)> = vec![("kustomization.yaml".into(), String::new())];
         let mut resources = String::from("resources:\n");
@@ -2431,7 +2216,6 @@ mod tests {
 
     #[test]
     fn a_repository_past_its_stored_budget_leaves_the_rest_out() {
-        // Many overlays over one base whose objects have long names.
         let long = "n".repeat(900);
         let base: String = (0..1000)
             .map(|i| {
@@ -2494,7 +2278,6 @@ mod tests {
 
     #[test]
     fn many_overlays_over_many_short_names_store_within_the_repository_budget() {
-        // Each node counts `NODE_BYTES` however short its names, so the budget bounds the count.
         let mut list = vec![(
             "base/kustomization.yaml".to_string(),
             "resources:\n".to_string(),
@@ -2524,7 +2307,6 @@ mod tests {
         );
     }
 
-    /// A ConfigMap `name` of `entries` keys whose values are a kilobyte each.
     fn large_map(name: &str, entries: usize) -> String {
         let value = "v".repeat(1000);
         let data: String = (0..entries).map(|i| format!("  k{i}: {value}\n")).collect();
@@ -2533,7 +2315,6 @@ mod tests {
 
     #[test]
     fn a_file_one_kustomization_names_twice_instantiates_once() {
-        // Copied at every listing, the map would spend the overlay's bytes before the last file.
         let resources = "  - big.yaml\n  - ./big.yaml\n".repeat(20) + "  - small.yaml\n";
         let out = evaluate(&files(&[
             ("o/kustomization.yaml", &format!("resources:\n{resources}")),
@@ -2549,8 +2330,6 @@ mod tests {
         );
     }
 
-    /// Each level names the next through two bases with their own prefixes: the map at the bottom
-    /// is reached along 2^6 paths, each a copy with its own name.
     #[test]
     fn a_large_object_reached_along_many_paths_is_copied_within_the_byte_ceiling() {
         const LEVELS: usize = 6;
@@ -2579,7 +2358,6 @@ mod tests {
         }
         let list: Vec<(&str, &str)> = list.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
         let out = evaluate(&files(&list));
-        // A copy holds at least its data's keys and values.
         let data: usize = (0..entries).map(|i| format!("k{i}").len() + 1000).sum();
         let copies = out.nodes.iter().filter(|n| n.root == "d0").count();
         assert!(copies > 0 && copies < 1 << LEVELS, "{copies}");

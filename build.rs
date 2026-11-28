@@ -1,6 +1,3 @@
-//! Compiles the vendored Kotlin grammar (`vendor/tree-sitter-kotlin-ng`, ADR 0017), with the
-//! flags of the published grammar crate's own build script.
-
 fn main() {
     let src = std::path::Path::new("vendor/tree-sitter-kotlin-ng/src");
     let mut build = cc::Build::new();

@@ -3,7 +3,6 @@ use crate::lang::{Class, Facts, Kind, Receiver, TsClass, TsFieldParameter, TsLoc
 use std::collections::HashMap;
 use tree_sitter::Node;
 
-/// Only a named type gives a receiver. The type reader rejects a shadowing type parameter.
 fn annotation(node: Node, src: &[u8], up: &Parents) -> Option<Class> {
     let ty = named(node).find(|n| n.kind() != "comment")?;
     let generic = ty.kind() == "generic_type";
@@ -104,7 +103,6 @@ pub(super) fn local(
                 {
                     return Some(Class::TsGlobalValue);
                 }
-                // The call's visit fills in its final index, after the declarator's visit.
                 results.insert(call.id(), index);
                 Some(Class::Unknown)
             }),
@@ -116,7 +114,6 @@ pub(super) fn local(
     Some(index)
 }
 
-/// A Promise's output becomes a receiver only when the call was awaited.
 fn result(typed: Node, src: &[u8], up: &Parents) -> (Option<Class>, Option<Class>) {
     let inner = named(typed).find(|n| n.kind() != "comment");
     if let Some(generic) = inner.filter(|n| n.kind() == "generic_type")
@@ -159,7 +156,6 @@ fn property(param: Node) -> bool {
     })
 }
 
-/// A plain assignment in the constructor body can supply an untyped field's receiver.
 fn constructor_receivers(
     ctor: Node,
     scope: &str,
@@ -366,7 +362,6 @@ pub(super) fn definition(node: Node, src: &[u8], scope: &str, up: &Parents, fact
     }
 }
 
-/// Preserve the written call id while resolving parentheses or await around a named receiver.
 pub(super) fn wrapped(function: Node, src: &[u8]) -> Option<(String, bool)> {
     let mut object = function.child_by_field_name("object")?;
     if object.kind() != "parenthesized_expression" {

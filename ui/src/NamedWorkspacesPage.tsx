@@ -19,17 +19,10 @@ import { useCatalog } from './useCatalog';
 import type { CatalogView } from './useCatalog';
 import './operations.css';
 
-/** The manifest text of `identities`, as `meada-core` writes it: the one canonical text the server stores. */
 function manifestOf(identities: string[]): string {
   return namedEntriesText(JSON.stringify(identities.map(repo => ({ repo }))));
 }
 
-/**
- * Named workspaces (#342): the workspaces the session sees, one's detail with the ingestion of each
- * entry in text, and the creation from the repositories the catalog offers. The page decides nothing:
- * `meada-core` (WebAssembly) validates the manifest and marks what the session may not select, and the
- * server decides again at the transaction that creates the workspace.
- */
 export function NamedWorkspacesPage({ api, locale, session, maxEntries }: { api: Api; locale: Language; session: Session; maxEntries: number }) {
   const t = namedCopy[locale];
   const common = copy[locale];
@@ -61,7 +54,6 @@ export function NamedWorkspacesPage({ api, locale, session, maxEntries }: { api:
     setEffective(undefined);
     if (!keep) { setOutcome(undefined); setNotice(undefined); }
     try { setDetail(await api.request<WorkspaceDetail>(`workspaces/${id}`)); } catch (error) { setProblem(error); return; }
-    // The effective configuration is a view of the detail: its failure leaves the detail as it is.
     try { setEffective(await api.request<EffectiveView>(effectiveRoute(id))); } catch { setEffective(undefined); }
   }
   return <>
@@ -111,7 +103,6 @@ export function NamedWorkspacesPage({ api, locale, session, maxEntries }: { api:
   </>;
 }
 
-/** The creation form: pick from the catalog, name it, review the canonical manifest, confirm. */
 function CreateWorkspace({ api, locale, session, catalog, maxEntries, onCreated }: { api: Api; locale: Language; session: Session; catalog: CatalogView; maxEntries: number; onCreated: (id: string) => void }) {
   const t = namedCopy[locale];
   const [chosen, setChosen] = useState<string[]>([]);
@@ -134,7 +125,6 @@ function CreateWorkspace({ api, locale, session, catalog, maxEntries, onCreated 
     setRefusal(undefined); setDone(undefined);
     setChosen(previous => previous.includes(identity) ? previous.filter(i => i !== identity) : [...previous, identity]);
   }
-  // The local rules are the core's, shared with the server: validation of the text, and what the session may select.
   const text = core === locale && chosen.length > 0 ? manifestOf(chosen) : '';
   let invalid: string | undefined;
   if (text) {

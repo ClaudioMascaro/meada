@@ -1,21 +1,13 @@
-//! The type table (ADR 0025, ADR 0026, #656): what an IaC type provisions, read from
-//! `types.toml`, which the binary embeds. An entry names the contract kind (a channel's broker or
-//! a resource's kind), the argument that holds the physical name and the forms an ARN or a URL
-//! holding the name takes. The file's own header documents its format for later entries.
-
 use std::sync::LazyLock;
 
 use serde::Deserialize;
 
-/// The table as the repository versions it.
 const TABLE: &str = include_str!("types.toml");
 
-/// The longest text `Entry::read` matches against its forms.
 // ponytail: an ARN or a URL is well under a few hundred characters; a longer text is the name as
 // it is, which keeps the matching (quadratic in the text) bounded.
 const FORM_TEXT_MAX: usize = 1024;
 
-/// The contract kind an entry provisions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Contract {
@@ -32,15 +24,12 @@ impl Contract {
     }
 }
 
-/// Whether an entry of the table provisions the broker or resource `kind` of the contract kind
-/// `prefix` (`channel`, `resource`): the only kinds with an orphan group (ADR 0026, #814).
 pub(crate) fn provisions(prefix: &str, kind: &str) -> bool {
     ENTRIES
         .iter()
         .any(|e| e.kind == kind && e.contract.prefix() == prefix)
 }
 
-/// One type of the table.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Entry {
@@ -49,11 +38,8 @@ pub(crate) struct Entry {
     pub ty: String,
     pub contract: Contract,
     pub kind: String,
-    /// The argument that holds the physical name.
     pub name: String,
-    /// A format-defined default, used only when the primary property is absent.
     pub fallback: Option<String>,
-    /// An alias reuses the canonical entry's identifier policy, without guessing from its kind.
     pub basis: Option<String>,
     pub qualifier: Option<String>,
     pub qualifier_ref: Option<String>,
@@ -128,7 +114,6 @@ pub(crate) fn registry(source: &str) -> Option<&'static Registry> {
     REGISTRY.iter().find(|m| m.source == source)
 }
 
-/// A type that runs code, with the image and code paths its format reads.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Workload {
@@ -138,7 +123,6 @@ pub(crate) struct Workload {
     pub images: Vec<String>,
     pub code: Option<String>,
     pub name: Option<String>,
-    /// Whether direct code must be a file, as for a deployment archive.
     #[serde(default)]
     pub code_file: bool,
 }
@@ -162,23 +146,18 @@ pub(crate) fn workload_of(node: &super::Node) -> Option<&'static Workload> {
     workload(format_of(&node.path)?, &node.ty)
 }
 
-pub(super) static ENTRIES: LazyLock<Vec<Entry>> = LazyLock::new(|| {
-    // The table is the repository's own file, checked by `the_table_parses`.
-    toml::from_str::<Table>(TABLE).map_or_else(|_| Vec::new(), |t| t.entry)
-});
+pub(super) static ENTRIES: LazyLock<Vec<Entry>> =
+    LazyLock::new(|| toml::from_str::<Table>(TABLE).map_or_else(|_| Vec::new(), |t| t.entry));
 
-/// The entry of `ty` in `format` (`terraform`), when the table lists it.
 pub(crate) fn entry(format: &str, ty: &str) -> Option<&'static Entry> {
     ENTRIES.iter().find(|e| e.format == format && e.ty == ty)
 }
 
-/// A configuration or stored mapping names an entry by its complete `format:type` identity.
 pub(crate) fn named(id: &str) -> Option<&'static Entry> {
     let (format, ty) = id.split_once(':')?;
     entry(format, ty)
 }
 
-/// Mapped nodes retain their physical type; their projection selects the curated entry.
 pub(crate) fn node_entry(node: &super::Node) -> Option<&'static Entry> {
     match node.provisioned.as_ref().and_then(|p| p.entry.as_deref()) {
         Some(id) => named(id),
@@ -194,7 +173,6 @@ pub(crate) fn stamp() -> blake3::Hash {
     blake3::hash(TABLE.as_bytes())
 }
 
-/// A type-table entry is a provisioner only in the format's resource declaration section.
 pub(crate) fn provision_entry(path: &str, block: &str, ty: &str) -> Option<&'static Entry> {
     let format = format_of(path)?;
     let declared = match format {
@@ -207,8 +185,6 @@ pub(crate) fn provision_entry(path: &str, block: &str, ty: &str) -> Option<&'sta
     declared.then(|| entry(format, ty)).flatten()
 }
 
-/// The format of the IaC file at `path` as the table names it: `terraform` for a `.tf` or
-/// `.tofu` file or its JSON equivalent, `None` for a format no entry has yet.
 pub(crate) fn format_of(path: &str) -> Option<&'static str> {
     if path.ends_with(".tf") || path.ends_with(".tofu") || super::json::is_file(path) {
         Some("terraform")
@@ -219,7 +195,6 @@ pub(crate) fn format_of(path: &str) -> Option<&'static str> {
     }
 }
 
-/// The unique contract named by a structured cloud identifier. AWS forms stay in the table.
 pub(crate) fn identified(text: &str) -> Option<String> {
     if let Some(contract) = crate::contract::azure::identified(text) {
         return Some(contract);
@@ -235,7 +210,6 @@ pub(crate) fn identified(text: &str) -> Option<String> {
         .and_then(|_| text.split(':').nth(2));
     let mut contracts = ENTRIES
         .iter()
-        // An ARN's service is explicit. Do not run unrelated service forms for every scalar.
         .filter(|entry| {
             service.is_none_or(|service| {
                 entry
@@ -259,7 +233,6 @@ impl Entry {
             None => Some(self),
         }
     }
-    /// A mapped input cannot fall back to a malformed structured identifier or bare composite.
     pub(crate) fn mapped(&self, text: &str, pattern: bool) -> Option<String> {
         if self.basis.is_some() {
             return self.canonical()?.mapped(text, pattern);
@@ -315,7 +288,6 @@ impl Entry {
         }
     }
 
-    /// Provider-specific identity validation belongs to the kind, shared with SDK/config readers.
     pub(crate) fn project(&self, text: &str) -> Option<String> {
         if self.basis.is_some() {
             return self.canonical()?.project(text);
@@ -335,19 +307,15 @@ impl Entry {
             "google_pubsub_subscription" => gcp::pubsub(text, true),
             "google_storage_bucket" => gcp::bucket(text),
             "google_sql_database_instance" => gcp::instance(text),
-            // The evaluator qualifies a database with its instance after names are known.
             "google_sql_database" => gcp::database_name(text).then(|| text.into()),
             "google_secret_manager_secret" => gcp::secret(text),
             _ => Some(self.read(text).into()),
         }
     }
-    /// The contract a node of this type named `name` provisions.
     pub(crate) fn contract(&self, name: &str) -> String {
         format!("{}::{}::{name}", self.contract.prefix(), self.kind)
     }
 
-    /// The name `text` holds: what `{name}` matches in the first form `text` fits, else `text`
-    /// itself.
     pub(crate) fn read<'t>(&self, text: &'t str) -> &'t str {
         if text.len() > FORM_TEXT_MAX {
             return text;
@@ -358,7 +326,6 @@ impl Entry {
     }
 }
 
-/// One piece of a form: literal text, `*` or `{name}`.
 #[derive(Clone, Copy)]
 enum Piece<'f> {
     Text(&'f str),
@@ -401,8 +368,6 @@ fn pieces(form: &str) -> Vec<Piece<'_>> {
     out
 }
 
-/// What `{name}` matches when `text` fits `form`: the form whole, or the form then `/` and
-/// anything.
 fn fits<'t>(form: &str, text: &'t str) -> Option<&'t str> {
     let pieces = pieces(form);
     let mut failed = std::collections::HashSet::new();
@@ -413,8 +378,6 @@ fn fits<'t>(form: &str, text: &'t str) -> Option<&'t str> {
     }
 }
 
-/// Whether `text` from `at` fits `pieces` from `p`, setting `name` on the way; `failed` holds the
-/// positions already known not to fit, so the walk is quadratic at worst.
 fn matches<'t>(
     pieces: &[Piece],
     text: &'t str,
@@ -491,7 +454,6 @@ mod tests {
         );
     }
 
-    /// Every format's entry has an evaluated, named resource in the provisioning fixtures.
     #[test]
     fn every_entry_has_a_fixture_case() {
         let root = concat!(
@@ -619,7 +581,6 @@ mod tests {
         let legacy = "https://eu-west-1.queue.amazonaws.com/123456789012/refunds";
         assert_eq!(sqs.read(legacy), "refunds");
         assert_eq!(sqs.read("orders"), "orders");
-        // A part that is not there fits no form.
         assert_eq!(
             sqs.read("arn:aws:sqs:eu-west-1::orders"),
             "arn:aws:sqs:eu-west-1::orders"
@@ -638,11 +599,9 @@ mod tests {
         assert_eq!(s3.read(regional), "orders-archive");
         let path = "https://s3.eu-west-1.amazonaws.com/orders-archive/key";
         assert_eq!(s3.read(path), "orders-archive");
-        // A form that stops short of the end fits only before a `/`.
         assert_eq!(s3.read("s3://a:b"), "s3://a:b");
     }
 
-    /// Past `FORM_TEXT_MAX` a text is the name as it is, however many forms it would fit.
     #[test]
     fn a_text_past_the_form_ceiling_is_the_name_as_it_is() {
         let sqs = entry("terraform", "aws_sqs_queue").unwrap();
@@ -652,7 +611,6 @@ mod tests {
         assert_eq!(sqs.read(&short), "q".repeat(100));
     }
 
-    /// A text built to make the matching backtrack stays fast.
     #[test]
     fn matching_a_hostile_text_stays_bounded() {
         let s3 = entry("terraform", "aws_s3_bucket").unwrap();

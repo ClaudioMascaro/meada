@@ -1,16 +1,9 @@
-//! A manifest error never quotes a value the file wrote (#449, #545): a secret pasted under the
-//! wrong key must not reach a log or a viewer. One marker goes into every case `describe`
-//! handles past the syntax check, and no message, in either language, may hold it.
-//!
-//! This binary holds one test, which sets the process-wide language: no other test shares it.
-
 use meada_core::manifest::{parse, validate};
 use serde::Deserialize;
 
 const MARKER: &str = "MARKER-s3cr3t";
 const FILE: &str = "ops/meada.workspace.toml";
 
-/// A schema of a shape the manifests do not have: a `char`, which makes serde's `invalid value`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 #[expect(dead_code)]
@@ -18,7 +11,6 @@ struct Probe {
     letter: Option<char>,
 }
 
-/// A whole file that its type refuses, which no key spans.
 #[derive(Deserialize)]
 #[serde(try_from = "toml::Table")]
 struct Whole;
@@ -33,7 +25,6 @@ impl TryFrom<toml::Table> for Whole {
     }
 }
 
-/// Every message the manifest schema gives for a marker written in each case.
 fn messages() -> Vec<(&'static str, String)> {
     let entry = |body: &str| format!("[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n{body}");
     let mut all: Vec<(&str, String)> = Vec::new();
@@ -92,7 +83,6 @@ fn messages() -> Vec<(&'static str, String)> {
         "invalid value",
         parse::<Probe>(FILE, &letter, "probe").err().unwrap(),
     );
-    // A comment first, so the error found at the start of the file lies in no key.
     let whole = format!("# one\nkey = \"{MARKER}\"\n");
     refused(
         "no key found",
@@ -110,7 +100,6 @@ fn no_manifest_error_quotes_a_written_value_in_either_language() {
                 !message.contains(MARKER),
                 "{case} ({lang:?}) quotes the value: {message}"
             );
-            // The no-key case is Meada's own text, not serde's.
             if case == "no key found" {
                 let own = [
                     "a value is not valid here",

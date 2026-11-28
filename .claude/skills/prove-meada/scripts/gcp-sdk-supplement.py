@@ -284,7 +284,6 @@ class Controls {
     ],
 )
 
-# Same-valued but incompatible typed actuals must not collide in factory memoization.
 CASES.extend(
     [
         {
@@ -318,8 +317,6 @@ CASES.extend(
     ]
 )
 
-# Exhausted evidence has a separate repository: its shared work ceiling can
-# conservatively invalidate names throughout that input. Ordinary controls stay bounded.
 for _group in ("js", "ts"):
     _file = "controls." + _group
     _source = SOURCES[_group][_file]
@@ -656,7 +653,6 @@ def cloud_run(binary, cloud, run, http):
                 data
             ) and "must-not-read-runtime" not in json.dumps(data)
             if http:
-                # Peer-aware server scope is exactly the same app+infra pair as local stdio.
                 manifest = folder / (phase + ".workspace.toml")
                 manifest.write_text(
                     'index_dir = "'
@@ -903,8 +899,6 @@ def main():
         for field in ("uses", "provisions", "subscriptions", "executions", "iac_nodes"):
             assert not data.get(field), (group, field, data.get(field))
         for case in cases:
-            # Qualified symbols retain the source function name in every pack. Match the
-            # function segment, never an arbitrary substring in a resource name.
             selected = [
                 row
                 for row in data[case["role"]]

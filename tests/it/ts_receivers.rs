@@ -1,5 +1,3 @@
-//! TypeScript calls by the receiver's class and the by-name answer when dispatch is open.
-
 use crate::common::fixture_repo;
 use meada::engine::Engine;
 use serde_json::Value;
@@ -17,7 +15,6 @@ fn export() -> &'static Value {
     })
 }
 
-// Each caller in the fixture makes exactly one call of this method.
 fn call(plugin: &str, file: &str, caller: &str, method: &str) -> &'static Value {
     let caller = format!("example.com/acme/receivers::plugins/{plugin}/src/{file}.ts::{caller}");
     let calls: Vec<_> = export()["calls"]
@@ -196,7 +193,6 @@ fn uncertain_receivers_keep_todays_answer() {
     ] {
         by_name(call("a", "guards", caller, "send"), SEND);
     }
-    // The import names an outside type that only the literal candidates might satisfy.
     by_name(call("a", "guards", "outside", "send"), LITERAL_SEND);
     by_name(
         call("a", "guards", "generic", "generic"),
@@ -450,7 +446,6 @@ fn a_fresh_literals_computed_write_preserves_the_call_and_read() {
     let json = literal_writes("ts_fresh_literal_owner", "values[key] = 'a';");
     exact_list(&json, "::call::api.list#0");
     exact_list(&json, "::read::(member)api.list#0");
-    // The imported call needs the fresh owner to prove that api is still intact.
     exact_list(&json, "::imported::api.list#0");
 }
 

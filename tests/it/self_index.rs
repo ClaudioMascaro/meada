@@ -1,6 +1,3 @@
-//! Invariants over Meada's own index: a copy of the repository's tracked files, indexed like any
-//! other repository (indexing writes `.meada/`, so never in place).
-
 use crate::common::git;
 
 use std::fs;
@@ -16,10 +13,8 @@ fn meada_own_index_keeps_its_invariants() {
     let source = Path::new(env!("CARGO_MANIFEST_DIR"));
     let repo = Path::new(env!("CARGO_TARGET_TMPDIR")).join("self_index/meada");
     let _ = fs::remove_dir_all(&repo);
-    // The working tree's tracked files, so an uncommitted change is tested too.
     for path in git(source, &["ls-files", "-z"]).split_terminator('\0') {
         let from = source.join(path);
-        // Symbolic links (`.claude/skills`) and files deleted but not staged are left out.
         if !fs::symlink_metadata(&from).is_ok_and(|m| m.is_file()) {
             continue;
         }

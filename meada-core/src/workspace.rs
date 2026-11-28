@@ -153,7 +153,6 @@ fn fields(table: &DeTable<'_>, prefix: &str, out: &mut Vec<(String, Vec<Json>, u
                     rows.push(row);
                 }
                 for (key, at) in columns {
-                    // Missing fields keep their row position; TOML has no null value to confuse it with.
                     let values = rows
                         .iter()
                         .map(|row| {

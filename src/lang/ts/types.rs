@@ -1,24 +1,16 @@
-//! Types that name a schema (spec #23): `z.infer<typeof S>` and the response types that wrap it.
-
 use tree_sitter::Node;
 
 use super::{Parents, children, named, text, unquote};
 use crate::lang::{Member, TYPE_DEPTH, Ty};
 
-/// How many levels above a name a type parameter hiding it is looked for. A type parameter
-/// declared farther up leaves the name unknown, never taken for a type of the file.
 // ponytail: a type parameter is declared by the function or interface around its uses; the limit
 // keeps a crafted nesting of thousands of levels from costing the square of its depth.
 const HIDING_CLIMB: usize = 64;
 
-/// The generics whose first type argument is the type of a response body.
 const RESPONSES: [&str; 2] = ["Promise", "NextResponse"];
 
-/// The generics that give the type a schema infers.
 const INFERS: [&str; 3] = ["infer", "output", "TypeOf"];
 
-/// The schema `typed`, a type annotation or a type, names through `z.infer<typeof S>`, also
-/// inside the generics a handler's return type wraps it in (`Promise<NextResponse<..>>`).
 pub(super) fn inferred(typed: Node, src: &[u8]) -> Option<String> {
     let mut node = typed;
     // Each step goes one level into the type: the walk ends at the innermost one.
@@ -44,7 +36,6 @@ pub(super) fn inferred(typed: Node, src: &[u8]) -> Option<String> {
     }
 }
 
-/// The names of the type parameters `node`, a function, declares, in order.
 pub(super) fn type_parameters(node: Node, src: &[u8]) -> Vec<String> {
     let Some(parameters) = node.child_by_field_name("type_parameters") else {
         return Vec::new();
@@ -54,8 +45,6 @@ pub(super) fn type_parameters(node: Node, src: &[u8]) -> Vec<String> {
         .collect()
 }
 
-/// The type a function's return annotation `typed` declares, inside the generics a handler wraps
-/// it in (`Promise<NextResponse<..>>`); `None` when it lists nothing.
 pub(super) fn returned(typed: Node, src: &[u8], up: &Parents) -> Option<Ty> {
     if let Some(schema) = inferred(typed, src) {
         return Some(Ty::Schema(schema));
@@ -79,8 +68,6 @@ pub(super) fn returned(typed: Node, src: &[u8], up: &Parents) -> Option<Ty> {
     Some(ty(node, src, up, &mut 0)).filter(|t| *t != Ty::Unknown)
 }
 
-/// The type an `interface` or `type` declaration writes: an interface is its body together with
-/// the types it extends. `cost` counts the nodes read.
 pub(super) fn declaration(node: Node, src: &[u8], up: &Parents, cost: &mut usize) -> Ty {
     if node.kind() == "type_alias_declaration" {
         return (node.child_by_field_name("value")).map_or(Ty::Unknown, |v| ty(v, src, up, cost));
@@ -99,7 +86,6 @@ pub(super) fn declaration(node: Node, src: &[u8], up: &Parents, cost: &mut usize
     }
 }
 
-/// The type `node` writes, as far as drift reads it. `cost` counts the nodes read.
 pub(super) fn ty(node: Node, src: &[u8], up: &Parents, cost: &mut usize) -> Ty {
     read(node, src, up, 0, cost)
 }
@@ -136,7 +122,6 @@ fn read(node: Node, src: &[u8], up: &Parents, depth: usize, cost: &mut usize) ->
             }
         }
         "intersection_type" => {
-            // `A & B & C` nests to the left: flattened with a stack, not by recursion.
             let (mut parts, mut stack) = (Vec::new(), vec![node]);
             while let Some(at) = stack.pop() {
                 *cost += 1;
@@ -166,7 +151,6 @@ fn read(node: Node, src: &[u8], up: &Parents, depth: usize, cost: &mut usize) ->
     }
 }
 
-/// A property of an object type, unless its name has no spelling in a field path.
 fn property(
     node: Node,
     src: &[u8],
@@ -191,8 +175,6 @@ fn property(
     })
 }
 
-/// The name `name`, used at `node`, unless a type parameter of a function, class, interface or
-/// alias around it hides it.
 fn reference<'t>(node: Node<'t>, src: &[u8], up: &Parents<'t>, name: &str, cost: &mut usize) -> Ty {
     let mut at = node;
     for _ in 0..HIDING_CLIMB {
@@ -207,7 +189,6 @@ fn reference<'t>(node: Node<'t>, src: &[u8], up: &Parents<'t>, name: &str, cost:
             })
         });
         if declares {
-            // A function's type parameter is the caller's to give; another's adds no fields.
             let function = super::BODIES.contains(&parent.kind());
             return if function {
                 Ty::Param(name.to_string())
@@ -225,7 +206,6 @@ mod tests {
     use super::HIDING_CLIMB;
     use crate::lang::{LanguagePack, TYPE_DEPTH, Value, ts::TsJs};
 
-    /// A name and the schema it is typed with.
     type Typed = Vec<(String, Option<String>)>;
 
     fn schema(ty: &Option<Ty>) -> Option<String> {
@@ -235,7 +215,6 @@ mod tests {
         }
     }
 
-    /// The schema each `const` of `src` is typed with, and each function's return type.
     fn parse(src: &str) -> (Typed, Typed) {
         let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
         let consts = (facts.consts.iter())
@@ -290,7 +269,6 @@ mod tests {
 
     use crate::lang::{Member, Ty};
 
-    /// The type each `interface` and `type` of `src` declares.
     fn declared(src: &str) -> Vec<(String, Ty)> {
         let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
         (facts.consts.into_iter())

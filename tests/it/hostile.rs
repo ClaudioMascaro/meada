@@ -1,15 +1,3 @@
-//! Hostile input (`CODING_STANDARDS.md`): a crafted file ends as a status line or an open part,
-//! and indexing carries on. Each limit has a unit test of its own; this subject is the net for
-//! the one nobody wrote. Per language pack, pathological repositories sized past the limits of
-//! "Known ceilings" are indexed on a thread with a small stack, joined with a wall-clock
-//! budget, twice, each run within the budget: the second time without the index, over the
-//! values cache the first left (ADR 0027), to the same export. A recursion with no limit overflows the stack (the process aborts: with
-//! `--nocapture`, the case named with no time after it is the one), a loop with none misses
-//! the budget.
-//!
-//! tree-sitter parses without recursion, so its depth is no limit here; the walks over its trees
-//! are Meada's. Real code nests about 30 deep.
-
 use crate::common;
 
 use std::fs;
@@ -19,47 +7,30 @@ use std::time::{Duration, Instant};
 
 use meada::engine::Engine;
 
-/// The stack of the indexing thread, a test thread's: the fixtures of every pack index in
-/// 128 KiB in debug, and the deepest case here, at the limits, in half of it.
 const STACK: usize = 2 << 20;
 
-/// The wall-clock budget of one case in debug. A case alone takes 3 s at most, but beside every
-/// other subject, on a loaded machine under `bounded`'s memory cap, one of 100 ms took over
-/// 10 s: a loop with no limit misses any budget all the same.
 const BUDGET: Duration = Duration::from_secs(60);
 
-/// Nesting and chains within one file, past every depth limit (`PATH_DEPTH`, `FOLD_DEPTH`,
-/// `EVAL_DEPTH` and `WALK_DEPTH` are 256, the others less) by enough that a recursion with no
-/// limit at all needs more than `STACK`.
 const DEEP: usize = 1000;
-/// Python nesting by indentation, past `DEFINITION_DEPTH` (128): its file grows with the square
-/// of the depth.
 const INDENTED: usize = 300;
-/// Past `FLUENT_CHAIN` (1024).
 const LONG: usize = 1100;
-/// Past `USE_BINDINGS` and `FEATURES` (4096).
 const WIDE: usize = 5000;
-/// Files in a chain, past `LINK_DEPTH` and `INCLUDE_DEPTH` (64) and `FAMILY_DEPTH` (128).
 const LINKS: usize = 130;
 
-/// A case: its name and the files of the repository, relative to its root.
 type Case = (&'static str, Vec<(String, String)>);
 
 fn one(path: &str, body: String) -> Vec<(String, String)> {
     vec![(path.into(), body)]
 }
 
-/// `open` `n` times, `core`, `close` `n` times.
 fn nest(open: &str, core: &str, close: &str, n: usize) -> String {
     format!("{}{core}{}", open.repeat(n), close.repeat(n))
 }
 
-/// `f(0)`, `f(1)`, ... `f(n - 1)`, one per line.
 fn lines(n: usize, f: impl Fn(usize) -> String) -> String {
     (0..n).map(f).collect::<Vec<_>>().join("\n")
 }
 
-/// The same files as `lines`, one file each: `path(i)` holds `body(i)`.
 fn chain(
     n: usize,
     path: impl Fn(usize) -> String,
@@ -68,8 +39,6 @@ fn chain(
     (0..n).map(|i| (path(i), body(i))).collect()
 }
 
-/// Indexes `files` as a repository and exports it, on a thread with `STACK` bytes, then removes
-/// the repository (a failed case's stays to be read). Gives the export.
 fn index(pack: &str, name: &str, files: &[(String, String)]) -> String {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("hostile-{pack}-{name}"));
     let _ = fs::remove_dir_all(&dir);
@@ -88,8 +57,6 @@ fn index(pack: &str, name: &str, files: &[(String, String)]) -> String {
         .spawn(move || {
             let index = || -> meada::Result<String> { Engine::open(&repo)?.export() };
             let _ = tx.send(index().map_err(|e| e.to_string()));
-            // Then a cold index again over the values cache the first left (ADR 0027): the
-            // values read back on the same stack, the same export, within a budget of its own.
             let _ = fs::remove_file(repo.join(".meada/index.db"));
             let _ = tx.send(index().map_err(|e| e.to_string()));
         })
@@ -113,11 +80,8 @@ fn index(pack: &str, name: &str, files: &[(String, String)]) -> String {
     export
 }
 
-/// Each pack's cases are split into `PARTS` tests, a case in every `PARTS`th, so the harness
-/// indexes them in parallel with the other subjects instead of after them.
 const PARTS: usize = 4;
 
-/// The cases of `pack` that fall to `part`.
 fn run(pack: &str, cases: Vec<Case>, part: usize) {
     for (name, files) in cases.into_iter().skip(part).step_by(PARTS) {
         index(pack, name, &files);
@@ -133,7 +97,6 @@ fn ts() -> Vec<Case> {
         t("arrays", x(nest("[", "1", "]", DEEP))),
         t("objects", x(nest("{a:", "1", "}", DEEP))),
         t("calls", x(nest("f(", "1", ")", DEEP))),
-        // A builder that uses its parameter twice, folded at each level: 2^n parts if unbounded.
         t(
             "builder-nest",
             format!(
@@ -692,7 +655,6 @@ fn python() -> Vec<Case> {
     ]
 }
 
-/// A crate `h`, its `src/lib.rs` the `body`, with `more` files beside it.
 fn krate(body: String, more: Vec<(String, String)>) -> Vec<(String, String)> {
     let mut files = vec![
         (
@@ -955,7 +917,6 @@ fn rust() -> Vec<Case> {
                 "+ \"a\"".repeat(WIDE)
             ),
         ),
-        // Values a reqwest call reads, through what each case chains or nests.
         r(
             "doubling",
             g(format!(
@@ -1212,7 +1173,6 @@ fn rust() -> Vec<Case> {
     ]
 }
 
-/// A Go module `example.com/h`, its `h.go` the `body`, with `more` files beside it.
 fn module(body: String, more: Vec<(String, String)>) -> Vec<(String, String)> {
     let mut files = vec![
         ("go.mod".to_string(), "module example.com/h\n".to_string()),
@@ -1247,8 +1207,6 @@ fn go() -> Vec<Case> {
         format!("{head}\nfunc f(w http.ResponseWriter, r *http.Request) {{}}\n\n{body}\n")
     };
     vec![
-        // Routers: groups made on groups past `PREFIX_DEPTH`, a registration function reaching
-        // the next one with a group, and a mux inside calls nested past the value depth.
         m(
             "groups",
             gin(format!(
@@ -1268,9 +1226,6 @@ fn go() -> Vec<Case> {
                 })
             )),
         ),
-        // chi and gorilla/mux: `Route` literals nested past the definition depth, a named
-        // function reaching the next with its subrouter, `Mount` and `PathPrefix` chains past
-        // `PREFIX_DEPTH`, and `Methods` chained past the value depth.
         m(
             "chi route literals",
             chi(format!(
@@ -1283,7 +1238,6 @@ fn go() -> Vec<Case> {
                 )
             )),
         ),
-        // Type uses nested past every depth limit of the pack: slices and function types.
         m(
             "nested types",
             format!(
@@ -1359,8 +1313,6 @@ fn go() -> Vec<Case> {
                 nest("w(", "mux", ")", DEEP)
             )),
         ),
-        // Consumers: a client built by more setters than `CLIENT_DEPTH`, one handed from name
-        // to name, and a URL written as a long `+` and a long `fmt.Sprintf` nest.
         m(
             "setters",
             gin(format!(
@@ -1401,8 +1353,6 @@ fn go() -> Vec<Case> {
                 "*".repeat(DEEP)
             ),
         ),
-        // Receivers: a result passed from variable to variable, a field chain, a type wrapped
-        // in pointers, and one name bound over and over.
         m(
             "result chain",
             format!(
@@ -1527,7 +1477,6 @@ fn go() -> Vec<Case> {
     ]
 }
 
-/// A test for each part of each pack: `<pack>_survives_hostile_input_<part>`.
 macro_rules! parts {
     ($($test:ident = $pack:literal, $cases:ident, $part:literal;)*) => {
         $(#[test]
@@ -1556,10 +1505,6 @@ parts! {
     go_survives_hostile_input_3 = "go", go, 3;
 }
 
-/// A static import of the class whose base is looked up through it (`using static N.A;` and
-/// `class A : Inner`; efcore's shape, where an interface's file imports statically the class
-/// that implements it, met from either end; Java's `import static p.A.*;`) is a cycle the
-/// linearization ends: indexing carries on, each type a symbol.
 #[test]
 fn a_static_import_of_a_class_naming_its_own_base_is_indexed() {
     let project = "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup>\
@@ -1630,14 +1575,8 @@ fn a_static_import_of_a_class_naming_its_own_base_is_indexed() {
     }
 }
 
-/// Locals in a chain, past `RECEIVER_DEPTH` (64) by 16: `var a1 = a0.m(); var a2 = a1.m(); ..`.
 const LOCALS: usize = 80;
 
-/// How a pack writes the chain of `LOCALS` locals, each holding a call on the one before it:
-/// the pack's name, how its repository holds a source, and the head of the source and the type
-/// of `a0` for a receiver typed outside the repository and for one the repository declares.
-/// `{t}`, `{locals}`, `{i}` and `{p}` (the one before `{i}`) stand for those in `function` and
-/// `local`. A new pack adds its row.
 type Chained = (
     &'static str,
     fn(String) -> Vec<(String, String)>,
@@ -1743,15 +1682,12 @@ fn chained() -> [Chained; 8] {
     ]
 }
 
-/// `chained` has a row for each pack of `PACKS` (`src/lang/mod.rs`), one each: a new pack fails
-/// here until it adds its row.
 #[test]
 fn the_chain_table_has_a_row_for_each_pack() {
     let lang = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lang/mod.rs"));
     let lang = lang.unwrap();
     let (_, packs) = lang.split_once("const PACKS: ").expect("a PACKS list");
     let (packs, _) = packs.split_once("];").unwrap();
-    // Past the line of the type, one `&module::Pack,` line each.
     let packs = (packs.lines().skip(1))
         .filter(|l| l.trim().starts_with('&'))
         .count();
@@ -1761,11 +1697,6 @@ fn the_chain_table_has_a_row_for_each_pack() {
     assert_eq!(rows.len(), packs, "one chained row per pack: {rows:?}");
 }
 
-/// Every pack reads a chain of locals on call results, from a receiver typed outside the
-/// repository and from one a type of the repository answers, in time linear in its length: a
-/// result read twice per link (once through the walk and once through the name match) made
-/// Java's cost double per link, and the C# pack's with it. The cases run side by side, each
-/// within `BUDGET`, and the test names the packs that missed it.
 #[test]
 fn every_pack_reads_a_chain_of_locals_on_call_results_in_linear_time() {
     let cases: Vec<_> = (chained().into_iter())

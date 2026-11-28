@@ -1,4 +1,3 @@
-//! Azure Java builder states and the documented synchronous operation inventory.
 use super::{Code, Frame, Handle, Role, Stage, argument};
 
 pub(super) fn constructed<'a>(
@@ -31,7 +30,6 @@ pub(super) fn step<'a>(
     frames: &[Frame<'a>],
 ) -> Option<Handle> {
     let call = code.call(path, index)?;
-    // A builder held in a local that is set again changes in place: its names are unknown.
     let builder = matches!(
         parent.stage,
         Stage::BusBuilder

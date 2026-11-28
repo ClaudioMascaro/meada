@@ -236,10 +236,7 @@ def on_post_page(output, page, config):
     if config.theme['language'] == 'pt-BR':
         output = output.replace('<html lang="pt"', '<html lang="pt-BR"')
     output = output.replace('hreflang="pt"', 'hreflang="pt-BR"')
-    # static-i18n already emits contextual language links. Material's alternate-link
-    # enhancement assumes language roots and requests nonexistent per-page sitemaps.
     output = re.sub(r'<link[^>]+rel="alternate"[^>]*>', '', output)
-    # Keep the repository link without fetching release statistics from GitHub.
     output = output.replace('data-md-component="source"', '')
     label = {'en': 'Change theme', 'es': 'Cambiar tema'}.get(config.theme['language'])
     return output.replace('Mudar tema', label) if label else output

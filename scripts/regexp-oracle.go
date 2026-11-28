@@ -1,11 +1,3 @@
-// Command regexp-oracle compiles each pattern of a JSON array of strings with Go's regexp, as
-// Alertmanager does, and writes a JSON array with one [a, b] pair of Go's error texts per
-// pattern, "" for a compiled one: a for "^(?:" + pattern + ")$", which wraps a match_re, and b
-// for "^(?s:" + pattern + ")$", which wraps a matcher value.
-//
-// Usage: go run scripts/regexp-oracle.go <patterns.json> [<results.json>]
-// The results go to standard output without the second argument. Only Go's standard library is
-// needed. The test `refusal_agrees_with_go` in src/alert/regexp.rs runs it (#718).
 package main
 
 import (

@@ -1,6 +1,3 @@
-//! The integration tests, one module per subject (`docs/agents/map/tests.md`), in one binary so
-//! `cargo test` links it once instead of once per subject.
-
 mod common;
 
 mod affected;
@@ -103,7 +100,6 @@ mod wide;
 mod workspace;
 mod xlang;
 
-/// A file or directory here left out of the list above would never compile or run.
 #[test]
 fn every_file_here_is_a_module() {
     let main = std::fs::read_to_string("tests/it/main.rs").unwrap();

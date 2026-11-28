@@ -214,14 +214,12 @@ test.each(['en', 'pt-BR'] as const)('CI links are a group of their own, with its
   ]);
   const rows = Array.from(links.querySelectorAll('tbody tr')).map(row =>
     Array.from(row.querySelectorAll('td')).map(cell => cell.textContent));
-  // A call to another repository, with the Git ref as written and the indexed commit.
   expect(rows[0]).toEqual([
     'ci::github.com/acme/workflows/.github/workflows/lint.yml',
     'github.com/acme/workflows::.github/workflows/lint.yml::.',
     'github.com/acme/app-a::.github/workflows/ci.yml::jobs.lint',
     'exact', '@main (indexed 2344e45)',
   ]);
-  // A call inside the repository is in the group too.
   expect(rows[6]).toEqual([
     'ci::github.com/acme/app-a/tools/local',
     'github.com/acme/app-a::tools/local/action.yml::.',

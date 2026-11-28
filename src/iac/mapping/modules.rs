@@ -1,5 +1,3 @@
-//! Module inputs use the ordinary Terraform evaluator, in the call's own instance.
-
 use super::super::*;
 
 struct Spec {
@@ -52,7 +50,6 @@ impl<'m> Eval<'m> {
         };
         let value = self.value(at, each, &arg.expr, 0);
         through.extend(value.through);
-        // The input is a `bool` variable of the module, which takes `"true"` and `"false"` too.
         let Val::Known(value) = value.val else {
             return None;
         };
@@ -212,7 +209,6 @@ impl<'m> Eval<'m> {
         }
     }
 
-    /// Workloads wait until the shared endpoint indexes and cloud projections are prepared.
     pub(in crate::iac) fn module_workload(
         &mut self,
         node: usize,

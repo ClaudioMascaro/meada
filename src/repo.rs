@@ -78,7 +78,6 @@ pub fn normalize_remote(url: &str) -> String {
     let url = url.trim();
     let (host, path) = match url.split_once("://") {
         Some((_, rest)) => rest.split_once('/').unwrap_or((rest, "")),
-        // scp-like syntax: `user@host:path`
         None => url.split_once(':').unwrap_or(("", url)),
     };
     let host = host.rsplit_once('@').map_or(host, |(_, h)| h);
@@ -108,7 +107,6 @@ pub fn relative(dir: &str, rel: &str) -> Option<String> {
     Some(parts.join("/"))
 }
 
-/// Whether `rev` names the commit `HEAD` names in the checkout at `root`.
 fn resolves_to_head(root: &Path, rev: &str) -> bool {
     let commit = git(
         root,
@@ -163,7 +161,6 @@ impl Changes<'_> {
         match *self {
             Changes::Uncommitted => working_tree(root, true),
             Changes::Range { base, head } => {
-                // `git diff` would take a revision starting with `-` as an option.
                 if let Some(rev) = [base, head].into_iter().find(|r| r.starts_with('-')) {
                     return Err(Msg::TraceChangesValue(rev).text().into());
                 }
@@ -184,7 +181,6 @@ impl Changes<'_> {
                         return Err(Msg::PathOutside { path }.text().into());
                     };
                     let full = root.join(&rel);
-                    // A symlink is a file to git, whatever it points to.
                     if std::fs::symlink_metadata(&full).is_ok_and(|m| m.is_dir()) {
                         return Err(Msg::PathIsDirectory { path }.text().into());
                     }
@@ -206,7 +202,6 @@ pub fn uncommitted(root: &Path) -> Result<Vec<(String, Change)>> {
     working_tree(root, false)
 }
 
-/// The working tree against `HEAD`; with `whole`, as `diff` reads it.
 fn working_tree(root: &Path, whole: bool) -> Result<Vec<(String, Change)>> {
     let untracked = |more: &[&str]| -> Result<Vec<(String, Change)>> {
         let args = [&["ls-files", "--others", "--exclude-standard", "-z"], more].concat();
@@ -224,11 +219,7 @@ fn working_tree(root: &Path, whole: bool) -> Result<Vec<(String, Change)>> {
     Ok(changes)
 }
 
-/// The paths `git diff <revs>` lists, with the lines of the new side each one changed. With
-/// `whole`, an entry with no line (a binary file, a mode change, a new empty file) is
-/// `Untracked` and a removed path `Deleted`; without it both are left out.
 fn diff(root: &Path, revs: &[&str], whole: bool) -> Result<Vec<(String, Change)>> {
-    // Explicit prefixes and no external diff, whatever the user's git configuration says.
     let mut args = vec!["-c", "core.quotePath=false", "diff"];
     args.extend(revs);
     args.extend([
@@ -242,14 +233,12 @@ fn diff(root: &Path, revs: &[&str], whole: bool) -> Result<Vec<(String, Change)>
     Ok(parse_diff(&run(root, &args)?, whole))
 }
 
-/// One entry of a diff: its path, whether it removes the file, the new side's changed lines.
 struct Entry {
     path: Option<String>,
     deleted: bool,
     lines: Vec<(usize, usize)>,
 }
 
-/// `diff`'s reading of git's output.
 fn parse_diff(diff: &str, whole: bool) -> Vec<(String, Change)> {
     let mut changes = Vec::new();
     let mut finish = |entry: Option<Entry>| {
@@ -283,7 +272,6 @@ fn parse_diff(diff: &str, whole: bool) -> Vec<(String, Change)> {
             entry.iter_mut().for_each(|e| e.deleted = true);
         } else if line.starts_with("@@ ") {
             header = false;
-            // `@@ -a,b +c,d @@`: `d` lines from line `c` on; `d` is 1 when left out.
             let new = line.split_whitespace().nth(2).unwrap_or("+0");
             let new = new.trim_start_matches('+');
             let (start, count) = new.split_once(',').unwrap_or((new, "1"));
@@ -300,9 +288,6 @@ fn parse_diff(diff: &str, whole: bool) -> Vec<(String, Change)> {
     changes
 }
 
-/// The path of a `diff --git a/<path> b/<path>` header (the rest after `diff --git `): with
-/// `--no-renames` both sides are the same path. ponytail: a path git still quotes (a tab, a
-/// newline or a quote in the name) is skipped.
 fn header_path(paths: &str) -> Option<String> {
     let len = paths.len().checked_sub(5).filter(|n| n % 2 == 0)? / 2;
     let a = paths.strip_prefix("a/")?.get(..len)?;
@@ -310,8 +295,6 @@ fn header_path(paths: &str) -> Option<String> {
     (a == b).then(|| a.to_string())
 }
 
-/// The mirrors a server-mode manifest lists, which `git` may read although another user owns
-/// them (ADR 0011). Empty locally: nothing there is trusted.
 static TRUSTED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
 
 /// Trusts the mirror at `path` for the `git` calls Meada makes in it: they pass
@@ -325,8 +308,6 @@ pub fn trust(path: &Path) {
     }
 }
 
-/// The directories holding mirrors pulled from a store (`meada snapshot pull`, ADR 0012):
-/// hostile input, read with no system or global git configuration.
 static ISOLATED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
 
 /// Every `git` call Meada makes in a directory under `dir` runs with `GIT_CONFIG_NOSYSTEM=1`
@@ -341,8 +322,6 @@ pub fn isolate(dir: &Path) {
     }
 }
 
-/// `git` in `dir`: the one place every call goes through, so the one place `safe.directory`
-/// and the isolation of pulled mirrors are added.
 fn command(dir: &Path) -> Command {
     let mut git = Command::new("git");
     let real = dir.canonicalize().ok();
@@ -375,12 +354,10 @@ pub fn refused_as_dubious(dir: &Path) -> bool {
             .is_ok_and(|out| is_dubious(&String::from_utf8_lossy(&out.stderr)))
 }
 
-/// Whether `stderr` is git's refusal of a directory another user owns.
 fn is_dubious(stderr: &str) -> bool {
     stderr.contains("dubious ownership")
 }
 
-/// `git` in `dir`, its standard output, or its error output as the error.
 fn run(dir: &Path, args: &[&str]) -> Result<String> {
     let out = command(dir).args(args).output()?;
     if !out.status.success() {
@@ -394,9 +371,6 @@ fn run(dir: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
-/// The bytes of the regular file at `abs`, read up to one past `max` so a caller can tell it is
-/// too large; `None` for a link, a directory, a device or a missing path. A file a repository
-/// holds is untrusted: a link to `/dev/zero` or to a terminal is never opened.
 pub(crate) fn regular(abs: &Path, max: usize) -> Option<Vec<u8>> {
     use std::io::Read;
     if !std::fs::symlink_metadata(abs).ok()?.is_file() {
@@ -418,7 +392,6 @@ pub fn show(root: &Path, rev: &str, path: &str) -> Result<Option<Vec<u8>>> {
     }
     let tree = format!("{rev}^{{tree}}");
     let listed = run(root, &["ls-tree", "-z", &tree, "--", path])?;
-    // `<mode> blob <oid>\t<path>`; a directory or a submodule there is no file.
     let Some((meta, _)) = listed.split('\0').next().and_then(|e| e.split_once('\t')) else {
         return Ok(None);
     };
@@ -429,7 +402,6 @@ pub fn show(root: &Path, rev: &str, path: &str) -> Result<Option<Vec<u8>>> {
     }
 }
 
-/// `git` in `dir`, its standard output as bytes, or its error output as the error.
 fn run_bytes(dir: &Path, args: &[&str]) -> Result<Vec<u8>> {
     let out = command(dir).args(args).output()?;
     if !out.status.success() {
@@ -443,7 +415,6 @@ fn run_bytes(dir: &Path, args: &[&str]) -> Result<Vec<u8>> {
     Ok(out.stdout)
 }
 
-/// `run`'s output trimmed, or `None` when it fails.
 fn git(dir: &Path, args: &[&str]) -> Option<String> {
     run(dir, args).ok().map(|out| out.trim().to_string())
 }
@@ -456,7 +427,6 @@ mod tests {
     };
     use std::path::{Path, PathBuf};
 
-    /// A new repository under the temporary directory, named for the test.
     fn scratch(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("meada-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -465,7 +435,6 @@ mod tests {
         dir
     }
 
-    /// `git` in `dir`, isolated from the user's configuration, with a fixed author.
     fn git(dir: &Path, args: &[&str]) {
         let out = std::process::Command::new("git")
             .current_dir(dir)
@@ -533,7 +502,6 @@ mod tests {
         write(&dir, "web/a.ts", b"a\n");
         commit(&dir, "base");
         assert_eq!(super::show(&dir, "HEAD", "web/yarn.lock").unwrap(), None);
-        // A directory is no file.
         assert_eq!(super::show(&dir, "HEAD", "web").unwrap(), None);
     }
 
@@ -551,8 +519,6 @@ mod tests {
         let dir = scratch("show-dash-rev");
         write(&dir, "a.ts", b"a\n");
         commit(&dir, "base");
-        // A branch named like the path: `ls-tree --format=x^{tree} -- a.ts` then lists it and
-        // exits 0, so only the refusal tells this rev from a path absent at the base.
         git(&dir, &["branch", "a.ts"]);
         let err = super::show(&dir, "--format=x", "a.ts").unwrap_err();
         assert_eq!(
@@ -635,7 +601,6 @@ mod tests {
             ("run.sh".to_string(), Change::Untracked),
         ];
         assert_eq!(sorted(Changes::Uncommitted.read(&dir).unwrap()), whole);
-        // The MCP tool's reading keeps dropping them, so a chmod moves no answer.
         assert_eq!(uncommitted(&dir).unwrap(), []);
         commit(&dir, "head");
         assert_eq!(sorted(range("HEAD~1", "HEAD").read(&dir).unwrap()), whole);
@@ -722,7 +687,6 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// Git tracks a symlink as a file, whatever it points to.
     #[cfg(unix)]
     #[test]
     fn files_take_a_symlink_to_a_directory() {

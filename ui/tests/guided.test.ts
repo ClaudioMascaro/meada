@@ -7,8 +7,6 @@ import { diffLines, entriesJson, lines, normalize, removeAt, replaceAt } from '.
 import type { Entry, NamedDiff } from '../src/guided';
 import { guidedCopy } from '../src/guided-i18n';
 
-// The guided form's model only reshapes entries; the checks are `meada-core`'s, through the actual
-// WebAssembly bundle. Y/A/B are the identities of the table the Rust tests read.
 const identities = table.identities as Record<string, string>;
 const Y = identities.Y!, A = identities.A!, B = identities.B!;
 const json = JSON.stringify;
@@ -32,9 +30,7 @@ const full: Entry[] = [
 test('the form and the text are one document: every form state reads back from its canonical text unchanged', () => {
   const text = namedEntriesText(entriesJson(full));
   expect(read(text)).toEqual(full);
-  // The text written from what was read is the same text: no edit in either view changes the other's meaning.
   expect(namedEntriesText(json(read(text)))).toBe(text);
-  // An emptied field is an absent field, and an undeclared serve block is absent from the text.
   const emptied = normalize({ repo: Y, serve: { hosts: [], prefix: '' }, resource: [], peer: [{ repo: A, base_url_env: [] }] });
   expect(emptied).toEqual({ repo: Y, serve: {}, peer: [{ repo: A }] });
   expect(namedEntriesText(entriesJson([{ repo: Y }]))).not.toContain('serve');
@@ -50,7 +46,6 @@ test('what an entry may hold is the core\'s decision, not the form\'s: it refuse
     [{ repo: Y }, { repo: Y }],
   ];
   for (const entries of bad) expect(() => namedEntriesJson(namedEntriesText(entriesJson(entries)), 10), json(entries)).toThrow();
-  // A text editor reaches the same refusals for what the form never offers.
   expect(() => namedEntriesJson(`[[repository]]\nrepo = "${Y}"\nowner = "g"\n`, 10)).toThrow(/reserved/);
   expect(() => namedEntriesJson(`[[repository]]\nrepo = "${Y}"\n[repository.serve]\ndocuments = ["d"]\n`, 10)).toThrow(/reserved/);
 });
@@ -70,12 +65,9 @@ test('the diff is the core\'s, in words, in both languages and never by color', 
   expect(diffLines(diff, guidedCopy.en)).toEqual([`Added: ${B}`, `Removed: ${A}`, `Changed: ${Y} (peers)`]);
   expect(diffLines(diff, guidedCopy['pt-BR'])).toEqual([`Adicionado: ${B}`, `Removido: ${A}`, `Alterado: ${Y} (peers)`]);
   expect(diffLines({ added: [], removed: [], changed: [] }, guidedCopy.en)).toEqual([]);
-  // The identities to recheck are the ones the diff adds or changes: a removal is not rechecked.
   expect(JSON.parse(namedChanged(json(before), json(after)))).toEqual([Y, B]);
 });
 
-// The Y/A/B matrix, through the edit path: an edit of a workspace holding Y touches (and so must find
-// eligible) only the identities it adds or changes, and the table decides each.
 test.each(table.creation.filter(row => ['alice', 'bob'].includes(row.caller)))('an edit by $caller that selects $select is allowed: $allowed', row => {
   const callers = table.callers as Record<string, { rows: { identity: string; role: string }[] }>;
   const eligible = callers[row.caller]!.rows.filter(r => table.accepted_roles.includes(r.role)).map(r => r.identity);

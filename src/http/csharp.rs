@@ -1,19 +1,3 @@
-//! ASP.NET Core controller providers (spec #28, #109): a method of a controller class carrying
-//! a route attribute serves the class `[Route]` prefix joined to each of its templates. The
-//! pack reads an attribute as a call decorating its target (`Call::decorates`), so the names
-//! and the templates are read here: an attribute or a base class counts only when
-//! `Code::outside` says a `using` from `Microsoft.AspNetCore.Mvc` binds its name (a class of
-//! the repository with the same name hides it), `HttpGet` and `HttpGetAttribute` are one name,
-//! and a template is read through `Code::value` (the pack folds no constants yet, so one that
-//! is no string literal serves nothing).
-//! A controller is a class with `[ApiController]` or deriving from `ControllerBase` or
-//! `Controller`. A class `[Route]` is a prefix, `[controller]` (the class name without its
-//! `Controller` suffix) and `[action]` (the method name) are replaced as ASP.NET Core does, and
-//! a template starting with `/` or `~/` replaces the prefix. A method `[Route]` without a method
-//! attribute serves every method (`ANY`).
-//! Conventional routing (`MapControllerRoute`) is not read. A class deriving from a class of the
-//! repository is not read either, since it inherits that class's attributes.
-
 mod clients;
 mod reads;
 mod refit;
@@ -33,8 +17,6 @@ use crate::resolve::{Code, Target};
 const MVC: &str = "Microsoft.AspNetCore.Mvc.";
 const BASES: &[&str] = &["ControllerBase", "Controller"];
 
-/// What an MVC attribute `spelled` (through its `using`) is: `ApiController`, `Route` or
-/// `Http<Method>`, whether or not it is written with the `Attribute` suffix.
 fn attribute(spelled: &str) -> Option<&str> {
     let name = spelled.strip_prefix(MVC)?;
     let name = name.strip_suffix("Attribute").unwrap_or(name);
@@ -44,16 +26,12 @@ fn attribute(spelled: &str) -> Option<&str> {
     .then_some(name)
 }
 
-/// Whether `spelled` is one of MVC's controller base classes.
 fn base(spelled: &str) -> bool {
     spelled
         .strip_prefix(MVC)
         .is_some_and(|n| BASES.contains(&n))
 }
 
-/// The name `name`, written in `scope` of `file`, as a name of the framework (the namespace
-/// `ns`) `is_known` accepts: bound by a `using`, or written in full
-/// (`Microsoft.AspNetCore.Mvc.Route`, `in_full`).
 fn spelled<'a>(
     code: &Code<'a>,
     (file, scope): (&'a str, &'a str),
@@ -68,21 +46,17 @@ fn spelled<'a>(
     known(code, file, scope, name, &is_known).or_else(full)
 }
 
-/// Whether `target` is a class (a type, which an attribute names).
 fn class(code: &Code, target: Target) -> bool {
     let defs = &code.files()[target.path].defs;
     (defs.iter()).any(|d| d.name == target.name && d.kind == Kind::Class)
 }
 
-/// What may hide a framework's attribute in the repository: the attribute classes it declares,
-/// by their simple and their full names.
 struct Hiding<'a> {
     declared: BTreeSet<&'a str>,
     full: BTreeSet<&'a str>,
 }
 
 impl<'a> Hiding<'a> {
-    /// What hides the attributes of a framework in `files`.
     fn of(files: &[(&'a str, &'a Facts)]) -> Self {
         let defs = || files.iter().flat_map(|(_, f)| f.defs.iter());
         let full: BTreeSet<&'a str> = (defs().filter(|d| d.kind == Kind::Class))
@@ -93,11 +67,6 @@ impl<'a> Hiding<'a> {
         Hiding { declared, full }
     }
 
-    /// The attribute `c` of `path`, read in `scope`, as the framework (the namespace `ns`)
-    /// spells it, when `is_attribute` accepts it and no class of the repository the file reaches
-    /// hides it: `[Get]` may be a class named `GetAttribute`. The class is looked up from the
-    /// scope around the attribute's target (a class's attribute is written in its namespace, a
-    /// method's in its class) and the one around that.
     fn spelled(
         &self,
         code: &Code<'a>,
@@ -123,7 +92,6 @@ impl<'a> Hiding<'a> {
                         .is_some_and(|t| class(code, t))
                 })
         });
-        // `[N.Get]` written in full may be the repository's `N.GetAttribute`.
         let own = own
             || self
                 .full
@@ -133,25 +101,19 @@ impl<'a> Hiding<'a> {
     }
 }
 
-/// The consumers of the `HttpClient` (`clients.rs`) and of Refit's interfaces (`refit.rs`).
 pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
     let mut found = clients::consumers(code, indexed);
     found.extend(refit::consumers(code, indexed));
     found
 }
 
-/// ASP.NET Core controller providers: see the module.
 pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     let mut found = Vec::new();
     let files: Vec<(&'a str, &'a Facts)> = (code.files().iter())
         .filter(|(p, _)| p.ends_with(".cs"))
         .map(|(p, f)| (*p, *f))
         .collect();
-    // The attribute classes the repository declares, and a namespace `Microsoft` of its own,
-    // hide MVC's.
     let hiding = Hiding::of(&files);
-    // A class with a class of the repository as a base inherits its attributes, and that base
-    // passes them down: neither is read.
     let (mut inheriting, mut based) = (BTreeSet::new(), BTreeSet::new());
     let mut parts: BTreeMap<&str, usize> = BTreeMap::new();
     for &(path, facts) in &files {
@@ -176,8 +138,6 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
         }
     }
     for &(path, facts) in &files {
-        // The MVC attributes (call index, call, name), and what an attribute not confirmed as
-        // MVC's `[Route]` leaves unread: the definitions it decorates.
         let (mut attributes, mut unread): (Vec<(usize, &'a Call, String)>, BTreeSet<&str>) =
             (Vec::new(), BTreeSet::new());
         for (n, c) in (facts.calls.iter().enumerate()).filter(|(_, c)| c.decorates.is_some()) {
@@ -220,8 +180,6 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
                 continue;
             };
             let prefixes: Vec<String> = prefixes.into_iter().flatten().collect();
-            // Without a class `[Route]` the template of an action stands alone, and an action
-            // with none is routed by convention, which is not read.
             let (prefixed, prefixes) = match prefixes.is_empty() {
                 true => (false, vec![String::new()]),
                 false => (true, prefixes),
@@ -236,14 +194,12 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
                     .filter_map(|(n, _, a)| Some((*n, a.strip_prefix("Http")?.to_uppercase())))
                     .collect();
                 let has = |n: &str| on(target).any(|(.., a)| a == n);
-                // Only a public method is an action, and `[NonAction]` says it is none.
                 if has("NonAction")
                     || unread.contains(target)
                     || facts.hidden.iter().any(|h| h == target)
                 {
                     continue;
                 }
-                // `[ActionName]` renames the action, to a literal only.
                 let action = target.split('(').next().unwrap_or(target);
                 let action = action.rsplit('.').next().unwrap_or(action);
                 let action = match on(target).find(|(.., a)| a == "ActionName") {
@@ -292,11 +248,6 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     found
 }
 
-/// The `(methods, template)` routes of one action, from its method attributes (`verbs`, as
-/// `(call index, METHOD)`) and its `[Route]` attributes (call indexes): a method attribute with
-/// a template is a route of its method, a `[Route]` one of every method the action's method
-/// attributes name, or `ANY` without any; method attributes with no template give the prefix
-/// alone, when the class has a `[Route]` and no attribute has a template. `None` when a template cannot be read.
 fn routes<'a>(
     code: &Code<'a>,
     file: &'a str,
@@ -329,9 +280,6 @@ fn routes<'a>(
     Some(routes)
 }
 
-/// The template an attribute (the call `index` of `file`) gives, through its first positional
-/// argument or `template:`: `Some(None)` when it gives none, `None` when it cannot be read. The
-/// index keeps no argument: they come from the full facts of the file.
 fn template<'a>(code: &Code<'a>, file: &'a str, index: usize) -> Option<Option<String>> {
     let call = code.call(file, index)?;
     match call.args.first().or_else(|| call.keyword("template")) {
@@ -340,7 +288,6 @@ fn template<'a>(code: &Code<'a>, file: &'a str, index: usize) -> Option<Option<S
     }
 }
 
-/// `path` without the `?` of an optional parameter (`{id?}`), which the trunk reads as a query.
 pub(super) fn optional(path: String) -> String {
     let mut depth = 0usize;
     path.chars()
@@ -355,8 +302,6 @@ pub(super) fn optional(path: String) -> String {
         .collect()
 }
 
-/// `template` with `[controller]` and `[action]` replaced and `[[`, `]]` read as the brackets
-/// they escape; `None` for any other token, which ASP.NET Core would not start with.
 fn tokens(template: &str, controller: &str, action: &str) -> Option<String> {
     let mut out = String::new();
     let mut rest = template;
@@ -393,7 +338,6 @@ mod tests {
 
     const USINGS: &str = "using Microsoft.AspNetCore.Mvc;\n";
 
-    /// The contracts of the providers the files give (`(path, source)`), sorted.
     fn served_in(sources: &[(&str, &str)]) -> Vec<String> {
         let parsed: Vec<_> = (sources.iter())
             .map(|(p, s)| (*p, CSharp.parse(p, s.as_bytes()).unwrap()))
@@ -491,8 +435,6 @@ mod tests {
         let qualified = "[Microsoft.AspNetCore.Mvc.ApiController] public class C { \
             [Microsoft.AspNetCore.Mvc.HttpGetAttribute(\"q\")] public void A() {} }";
         assert_eq!(served("", qualified), ["http::GET::/q"]);
-        // Another namespace under the framework's root hides no name written in full; the
-        // repository's own class of that very name does (`names::in_full`).
         let root = "namespace Microsoft.Acme { public class Tool { } }";
         let full = format!("namespace A {{ {qualified} }}");
         assert_eq!(
@@ -513,10 +455,6 @@ mod tests {
         assert!(plain("", ": Other", USINGS).is_empty());
     }
 
-    /// `(annotation, known)` for the attribute `attr` of the first method of `class C : base`,
-    /// under `using <attr> = Acme.<attr>;` (the alias is C#'s single-name import, which a
-    /// `using Acme;` is not), where `Acme.<attr>` is the one name the table knows: the decorator
-    /// reading and the value reading of the same name.
     fn attribute_of(base: &str, attr: &str) -> (Option<String>, Option<String>) {
         let src = format!(
             "using {attr} = Acme.{attr};\nnamespace A;\npublic class C : {base} {{ [{attr}] public void M() {{}} }}\n"
@@ -535,25 +473,17 @@ mod tests {
         )
     }
 
-    /// A class with a base from outside the repository hides no `using` from its members'
-    /// attributes (#354): `[Foo]` reads as a decorator, which no member of the base binds. A
-    /// value reading of the same name stays unknown where the base may declare it. This pins
-    /// `names::annotation` over C# facts; the reader of this module reads its attributes through
-    /// `known`, the value reading (`spelled`), so it does not yet take that way (#466).
     #[test]
     fn an_attribute_of_a_member_under_an_outside_base_is_read_through_the_usings() {
         let acme = |attr: &str| Some(format!("Acme.{attr}"));
-        // A listed base (`IDisposable` declares `Dispose` alone): both readings agree.
         assert_eq!(
             attribute_of("IDisposable", "Foo"),
             (acme("Foo"), acme("Foo"))
         );
-        // A listed base's own name: only the decorator reading gets past it.
         assert_eq!(
             attribute_of("IDisposable", "Dispose"),
             (acme("Dispose"), None)
         );
-        // An unlisted base may declare anything.
         assert_eq!(attribute_of("Unlisted", "Foo"), (acme("Foo"), None));
     }
 
@@ -594,7 +524,6 @@ mod tests {
 
     #[test]
     fn a_route_that_is_not_mvcs_leaves_its_class_and_its_method_unread() {
-        // A class `Route` that is no attribute, and a `RouteAttribute` no using reaches.
         let own = format!(
             "public class Route {{}} [ApiController] [Route(\"api\")] \
              public class OController : ControllerBase {{ {GET} }}"
@@ -610,17 +539,14 @@ mod tests {
             served_in(&[("L/R.cs", legacy), ("A/C.cs", &api)]),
             ["http::GET::/api/x"]
         );
-        // Written in full, it is not MVC's either.
         let full = format!(
             "[ApiController] [Legacy.Web.Route(\"api\")] public class OController : \
              ControllerBase {{ {GET} }}"
         );
         assert!(served(USINGS, &full).is_empty());
-        // The same on a method.
         let method = "public class Route {} [ApiController] public class OController : \
                       ControllerBase { [HttpGet] [Route(\"x\")] public void A() {} }";
         assert!(served(USINGS, method).is_empty());
-        // An attribute class of another namespace the file does not reach hides nothing.
         let other = format!(
             "{USINGS}\nnamespace A; [ApiController] public class OController : ControllerBase \
              {{ {GET} }}"

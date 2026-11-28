@@ -13,7 +13,6 @@ fn export_matches_golden() {
         "ts-basic",
         Some("git@Example.com:Acme/Web.git"),
     );
-    // An untracked file is indexed; a gitignored one is not.
     fs::write(
         repo.join("src/draft.ts"),
         "function draft() {\n  draft();\n}\n",
@@ -178,7 +177,6 @@ fn index_whose_stored_facts_do_not_parse_is_rebuilt() {
     let db = rusqlite::Connection::open(broken.join(".meada/index.db")).unwrap();
     db.execute("UPDATE files SET facts = '{'", []).unwrap();
     drop(db);
-    // A changed file makes the refresh read the facts it keeps for the others.
     for repo in [&fresh, &broken] {
         age(repo);
         let math = repo.join("src/math.ts");
@@ -201,13 +199,11 @@ fn a_root_tsconfig_that_is_invalid_or_linked_declares_no_paths() {
         Engine::open(&repo).unwrap().export().unwrap()
     };
     let none = export("tsconfig_none", &|path| fs::write(path, "{}\n").unwrap());
-    // The fixture's `@/*` alias resolves calls: a config that declares nothing shows.
     assert_ne!(export("tsconfig_valid", &|_| {}), none);
 
     let invalid = export("tsconfig_invalid", &|path| {
         fs::write(path, "{ not").unwrap()
     });
-    // Like the walk, the read goes through no symbolic link.
     let linked = export("tsconfig_linked", &|path| {
         let outside = path.parent().unwrap().with_extension("tsconfig.json");
         fs::rename(path, &outside).unwrap();
@@ -220,7 +216,6 @@ fn a_root_tsconfig_that_is_invalid_or_linked_declares_no_paths() {
 
 #[test]
 fn an_oversized_document_is_read_up_to_the_limit_and_refreshes_as_cold() {
-    // One byte past `document::DOCUMENT_BYTES_MAX`, the size limit of a provider document.
     let read = (16 << 20) + 1;
     let document = |repo: &Path| {
         let valid = fs::read_to_string(repo.join("openapi.json")).unwrap();
@@ -238,7 +233,6 @@ fn an_oversized_document_is_read_up_to_the_limit_and_refreshes_as_cold() {
 
     assert_ne!(refreshed, before);
     assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
-    // The document row hashes what was read.
     let db = rusqlite::Connection::open(warm.join(".meada/index.db")).unwrap();
     let hash: String = db
         .query_row(
@@ -253,7 +247,6 @@ fn an_oversized_document_is_read_up_to_the_limit_and_refreshes_as_cold() {
 
 #[test]
 fn an_oversized_manifest_is_read_up_to_the_limit_and_refreshes_as_cold() {
-    // One byte past `lang::MAX_BYTES`, the size limit of every manifest and config.
     let read = (1 << 20) + 1;
     let config = |repo: &Path| {
         let valid = fs::read_to_string(repo.join("tsconfig.json")).unwrap();
@@ -270,7 +263,6 @@ fn an_oversized_manifest_is_read_up_to_the_limit_and_refreshes_as_cold() {
     let refreshed = Engine::open(&warm).unwrap().export().unwrap();
 
     assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
-    // The manifest row hashes what was read.
     let db = rusqlite::Connection::open(warm.join(".meada/index.db")).unwrap();
     let hash: String = db
         .query_row(
@@ -283,15 +275,12 @@ fn an_oversized_manifest_is_read_up_to_the_limit_and_refreshes_as_cold() {
     assert_eq!(hash, prefix.to_hex().to_string());
 }
 
-/// Writes a function named `name` at `path`, creating its directory.
 fn put(repo: &Path, path: &str, name: &str) {
     let file = repo.join(path);
     fs::create_dir_all(file.parent().unwrap()).unwrap();
     fs::write(file, format!("function {name}() {{}}\n")).unwrap();
 }
 
-/// The default skips (`node_modules`, `Pods`, `Carthage/Checkouts`, `*.min.js`, `*.min.css`)
-/// leave only first-party code, and `vendor` stays indexed.
 #[test]
 fn dependency_caches_and_minified_assets_are_not_indexed() {
     let repo = fixture_repo("dependency_caches", "ts-basic", None);
@@ -312,8 +301,6 @@ fn dependency_caches_and_minified_assets_are_not_indexed() {
     assert!(export.contains("inVendor"));
 }
 
-/// `.ignore` and `.meadaignore` (root and nested) drop their files; a refresh after adding an
-/// entry equals a cold index of the same tree.
 #[test]
 fn ignore_files_are_honoured_and_a_refresh_drops_what_they_add() {
     let tree = |repo: &Path| {
@@ -348,8 +335,6 @@ fn ignore_files_are_honoured_and_a_refresh_drops_what_they_add() {
     assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
 }
 
-/// A file past its budget keeps no symbols, so `meada status` lists it as dropped: an exported
-/// constant of that file gives no symbol either, or the file would look kept.
 #[test]
 fn a_ts_file_dropped_by_its_budget_keeps_no_declaration_rows() {
     let repo = fixture_repo("budget_declarations", "ts-basic", None);

@@ -1,36 +1,16 @@
-//! .NET configuration (spec #28, #112), shared by the C# contract kinds: the base
-//! `appsettings.json` of a project, read for the sources of that project (`Facts::unit`, the
-//! project directory the pack's `join` gives a file; a file in no project reads the nearest
-//! `appsettings.json` above it). The file is JSON that .NET reads with comments (`//`, `/* */`)
-//! and trailing commas, which this reader accepts too. A key `A:B` is looked up by descending the
-//! nested objects (`"A": {"B": "x"}`), each segment without case, as .NET compares them; the
-//! parsed document is kept as it is and never flattened, so a hostile one costs what it weighs.
-//! A JSON key that holds a `:` itself is not matched. Only string values are read: a number, a
-//! boolean, a null and an array are left out. Environment-specific files
-//! (`appsettings.<Environment>.json`), user secrets and the other providers are not read. Nothing
-//! read here is kept in the index: the bytes come from the pack's config files on every refresh,
-//! and a value lives only while the contracts are extracted. Meada reads no environment value.
-
 use std::collections::BTreeMap;
 
 use serde_json::Value;
 
-/// How deep a document may nest: `serde_json`'s own recursion limit, past which the file is not
-/// read (the key is then the variable alone).
 #[cfg(test)]
 const JSON_DEPTH: usize = 128;
 
-/// The configurations of a repository's projects, by the project's directory (`api/`, or empty
-/// for the repository root).
 #[derive(Default)]
 pub struct Settings {
     files: BTreeMap<String, serde_json::Map<String, Value>>,
 }
 
 impl Settings {
-    /// The configurations among `configs` (repository path and bytes, as `Indexed::configs`
-    /// lists them): the `appsettings.json` files. A file past `lang::MAX_BYTES`, which the
-    /// index reads cut, is not read.
     pub fn read(configs: &[(&str, &[u8])]) -> Self {
         let mut found = Self::default();
         for &(path, src) in configs {
@@ -50,8 +30,6 @@ impl Settings {
         found
     }
 
-    /// The string `key` (`A:B`) holds in the configuration of the project `unit` (a directory,
-    /// or the path of a source in no project).
     pub fn get(&self, unit: &str, key: &str) -> Option<&str> {
         let own = (unit.is_empty() || unit.ends_with('/')).then(|| self.files.get(unit));
         let root = own.unwrap_or_else(|| self.above(unit))?;
@@ -65,21 +43,18 @@ impl Settings {
         node?.as_str()
     }
 
-    /// The configuration of the nearest directory above `source` that has one.
     fn above(&self, source: &str) -> Option<&serde_json::Map<String, Value>> {
         let dirs = source.match_indices('/').map(|(at, _)| &source[..=at]);
         (dirs.rev().chain(std::iter::once(""))).find_map(|dir| self.files.get(dir))
     }
 }
 
-/// Whether two keys are the same without case.
 fn same(a: &str, b: &str) -> bool {
     a.chars()
         .flat_map(char::to_lowercase)
         .eq(b.chars().flat_map(char::to_lowercase))
 }
 
-/// The root object of a JSON text as .NET reads it, or `None` when it is no JSON object.
 fn parse(src: &str) -> Option<serde_json::Map<String, Value>> {
     let src = src.strip_prefix('\u{feff}').unwrap_or(src);
     match serde_json::from_str(&clean(src)).ok()? {
@@ -88,8 +63,6 @@ fn parse(src: &str) -> Option<serde_json::Map<String, Value>> {
     }
 }
 
-/// `src` without its comments and without the commas that precede a closing bracket, both
-/// outside strings.
 fn clean(src: &str) -> String {
     let mut out = String::with_capacity(src.len());
     let mut chars = src.chars().peekable();
@@ -131,11 +104,9 @@ fn clean(src: &str) -> String {
     trailing_commas(&out)
 }
 
-/// `src` without the commas that precede a `}` or `]`, outside strings.
 fn trailing_commas(src: &str) -> String {
     let mut out = String::with_capacity(src.len());
     let (mut in_string, mut escaped) = (false, false);
-    // A comma and the whitespace after it, not yet written.
     let mut held = String::new();
     for c in src.chars() {
         if in_string {
@@ -186,7 +157,6 @@ mod tests {
         assert_eq!(get("Api:Url"), Some("http://api.example.com/"));
         assert_eq!(get("esc"), Some("q\"//"));
         assert_eq!(get("MIXED"), Some("has // and /* inside, } and ,]"));
-        // Not a string, not there, or a section.
         for key in [
             "Api:Port",
             "List",
@@ -221,18 +191,14 @@ mod tests {
             ("loose/appsettings.json", a),
         ]);
         let key = |unit| found.get(unit, "k");
-        // A project (its directory is the unit) reads its own file, whatever lies above it.
         assert_eq!(key("api/"), Some("a"));
         assert_eq!(key("api/tools/"), None);
         assert_eq!(key(""), Some("b"));
-        // A source in no project (the unit is its path) reads the nearest file above it.
         assert_eq!(key("loose/deep/C.cs"), Some("a"));
         assert_eq!(key("api/C.cs"), Some("a"));
         assert_eq!(key("other/C.cs"), Some("b"));
     }
 
-    /// The document is kept as parsed, not flattened to full keys: a long key with many children
-    /// costs what the document weighs, not its length times its children.
     #[test]
     fn a_hostile_document_costs_what_it_weighs() {
         let long = "k".repeat(400_000);

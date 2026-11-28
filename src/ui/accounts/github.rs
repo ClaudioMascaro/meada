@@ -1,26 +1,3 @@
-//! A local account's verified GitHub login (#561, ADR 0024): with `[accounts.github]`, a person
-//! proves their login once by pasting a GitHub personal access token, and the GitHub grant
-//! provider then grants from that login on every surface, as from `login_claim` under an identity
-//! provider.
-//!
-//! - `POST account/github`: `{token}` (at most `GITHUB_BODY_MAX` bytes). The account's row is read
-//!   first, as before every console write: suspended, unknown or hostile is the 403 `forbidden`,
-//!   recorded. The console then calls `GET <api>/user` once (`Verifier::login`) through the agent
-//!   every module uses (no redirect, no proxy, `GITHUB_TIMEOUT`, at most `GITHUB_ANSWER_MAX`
-//!   bytes, the platform verifier), reads `login`, and stores it lowercase when it is a login. A
-//!   login another account holds is a 409 `login_taken`; GitHub's refusal is a 422
-//!   `github_refused`, a `login` that is no login a 422 `invalid_login`, and GitHub out of reach or
-//!   answering anything else a 503 `github_unavailable`, none echoing GitHub's body. Recorded
-//!   `account.github` with the login, before it is stored. The answer is the login and a fresh
-//!   session token that carries it.
-//! - `POST account/github/remove`: the person's own verified login removed, recorded
-//!   `account.remove_github`; the answer is a fresh session token without a login. The global
-//!   operator removes anyone's with the account administration action `remove_github`.
-//!
-//! The personal access token is sent only in that one request's `Authorization` header: never
-//! stored, never in a record, a stderr line, an error or a URL, and dropped with the request.
-//! A token issued before a change keeps its login until it expires.
-
 use hyper::StatusCode;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -32,7 +9,6 @@ use crate::accounts::{self, Holder};
 use crate::audit::Outcome;
 use crate::msg::Msg;
 
-/// The routes of this module.
 pub(in crate::ui) const GITHUB: &str = "account/github";
 pub(in crate::ui) const GITHUB_REMOVE: &str = "account/github/remove";
 
@@ -46,20 +22,15 @@ const GITHUB_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 // `github_unavailable`.
 const GITHUB_ANSWER_MAX: u64 = 64 << 10;
 
-/// The console's one call to GitHub: `[accounts.github] api` and the agent it is called with.
 pub(super) struct Verifier {
     api: String,
     agent: ureq::Agent,
 }
 
-/// Why a login could not be read from GitHub.
 #[derive(Debug, PartialEq)]
 enum Unverified {
-    /// GitHub refused the token (a 4xx but a 429).
     Refused,
-    /// GitHub's `login` is no login.
     Invalid,
-    /// GitHub out of reach, or an answer that is no `{login}`: the reason, never its body.
     Unavailable(String),
 }
 
@@ -68,7 +39,6 @@ impl Verifier {
         Self::within(api, GITHUB_TIMEOUT)
     }
 
-    /// The verifier of `api` whose call ends after `timeout`.
     fn within(api: String, timeout: std::time::Duration) -> Self {
         Self {
             api,
@@ -76,8 +46,6 @@ impl Verifier {
         }
     }
 
-    /// The login `token` belongs to, lowercase: `GET <api>/user` once, with `token` as its bearer
-    /// and nowhere else. No reason carries the token.
     fn login(&self, token: &str) -> Result<String, Unverified> {
         #[derive(Deserialize)]
         struct User {
@@ -104,7 +72,6 @@ impl Verifier {
                 "{url}: http status {status}"
             )));
         }
-        // ureq refuses a body that fills its limit, so `max` bytes take a limit one past it.
         let body = response
             .body_mut()
             .with_config()
@@ -120,14 +87,10 @@ impl Verifier {
     }
 }
 
-/// Whether `token` can be a personal access token: one or more visible ASCII characters, so it is
-/// a header value and nothing else (the body's `GITHUB_BODY_MAX` bounds its length).
 fn token_ok(token: &str) -> bool {
     !token.is_empty() && token.bytes().all(|b| b.is_ascii_graphic())
 }
 
-/// `{login, token, expires_at, change_required}`: the account's verified login after a change and
-/// a fresh session token carrying it.
 fn answered(local: &Local, issuer: &str, holder: &Holder) -> Answer {
     match local.keys.session(issuer, holder, false) {
         Ok((token, expires)) => {
@@ -144,9 +107,6 @@ fn answered(local: &Local, issuer: &str, holder: &Holder) -> Answer {
 }
 
 impl Console {
-    /// The account's row read now, before a change of its own verified login: an active account
-    /// passes, any other gets the role refusal (a 403 `forbidden`, recorded with `arguments`), and
-    /// the table out of reach the 503.
     fn github_standing(
         &self,
         local: &Local,
@@ -176,8 +136,6 @@ impl Console {
         }
     }
 
-    /// `POST account/github` (#561): the session's own account's verified login, read from GitHub
-    /// with the pasted personal access token.
     pub(in crate::ui) fn verify_github(
         &self,
         local: &Local,
@@ -187,7 +145,6 @@ impl Console {
         let Some(verifier) = &local.github else {
             return error(StatusCode::NOT_FOUND, "not_found", &Msg::UiNoRoute.text());
         };
-        // No `Debug`: it holds the personal access token.
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
         struct Pasted {
@@ -250,7 +207,6 @@ impl Console {
         self.github_change(local, session, action, &arguments, &change, username)
     }
 
-    /// `POST account/github/remove` (#561): the session's own account's verified login removed.
     pub(in crate::ui) fn remove_own_github(&self, local: &Local, session: &Session) -> Answer {
         if local.github.is_none() {
             return error(StatusCode::NOT_FOUND, "not_found", &Msg::UiNoRoute.text());
@@ -266,12 +222,6 @@ impl Console {
         self.github_change(local, session, action, &arguments, &change, username)
     }
 
-    /// `change` of the session's own account `username` recorded as `action` with `arguments`
-    /// before the table is touched, then answered with a fresh session token for the account as
-    /// the change left it (its role, groups and login, so a suspension or a role change made
-    /// while GitHub answered is never signed over): the 409 `login_taken`, the 403 of an account
-    /// suspended meanwhile, or the 404 and 503 of administration's changes, each finished in the
-    /// record.
     fn github_change(
         &self,
         local: &Local,
@@ -296,7 +246,6 @@ impl Console {
                 self.audit
                     .finish(pending, Outcome::Accepted, &message, None);
                 write::audit(subject, None, action, username, "accepted");
-                // A removal still lands on an account suspended meanwhile, but signs nothing.
                 return match listed {
                     Some(listed) if !listed.suspended => {
                         let holder = Holder {
@@ -328,7 +277,6 @@ impl Console {
                 "login_taken",
                 Msg::AccountsLoginTaken.text(),
             ),
-            // A row that fails its checks admits nothing, as no row does.
             Ok(changed) => {
                 if changed == Changed::Bad {
                     bad_row(local);
@@ -354,7 +302,6 @@ impl Console {
 mod tests {
     use super::*;
 
-    /// A pasted token is visible ASCII, so it is a header value and nothing more.
     #[test]
     fn a_pasted_token_is_visible_ascii() {
         for ok in ["ghp_abc123", "github_pat_11AAAA_x-y.z", "!"] {
@@ -365,9 +312,6 @@ mod tests {
         }
     }
 
-    /// `GET /user` against a one-shot server: the login lowercased on a success, GitHub's 4xx a
-    /// refusal, a 429, a 5xx, a body that is no `{login}` and a body past the cap unavailable, a
-    /// `login` that is no login invalid; the token is sent as the bearer and in no reason.
     #[test]
     fn the_login_is_read_from_get_user_once_and_the_token_goes_nowhere_else() {
         let token = "ghp_secret0123456789";
@@ -409,7 +353,6 @@ mod tests {
                 (found, expected) => panic!("{status} {body}: {found:?}, not {expected:?}"),
             }
         }
-        // Nothing listening: unavailable, without the token.
         let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let api = format!("http://{}", closed.local_addr().unwrap());
         drop(closed);
@@ -419,8 +362,6 @@ mod tests {
         }
     }
 
-    /// The call ends at the verifier's timeout: a server that accepts and never answers is
-    /// unavailable (`GITHUB_TIMEOUT` past its bound, shortened here so the test stays fast).
     #[test]
     fn a_silent_github_is_unavailable_at_the_timeout() {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -441,8 +382,6 @@ mod tests {
         held.join().unwrap();
     }
 
-    /// A server on loopback that answers one request with `status` and `body`, and the request
-    /// it read, headers and all.
     fn once(status: &str, body: &str) -> (String, std::thread::JoinHandle<String>) {
         use std::io::{Read, Write};
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();

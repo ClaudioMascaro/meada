@@ -1,35 +1,3 @@
-//! The OIDC module (ADR 0012, feature `oidc`, section `[oidc]`): server mode as an OAuth 2.1
-//! resource server, as the MCP authorization specification (2026-07-28) describes. The proxy
-//! stays the default admission (ADR 0011); with `[oidc]`, every request carries
-//! `Authorization: Bearer <JWT>` issued by the operator's provider.
-//!
-//! At start (`Oidc::start`, before the listener binds) the issuer's metadata (RFC 8414 or OpenID
-//! discovery, its `issuer` checked) names the `jwks_uri`, and the JWKS is read; a failure
-//! refuses the start. Both go through ureq with no redirect, no proxy, `FETCH_TIMEOUT` and a
-//! size cap (`METADATA_MAX`, `JWKS_MAX`). A thread refreshes the JWKS every
-//! `jwks_refresh_seconds`, and a token naming a `kid` the cached set lacks refreshes it, at most
-//! once per `KID_REFRESH_EVERY`. A failed refresh keeps the cached keys and says so on stderr.
-//!
-//! `Oidc::admit` runs before routing, after `mcp::route` refused a request carrying `Origin` (a
-//! browser) with 403: it serves the protected resource metadata (RFC 9728) of any path, without
-//! a token, and checks the token: an asymmetric `alg` that fits the key, the signature, `iss`,
-//! `aud`, `exp` (required) and `nbf` with `LEEWAY`, and every configured scope. A missing or invalid token is
-//! a 401 naming the metadata. What passes is a `Grant`, which the grant providers compute
-//! (`grant::Providers::grant`) from what the token's claims name: the groups of its
-//! `groups_claim`, which `[oidc.groups]` maps to identities (#291), and the login of
-//! `[oidc.github] login_claim`, which the GitHub grant provider grants from (#332); the
-//! identities its `identities_claim` lists join the groups side (`Granted::listing`, `*` from
-//! either for all): the identity provider's claims grant (ADR 0016). This module is one producer
-//! of those inputs and reads no permissions set itself. `type` names the identity provider; none
-//! changes what a token is granted, and `[oidc.entra] overage = "ignore"` leaves a token in
-//! overage no groups, while `"directory"` gives it those the directory holds for its user (#336,
-//! `overage`). Routing checks the grant (403) and lists it (404), and it bounds the workspace of
-//! every answer behind it (#290): a repository outside it is absent. An identity the server does
-//! not serve grants nothing.
-//!
-//! Meada never forwards a token, and no error or stderr line holds one or any of its parts (a
-//! group, an identity): the 401 and 403 bodies are fixed, and a refused token is never described.
-
 use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::str::FromStr;
@@ -50,7 +18,6 @@ use crate::grant::{Github, Grant, Granted, Providers, ROLE_MAX, role_ok};
 use crate::modules::{Shape, agent, reachable};
 use crate::msg::Msg;
 
-/// An answer of the server.
 pub type Reply = Response<BoxBody<Bytes, Infallible>>;
 
 // ponytail: how long one metadata or JWKS request may take, connection to last byte.
@@ -59,14 +26,11 @@ const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const METADATA_MAX: u64 = 64 << 10;
 // ponytail: the most bytes of a JWKS read; past it the fetch fails.
 const JWKS_MAX: u64 = 256 << 10;
-/// The least time between two JWKS fetches an unknown `kid` causes.
+
 const KID_REFRESH_EVERY: Duration = Duration::from_secs(60);
-/// The seconds of clock skew `exp` and `nbf` tolerate, a Meada-signed token's too (ADR 0024).
 pub(crate) const LEEWAY: u64 = 60;
-/// The shortest `jwks_refresh_seconds`, and its default.
 const REFRESH_MIN: i64 = 60;
 const REFRESH_DEFAULT: i64 = 3600;
-/// The algorithms a token may be signed with: asymmetric ones only, so no `none` and no HMAC.
 const ALGORITHMS: [Algorithm; 6] = [
     Algorithm::RS256,
     Algorithm::RS384,
@@ -75,9 +39,7 @@ const ALGORITHMS: [Algorithm; 6] = [
     Algorithm::ES384,
     Algorithm::PS256,
 ];
-/// Where a resource's metadata lives, inserted before its path (RFC 9728).
 const METADATA_PATH: &str = ".well-known/oauth-protected-resource";
-/// What a path keeps encoded in a URL: everything but the characters a path may hold as is.
 const PATH: &AsciiSet = &CONTROLS
     .add(b' ')
     .add(b'"')
@@ -95,22 +57,13 @@ const PATH: &AsciiSet = &CONTROLS
     .add(b'|')
     .add(b'}');
 
-/// The identity provider's `type`s (ADR 0016): `okta` and `keycloak` behave as `generic`, and
-/// only `entra` takes a table of its own.
 const TYPES: [&str; 4] = ["generic", "entra", "okta", "keycloak"];
 
-/// What `[oidc.entra] overage` accepts: `ignore`, a token in overage having no groups, and
-/// `directory`, its groups from the directory the identity provider pushes (#336).
 const OVERAGES: [&str; 2] = ["ignore", "directory"];
 
-/// `[oidc.github] roles` by default: GitHub's five built-in repository roles, as `role_name`
-/// spells them.
 pub(crate) const ROLES: [&str; 5] = ["read", "triage", "write", "maintain", "admin"];
-/// The shortest `[oidc.github] max_age_seconds`.
 const MAX_AGE_MIN: i64 = 60;
 
-/// The shortest `[oidc.github] max_age_seconds` this process takes: `MAX_AGE_MIN`, or 1 in a debug
-/// build with `MEADA_PERMISSIONS_POLL_MS` set, so a test crosses the age in seconds.
 fn max_age_min() -> i64 {
     #[cfg(all(debug_assertions, feature = "postgres"))]
     if crate::grant::poll_knob().is_some() {
@@ -130,11 +83,9 @@ pub struct Overage {
     pub lookup: Option<(crate::directory::Config, crate::postgres::Config)>,
 }
 
-/// The `[oidc]` section as written: the identity provider.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct File {
-    /// Any value, so that one of another type is the error naming the accepted ones.
     #[serde(rename = "type")]
     kind: Option<toml::Value>,
     issuer: String,
@@ -142,7 +93,6 @@ pub struct File {
     audience: Option<String>,
     identities_claim: Option<String>,
     groups_claim: Option<String>,
-    /// `[oidc.groups]`: a group to the identities it grants.
     groups: Option<HashMap<String, Vec<String>>>,
     scopes: Option<Vec<String>>,
     jwks_refresh_seconds: Option<i64>,
@@ -150,14 +100,12 @@ pub struct File {
     github: Option<GithubFile>,
 }
 
-/// `[oidc.entra]`: the settings only Entra ID needs.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Entra {
     overage: Option<toml::Value>,
 }
 
-/// `[oidc.github]`: the GitHub grant provider (ADR 0016).
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct GithubFile {
@@ -167,12 +115,8 @@ struct GithubFile {
     max_age_seconds: Option<i64>,
 }
 
-/// The keys of a GitHub grant provider's table, as its errors name them: the table, `host`,
-/// `roles` and `max_age_seconds`. `[oidc.github]`'s, and `[accounts.github]`'s (#561).
 pub(crate) type GithubKeys = [&'static str; 4];
 
-/// The GitHub grant provider a table configures with `host`, `roles` and `max_age_seconds`
-/// (ADR 0016), whichever table it is (`keys`): `[oidc.github]` or `[accounts.github]` (#561).
 pub(crate) fn github_provider(
     keys: GithubKeys,
     host: Option<String>,
@@ -180,7 +124,6 @@ pub(crate) fn github_provider(
     max_age_seconds: Option<i64>,
 ) -> Result<Github, crate::modules::Problem> {
     let [table, host_key, roles_key, max_age_key] = keys;
-    // Without the data layer there is no permissions set to read or write.
     if !cfg!(feature = "postgres") {
         let (section, feature) = (table, "postgres");
         return Err((table, Msg::NeedsFeature { section, feature }.text()));
@@ -213,7 +156,6 @@ pub(crate) fn github_provider(
 }
 
 impl GithubFile {
-    /// The `login_claim` and the GitHub grant provider the table configures.
     fn validate(self) -> Result<(String, Github), crate::modules::Problem> {
         let keys = [
             "oidc.github",
@@ -297,13 +239,11 @@ impl File {
             Some((claim, github)) => (Some(claim), Some(github)),
             None => (None, None),
         };
-        // The GitHub grant provider alone may grant: no claim is needed beside it.
         if self.identities_claim.is_none() && groups.is_none() && github.is_none() {
             return Err(("oidc.identities_claim", Msg::OidcNoClaim.text()));
         }
         let scopes = self.scopes.unwrap_or_default();
         for scope in &scopes {
-            // RFC 6749's scope-token: what a quoted `scope` parameter can carry as is.
             let bad = (scope.chars()).find(|c| !matches!(c, '!' | '#'..='[' | ']'..='~'));
             match bad {
                 _ if scope.is_empty() => return Err(("oidc.scopes", Msg::OidcEmpty.text())),
@@ -334,7 +274,6 @@ impl File {
                 let chosen =
                     one_of(value, &OVERAGES).ok_or((key, Msg::OidcOneOf(&OVERAGES).text()))?;
                 if chosen == "directory" {
-                    // The directory is in the data layer, which only `directory` builds have.
                     if !cfg!(feature = "directory") {
                         let (section, feature) = ("oidc.entra", "directory");
                         return Err((key, Msg::NeedsFeature { section, feature }.text()));
@@ -365,7 +304,6 @@ impl File {
     }
 }
 
-/// The identities `claims`' `identities_claim` lists: none when it is no array of strings.
 fn claims_listed<'a>(
     claims: &'a Map<String, Value>,
     config: &'a Config,
@@ -373,8 +311,6 @@ fn claims_listed<'a>(
     config.claim.iter().flat_map(|claim| strings(claims, claim))
 }
 
-/// The strings of `claims`' array `claim`; none when it is no array or holds anything but
-/// strings, so a malformed claim fails closed.
 fn strings<'a>(
     claims: &'a Map<String, Value>,
     claim: &str,
@@ -384,49 +320,33 @@ fn strings<'a>(
     strings.into_iter().flatten()
 }
 
-/// Why a token is not admitted.
 #[derive(Debug, PartialEq)]
 pub(crate) enum Refusal {
-    /// No `Authorization` header.
     Missing,
-    /// A header or token that does not pass.
     Invalid,
-    /// A valid token without every configured scope.
     Scope,
 }
 
-/// The module of a running server: its section, the issuer's metadata and `jwks_uri`, and the
-/// cached keys.
 pub struct Oidc {
     config: Config,
-    /// The issuer's metadata document, as read at start.
     #[cfg_attr(not(feature = "ui"), expect(dead_code))]
     issuer_metadata: Value,
     jwks_uri: String,
     agent: ureq::Agent,
     keys: RwLock<Arc<Vec<Jwk>>>,
-    /// When an unknown `kid` last made the module fetch the JWKS.
     kid_fetched: Mutex<Option<Instant>>,
-    /// When the JWKS was last read, and the refresh that failed since.
     fetched: Mutex<Fetched>,
-    /// The grant providers the token's groups and login feed: the process's own, shared with
-    /// whatever else reads them (the console's catalog, the admission view).
     providers: Arc<Providers>,
-    /// The overage lookup and its cache, with `[oidc.entra] overage = "directory"` (#336).
     #[cfg(feature = "directory")]
     overage: Option<overage::Overage>,
 }
 
-/// When the cached JWKS was read (seconds since the epoch), and the last refresh that failed
-/// after it, with its time and why.
 #[cfg_attr(not(feature = "ui"), expect(dead_code))]
 struct Fetched {
     at: u64,
     failed: Option<(u64, String)>,
 }
 
-/// Each check of a pasted token (ADR 0014): `None` where it could not be made, since the
-/// signature did not pass.
 #[cfg(feature = "ui")]
 pub struct Checked {
     pub signature: bool,
@@ -434,14 +354,10 @@ pub struct Checked {
     pub audience: Option<bool>,
     pub lifetime: Option<bool>,
     pub scopes: Option<bool>,
-    /// What the token may read when every check passes.
     pub grant: Option<Grant>,
-    /// With `[oidc.github]` and every check passed, the grant's two sides: the claims grant
-    /// and the GitHub grant, from the cache (#332).
     pub sources: Option<(Grant, Vec<String>)>,
 }
 
-/// `GET url`, at most `max` bytes of a success answer; a redirect is no success.
 fn get(agent: &ureq::Agent, url: &str, max: u64) -> Result<Vec<u8>, String> {
     let mut response =
         (agent.get(url).header("Accept", "application/json").call()).map_err(|e| e.to_string())?;
@@ -449,13 +365,10 @@ fn get(agent: &ureq::Agent, url: &str, max: u64) -> Result<Vec<u8>, String> {
     if !status.is_success() {
         return Err(format!("http status {}", status.as_u16()));
     }
-    // ureq refuses a body that fills its limit, so `max` bytes take a limit one past it.
     let body = response.body_mut().with_config().limit(max + 1);
     body.read_to_vec().map_err(|e| e.to_string())
 }
 
-/// The metadata URLs of `issuer`, in the order the MCP authorization specification tries them:
-/// RFC 8414 and OpenID discovery with the path inserted, then OpenID's with it appended.
 fn metadata_urls(issuer: &str) -> Vec<String> {
     let Ok(uri) = issuer.parse::<Uri>() else {
         return Vec::new();
@@ -476,9 +389,6 @@ fn metadata_urls(issuer: &str) -> Vec<String> {
     urls
 }
 
-/// The `jwks_uri` of the first metadata document of `issuer` that can be used, and the document:
-/// it must name `issuer` (RFC 8414) and an endpoint the module may reach. A document that cannot
-/// is passed over as an unanswered one is, and each is named in the error when none can.
 fn discover(agent: &ureq::Agent, issuer: &str) -> Result<(String, Value), String> {
     let mut tried = Vec::new();
     for url in metadata_urls(issuer) {
@@ -490,7 +400,6 @@ fn discover(agent: &ureq::Agent, issuer: &str) -> Result<(String, Value), String
     Err(Msg::OidcMetadata(&tried.join("; ")).text())
 }
 
-/// The `jwks_uri` of the metadata document at `url`, and the document, or why it cannot be used.
 fn metadata(agent: &ureq::Agent, url: &str, issuer: &str) -> Result<(String, Value), String> {
     #[derive(Deserialize)]
     struct Metadata {
@@ -510,8 +419,6 @@ fn metadata(agent: &ureq::Agent, url: &str, issuer: &str) -> Result<(String, Val
     }
 }
 
-/// The signing keys of the JWKS at `url` the module accepts: RSA, or EC on P-256 or P-384, for
-/// signatures; any other key is left out, and a set with none fails.
 fn jwks(agent: &ureq::Agent, url: &str) -> Result<Vec<Jwk>, String> {
     #[derive(Deserialize)]
     struct Set {
@@ -519,7 +426,6 @@ fn jwks(agent: &ureq::Agent, url: &str) -> Result<Vec<Jwk>, String> {
     }
     let fail = |why: String| Msg::OidcJwks { url, why: &why }.text();
     let body = get(agent, url, JWKS_MAX).map_err(fail)?;
-    // Only where the document fails, never what it holds: a failed refresh is shown (ADR 0014).
     let shape = |e: serde_json::Error| {
         let (line, column) = (e.line(), e.column());
         fail(Msg::OidcJwksShape { line, column }.text())
@@ -535,7 +441,6 @@ fn jwks(agent: &ureq::Agent, url: &str) -> Result<Vec<Jwk>, String> {
     }
 }
 
-/// Whether `key` may verify a token's signature.
 fn signs(key: &Jwk) -> bool {
     let common = &key.common;
     let usable = matches!(common.public_key_use, None | Some(PublicKeyUse::Signature))
@@ -551,14 +456,11 @@ fn signs(key: &Jwk) -> bool {
     usable && named && kind
 }
 
-/// The algorithm a key names, when it is one a token may use.
 fn algorithm(named: &jsonwebtoken::jwk::KeyAlgorithm) -> Option<Algorithm> {
     let algorithm = Algorithm::from_str(&named.to_string()).ok()?;
     ALGORITHMS.contains(&algorithm).then_some(algorithm)
 }
 
-/// Whether `key` is the one `header` names and fits its algorithm: the same `kid` when both
-/// have one, the algorithm the key names when it names one, and its type and curve.
 fn fits(key: &Jwk, header: &Header) -> bool {
     let kid = match (header.kid.as_deref(), key.common.key_id.as_deref()) {
         (Some(named), Some(kid)) => named == kid,
@@ -578,9 +480,6 @@ fn fits(key: &Jwk, header: &Header) -> bool {
     kid && named && kind
 }
 
-/// The token of `headers`' one `Authorization: Bearer` header: `Ok(None)` without one, or with
-/// another scheme (RFC 6750 §3.1: no bearer token was sent); two headers, a value that is not
-/// UTF-8 and an empty token are refused.
 pub(crate) fn bearer(headers: &HeaderMap) -> Result<Option<&str>, Refusal> {
     let mut values = headers.get_all(header::AUTHORIZATION).iter();
     let Some(value) = values.next() else {
@@ -600,14 +499,11 @@ pub(crate) fn bearer(headers: &HeaderMap) -> Result<Option<&str>, Refusal> {
     }
 }
 
-/// The header of `token` when it may be checked: an algorithm of `ALGORITHMS`, and no `crit`,
-/// which names extensions the token needs understood (RFC 7515 §4.1.11): none is.
 fn signing(token: &str) -> Option<Header> {
     let header = jsonwebtoken::decode_header(token).ok()?;
     (ALGORITHMS.contains(&header.alg) && header.crit.is_none()).then_some(header)
 }
 
-/// Whether `claims`' `aud`, a string or an array, holds one of `audiences`.
 fn addressed(claims: &Map<String, Value>, audiences: &[String]) -> bool {
     let aud = match claims.get("aud") {
         Some(Value::String(aud)) => vec![aud.as_str()],
@@ -617,7 +513,6 @@ fn addressed(claims: &Map<String, Value>, audiences: &[String]) -> bool {
     aud.iter().any(|aud| audiences.iter().any(|a| a == aud))
 }
 
-/// A response with a fixed body.
 fn reply(status: StatusCode, kind: &str, body: String) -> Reply {
     Response::builder()
         .status(status)
@@ -627,9 +522,6 @@ fn reply(status: StatusCode, kind: &str, body: String) -> Reply {
 }
 
 impl Oidc {
-    /// The module of `config`: the issuer's metadata and its JWKS read, then a thread that
-    /// fetches the JWKS again every `config.refresh` while the module lives. Its tokens' groups
-    /// and logins feed `providers`, the process's grant providers (`Providers::of` its manifest).
     pub fn start(config: Config, providers: Arc<Providers>) -> crate::Result<Arc<Self>> {
         let agent = agent(FETCH_TIMEOUT);
         let (jwks_uri, issuer_metadata) = discover(&agent, &config.issuer)?;
@@ -651,8 +543,6 @@ impl Oidc {
         Ok(oidc)
     }
 
-    /// The module of `config` with `keys` cached, its grant providers only the groups table of
-    /// `config` until `start` hands it the process's.
     fn new(config: Config, agent: ureq::Agent, jwks_uri: String, keys: Vec<Jwk>) -> Self {
         let groups = config.groups.as_ref().map(|(_, table)| table.clone());
         Self {
@@ -672,9 +562,6 @@ impl Oidc {
         }
     }
 
-    /// The grant of `claims` by side, and the groups it read (`groups`): the grant providers'
-    /// grant of those groups and of `login_claim`'s value when it is a string, with the
-    /// identities `identities_claim` lists on the groups side (`claims_listed`).
     fn granted(&self, claims: &Map<String, Value>) -> (Vec<String>, Granted) {
         let groups = self.groups(claims);
         let login = (self.config.login_claim.as_ref())
@@ -684,9 +571,6 @@ impl Oidc {
         (groups, granted.listing(claims_listed(claims, &self.config)))
     }
 
-    /// The groups of `claims` as every check reads them: its `groups_claim` array (none when it
-    /// is no array of strings), or, for a token in overage under `overage = "directory"`, those
-    /// the directory holds for its user (#336).
     fn groups(&self, claims: &Map<String, Value>) -> Vec<String> {
         let Some((claim, _)) = &self.config.groups else {
             return Vec::new();
@@ -700,7 +584,6 @@ impl Oidc {
         strings(claims, claim).map(str::to_string).collect()
     }
 
-    /// Whether `claims` is a token in overage whose groups the directory gives (#336).
     #[cfg(feature = "ui")]
     fn overage(&self, claims: &Map<String, Value>) -> bool {
         #[cfg(feature = "directory")]
@@ -711,13 +594,6 @@ impl Oidc {
         false
     }
 
-    /// Whether the request to `path` (percent-decoded, without its leading and trailing
-    /// slashes) goes on to routing, and with what grant; `identity` is the repository `path`
-    /// names (`path` without its pin, if it has one). Otherwise the answer: the protected
-    /// resource metadata of a path under `.well-known/oauth-protected-resource`, with no token
-    /// needed; 401 for a missing or invalid token and 403 for a missing scope. Blocks on the
-    /// JWKS fetch an unknown `kid` causes. A request carrying `Origin` never reaches it
-    /// (`mcp::route` refuses it first).
     pub fn admit(
         &self,
         headers: &HeaderMap,
@@ -744,7 +620,6 @@ impl Oidc {
         Err(Box::new(self.refusal(path, &refused)))
     }
 
-    /// The 403 for a valid token whose claim does not list the identity `path` names.
     pub fn forbidden(&self, path: &str) -> Reply {
         let challenge = self.challenge(Some(path), Some("insufficient_scope"), false);
         self.challenged(StatusCode::FORBIDDEN, challenge)
@@ -773,8 +648,6 @@ impl Oidc {
         response
     }
 
-    /// `WWW-Authenticate` for `path`: the error, the metadata URL (none without a path: the
-    /// console serves no metadata) and, with `scope`, the configured scopes.
     fn challenge(&self, path: Option<&str>, error: Option<&str>, scope: bool) -> String {
         let mut parts = Vec::new();
         if let Some(error) = error {
@@ -796,7 +669,6 @@ impl Oidc {
         }
     }
 
-    /// The URL of the resource at `path`: `<public_url>/<path>`, the path percent-encoded.
     fn resource(&self, path: &str) -> String {
         let public = &self.config.public_url;
         match path.is_empty() {
@@ -805,7 +677,6 @@ impl Oidc {
         }
     }
 
-    /// The protected resource metadata of the resource at `path` (RFC 9728).
     fn metadata(&self, path: &str) -> Reply {
         let mut document = serde_json::json!({
             "resource": self.resource(path),
@@ -818,15 +689,11 @@ impl Oidc {
         reply(StatusCode::OK, "application/json", document.to_string())
     }
 
-    /// The grant of `token` if it passes (`verified`): the union of its providers' grants.
     fn verify(&self, token: &str, audiences: &[String]) -> Result<Grant, Refusal> {
         let claims = self.verified(token, audiences)?;
         Ok(self.granted(&claims).1.union())
     }
 
-    /// The claims of `token` if it passes: an algorithm of `ALGORITHMS`, signed by a cached key
-    /// that fits it (the JWKS fetched again once when none does), `exp` and `nbf`, `iss`, an
-    /// `aud` among `audiences`, and every configured scope.
     fn verified(&self, token: &str, audiences: &[String]) -> Result<Map<String, Value>, Refusal> {
         let header = signing(token).ok_or(Refusal::Invalid)?;
         if !self.keys().iter().any(|key| fits(key, &header)) {
@@ -842,8 +709,6 @@ impl Oidc {
         Ok(claims)
     }
 
-    /// The claims of `token`, whose header is `header`, if a cached key that fits it signed it;
-    /// with `lifetime`, also `exp` (required) and `nbf` with `LEEWAY`.
     fn signed(&self, token: &str, header: &Header, lifetime: bool) -> Option<Map<String, Value>> {
         let mut validation = Validation::new(header.alg);
         validation.leeway = LEEWAY;
@@ -852,7 +717,6 @@ impl Oidc {
         if !lifetime {
             validation.required_spec_claims.clear();
         }
-        // Checked by `verified`, against the claims as signed.
         validation.validate_aud = false;
         (self.keys().iter())
             .filter(|key| fits(key, header))
@@ -867,7 +731,6 @@ impl Oidc {
         claims.get("iss").and_then(Value::as_str) == Some(&self.config.issuer)
     }
 
-    /// Whether `claims`' `scope` holds every configured scope.
     fn scoped(&self, claims: &Map<String, Value>) -> bool {
         let granted: HashSet<&str> = (claims.get("scope").and_then(Value::as_str))
             .map(|s| s.split(' ').collect())
@@ -875,12 +738,6 @@ impl Oidc {
         (self.config.scopes.iter()).all(|s| granted.contains(s.as_str()))
     }
 
-    /// The console's admission (ADR 0014): `headers`' bearer token checked as `verified` checks
-    /// it, its audience `audience`. Otherwise the status and `WWW-Authenticate` refusing it: 401
-    /// for a missing or invalid token (`error="invalid_token"` when one was sent), 403 for a
-    /// missing scope; no `resource_metadata`, since the console serves none. What passes is the
-    /// neutral admitted subject (`grant::Admitted`) and the token's `user_claim`, when it is a
-    /// string: what the directory is asked about (#335), never printed.
     #[cfg(feature = "ui")]
     pub fn admit_console(
         &self,
@@ -894,16 +751,12 @@ impl Oidc {
             Ok(Some(token)) => match self.verified(token, &[audience.to_string()]) {
                 Ok(claims) => {
                     let subject = claims.get("sub").and_then(Value::as_str);
-                    // The groups the directory gives a token in overage replace its missing
-                    // claim here as everywhere (#336).
                     let (groups, granted) = self.granted(&claims);
                     let in_operators = |group: &str| {
                         operator_groups.is_some_and(|ops| ops.iter().any(|op| op == group))
                     };
                     let by_groups = match self.overage(&claims) {
                         true => groups.iter().any(|group| in_operators(group)),
-                        // A token with its own claim keeps the lenient reading it always had: a
-                        // string among other elements still matches an operator group.
                         false => self.config.groups.as_ref().is_some_and(|(claim, _)| {
                             let groups = claims.get(claim).and_then(Value::as_array);
                             groups.is_some_and(|groups| {
@@ -934,10 +787,6 @@ impl Oidc {
         Err((status, self.challenge(None, error, true)))
     }
 
-    /// Each check of a pasted `token` as a node makes it (ADR 0014), against the cached keys
-    /// only: an unknown `kid` fetches nothing, so the check sends no request anywhere. Its
-    /// audience is a node's: `[oidc] audience`, else the resource of the root or of an identity
-    /// of `served`.
     #[cfg(feature = "ui")]
     pub fn check(&self, token: &str, served: &[&str]) -> Checked {
         let failed = Checked {
@@ -979,11 +828,6 @@ impl Oidc {
         }
     }
 
-    /// The state an operator explains a 401 or a 403 with (ADR 0014): the identity provider's
-    /// `type` (ADR 0016), the issuer, its metadata, the JWKS cache (the cached key ids, the last
-    /// read, a refresh that failed since, with why) and the groups table, each group's identities
-    /// those `reads` admits (`*` kept: it names none); with `[oidc.github]`, `github`: the
-    /// provider, the grant's state and the newest set as loaded, its counts the job's (#332).
     #[cfg(feature = "ui")]
     pub fn admission(&self, reads: &dyn Fn(&str) -> bool) -> Value {
         let kids: Vec<Option<String>> = (self.keys().iter())
@@ -1015,7 +859,6 @@ impl Oidc {
         document
     }
 
-    /// The issuer and the scopes the console's browser logs in with (ADR 0014).
     #[cfg(feature = "ui")]
     pub fn login(&self) -> (&str, &[String]) {
         (&self.config.issuer, &self.config.scopes)
@@ -1025,9 +868,6 @@ impl Oidc {
         self.keys.read().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
-    /// Fetches the JWKS for a `kid` it lacks, unless an unknown `kid` already did within
-    /// `KID_REFRESH_EVERY`. The lock only claims the fetch: a request arriving during it does
-    /// not wait, and is checked against the keys cached then.
     fn refetch(&self) {
         {
             let mut fetched = self.kid_fetched.lock().unwrap_or_else(|e| e.into_inner());
@@ -1039,8 +879,6 @@ impl Oidc {
         self.refresh();
     }
 
-    /// Fetches the JWKS again: the new keys replace the cached ones, and a failure keeps them
-    /// and says so on stderr.
     fn refresh(&self) {
         let fetched = jwks(&self.agent, &self.jwks_uri);
         let mut state = self.fetched.lock().unwrap_or_else(|e| e.into_inner());
@@ -1061,7 +899,6 @@ impl Oidc {
     }
 }
 
-/// The refresh thread: fetches the JWKS of `module` every `every`, until the module is gone.
 fn refresh_every(module: Weak<Oidc>, every: Duration) {
     loop {
         std::thread::sleep(every);
@@ -1082,7 +919,6 @@ mod tests {
 
     use super::*;
 
-    /// The section with `issuer`, `public_url` and `rest`.
     fn bare(rest: &str) -> Result<Config, crate::modules::Problem> {
         let src = format!(
             "issuer = \"https://id.example/realms/agents\"\npublic_url = \
@@ -1102,11 +938,9 @@ mod tests {
         let table = |rest: &str| format!("[github]\nlogin_claim = \"github_login\"\n{rest}");
         let parsed = bare(&table("max_age_seconds = 5400\n"));
         if !cfg!(feature = "postgres") {
-            // Without the data layer the table is the error naming the feature.
             assert_eq!(parsed.err().map(|e| e.0), Some("oidc.github"));
             return;
         }
-        // Alone, with neither `identities_claim` nor `groups_claim`.
         let config = parsed.unwrap();
         let github = config.github.unwrap();
         assert_eq!(github.host, "github.com");
@@ -1180,7 +1014,6 @@ mod tests {
             let missing = Msg::KeyMissing("oidc.groups_claim").text();
             assert_eq!(table("entra", false, directory), Err((key, missing)));
         } else {
-            // Without the module the key names the feature, with or without the claim.
             for groups in [true, false] {
                 let refused = table("entra", groups, directory).unwrap_err();
                 let (section, feature) = ("oidc.entra", "directory");
@@ -1188,7 +1021,6 @@ mod tests {
                 assert_eq!(refused, (key, named));
             }
         }
-        // Under another `type` the error of `[oidc.entra]` stands.
         let other = table("okta", true, directory).unwrap_err();
         assert_eq!(other, ("oidc.entra", Msg::OidcTypeTable("entra").text()));
         let always = table("entra", true, "overage = \"always\"").unwrap_err();
@@ -1220,8 +1052,6 @@ mod tests {
         assert_eq!(key(""), ("oidc.identities_claim", Msg::OidcNoClaim.text()));
     }
 
-    /// What `claims` grants under `[oidc.groups]` mapping `g` to `b` and `p` to `*`: `None` for
-    /// all, else the identities, sorted.
     fn granted(claims: Value) -> Option<Vec<String>> {
         let table = HashMap::from([
             ("g".to_string(), vec!["b".to_string()]),
@@ -1232,7 +1062,6 @@ mod tests {
             ..config(None, &[])
         };
         let claims = claims.as_object().unwrap();
-        // The groups side through the grant providers, the claim's identities beside it.
         let (_, granted) = module(config, Vec::new()).granted(claims);
         match granted.claims {
             Grant::All => None,
@@ -1254,7 +1083,6 @@ mod tests {
         assert_eq!(granted(both), only(&["a", "b"]));
         assert_eq!(granted(json!({"groups": ["g", "p"]})), None);
         assert_eq!(granted(json!({"groups": ["unmapped"]})), only(&[]));
-        // Not an array of strings grants nothing, even through its string elements.
         let shapes = json!({"meada_repositories": "a", "groups": [{"g": 1}, 7, "g"]});
         assert_eq!(granted(shapes), only(&[]));
         assert_eq!(granted(json!({"meada_repositories": ["a", 7]})), only(&[]));
@@ -1287,7 +1115,6 @@ mod tests {
             "ftp://id.example",
             "id.example",
             "",
-            // Names that only look like loopback, and an IPv4-mapped loopback address.
             "http://localhost.evil.com",
             "http://127.0.0.1.nip.io",
             "http://[::ffff:127.0.0.1]",
@@ -1296,7 +1123,6 @@ mod tests {
             assert!(!reachable(bad, Shape::Path), "{bad}");
         }
         assert!(!reachable("https://meada.example/prefix", Shape::Bare));
-        // A `jwks_uri` may carry a query, never a user or a fragment.
         assert!(reachable("https://id.example/jwks?realm=a", Shape::Query));
         for bad in [
             "https://u@id.example/jwks?realm=a",
@@ -1353,8 +1179,6 @@ mod tests {
         );
     }
 
-    /// A local HTTP server: each request gets `answer(path)`, a status, more header lines and a
-    /// body. Its base URL and the count of requests it read.
     fn issuer(
         answer: impl Fn(&str, &str) -> (u16, String, String) + Send + 'static,
     ) -> (String, Arc<AtomicUsize>) {
@@ -1386,7 +1210,6 @@ mod tests {
         (base, hits)
     }
 
-    /// A P-256 key generated now, as a signing key and its public JWK with `kid`.
     fn key(kid: &str) -> (EncodingKey, Jwk) {
         let rng = ring::rand::SystemRandom::new();
         let alg = &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING;
@@ -1433,7 +1256,6 @@ mod tests {
         }
     }
 
-    /// The claims of a token that passes for `/a`, changed by `edit`.
     fn claims(edit: impl FnOnce(&mut Value)) -> Value {
         let mut claims = serde_json::json!({
             "iss": ISSUER, "aud": format!("{PUBLIC}/a"), "exp": now() + 300,
@@ -1456,8 +1278,6 @@ mod tests {
         headers
     }
 
-    /// What `oidc` answers a request to `path` (identity `identity`) with `token`: the status
-    /// of a refusal and its challenge, or the grant's answer about `a` and `b`.
     fn admitted(
         oidc: &Oidc,
         token: &str,
@@ -1486,7 +1306,6 @@ mod tests {
             "Bearer error=\"invalid_token\", resource_metadata=\"https://meada.example/.well-known/oauth-protected-resource/a\"".to_string(),
         ));
         assert_eq!(pass(&ok(&claims(|_| {}))), Ok((true, false)));
-        // The audience as an array, and a pinned path, which takes `/a`'s audience and its own.
         let array = ok(&claims(|c| {
             c["aud"] = serde_json::json!(["x", format!("{PUBLIC}/a")])
         }));
@@ -1498,7 +1317,6 @@ mod tests {
         );
         let pinned = ok(&claims(|c| c["aud"] = format!("{PUBLIC}/{pin}").into()));
         assert_eq!(admitted(&oidc, &pinned, pin, "a"), Ok((true, false)));
-        // Within the leeway, an expiry just past and a start just ahead pass.
         let skewed = ok(&claims(|c| {
             c["exp"] = (now() - LEEWAY / 2).into();
             c["nbf"] = (now() + LEEWAY / 2).into();
@@ -1548,7 +1366,6 @@ mod tests {
         ] {
             assert_eq!(pass(&token), invalid, "{case}");
         }
-        // `/b`'s audience is no audience of `/a`, nor `/a`'s of `/b`.
         let b = Err((
             401,
             "Bearer error=\"invalid_token\", resource_metadata=\"https://meada.example/.well-known/oauth-protected-resource/b\"".to_string(),
@@ -1556,8 +1373,6 @@ mod tests {
         assert_eq!(admitted(&oidc, &ok(&claims(|_| {})), "b", "b"), b);
     }
 
-    /// `alg: none`, HMAC (with the public key's bytes as the secret, the classic confusion) and
-    /// an `alg` the key does not name are refused.
     #[test]
     fn none_hmac_and_an_algorithm_the_key_does_not_fit_are_refused() {
         let (signing, jwk) = key("k1");
@@ -1565,7 +1380,6 @@ mod tests {
         let good = sign(&signing, "k1", Algorithm::ES256, &claims(|_| {}));
         let (_, payload) = good.split_once('.').unwrap();
         let payload = payload.rsplit_once('.').unwrap().0;
-        // {"alg":"none","typ":"JWT","kid":"k1"}
         let none = format!("eyJhbGciOiJub25lIiwidHlwIjoiSldUIiwia2lkIjoiazEifQ.{payload}.");
         let secret = serde_json::to_vec(&jwk).unwrap();
         let hmac = sign(
@@ -1574,7 +1388,6 @@ mod tests {
             Algorithm::HS256,
             &claims(|_| {}),
         );
-        // A P-384 key signing under the P-256 key's `kid`: ES384 does not fit that key.
         let rng = ring::rand::SystemRandom::new();
         let alg = &ring::signature::ECDSA_P384_SHA384_FIXED_SIGNING;
         let pkcs8 = ring::signature::EcdsaKeyPair::generate_pkcs8(alg, &rng).unwrap();
@@ -1587,7 +1400,6 @@ mod tests {
                 "{case}"
             );
         }
-        // An RSA key fits RS and PS algorithms only; an EC key, its own curve only.
         let rsa: Jwk = serde_json::from_value(serde_json::json!({
             "kty": "RSA", "kid": "r", "n": "AQAB", "e": "AQAB", "alg": "RS256"
         }))
@@ -1605,7 +1417,6 @@ mod tests {
         assert!(!fits(&rsa, &header(Algorithm::ES256)));
         assert!(fits(&jwk, &Header::new(Algorithm::ES256)));
         assert!(!fits(&jwk, &Header::new(Algorithm::ES384)));
-        // An HMAC key or an encryption key is no signing key.
         let oct: Jwk =
             serde_json::from_value(serde_json::json!({"kty": "oct", "k": "c2VjcmV0"})).unwrap();
         assert!(!signs(&oct));
@@ -1630,12 +1441,10 @@ mod tests {
             )
         };
         assert_eq!(admitted(&oidc, &token(|_| {}), "a", "a"), Ok((true, false)));
-        // The configured audience replaces the endpoint's.
         let endpoint = token(|c| c["aud"] = format!("{PUBLIC}/a").into());
         assert_eq!(admitted(&oidc, &endpoint, "a", "a").unwrap_err().0, 401);
         let all = token(|c| c["meada_repositories"] = serde_json::json!(["*"]));
         assert_eq!(admitted(&oidc, &all, "a", "a"), Ok((true, true)));
-        // A string, or no claim, grants nothing; the token is still valid.
         let string = token(|c| c["meada_repositories"] = "a".into());
         assert_eq!(admitted(&oidc, &string, "a", "a"), Ok((false, false)));
         let scoped = Err((
@@ -1685,15 +1494,12 @@ mod tests {
                 ))
             )
         );
-        // A CR LF in the path stays encoded: the challenge is one header.
         assert_eq!(
             answer(HeaderMap::new(), "a\r\nX-Evil: 1").1.unwrap(),
             format!(
                 "Bearer resource_metadata=\"{metadata}/a%0D%0AX-Evil:%201\", scope=\"meada:read\""
             )
         );
-        // Another scheme is no bearer token (RFC 6750 §3.1); an empty bearer, two headers or
-        // a value that is not UTF-8 are refused.
         let with = |values: &[&[u8]]| {
             let mut headers = HeaderMap::new();
             for value in values {
@@ -1711,7 +1517,6 @@ mod tests {
         assert_eq!(with(&[b"Bearer "]), refused);
         assert_eq!(with(&[b"Bearer a.b.c", b"Bearer a.b.c"]), refused);
         assert_eq!(with(&[b"Bearer a.b.\xff"]), refused);
-        // The metadata of a path and of a pinned one.
         for (path, resource) in [
             (format!("{METADATA_PATH}/a"), "https://meada.example/a"),
             (
@@ -1738,7 +1543,6 @@ mod tests {
                 "{path}"
             );
         }
-        // `.well-known/oauth-protected-resourcex` is no metadata path.
         assert_eq!(
             answer(HeaderMap::new(), &format!("{METADATA_PATH}x")).0,
             401
@@ -1746,8 +1550,6 @@ mod tests {
     }
 
     #[test]
-    /// The RFC 8414 document answers 200 with junk, so OpenID discovery's is used; its
-    /// `jwks_uri` carries a query.
     fn start_reads_the_metadata_the_issuer_names_and_its_jwks() {
         let (_, jwk) = key("k1");
         let keys = set(&[&jwk]);
@@ -1773,7 +1575,6 @@ mod tests {
         assert_eq!(oidc.keys().len(), 1);
     }
 
-    /// A document naming another issuer is passed over too, and the next one is used.
     #[test]
     fn a_document_naming_another_issuer_is_passed_over() {
         let (_, jwk) = key("k1");
@@ -1870,14 +1671,12 @@ mod tests {
             (200, String::new(), " ".repeat(size as usize))
         });
         let agent = agent(FETCH_TIMEOUT);
-        // The cap is inclusive.
         let exact = get(&agent, &format!("{base}/exact"), METADATA_MAX).unwrap();
         assert_eq!(exact.len() as u64, METADATA_MAX);
         let big = get(&agent, &format!("{base}/metadata"), METADATA_MAX).unwrap_err();
         assert!(big.contains("limit"), "{big}");
         let big = jwks(&agent, &format!("{base}/jwks")).unwrap_err();
         assert!(big.contains("limit"), "{big}");
-        // An issuer that accepts and never answers: the request ends at its timeout.
         let silent = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}/", silent.local_addr().unwrap());
         let started = Instant::now();
@@ -1887,8 +1686,6 @@ mod tests {
         drop(silent);
     }
 
-    /// A rotated key reaches the module on the first token naming its `kid`; a second unknown
-    /// `kid` within `KID_REFRESH_EVERY` fetches nothing; a failed fetch keeps the keys.
     #[test]
     fn an_unknown_kid_fetches_the_jwks_once_per_interval() {
         let (old, old_jwk) = key("old");
@@ -1921,14 +1718,11 @@ mod tests {
             1,
             "a second fetch within the interval"
         );
-        // A failed refresh keeps the cached keys.
         oidc.jwks_uri = "http://127.0.0.1:9/jwks".into();
         oidc.refresh();
         assert_eq!(oidc.keys().len(), 2);
     }
 
-    /// While an unknown `kid` fetches the JWKS, another one does not wait for the fetch: the
-    /// lock is never held across the network.
     #[test]
     fn a_fetch_in_flight_holds_no_request_back() {
         let (_, jwk) = key("k1");
@@ -1959,8 +1753,6 @@ mod tests {
         assert_eq!(fetching.join().unwrap(), 401);
     }
 
-    /// A JWK with no `kid` fits a token naming one; a JWK with a `kid` fits only that one; a
-    /// token with `crit` is refused.
     #[test]
     fn a_key_without_a_kid_fits_and_crit_is_refused() {
         let (signing, mut jwk) = key("k1");

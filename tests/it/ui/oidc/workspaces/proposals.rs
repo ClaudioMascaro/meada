@@ -1,16 +1,7 @@
-//! The proposal server (ADR 0022, #346), as public processes: `meada workspaces mcp` answers the
-//! callers of the shared Y/A/B table (`tests/fixtures/named-workspaces.json`) over MCP with the
-//! console's own rules, beside a console over the same bootstrap, the loopback issuer, the fake
-//! GitHub API and the local Valkey, Postgres and S3-compatible store. What a caller may do and
-//! what a call leaves behind are seen through MCP answers, the console's reads, the audit page
-//! and the fake GitHub's request count, never the module's tables.
-
 use super::*;
 
-/// The proposal server's URL and its tokens' audience.
 const PROPOSALS: &str = "https://proposals.example";
 
-/// The arguments no tool takes: anything naming authority is an undeclared property.
 const FORGED: [&str; 8] = [
     "actor",
     "owner",
@@ -23,13 +14,10 @@ const FORGED: [&str; 8] = [
 ];
 
 impl Case {
-    /// `[proposals]` added to the bootstrap the console already read, and the proposal server
-    /// over it.
     fn proposals(&self) -> Server {
         self.proposals_with(&[])
     }
 
-    /// `proposals` with `env` besides the case's.
     fn proposals_with(&self, env: &[(&str, &str)]) -> Server {
         let file = self.dir.join(MANIFEST);
         let mut text = fs::read_to_string(&file).unwrap();
@@ -50,8 +38,6 @@ impl Case {
         )
     }
 
-    /// An agent's token of the table's caller `name`, for the proposal server; with local
-    /// accounts, the agent token for its surface the console issues it.
     fn agent(&self, name: &str) -> String {
         match self.mode {
             Mode::Oidc => self.token_for(name, PROPOSALS),
@@ -59,8 +45,6 @@ impl Case {
         }
     }
 
-    /// What the console shows of every workspace and its versions and history, and the audit:
-    /// the state a proposal must leave as it found it.
     fn state(&self, ids: &[&str]) -> Vec<String> {
         let root = self.token("root");
         let mut state = vec![self.get("/api/v1/audit?limit=100", &root).body];
@@ -76,7 +60,6 @@ impl Case {
     }
 }
 
-/// A JSON-RPC request to the proposal server with `headers`.
 fn rpc(server: &Server, headers: &[(&str, &str)], message: &Value) -> Reply {
     let mut all = vec![
         ("Content-Type", "application/json"),
@@ -86,7 +69,6 @@ fn rpc(server: &Server, headers: &[(&str, &str)], message: &Value) -> Reply {
     send_body(server, "POST", "/", &all, &message.to_string())
 }
 
-/// `tools/call` of `tool` with `arguments` by `token`: the JSON-RPC answer.
 fn call(server: &Server, token: &str, tool: &str, arguments: Value) -> Value {
     let bearer = format!("Bearer {token}");
     let message = json!({
@@ -98,7 +80,6 @@ fn call(server: &Server, token: &str, tool: &str, arguments: Value) -> Value {
     reply.json()
 }
 
-/// The structured answer of a call that succeeded.
 fn answer(server: &Server, token: &str, tool: &str, arguments: Value) -> Value {
     let reply = call(server, token, tool, arguments);
     let result = &reply["result"];
@@ -106,16 +87,12 @@ fn answer(server: &Server, token: &str, tool: &str, arguments: Value) -> Value {
     result["structuredContent"].clone()
 }
 
-/// The error a tool answered (`isError`), `{code, message, ...}`.
 fn refused(server: &Server, token: &str, tool: &str, arguments: Value) -> Value {
     let reply = call(server, token, tool, arguments);
     assert_eq!(reply["result"]["isError"], true, "{reply}");
     reply["result"]["structuredContent"]["error"].clone()
 }
 
-/// Whether a call was refused for its arguments: a tool error, from the tool's schema (an
-/// undeclared or mistyped property) or from its bounds (`invalid_params`), so the agent corrects
-/// it.
 fn invalid(server: &Server, token: &str, tool: &str, arguments: Value) -> bool {
     let reply = call(server, token, tool, arguments);
     let result = &reply["result"];
@@ -125,7 +102,6 @@ fn invalid(server: &Server, token: &str, tool: &str, arguments: Value) -> bool {
             || text.starts_with("failed to deserialize parameters:"))
 }
 
-/// Waits until the proposal server has read a permissions set.
 fn read_a_set(server: &Server, token: &str) {
     let start = Instant::now();
     loop {
@@ -138,14 +114,6 @@ fn read_a_set(server: &Server, token: &str) {
     }
 }
 
-/// Admission is Meada's own and the audience is the proposal server's: no token, an invalid
-/// one, a console's or a node's token is a 401 naming the metadata before any tool is reached,
-/// a browser is a 403, and this server's token is refused by the console. The tools are four,
-/// read-only, with closed input schemas that name no authority, and an argument asserting an
-/// actor, a role or a grant is invalid, never trusted. The Y/A/B table through `propose` is the
-/// console's: each refusal is the console's own error, a hidden repository is counted and never
-/// named, a hint changes nothing and its note is never echoed or logged, a token without a login
-/// is pending, and the inputs are bounded. No call reaches GitHub or leaves a token on stderr.
 #[test]
 fn proposals_follow_the_shared_table_and_trust_no_asserted_identity() {
     if let Some(case) = Case::new("ws_proposals_table") {
@@ -153,10 +121,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity() {
     }
 }
 
-/// `proposals_follow_the_shared_table_and_trust_no_asserted_identity` with local accounts (#562):
-/// the proposal server admits only its own agent tokens (the console's session token and an agent
-/// token for the nodes are a 401 without `resource_metadata`, and there is no metadata to serve),
-/// derives everything from the token and keeps every refusal, forged arguments included.
 #[cfg(feature = "accounts")]
 #[test]
 fn local_accounts_proposals_follow_the_shared_table_and_trust_no_asserted_identity() {
@@ -166,11 +130,7 @@ fn local_accounts_proposals_follow_the_shared_table_and_trust_no_asserted_identi
     }
 }
 
-/// The body of `proposals_follow_the_shared_table_and_trust_no_asserted_identity` and
-/// `local_accounts_proposals_follow_the_shared_table_and_trust_no_asserted_identity`, over `case`.
 fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Case) {
-    // Without `[proposals]` the server refuses to start, naming the section (the local case's
-    // console started with one, to issue tokens for it).
     if case.mode == Mode::Oidc {
         let (_, stderr, code) = case.job(&[
             "workspaces",
@@ -185,8 +145,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
     }
     case.refresh();
     case.ready();
-    // The proposal server reads the public half alone: with local accounts the private one is
-    // gone before it starts (the console read it at its own start).
     if case.mode == Mode::Local {
         let ops = case.dir.join("ops");
         fs::rename(ops.join("private.pem"), ops.join("private.pem.away")).unwrap();
@@ -196,8 +154,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
     let requests = case.github.api.with(|s| s.requests);
     let (y, a, b) = (case.identity("Y"), case.identity("A"), case.identity("B"));
 
-    // The metadata needs no token and names this server and the issuer; with local accounts
-    // there is no authorization server to discover, so none.
     let metadata = send(&server, "GET", "/.well-known/oauth-protected-resource", &[]);
     match case.mode {
         Mode::Oidc => {
@@ -210,7 +166,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
         }
         Mode::Local => assert_eq!(metadata.status, 404, "{}", metadata.body),
     }
-    // No token, a forged one, a console token and a node token: 401 before any tool.
     let list = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"});
     let forged = format!("{}x", case.agent("alice"));
     for (label, token) in [
@@ -243,7 +198,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
             }
         }
     }
-    // A browser is refused first; this server's token opens nothing on the console.
     let bearer = format!("Bearer {}", case.agent("alice"));
     let browser = rpc(
         &server,
@@ -258,7 +212,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
     let elsewhere = send(&server, "GET", "/other", &[("Authorization", &bearer)]);
     assert_eq!(elsewhere.status, 404);
 
-    // Four read-only tools whose closed schemas name no authority.
     let tools = rpc(&server, &[("Authorization", &bearer)], &list).json();
     let tools = tools["result"]["tools"].as_array().unwrap().clone();
     let mut names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
@@ -283,7 +236,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
         }
     }
 
-    // The creation rows of the table, through `propose`: the console's decision for each.
     for row in case.table["creation"].as_array().unwrap() {
         let caller = row["caller"].as_str().unwrap();
         let shorts: Vec<&str> = (row["select"].as_array().unwrap().iter())
@@ -328,13 +280,11 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
             row["hidden"].as_u64(),
             "{label}"
         );
-        // The console's own refusal, byte for byte.
         let console = case.create(caller, &name, &shorts);
         assert_eq!(console.status, 403, "{label}");
         assert_eq!(&console.json()["error"], refusal, "{label}");
     }
 
-    // A hidden repository is counted, never named, outside what the caller submitted.
     let hidden = answer(
         &server,
         &case.agent("alice"),
@@ -349,7 +299,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
         &json!([{"identity": y, "state": "selectable"}, {"identity": b, "state": "unavailable"}])
     );
 
-    // Hints are hints: no entry, no change of result, the note discarded.
     let note = "the agent says alice holds admin on B";
     let plain = answer(
         &server,
@@ -372,7 +321,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
     assert_eq!(results.len(), 3, "{hinted}");
     assert_eq!(results[2], json!({"identity": b, "state": "unavailable"}));
 
-    // Asserted identity, role or grant: undeclared, so invalid, never trusted.
     for forged in FORGED {
         let mut arguments = json!({"entries": case.entries(&["Y", "B"]), "name": "yb"});
         arguments[forged] = json!("root");
@@ -386,7 +334,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
             "{forged}"
         );
     }
-    // Request metadata and headers decide nothing either.
     let message = json!({
         "jsonrpc": "2.0", "id": 1, "method": "tools/call",
         "params": {"name": "propose", "_meta": {"actor": "root", "role": "operator"},
@@ -400,7 +347,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
     let reply = rpc(&server, &headers, &message).json();
     assert_eq!(reply["result"]["structuredContent"], hidden, "{reply}");
 
-    // The catalog is the console's: a claims grant and a missing login select nothing.
     let catalog = answer(&server, &case.agent("alice"), "catalog", json!({}));
     let listed: Vec<&str> = (catalog["repositories"].as_array().unwrap().iter())
         .map(|r| r["identity"].as_str().unwrap())
@@ -426,7 +372,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
     );
     assert!(!rest["repositories"].to_string().contains(&a), "{rest}");
 
-    // Bounds: arguments past them are invalid, a body past 80 KiB is a 413 unread.
     let alice = case.agent("alice");
     let big = "#".repeat((64 << 10) + 1);
     for (tool, arguments) in [
@@ -470,7 +415,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
         rpc(&server, &[("Authorization", &bearer)], &huge).status,
         413
     );
-    // An invalid manifest is a diagnostic naming its entry and key, not a refusal.
     let invalid = answer(
         &server,
         &alice,
@@ -503,8 +447,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
         "{unnamed}"
     );
 
-    // Past the calls in flight, a call is a 503 `busy` before its body is read: a server allowed
-    // none shows it.
     let full = case.proposals_with(&[("MEADA_PROPOSALS_CALLS", "0")]);
     let busy = rpc(&full, &[("Authorization", &bearer)], &list);
     assert_eq!(
@@ -513,11 +455,7 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
     );
     drop(full);
 
-    // With local accounts nothing but the token decides: alice's account suspended in the
-    // console, her agent token still answers as it did until it expires (ADR 0024: no row read).
     if case.mode == Mode::Local {
-        // An issue for this surface is recorded with the surface, the hours and the token id,
-        // never the token.
         let asked = json!({"surface": "proposals", "hours": 2});
         let issued = case.post("/api/v1/account/tokens", &case.token("bob"), &asked);
         assert_eq!(issued.status, 200, "{}", issued.body);
@@ -545,7 +483,6 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
         assert_eq!(after["repositories"], catalog["repositories"]);
     }
 
-    // No call reached GitHub; nothing on stderr holds a token, a note or a manifest.
     assert_eq!(case.github.api.with(|s| s.requests), requests);
     let tokens = vec![case.agent("alice"), case.agent("root"), forged];
     let stderr = server.stderr();
@@ -562,19 +499,11 @@ fn proposals_follow_the_shared_table_and_trust_no_asserted_identity_as(case: Cas
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// The canonical text the console stores for the table's `shorts`.
 fn meada_text(case: &Case, shorts: &[&str]) -> String {
     let one = |s: &&str| format!("[[repository]]\nrepo = \"{}\"\n", case.identity(s));
     shorts.iter().map(one).collect::<Vec<_>>().join("\n")
 }
 
-/// A proposal over an existing workspace is the console's save with persistence off: the caller
-/// lists and shows what it may see (a hidden workspace is the one `not_found` of an unknown id),
-/// its proposal names the base, the diff against the entries it reads and the effective
-/// configuration, and a peer is refused as a non-operator. Equal calls give equal bytes, and
-/// the console's records, versions, history and audit are as they were: no version stored, no
-/// pointer moved. A person then saves the manifest at the base in the console, after which the
-/// old base is stale.
 #[test]
 fn a_proposal_changes_nothing_and_a_person_saves_it_in_the_console() {
     let Some(case) = Case::new("ws_proposals_base") else {
@@ -596,7 +525,6 @@ fn a_proposal_changes_nothing_and_a_person_saves_it_in_the_console() {
     let (alice, dave, bob) = (case.agent("alice"), case.agent("dave"), case.agent("bob"));
     let (y, b) = (case.identity("Y"), case.identity("B"));
 
-    // What each caller sees: the console's discovery rule.
     let listed = |token: &str| -> Vec<(String, bool, i64)> {
         let page = answer(&server, token, "workspaces", json!({}));
         (page["workspaces"].as_array().unwrap().iter())
@@ -633,7 +561,6 @@ fn a_proposal_changes_nothing_and_a_person_saves_it_in_the_console() {
         refused(&server, &bob, "show", json!({"workspace": ya})),
         unknown
     );
-    // The table's discovery rows through `show`: a hidden workspace is the unknown id's answer.
     let ids = [
         ("w_ya", &ya),
         ("w_yb", &yb),
@@ -659,7 +586,6 @@ fn a_proposal_changes_nothing_and_a_person_saves_it_in_the_console() {
         }
     }
 
-    // A change alice may make: Y served under a host, A kept.
     let text = format!(
         "[[repository]]\nrepo = \"{y}\"\n[repository.serve]\nhosts = [\"y.example\"]\n\n\
          [[repository]]\nrepo = \"{}\"\n",
@@ -683,10 +609,8 @@ fn a_proposal_changes_nothing_and_a_person_saves_it_in_the_console() {
         2
     );
     assert!(!proposal["manifest"].as_str().unwrap().contains("ingestion"));
-    // Equal calls, equal bytes.
     let again = call(&server, &alice, "propose", arguments.clone());
     assert_eq!(again["result"]["structuredContent"], proposal);
-    // Adding B is refused as the console's save is: B counted, never named.
     let wider = answer(
         &server,
         &alice,
@@ -697,7 +621,6 @@ fn a_proposal_changes_nothing_and_a_person_saves_it_in_the_console() {
     assert_eq!(wider["refusals"][0]["code"], "entries_refused");
     assert_eq!(wider["refusals"][0]["hidden"], 1);
     assert!(!wider["refusals"].to_string().contains(&b));
-    // A peer is no operator; a caller who cannot see the workspace gets the unknown id's answer.
     let peer = answer(&server, &dave, "propose", arguments.clone());
     assert_eq!(peer["refusals"][0]["code"], "not_operator", "{peer}");
     assert_eq!(
@@ -705,29 +628,23 @@ fn a_proposal_changes_nothing_and_a_person_saves_it_in_the_console() {
         unknown
     );
 
-    // Nothing stored, no pointer moved, no audit record.
     assert_eq!(case.state(&[&ya, &yb, &yab, &only_y]), before);
 
-    // A person saves the manifest at the proposal's base in the console, then applies it.
     let manifest = proposal["manifest"].as_str().unwrap();
     let saved = case.save("alice", &ya, manifest, 1);
     assert_eq!(saved.status, 201, "{}", saved.body);
     let saved_version = saved.json()["version"].as_str().unwrap().to_string();
     let applied = case.apply("alice", &ya, &saved_version, 1);
     assert_eq!(applied.status, 200, "{}", applied.body);
-    // The old proposal's base is stale now, and the console refuses it.
     let stale = case.save("alice", &ya, manifest, 1);
     assert_eq!(stale.status, 409, "{}", stale.body);
     assert_eq!(stale.json()["error"]["code"], "stale_base");
-    // A new proposal names the new base and has nothing left to change.
     let now = answer(&server, &alice, "propose", arguments);
     assert_eq!(now["base"]["seq"], 2);
     assert_eq!(
         now["diff"],
         json!({"added": [], "removed": [], "changed": []})
     );
-    // The creator loses A: its proposal composes over A, which stays in place unnamed, and no
-    // field of the proposal or of `show` names it.
     let a = case.identity("A");
     case.revoke(&[("alice", "A")]);
     let start = Instant::now();
@@ -750,7 +667,6 @@ fn a_proposal_changes_nothing_and_a_person_saves_it_in_the_console() {
     let shown = answer(&server, &alice, "show", json!({"workspace": ya}));
     assert_eq!(shown["hidden"], 1, "{shown}");
     assert!(!shown.to_string().contains(&a), "{shown}");
-    // Naming A is no way around it: the proposal is the same, A still unnamed in it.
     let named = answer(
         &server,
         &alice,
@@ -760,11 +676,9 @@ fn a_proposal_changes_nothing_and_a_person_saves_it_in_the_console() {
     for key in ["manifest", "diff", "refusals", "effective", "applicable"] {
         assert_eq!(named[key], only[key], "{key}");
     }
-    // A rename is the console's: no name or description with a base.
     let renamed = json!({"workspace": ya, "entries": case.entries(&["Y"]), "name": "n"});
     assert!(invalid(&server, &alice, "propose", renamed));
 
-    // A creation the console's transaction would refuse: the same workspace created and deleted.
     let gone = id_of(&case.create("bob", "gone", &["Y"]));
     let deleted = case.post(
         &format!("/api/v1/workspaces/{gone}/delete"),
@@ -785,13 +699,6 @@ fn a_proposal_changes_nothing_and_a_person_saves_it_in_the_console() {
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// The console's preview (`POST workspaces/effective`, what the guided editor shows) and
-/// `propose` share one core: for the same caller (alice, an operator reading Y and A) and the same
-/// manifest text they give the same effective configuration, and what `propose` says is
-/// applicable the console's save then accepts, what it refuses the save refuses, leaving the
-/// console as it was. The preview has no refusals of its own (the save decides eligibility): for
-/// an entry the caller cannot read it shows the repository as pending, as for any repository no
-/// generation holds, where `propose` composes over it and leaves it out.
 #[test]
 fn the_guided_preview_and_propose_agree_on_the_same_text() {
     let Some(case) = Case::new("ws_preview_propose") else {
@@ -810,7 +717,6 @@ fn the_guided_preview_and_propose_agree_on_the_same_text() {
     let (y, a, b) = (case.identity("Y"), case.identity("A"), case.identity("B"));
     let entry = |repo: &str, extra: &str| format!("[[repository]]\nrepo = \"{repo}\"\n{extra}");
     let join = |entries: &[String]| entries.join("\n");
-    // What each text is, and what it must give.
     let clean = join(&[entry(&y, ""), entry(&a, "")]);
     let diagnosed = join(&[
         entry(&y, "[[repository.peer]]\nrepo = \"github.com/acme/b\"\n"),
@@ -829,7 +735,6 @@ fn the_guided_preview_and_propose_agree_on_the_same_text() {
     };
     let before = case.state(&[&ya]);
 
-    // Clean and diagnosed: both answer the same view, entry by entry, diagnostics included.
     for (label, text, diagnostics) in [
         ("clean", &clean, vec![]),
         (
@@ -861,7 +766,6 @@ fn the_guided_preview_and_propose_agree_on_the_same_text() {
         );
     }
 
-    // Invalid text: the preview's 422 carries the problems `propose` lists as diagnostics.
     let shown = preview(&invalid);
     assert_eq!(shown.status, 422, "{}", shown.body);
     assert_eq!(shown.json()["error"]["code"], "invalid_entries");
@@ -885,8 +789,6 @@ fn the_guided_preview_and_propose_agree_on_the_same_text() {
         (422, "invalid_entries".into())
     );
 
-    // An entry alice cannot read: `propose` refuses and composes over it, the save refuses, the
-    // preview shows B as pending and the rest as `propose` does.
     let shown = preview(&refused);
     assert_eq!(shown.status, 200, "{}", shown.body);
     let (shown, proposal) = (shown.json(), propose(&refused));
@@ -909,10 +811,8 @@ fn the_guided_preview_and_propose_agree_on_the_same_text() {
         ),
         (403, "entries_refused".into())
     );
-    // The refusal is audited; no workspace, version or history changes.
     assert_eq!(case.state(&[&ya])[1..], before[1..], "nothing is stored");
 
-    // The same text, saved and applied through the console, then shows what `propose` previewed.
     let proposal = propose(&diagnosed);
     let saved = case.save("alice", &ya, &diagnosed, 1);
     assert_eq!(saved.status, 201, "{}", saved.body);
@@ -926,9 +826,6 @@ fn the_guided_preview_and_propose_agree_on_the_same_text() {
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// Eligibility is read from the newest set, never cached past its age: once the set is stale,
-/// a proposal that was applicable is pending `stale_set` for everyone, the administrator
-/// included, and the catalog lists nothing.
 #[test]
 fn a_stale_set_makes_every_proposal_pending() {
     let Some(case) = Case::aged("ws_proposals_stale", false, 4) else {
@@ -967,8 +864,6 @@ fn a_stale_set_makes_every_proposal_pending() {
     }
 }
 
-/// A user the SCIM directory deleted is refused by the proposal server as by the console, until
-/// it is provisioned active again; a user never provisioned keeps normal admission.
 #[cfg(feature = "directory")]
 #[test]
 fn a_deleted_user_is_refused_until_provisioned_active() {
@@ -1020,10 +915,6 @@ fn a_deleted_user_is_refused_until_provisioned_active() {
     assert_eq!(status("alice").status, 200);
 }
 
-/// With `[oidc]`, the proposal server ignores `[accounts]` under break glass (#563, ADR 0024): it
-/// starts though neither key file exists, reads neither, admits the identity provider's agent
-/// token as before, and refuses a token signed with Ed25519 for the console's issuer and this
-/// server's audience, as any token the identity provider did not sign, before any tool.
 #[cfg(feature = "accounts")]
 #[test]
 fn the_proposal_server_with_oidc_ignores_accounts_under_break_glass() {

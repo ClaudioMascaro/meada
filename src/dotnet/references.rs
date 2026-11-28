@@ -1,21 +1,10 @@
-//! The `ProjectReference` graph of one repository (#369): the project file a reference names
-//! (`located`), and the projects a project references directly or through the projects it
-//! references, as MSBuild passes them on (`referenced`). The walk reads what each project's read
-//! yields (`msbuild::read`, or the NuGet manifest built from it), never another file, so package
-//! resolution and the C# resolver walk the same graph.
-
 use std::collections::HashSet;
 
 use crate::repo::relative;
 
-/// The longest chain of `ProjectReference`s `referenced` follows; a project further down is not
-/// referenced.
 // ponytail: real solutions nest a few projects deep; this bounds the walk over a hostile one.
 pub const REFERENCE_DEPTH: usize = 32;
 
-/// The project file the `ProjectReference` `include`, written in the project whose directory is
-/// `dir` (`a/b`, empty at the root), names, as a path of the repository (`../` past its root).
-/// `None` for a computed (`$(Property)`) or absolute path, or a file that is no `.csproj`.
 pub fn located(dir: &str, include: &str) -> Option<String> {
     if include.contains("$(") || include.contains(':') {
         return None;
@@ -23,14 +12,6 @@ pub fn located(dir: &str, include: &str) -> Option<String> {
     relative(dir, &include.replace('\\', "/")).filter(|at| at.ends_with(".csproj"))
 }
 
-/// The projects of its repository the project file `start` references, directly or through the
-/// projects those reference, nearest first, each once and `start` never. `references` gives a
-/// project's `ProjectReference`s from what its read yields, each as the project file it names (a
-/// path of the repository, `located`) and whether it is private (`msbuild::Reference::private`);
-/// a project it gives none for references nothing. A private reference is followed from `start`
-/// alone: MSBuild passes it on to no project referencing the one that writes it. A cycle stops at
-/// a project already found, and a chain past `REFERENCE_DEPTH`, so each project's references are
-/// read once at most.
 pub fn referenced<'p>(
     start: &'p str,
     references: impl Fn(&str) -> Vec<(&'p str, bool)>,
@@ -60,7 +41,6 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    /// `referenced` over a graph written as `(project, [(reference, private)])`.
     fn walk<'p>(graph: &HashMap<&'p str, Vec<(&'p str, bool)>>, start: &'p str) -> Vec<&'p str> {
         referenced(start, |p| graph.get(p).cloned().unwrap_or_default())
     }
@@ -98,7 +78,6 @@ mod tests {
     #[test]
     fn a_reference_cycle_and_a_chain_past_the_depth_bound_are_walked_in_linear_time() {
         let names: Vec<String> = (0..1000).map(|i| format!("P{i}")).collect();
-        // Every project references every other: a cycle through each pair.
         let all: Vec<(&str, bool)> = names.iter().map(|n| (n.as_str(), false)).collect();
         let reads = std::cell::Cell::new(0);
         let start = std::time::Instant::now();
@@ -106,7 +85,6 @@ mod tests {
             reads.set(reads.get() + 1);
             all.clone()
         });
-        // 0.26 s measured in a local debug build; the bound is over twenty times that.
         assert!(start.elapsed().as_secs() < 6, "{:?}", start.elapsed());
         assert_eq!((found.len(), reads.get()), (names.len() - 1, names.len()));
         let cycle = HashMap::from([("A", vec![("B", false)]), ("B", vec![("A", false)])]);

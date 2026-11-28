@@ -1,5 +1,3 @@
-//! Console operations through HTTP, using the same real stores as their CLI counterparts.
-
 use super::{PUBLIC, SUBJECT, VERSION, WEB, ask, bearer, claims, oidc, ui_oidc};
 use crate::generations::Fleet;
 use crate::oidc::{Issuer, key, set, sign};
@@ -42,8 +40,6 @@ fn post(console: &Server, route: &str, token: &str, body: Value) -> Reply {
     )
 }
 
-/// Retain, set and drop use the CLI operations, expose their resulting state and print one
-/// audit line each. An operator's restricted grant does not hide any repository or generation.
 #[test]
 fn pointer_operations_match_the_cli_results_and_audit_each_accepted_write() {
     let Some(fleet) = Fleet::new("ui_write_pointer", 2) else {
@@ -108,8 +104,6 @@ fn pointer_operations_match_the_cli_results_and_audit_each_accepted_write() {
     }
 }
 
-/// Recovery preserves the CLI's floor semantics and decimal precision beyond JavaScript's
-/// safe integer range; every accepted operation is audited once.
 #[test]
 fn fence_recover_returns_the_cli_counter_and_preserves_an_exact_decimal_floor() {
     let Some(fleet) = Fleet::new("ui_write_recover", 2) else {
@@ -153,8 +147,6 @@ fn fence_recover_returns_the_cli_counter_and_preserves_an_exact_decimal_floor() 
     );
 }
 
-/// Shape errors are safe body errors, not CLI argument echoes: a token pasted into an id or
-/// floor can appear in neither the response nor the audit, and opens no operation lock.
 #[test]
 fn tokens_in_operation_arguments_are_not_reflected_or_recorded() {
     let Some(fleet) = Fleet::new("ui_write_argument_secret", 2) else {
@@ -197,8 +189,6 @@ fn tokens_in_operation_arguments_are_not_reflected_or_recorded() {
     }
 }
 
-/// A workspace apply uses the same fence counter as a publish. Recovery and the fleet
-/// diagnostic count its pointer, while a malformed heartbeat cannot poison either with MAX.
 #[test]
 fn recovery_and_fleet_count_workspace_fences_and_ignore_malformed_heartbeats() {
     use crate::generations::{admin, meada_in, prefix, send};
@@ -268,8 +258,6 @@ fn recovery_and_fleet_count_workspace_fences_and_ignore_malformed_heartbeats() {
     );
 }
 
-/// Save shares entry validation with CLI import, keeps the admitted author verbatim and
-/// imports entries despite other top-level keys. Audit output keeps its single-line shape.
 #[test]
 fn workspace_save_uses_cli_validation_and_stores_the_authenticated_author() {
     use crate::generations::meada_in;
@@ -349,8 +337,6 @@ fn workspace_save_uses_cli_validation_and_stores_the_authenticated_author() {
     }
 }
 
-/// The editor upload fits its own cap, but the pretty stored document must also fit the
-/// existing workspace version ceiling. Neither CLI nor HTTP may leave an unreadable version.
 #[test]
 fn imports_and_saves_refuse_a_serialized_version_larger_than_the_reader_limit() {
     use crate::generations::meada_in;
@@ -410,8 +396,6 @@ fn imports_and_saves_refuse_a_serialized_version_larger_than_the_reader_limit() 
     );
 }
 
-/// Applying saved entries moves only the workspace pointer, with the same fenced result as
-/// the CLI. Unknown but well-formed versions are operational refusals, never body errors.
 #[test]
 fn workspace_apply_moves_the_pointer_and_preserves_the_cli_refusal() {
     use crate::generations::meada_in;
@@ -489,8 +473,6 @@ fn workspace_apply_moves_the_pointer_and_preserves_the_cli_refusal() {
     );
 }
 
-/// Body caps and shape errors are rejected before an operation acquires its fence. No refused
-/// upload is reflected, and every refusal is one audit line with a safe outcome.
 #[test]
 fn operation_caps_and_malformed_bodies_are_safe_and_leave_state_unchanged() {
     let Some(fleet) = Fleet::new("ui_write_bodies", 2) else {
@@ -573,9 +555,6 @@ fn operation_caps_and_malformed_bodies_are_safe_and_leave_state_unchanged() {
     }
 }
 
-/// Every HTTP write keeps the CLI refresh lock and holder refusal, while CLI import remains
-/// usable without that lock. Viewer refusals and held-lock refusals change neither pointer nor
-/// stored versions; each is audited exactly once.
 #[test]
 fn all_writes_refuse_a_held_lock_and_viewers_without_changing_the_workspace() {
     use crate::generations::import;
@@ -666,8 +645,6 @@ fn all_writes_refuse_a_held_lock_and_viewers_without_changing_the_workspace() {
     }
 }
 
-/// Validation still returns the CLI's complete diagnostics, but its audit outcome must never
-/// record editor contents, even when a credential was pasted into an invalid identity.
 #[test]
 fn save_validation_audits_a_fixed_refusal_without_editor_token_text() {
     use crate::generations::meada_in;
@@ -721,8 +698,6 @@ fn save_validation_audits_a_fixed_refusal_without_editor_token_text() {
     }
 }
 
-/// All u64 floors retain their transport shape; unusable counters are operational conflicts,
-/// with the CLI catalog message, and leave a subsequent valid recovery usable.
 #[test]
 fn fence_recover_refuses_unusable_u64_floors_as_operational_conflicts() {
     let Some(fleet) = Fleet::new("ui_write_ceiling", 2) else {

@@ -1,25 +1,3 @@
-//! The directory's SCIM 2.0 endpoint (RFC 7643, RFC 7644; #334): with `[ui]` and `[directory]`
-//! the console serves `/scim/v2/` on its listener, the surface Entra ID's and Okta's
-//! provisioning send and no more. The console admits a request (`Scim::admits`, after the `Host`
-//! and `Origin` checks) and bounds its body at `SCIM_BODY_MAX`; `Scim::answer` routes it:
-//!
-//! - `/Users` and `/Groups`: `POST` (201), `GET` with `filter` (`userName eq`, `externalId eq`;
-//!   `displayName eq`, `externalId eq`), `startIndex` and `count` (at most `SCIM_PAGE_MAX`), and `GET`,
-//!   `PUT`, `PATCH` and `DELETE` (204) of `/<kind>/<id>`. A user `PATCH` answers 200 with the
-//!   user, a group `PATCH` 204; `excludedAttributes=members` leaves a group's members out.
-//! - `/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas`: fixed documents.
-//!
-//! Every write runs in one transaction under one advisory lock of the schema, so a uniqueness or
-//! membership check and the write it guards cannot interleave with another write, and a `PATCH`
-//! whose later operation fails writes nothing. A resource is stored as the JSON the provider sent,
-//! without `id`, `meta` and `password` (Meada's own, and never kept), a group without `members`,
-//! which live in their own table; at most `SCIM_RESOURCE_MAX` bytes after every change. Meada's
-//! ids (32 lowercase hex characters, from Postgres) are checked wherever read. A deleted user
-//! leaves every group and a revocation marker (its `userName` and `externalId`) that only a write
-//! naming `active` true for a user with the same `user_attribute` clears. An error is RFC 7644's, its
-//! detail fixed: none echoes a value. Postgres unreachable, or at a version this binary does not
-//! know, is a 503 and one `ui:` line naming why.
-
 use hyper::{Method, StatusCode};
 use serde_json::{Map, Value, json};
 use tokio_postgres::Row;
@@ -35,9 +13,6 @@ pub const SCIM_RESOURCE_MAX: usize = 64 << 10;
 // ponytail: the most resources a page holds, and how many without `count`.
 const SCIM_PAGE_MAX: i64 = 100;
 
-/// The statements of the longest request besides the version check's: a group `PATCH`, which
-/// begins, takes the lock, loads the group and its members, checks the name, the members, writes
-/// the group, marks groups provisioned, drops and adds the members, stamps the state and commits.
 const STATEMENTS: u32 = 12;
 
 const ERROR: &str = "urn:ietf:params:scim:api:messages:2.0:Error";
@@ -45,14 +20,12 @@ const LIST: &str = "urn:ietf:params:scim:api:messages:2.0:ListResponse";
 const USER: &str = "urn:ietf:params:scim:schemas:core:2.0:User";
 const GROUP: &str = "urn:ietf:params:scim:schemas:core:2.0:Group";
 
-/// The fixed details of the refusals the console makes before routing.
 pub const ORIGIN_REFUSED: &str = "a request carrying Origin is refused";
 pub const UNAUTHORIZED: &str = "the SCIM bearer token is missing or wrong";
 pub const TOO_LARGE: &str = "the request body is too large";
 pub const UNREADABLE: &str = "the request body could not be read";
 pub const MEDIA_TYPE: &str = "the body must be application/scim+json or application/json";
 
-/// A timestamp column as RFC 3339, UTC, to the microsecond.
 macro_rules! time {
     ($column:literal) => {
         concat!(
@@ -63,7 +36,6 @@ macro_rules! time {
     };
 }
 
-/// What a read of a resource selects: `Stored::of` takes it.
 const COLUMNS: &str = concat!(
     "id, resource::text, ",
     time!("created"),
@@ -71,39 +43,31 @@ const COLUMNS: &str = concat!(
     time!("last_modified")
 );
 
-/// Whether `path` is the endpoint's.
 pub fn routed(path: &str) -> bool {
     path == "/scim/v2" || path.starts_with("/scim/v2/")
 }
 
-/// The resource a write's stderr line names: `Users`, `Groups` or `-`.
 pub fn resource(path: &str) -> &'static str {
     let first = path.trim_start_matches("/scim/v2/").split('/').next();
     first.and_then(Kind::of).map_or("-", Kind::name)
 }
 
-/// The endpoint: the token's hash and where the directory lives.
 pub struct Scim {
-    /// The SCIM token's BLAKE3 hash: comparing hashes is constant-time and keeps no token.
     token: blake3::Hash,
     postgres: crate::postgres::Config,
-    /// `<[ui] public_url>/scim/v2`.
     base: String,
     user_attribute: &'static str,
     group_attribute: &'static str,
 }
 
-/// An answer: its status, its document, and the id of the stored resource it names, if any.
 pub struct Reply {
     pub status: StatusCode,
     pub body: Option<Value>,
     pub named: Option<String>,
-    /// A created resource's location.
     pub location: Option<String>,
 }
 
 impl Reply {
-    /// RFC 7644's error, `scim_type` set for a 400 or 409.
     pub fn error(status: StatusCode, scim_type: Option<&str>, detail: &str) -> Self {
         let mut body =
             json!({"schemas": [ERROR], "status": status.as_u16().to_string(), "detail": detail});
@@ -128,7 +92,6 @@ impl Reply {
     }
 }
 
-/// A refusal: its status, `scimType` and fixed detail.
 struct Fail(StatusCode, Option<&'static str>, &'static str);
 
 type Done<T> = Result<T, Fail>;
@@ -149,8 +112,6 @@ fn too_large() -> Fail {
     )
 }
 
-/// Postgres unreachable, or at a version this binary does not know: one stderr line naming why
-/// (never the URL or its password), and a 503.
 fn unavailable(reason: &str) -> Fail {
     eprintln!(
         "ui: {}",
@@ -207,12 +168,10 @@ impl Kind {
     }
 }
 
-/// Whether `id` is one of Meada's: 32 lowercase hex characters.
 fn is_id(id: &str) -> bool {
     id.len() == 32 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
 
-/// A resource as stored.
 struct Stored {
     id: String,
     resource: Map<String, Value>,
@@ -221,7 +180,6 @@ struct Stored {
 }
 
 impl Stored {
-    /// A row of `COLUMNS`; `None` for one that fails its checks (every row is hostile).
     fn of(row: &Row) -> Option<Self> {
         let text = |i| row.try_get::<_, Option<String>>(i).ok().flatten();
         let id = text(0).filter(|id| is_id(id))?;
@@ -237,34 +195,26 @@ impl Stored {
     }
 }
 
-/// A resource about to be stored, checked.
 struct Candidate {
     resource: Map<String, Value>,
-    /// `userName` or `displayName`.
     name: String,
     external_id: Option<String>,
     active: bool,
-    /// Whether the resource names `active` itself: only an explicit active user clears a
-    /// revocation marker.
     active_named: bool,
-    /// A group's members, sorted, without repeats.
     members: Vec<String>,
 }
 
-/// The key of `map` named `name` ignoring case, else `name`.
 fn key_of(map: &Map<String, Value>, name: &str) -> String {
     let found = map.keys().find(|k| k.eq_ignore_ascii_case(name));
     found.cloned().unwrap_or_else(|| name.to_string())
 }
 
-/// The value of `map` named `name` ignoring case.
 fn get<'a>(map: &'a Map<String, Value>, name: &str) -> Option<&'a Value> {
     map.iter()
         .find(|(k, _)| k.eq_ignore_ascii_case(name))
         .map(|(_, v)| v)
 }
 
-/// `value` as `active`: a boolean, or the string `True` or `False` ignoring case.
 fn boolean(value: &Value) -> Option<bool> {
     match value {
         Value::Bool(b) => Some(*b),
@@ -274,10 +224,6 @@ fn boolean(value: &Value) -> Option<bool> {
     }
 }
 
-/// `resource` checked for storage as a `kind`: `id`, `meta` and `password` dropped, `userName`
-/// or `displayName` a non-empty string, `externalId` a string if any, `active` a boolean (true
-/// when absent), a group's `members` objects naming an id each, taken out; at most
-/// `SCIM_RESOURCE_MAX` bytes.
 fn candidate(kind: Kind, mut resource: Map<String, Value>) -> Done<Candidate> {
     let invalid = |detail| bad("invalidValue", detail);
     resource.retain(|k, _| {
@@ -354,31 +300,24 @@ enum Op {
     Replace,
 }
 
-/// A step of an attribute path: an attribute, and for a multi-valued one the `eq` filter
-/// selecting its values (`emails[type eq "work"]`).
 #[derive(Debug, PartialEq)]
 struct Step {
     name: String,
     filter: Option<(String, Value)>,
 }
 
-/// One `PATCH` operation.
 struct Operation {
     op: Op,
     path: Option<Vec<Step>>,
     value: Option<Value>,
 }
 
-/// Whether `name` is an attribute name (RFC 7643's `ATTRNAME`, or `$ref`).
 fn attribute(name: &str) -> bool {
     name == "$ref"
         || (name.starts_with(|c: char| c.is_ascii_alphabetic())
             && (name.bytes()).all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'))
 }
 
-/// An attribute path: an optional schema URN (the core schemas' dropped), an attribute, an
-/// optional `[<sub-attribute> eq <value>]` filter and an optional `.<sub-attribute>`. Anything
-/// else is `invalidPath`.
 fn path(text: &str) -> Done<Vec<Step>> {
     let invalid = || bad("invalidPath", "the attribute path is not supported");
     let head = text.find('[').unwrap_or(text.len());
@@ -436,8 +375,6 @@ fn path(text: &str) -> Done<Vec<Step>> {
     Ok(steps)
 }
 
-/// A `PATCH` body's operations: `Operations`, each with `op` (`add`, `remove` or `replace`,
-/// ignoring case), an optional `path` and the `value` an `add` or `replace` needs.
 fn operations(body: &Value) -> Done<Vec<Operation>> {
     let syntax = || bad("invalidSyntax", "the body is not a SCIM PatchOp");
     let body = body.as_object().ok_or_else(syntax)?;
@@ -478,15 +415,11 @@ fn operations(body: &Value) -> Done<Vec<Operation>> {
     Ok(operations)
 }
 
-/// What tells a value of a multi-valued attribute from the others: its `value` when it is an
-/// object that has one, else itself, as JSON text.
 fn identity(v: &Value) -> String {
     let value = v.as_object().and_then(|o| get(o, "value"));
     value.unwrap_or(v).to_string()
 }
 
-/// Whether `element`, a value of a multi-valued attribute, has `sub` equal to `expected`
-/// (strings ignoring case).
 fn matches(element: &Value, (sub, expected): &(String, Value)) -> bool {
     let found = element.as_object().and_then(|o| get(o, sub));
     match (found, expected) {
@@ -496,8 +429,6 @@ fn matches(element: &Value, (sub, expected): &(String, Value)) -> bool {
     }
 }
 
-/// `new`'s attributes set in `into`, names compared ignoring case. The keys are indexed once, so
-/// a body of many attributes costs linear time under the directory's lock.
 fn merge(into: &mut Map<String, Value>, new: &Map<String, Value>) {
     let mut keys = std::collections::HashMap::new();
     for key in into.keys() {
@@ -511,13 +442,10 @@ fn merge(into: &mut Map<String, Value>, new: &Map<String, Value>) {
     }
 }
 
-/// `operation` applied to `resource` (RFC 7644, section 3.5.2).
 fn apply(resource: &mut Map<String, Value>, operation: &Operation) -> Done<()> {
     let value = operation.value.as_ref();
     match &operation.path {
         Some(steps) => at(resource, operation.op, steps, value),
-        // Without a path the value's attributes are the targets: a URN names an extension's
-        // attributes, anything else is a path.
         None => {
             let Some(Value::Object(attributes)) = value else {
                 return Ok(());
@@ -537,7 +465,6 @@ fn apply(resource: &mut Map<String, Value>, operation: &Operation) -> Done<()> {
     }
 }
 
-/// `op` with `value` at `steps` under `target`.
 fn at(target: &mut Map<String, Value>, op: Op, steps: &[Step], value: Option<&Value>) -> Done<()> {
     let invalid = || bad("invalidPath", "the attribute path is not supported");
     let no_target = || bad("noTarget", "the filter matches no value");
@@ -592,7 +519,6 @@ fn at(target: &mut Map<String, Value>, op: Op, steps: &[Step], value: Option<&Va
     match (found, op) {
         (true, _) | (false, Op::Remove) => Ok(()),
         (false, Op::Replace) => Err(no_target()),
-        // An `add` through a filter that matches nothing adds the value it describes.
         (false, Op::Add) => {
             let mut element = Map::new();
             element.insert(filter.0.clone(), filter.1.clone());
@@ -607,10 +533,6 @@ fn at(target: &mut Map<String, Value>, op: Op, steps: &[Step], value: Option<&Va
     }
 }
 
-/// `op` with `value` on the attribute `key` of `target`: an `add` appends to a multi-valued
-/// attribute (skipping values already there) and merges into a complex one; a `replace` merges
-/// into a complex one and sets anything else; a `remove` with a list removes those values from a
-/// multi-valued attribute, and otherwise the attribute.
 fn leaf(target: &mut Map<String, Value>, key: String, op: Op, value: Option<&Value>) {
     match (op, target.get_mut(&key), value) {
         (Op::Remove, Some(Value::Array(values)), Some(Value::Array(removed))) => {
@@ -642,7 +564,6 @@ fn leaf(target: &mut Map<String, Value>, key: String, op: Op, value: Option<&Val
     }
 }
 
-/// The decoded parameters of a query, form-encoded (`+` a space).
 fn parameters(query: Option<&str>) -> Vec<(String, String)> {
     let decode = |s: &str| {
         let spaced = s.replace('+', " ");
@@ -659,8 +580,6 @@ fn parameters(query: Option<&str>) -> Vec<(String, String)> {
         .collect()
 }
 
-/// A list's `filter`: `<attribute> eq "<value>"`, the attribute one `kind` supports (names
-/// ignoring case); the SQL condition on `$1` and the value. Anything else is `invalidFilter`.
 fn filter(kind: Kind, text: &str) -> Done<(&'static str, String)> {
     let invalid = || bad("invalidFilter", "the filter is not supported");
     let mut parts = text.trim().splitn(3, ' ');
@@ -682,7 +601,6 @@ fn filter(kind: Kind, text: &str) -> Done<(&'static str, String)> {
     Ok((condition, value))
 }
 
-/// A connection to the directory's schema, with `{s}` in a statement standing for it.
 struct Db {
     opened: Opened,
     schema: String,
@@ -701,8 +619,6 @@ impl Db {
         done.map_err(|e| self.failed(e))
     }
 
-    /// A statement's error: a value Postgres cannot store (SQLSTATE class 22, as a NUL in a
-    /// string) is the provider's `invalidValue`; anything else is Postgres unavailable.
     fn failed(&self, e: tokio_postgres::Error) -> Fail {
         match e.code().is_some_and(|code| code.code().starts_with("22")) {
             true => bad("invalidValue", "a value cannot be stored"),
@@ -710,14 +626,12 @@ impl Db {
         }
     }
 
-    /// The resource `id` of `kind`, if stored and sound.
     async fn load(&self, kind: Kind, id: &str) -> Done<Option<Stored>> {
         let sql = format!("SELECT {COLUMNS} FROM {{s}}.{} WHERE id = $1", kind.table());
         let rows = self.query(&sql, &[&id]).await?;
         Ok(rows.first().and_then(Stored::of))
     }
 
-    /// The members of each group of `ids`, by group, sorted.
     async fn members(&self, ids: &[String]) -> Done<Vec<(String, String)>> {
         let sql = "SELECT group_id, user_id FROM {s}.directory_members WHERE group_id = ANY($1) \
                    ORDER BY user_id";
@@ -729,7 +643,6 @@ impl Db {
         Ok(pairs.collect())
     }
 
-    /// Records the write's time in the directory's state (#335) and commits.
     async fn commit(&self) -> Done<()> {
         let state = "UPDATE {s}.directory_state SET last_write = now()";
         self.execute(state, &[]).await?;
@@ -753,8 +666,6 @@ impl Scim {
         }
     }
 
-    /// Whether `authorization`, a request's header, is `Bearer <the SCIM token>`, compared in
-    /// constant time.
     pub fn admits(&self, authorization: Option<&str>) -> bool {
         let presented = authorization.and_then(|a| {
             let (scheme, token) = a.split_once(' ')?;
@@ -763,17 +674,10 @@ impl Scim {
         blake3::hash(presented.unwrap_or("").as_bytes()) == self.token
     }
 
-    /// How long a request's database work may take, all told: a connection, the version check
-    /// and `STATEMENTS` of its own.
     pub fn bound(&self) -> std::time::Duration {
         self.postgres.bound(STATEMENTS)
     }
 
-    /// The answer to an admitted request: `method` on `path` (under `/scim/v2`) with `query`
-    /// and `body`, at most `SCIM_BODY_MAX` bytes, within `bound`. A request still running then is
-    /// a 503 like an unreachable Postgres, and its client is dropped: the connection closes once
-    /// Postgres answers the statement it stalled on (tokio-postgres waits for a pending
-    /// response), so Postgres rolls the transaction back and the directory's lock is released.
     pub async fn answer(
         &self,
         method: &Method,
@@ -851,7 +755,6 @@ impl Scim {
         format!("{}/{}/{id}", self.base, kind.name())
     }
 
-    /// A connection whose schema holds this binary's version.
     async fn connect(&self) -> Done<Db> {
         let opened = crate::postgres::connected(&self.postgres).await;
         let opened = opened.map_err(|reason| unavailable(&reason))?;
@@ -859,8 +762,6 @@ impl Scim {
         Ok(Db { opened, schema })
     }
 
-    /// `connect`, in a transaction holding the directory's advisory lock until it ends: a
-    /// connection dropped without `commit` rolls it back.
     async fn begin(&self) -> Done<Db> {
         let db = self.connect().await?;
         // ponytail: one lock for every directory write, so they run one at a time; per-resource
@@ -873,7 +774,6 @@ impl Scim {
         Ok(db)
     }
 
-    /// The answer's document of `stored`, a `kind`, with `members` for a group that shows them.
     fn document(&self, kind: Kind, stored: &Stored, members: Option<&[String]>) -> Value {
         let mut document = stored.resource.clone();
         if get(&document, "schemas").is_none() {
@@ -894,8 +794,6 @@ impl Scim {
         Value::Object(document)
     }
 
-    /// `GET /<kind>`: the resources `filter` selects (all without it), from `startIndex` (1 by
-    /// default) at most `count` (`SCIM_PAGE_MAX` by default and at most).
     async fn list(&self, kind: Kind, query: Option<&str>) -> Done<Reply> {
         let (mut selected, mut start, mut count, mut members) = (None, 1, SCIM_PAGE_MAX, true);
         for (name, value) in parameters(query) {
@@ -953,7 +851,6 @@ impl Scim {
         ))
     }
 
-    /// `GET /<kind>/<id>`.
     async fn get(&self, kind: Kind, id: &str, query: Option<&str>) -> Done<Reply> {
         let db = self.connect().await?;
         let stored = db.load(kind, id).await?.ok_or_else(not_found)?;
@@ -972,7 +869,6 @@ impl Scim {
         Ok(held.into_iter().map(|(_, user)| user).collect())
     }
 
-    /// `POST /<kind>`: 201 with the resource and its location.
     async fn create(
         &self,
         kind: Kind,
@@ -991,7 +887,6 @@ impl Scim {
         Ok(reply)
     }
 
-    /// `PUT /<kind>/<id>`: the whole resource replaced, 200 with it.
     async fn replace(
         &self,
         kind: Kind,
@@ -1011,8 +906,6 @@ impl Scim {
         Ok(Reply::ok(StatusCode::OK, Some(document)))
     }
 
-    /// `PATCH /<kind>/<id>`: every operation applied in order, then stored as one write; one that
-    /// fails writes nothing. A user answers 200 with itself, a group 204.
     async fn patch(
         &self,
         kind: Kind,
@@ -1045,7 +938,6 @@ impl Scim {
         })
     }
 
-    /// `DELETE /<kind>/<id>`: 204. A user leaves every group and a revocation marker.
     async fn delete(&self, kind: Kind, id: &str, named: &mut Option<String>) -> Done<Reply> {
         let db = self.begin().await?;
         if kind == Kind::Users {
@@ -1079,11 +971,6 @@ impl Scim {
         Ok(Reply::ok(StatusCode::NO_CONTENT, None))
     }
 
-    /// Stores `candidate` as `id` (a new resource without one) inside `begin`'s transaction:
-    /// `uniqueness` for a `userName` (ignoring case) or `externalId` another user holds, or a
-    /// `group_attribute` another group holds; `invalidValue` for a member naming no stored user.
-    /// An active user clears the revocation markers its `user_attribute` matches. Returns the
-    /// stored resource and, for a group, its members.
     async fn store(
         &self,
         db: &Db,
@@ -1213,8 +1100,6 @@ impl Scim {
         Ok((stored, members))
     }
 
-    /// `/ServiceProviderConfig`: `patch` and `filter` (up to `SCIM_PAGE_MAX` results) supported;
-    /// `bulk`, `sort`, `etag` and `changePassword` not; the bearer token scheme.
     fn provider_config(&self) -> Reply {
         Reply::ok(
             StatusCode::OK,
@@ -1240,7 +1125,6 @@ impl Scim {
         )
     }
 
-    /// `/ResourceTypes`: `User` and `Group`, with no extension.
     fn resource_types(&self) -> Reply {
         let of = |kind: Kind| {
             let name = kind.resource_type();
@@ -1263,12 +1147,10 @@ impl Scim {
     }
 }
 
-/// Whether an `excludedAttributes` value names `members`.
 fn excludes_members(value: &str) -> bool {
     (value.split(',')).any(|name| name.trim().eq_ignore_ascii_case("members"))
 }
 
-/// A list response of `resources`, all of them.
 fn listed(resources: Vec<Value>) -> Value {
     json!({
         "schemas": [LIST],
@@ -1279,8 +1161,6 @@ fn listed(resources: Vec<Value>) -> Value {
     })
 }
 
-/// `/Schemas`: the attributes Meada reads of a user and a group, as it compares them: only
-/// `userName` ignoring case, and a group's `group_attribute` unique.
 fn schemas(group_attribute: &str) -> Reply {
     let attribute = |name: &str, unique: bool| {
         json!({
@@ -1421,7 +1301,6 @@ mod tests {
             done.ok().unwrap(),
             json!({"displayName": "g", "members": [{"value": "1"}]})
         );
-        // A replace through a filter that matches nothing has no target; a remove needs a path.
         for (operations, kind) in [
             (
                 json!([{"op": "replace", "path": "emails[type eq \"x\"].value", "value": "v"}]),

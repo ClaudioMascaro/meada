@@ -1,10 +1,3 @@
-//! The generation pointer and pins (ADR 0012, spec #259, feature `generation-pointer`):
-//! `meada snapshot publish` records the current and retained generations in the local Valkey
-//! `MEADA_TEST_VALKEY_URL` names, `meada snapshot pull` mirrors them from the local
-//! S3-compatible server `MEADA_TEST_S3_ENDPOINT` names, and two servers serve
-//! `/<identity>@<generation>` from a held generation while `/<identity>` serves the current one.
-//! Without either variable these tests print why and skip; with `MEADA_TEST_SERVICES_REQUIRED=1`
-//! they fail.
 #![cfg(feature = "generation-pointer")]
 
 use std::fs;
@@ -21,7 +14,6 @@ use crate::snapshot::{
 
 const WEB: &str = "example.com/chain/web";
 
-/// The local Valkey, or `None` with the reason printed.
 pub(crate) fn valkey_service() -> Option<String> {
     let url = std::env::var("MEADA_TEST_VALKEY_URL").ok();
     if url.is_none() {
@@ -32,7 +24,6 @@ pub(crate) fn valkey_service() -> Option<String> {
     url
 }
 
-/// The `[valkey]` and `[generations]` sections of a case: its own key prefix.
 fn sections(valkey: &str, case: &str, keep: u64) -> String {
     format!(
         "\n[valkey]\nurl = \"{valkey}\"\nkey_prefix = \"{}\"\n\n[generations]\nkeep = {keep}\n",
@@ -44,12 +35,10 @@ pub(crate) fn prefix(case: &str) -> String {
     format!("meada:test-{}-{case}", std::process::id())
 }
 
-/// A connection to the local Valkey, as the tests see it.
 pub(crate) fn admin(url: &str) -> redis::Connection {
     redis::Client::open(url).unwrap().get_connection().unwrap()
 }
 
-/// What Valkey holds for `case`: the pointer hash and the retained list.
 pub(crate) fn pointer(valkey: &mut redis::Connection, case: &str) -> (Vec<String>, Vec<String>) {
     let prefix = prefix(case);
     let hash: Vec<String> = redis::cmd("HMGET")
@@ -67,7 +56,6 @@ pub(crate) fn pointer(valkey: &mut redis::Connection, case: &str) -> (Vec<String
     (hash, list)
 }
 
-/// A store, a Valkey and the chain's manifest with `[generations]`, indexed.
 pub(crate) struct Fleet {
     pub(crate) endpoint: String,
     pub(crate) bucket: String,
@@ -95,7 +83,6 @@ impl Fleet {
         })
     }
 
-    /// A node of this fleet, with its own `[valkey]` and `[generations]`.
     pub(crate) fn node(&self, name: &str) -> (String, PathBuf) {
         let (manifest, local) = named_node(&self.dir, name, &self.endpoint, &self.bucket);
         let file = self.dir.join(&manifest);
@@ -105,14 +92,12 @@ impl Fleet {
         (manifest, local)
     }
 
-    /// `meada snapshot publish`: the generation id.
     pub(crate) fn publish(&self) -> String {
         let (stdout, stderr, code) = publish(&self.dir, MANIFEST);
         assert_eq!(code, Some(0), "{stderr}");
         stdout.trim().to_string()
     }
 
-    /// `meada snapshot pull` on `node`: the id it printed.
     pub(crate) fn pull(&self, node: &str) -> String {
         let (stdout, stderr, code) = pull(&self.dir, node, &[]);
         assert_eq!(code, Some(0), "{stderr}");
@@ -120,7 +105,6 @@ impl Fleet {
     }
 }
 
-/// The generation ids `local` holds, sorted.
 fn held(local: &Path) -> Vec<String> {
     let mut ids: Vec<String> = (fs::read_dir(local).unwrap())
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
@@ -136,7 +120,6 @@ pub(crate) fn sorted(ids: &[&str]) -> Vec<String> {
     ids
 }
 
-/// An HTTP agent that reads 4xx and 5xx answers instead of failing on them.
 fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
         .http_status_as_error(false)
@@ -144,18 +127,15 @@ fn agent() -> ureq::Agent {
         .new_agent()
 }
 
-/// The `Meada-Generation` header of a response.
 fn generation(response: &ureq::http::Response<ureq::Body>) -> Option<String> {
     let value = response.headers().get("meada-generation")?;
     Some(value.to_str().unwrap().to_string())
 }
 
-/// `GET url`: status, `Content-Type`, `Meada-Generation` and body.
 pub(crate) fn get(url: &str) -> (u16, String, Option<String>, String) {
     get_with(url, &[])
 }
 
-/// `get` with more `headers`.
 fn get_with(url: &str, headers: &[(&str, &str)]) -> (u16, String, Option<String>, String) {
     let mut request = agent().get(url);
     for (name, value) in headers {
@@ -171,7 +151,6 @@ fn get_with(url: &str, headers: &[(&str, &str)]) -> (u16, String, Option<String>
     (response.status().as_u16(), kind, named, body)
 }
 
-/// A `trace` from `dashboard` POSTed alone to `url`: status, `Meada-Generation` and the body.
 fn post_trace(url: &str) -> (u16, Option<String>, serde_json::Value) {
     let message = serde_json::json!({
         "jsonrpc": "2.0", "id": 1, "method": "tools/call",
@@ -192,15 +171,11 @@ fn post_trace(url: &str) -> (u16, Option<String>, serde_json::Value) {
     )
 }
 
-/// The `_meta` generation of a tool result.
 pub(crate) fn meta(result: &rmcp::model::CallToolResult) -> Option<String> {
     let meta = result.meta.as_ref()?;
     Some(meta.get("meada/generation")?.as_str()?.to_string())
 }
 
-/// What `server` answers at `/WEB@<pin>` and at `/WEB`: a pinned `trace` equals the chain's
-/// golden for `pin`, and `/WEB` answers from `current`, each naming its generation in the
-/// header and in `_meta`; the tool list on the pinned URL stays within its budget.
 fn answers(server: &Server, pin: &str, current: &str) {
     block_on(async {
         let client = server.client(&format!("/{WEB}@{pin}")).await;
@@ -225,7 +200,6 @@ fn answers(server: &Server, pin: &str, current: &str) {
         let new = client.call_tool(call("search", second)).await.unwrap();
         assert!(text(&new).contains("src/status.ts"), "{}", text(&new));
         assert_eq!(meta(&new).as_deref(), Some(current));
-        // A tool error names its generation too.
         let uncommitted = serde_json::json!({"changes": "uncommitted"});
         let refused = client.call_tool(call("trace", uncommitted)).await.unwrap();
         assert_eq!(refused.is_error, Some(true));
@@ -251,8 +225,6 @@ fn answers(server: &Server, pin: &str, current: &str) {
             assert_eq!(json["result"]["content"][0]["text"], golden.as_str());
         }
     }
-    // `/` still lists the identities, naming the current generation; an identity a held pin
-    // does not record lists that generation's.
     let (status, _, named, body) = get(&server.url);
     assert_eq!((status, named.as_deref()), (404, Some(current)));
     assert!(body.starts_with(&format!("{WEB}\n")), "{body}");
@@ -261,9 +233,6 @@ fn answers(server: &Server, pin: &str, current: &str) {
     assert!(body.starts_with(&format!("{WEB}\n")), "{body}");
 }
 
-/// Publish G1, pull, publish G2, pull: a pinned `trace` on G1 still answers G1's golden on both
-/// servers while `/<identity>` answers G2; after `keep` more publishes G1 is gone and its pin is
-/// the 404 naming it, the current generation and the held ones.
 #[test]
 fn a_pin_answers_its_generation_on_every_node_until_it_is_no_longer_retained() {
     let Some(fleet) = Fleet::new("generations_pins", 2) else {
@@ -271,7 +240,6 @@ fn a_pin_answers_its_generation_on_every_node_until_it_is_no_longer_retained() {
     };
     let mut valkey = admin(&fleet.valkey);
     let g1 = fleet.publish();
-    // The pointer is in Valkey, and the store has no `current`.
     assert_eq!(
         pointer(&mut valkey, fleet.case),
         (vec![g1.clone(), "0".into()], vec![format!("{g1}:0")])
@@ -297,14 +265,12 @@ fn a_pin_answers_its_generation_on_every_node_until_it_is_no_longer_retained() {
         pointer(&mut valkey, fleet.case),
         (vec![g2.clone(), "0".into()], list.clone())
     );
-    // A republish of the current generation leaves the list as it was: each id once.
     assert_eq!(fleet.publish(), g2);
     assert_eq!(pointer(&mut valkey, fleet.case).1, list);
     for (node, local) in &nodes {
         assert_eq!(fleet.pull(node), g2);
         assert_eq!(held(local), sorted(&[&g1, &g2]));
     }
-    // A node that joins now holds every retained generation.
     let (late, late_local) = fleet.node("late");
     assert_eq!(fleet.pull(&late), g2);
     assert_eq!(held(&late_local), sorted(&[&g1, &g2]));
@@ -339,8 +305,6 @@ fn a_pin_answers_its_generation_on_every_node_until_it_is_no_longer_retained() {
                 holds.join(" ")
             )
         );
-        // Without `[oidc]`, a browser's request (DNS rebinding) gets 403 before routing: no
-        // pin's ids, no listing.
         let origin = [("Origin", "http://evil.example")];
         for path in [format!("/{WEB}@{g1}"), format!("/{WEB}@{last}"), "/".into()] {
             let (status, _, _, body) = get_with(&format!("{}{path}", server.url), &origin);
@@ -353,7 +317,6 @@ fn a_pin_answers_its_generation_on_every_node_until_it_is_no_longer_retained() {
     }
 }
 
-/// `args` sent to Valkey as one command.
 pub(crate) fn send(valkey: &mut redis::Connection, args: &[&str]) {
     let mut command = redis::cmd(args[0]);
     for arg in &args[1..] {
@@ -362,9 +325,6 @@ pub(crate) fn send(valkey: &mut redis::Connection, args: &[&str]) {
     command.exec(valkey).unwrap();
 }
 
-/// A malformed pointer or list entry in Valkey stops the pull with an error naming the key, and
-/// the node stays as it was; so does a missing pointer or an empty list. The node's pointer file
-/// carries the fence read with the id.
 #[test]
 fn every_id_and_fence_read_from_valkey_is_checked_before_the_node_changes() {
     let Some(fleet) = Fleet::new("generations_hostile", 2) else {
@@ -382,7 +342,6 @@ fn every_id_and_fence_read_from_valkey_is_checked_before_the_node_changes() {
     let (bare, bad_fence) = (g1.clone(), format!("{g1}:x"));
     let pointer = "decimal fence";
     let entry = "<generation id>:<fence>";
-    // `keep` plus the kept maximum is 10: with G1's entry, 11.
     let many: Vec<String> = (0..10).map(|n| format!("{n:016x}:0")).collect();
     let many = many.iter().map(String::as_str);
     let too_long: Vec<&str> = ["RPUSH", r].into_iter().chain(many).collect();
@@ -452,7 +411,6 @@ fn every_id_and_fence_read_from_valkey_is_checked_before_the_node_changes() {
         assert!(contents(&local) == before, "{case}: the node changed");
     }
 
-    // The retained-list ceiling has the same refusal in the Brazilian Portuguese catalog.
     reset(&mut valkey);
     let many: Vec<String> = (0..10).map(|n| format!("{n:016x}:0")).collect();
     let mut append = vec!["RPUSH", r];
@@ -473,7 +431,6 @@ fn every_id_and_fence_read_from_valkey_is_checked_before_the_node_changes() {
     );
     assert!(contents(&local) == before);
 
-    // The fence read with the id reaches the pointer file.
     reset(&mut valkey);
     send(&mut valkey, &["HSET", c, "fence", "7"]);
     assert_eq!(fleet.pull(&node), g1);
@@ -481,7 +438,6 @@ fn every_id_and_fence_read_from_valkey_is_checked_before_the_node_changes() {
     assert_eq!(pointer, format!("{g1} 7\n"));
 }
 
-/// `[generations]` needs `[snapshot]` and `[valkey]`, and keeps at least two generations.
 #[test]
 fn generations_section_errors_name_the_file_the_line_and_the_sections() {
     let dir = chain_manifest("generations_section");
@@ -515,9 +471,6 @@ fn generations_section_errors_name_the_file_the_line_and_the_sections() {
     }
 }
 
-/// A retained generation that cannot be pulled (here its document is gone from the store) never
-/// blocks the current one: the pull swaps, warns naming it and exits 0, the node serves the
-/// current generation, the pin of the missing one is the 404, and the next pull tries again.
 #[test]
 fn a_retained_generation_that_fails_to_pull_does_not_block_the_current_one() {
     let Some(fleet) = Fleet::new("generations_broken", 2) else {
@@ -558,9 +511,6 @@ fn a_retained_generation_that_fails_to_pull_does_not_block_the_current_one() {
     assert!(body.starts_with(&missing), "{body}");
 }
 
-/// `meada status --generations` with `[generations]` reads the current id from Valkey and checks
-/// that the store holds its document; a dead Valkey or a dead store is named, and the exit code
-/// depends only on what the node holds.
 #[test]
 fn the_status_probe_reads_the_current_generation_from_valkey() {
     let Some(fleet) = Fleet::new("generations_status", 2) else {
@@ -602,10 +552,6 @@ fn the_status_probe_reads_the_current_generation_from_valkey() {
     }
 }
 
-/// `meada snapshot pointer set` (ADR 0014) under the refresh lock: G1 and G2 published, two
-/// nodes on G2; a generation outside the retained list and a malformed id are refused, then
-/// `set G1` gives the pointer a fence above G2's, both nodes swap back on their next pull and
-/// `/<identity>` answers G1's goldens, until the next publish moves the pointer past it.
 #[cfg(feature = "refresh-lock")]
 #[test]
 fn pointer_set_rolls_every_node_back_until_the_next_publish() {
@@ -629,7 +575,6 @@ fn pointer_set_rolls_every_node_back_until_the_next_publish() {
     let before = pointer(&mut valkey, fleet.case);
     assert_eq!(before.0, [g2.clone(), "2".into()]);
 
-    // Outside the retained list: refused naming it, after taking (and releasing) the lock.
     let retained = key(&fleet, "retained");
     let refused = format!(
         "meada: {retained}: generation 0000000000000000 is not retained: the pointer did not \
@@ -638,7 +583,6 @@ fn pointer_set_rolls_every_node_back_until_the_next_publish() {
     let (stdout, stderr, code) = set("0000000000000000");
     assert_eq!((code, stdout.as_str(), stderr), (Some(1), "", refused));
     assert_eq!(get(&fleet, "fence").as_deref(), Some("3"));
-    // Malformed: refused before the lock is taken, so the fence did not move either.
     for bad in [
         g1.to_uppercase(),
         "../../../../etc/".into(),
@@ -688,10 +632,6 @@ fn pointer_set_rolls_every_node_back_until_the_next_publish() {
     }
 }
 
-/// `meada snapshot pointer retain` and `drop` (ADR 0014): two nodes, `keep = 2`; G1 retained,
-/// then three more publishes: both nodes still hold G1 and `/<identity>@G1` answers its goldens,
-/// while G2, beyond `keep` and not kept, is gone. After `drop G1` the next pull deletes it and
-/// its pin is the 404 naming it, the current generation and the held ones.
 #[cfg(feature = "refresh-lock")]
 #[test]
 fn a_retained_generation_stays_on_every_node_until_it_is_dropped() {
@@ -719,7 +659,6 @@ fn a_retained_generation_stays_on_every_node_until_it_is_dropped() {
     assert_eq!(pointer_op("retain", &g1), printed(&g1));
     assert!(released(&fleet));
     assert_eq!(kept(), std::slice::from_ref(&g1));
-    // Already retained: only kept, its entry as it was.
     assert_eq!(pointer(&mut valkey, fleet.case).1, [format!("{g1}:1")]);
 
     let mut ids = vec![g1.clone()];
@@ -733,7 +672,6 @@ fn a_retained_generation_stays_on_every_node_until_it_is_dropped() {
     let [_, g2, g3, g4] = &ids[..] else {
         panic!("{ids:?}")
     };
-    // The fences: G1's publish 1, the retain 2, then 3, 4 and 5.
     let list = vec![format!("{g4}:5"), format!("{g3}:4"), format!("{g1}:1")];
     assert_eq!(pointer(&mut valkey, fleet.case).1, list);
     let servers: Vec<Server> = (nodes.iter()).map(|(node, _)| serve(dir, node)).collect();
@@ -763,8 +701,6 @@ fn a_retained_generation_stays_on_every_node_until_it_is_dropped() {
     }
 }
 
-/// `meada <args>` in `dir` under `lang`, with the store's key id: stdout, stderr and the exit
-/// code.
 pub(crate) fn meada_in(dir: &Path, lang: &str, args: &[&str]) -> (String, String, Option<i32>) {
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(dir)
@@ -778,7 +714,6 @@ pub(crate) fn meada_in(dir: &Path, lang: &str, args: &[&str]) -> (String, String
     (text(&out.stdout), text(&out.stderr), out.status.code())
 }
 
-/// `meada workspace <args> --workspace ops/meada.workspace.toml` in `dir`, in English.
 pub(crate) fn workspace(dir: &Path, args: &[&str]) -> (String, String, Option<i32>) {
     let args: Vec<&str> = (["workspace"].into_iter())
         .chain(args.iter().copied())
@@ -787,8 +722,6 @@ pub(crate) fn workspace(dir: &Path, args: &[&str]) -> (String, String, Option<i3
     meada_in(dir, "en_US.UTF-8", &args)
 }
 
-/// `meada workspace import <file> --message <message> --author <author>`: the id it printed and
-/// stderr.
 pub(crate) fn import(dir: &Path, file: &str, message: &str, author: &str) -> (String, String) {
     let args = ["import", file, "--message", message, "--author", author];
     let (stdout, stderr, code) = workspace(dir, &args);
@@ -796,17 +729,14 @@ pub(crate) fn import(dir: &Path, file: &str, message: &str, author: &str) -> (St
     (stdout.trim().to_string(), stderr)
 }
 
-/// The store key of the workspace version `id` in a fleet's store.
 pub(crate) fn version_key(id: &str) -> String {
     format!("prod/meada/workspaces/{id}.json")
 }
 
-/// `{<prefix>}:workspace` of `case`.
 pub(crate) fn workspace_pointer(case: &str) -> String {
     format!("{{{}}}:workspace", prefix(case))
 }
 
-/// Whether `text` is a time as a version records it.
 fn is_time(text: &str) -> bool {
     let shape = "dddd-dd-ddTdd:dd:ddZ";
     text.len() == shape.len()
@@ -816,10 +746,6 @@ fn is_time(text: &str) -> bool {
         })
 }
 
-/// `import` of the chain's manifest stores `workspaces/<id>.json` with every field and the
-/// metadata of every object, and prints the id; its other sections are named as not imported.
-/// The same entries again upload nothing and answer the first author and message; two entries
-/// swapped are another version.
 #[test]
 fn import_stores_a_version_once_and_answers_its_id() {
     let Some(fleet) = Fleet::new("workspace_import", 3) else {
@@ -893,7 +819,6 @@ fn import_stores_a_version_once_and_answers_its_id() {
     assert_eq!(objects(&s3, "prod/meada/workspaces").len(), 2);
 }
 
-/// A bootstrap manifest whose store and Valkey listen nowhere, in `<dir>/ops/`.
 fn unreachable_bootstrap(dir: &Path) {
     let dead = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = dead.local_addr().unwrap().port();
@@ -907,9 +832,6 @@ fn unreachable_bootstrap(dir: &Path) {
     fs::write(dir.join(MANIFEST), bootstrap).unwrap();
 }
 
-/// A file with a validation error: the error names the file, the line and the dotted key, its
-/// other sections are named as not imported, and nothing is uploaded: the store and Valkey the
-/// bootstrap manifest names listen nowhere, and no connection error comes.
 #[test]
 fn import_validates_before_any_connection() {
     let dir = chain_manifest("workspace_import_invalid");
@@ -928,7 +850,6 @@ fn import_validates_before_any_connection() {
          [[repository]] entries\n\
          meada: ops/invalid.toml:9: `repository.branch` is not a meada.workspace.toml key\n"
     );
-    // An `owner` that breaks a rule is refused alike, in both languages.
     let padded = "[[repository]]\nrepo = \"example.com/chain/web\"\npath = \"w\"\nowner = \" t\"\n";
     fs::write(dir.join("ops/invalid.toml"), padded).unwrap();
     for (lang, what) in [
@@ -955,15 +876,10 @@ fn import_validates_before_any_connection() {
     );
 }
 
-/// A file one byte past the version bound is refused before any connection: exit 1, the bound
-/// named, nothing on stdout (so no id), the store and Valkey the manifest names listening
-/// nowhere (#541).
 #[test]
 fn import_of_a_file_past_the_version_bound_is_refused() {
     let dir = chain_manifest("workspace_import_oversize");
     unreachable_bootstrap(&dir);
-    // `VERSION_MAX` (src/snapshot/versions.rs), 4 MiB, plus one byte: the integration tests
-    // cannot see the constant.
     fs::write(dir.join("ops/big.toml"), vec![b'#'; 4_194_304 + 1]).unwrap();
     let args = ["import", "ops/big.toml", "--message", "m"];
     let (stdout, stderr, code) = workspace(&dir, &args);
@@ -971,8 +887,6 @@ fn import_of_a_file_past_the_version_bound_is_refused() {
     assert!(stderr.contains("larger than 4194304 bytes"), "{stderr}");
 }
 
-/// `text`'s `[[repository]]` entries with `owners[n]`, when it is `Some`, as the `owner` right
-/// after the `path` of its n-th entry.
 pub(crate) fn owned(text: &str, owners: &[Option<&str>]) -> String {
     let mut owners = owners.iter();
     (text.lines())
@@ -985,8 +899,6 @@ pub(crate) fn owned(text: &str, owners: &[Option<&str>]) -> String {
         .collect()
 }
 
-/// `text`'s `[[repository]]` entries with `logins[n]`, when it is `Some`, as the `added_by` right
-/// after the `path` of its n-th entry (the key order of a source text is free).
 pub(crate) fn added(text: &str, logins: &[Option<&str>]) -> String {
     let mut logins = logins.iter();
     (text.lines())
@@ -999,11 +911,6 @@ pub(crate) fn added(text: &str, logins: &[Option<&str>]) -> String {
         .collect()
 }
 
-/// An entry's `owner` is imported, stored, shown and pulled like its other keys: the document
-/// holds it, `show` prints it right after `path` and importing that output gives the same id,
-/// and `pull` writes the document as stored. A stored document whose owner breaks a rule (empty,
-/// padded, with a control character, over 256 characters) is listed as malformed, refused by
-/// `show` and by `pull`, which leaves the index directory's workspace state as it was.
 #[test]
 fn an_owner_is_stored_shown_and_pulled_and_a_malformed_one_is_refused() {
     let Some(fleet) = Fleet::new("workspace_owner", 3) else {
@@ -1048,7 +955,6 @@ fn an_owner_is_stored_shown_and_pulled_and_a_malformed_one_is_refused() {
     assert_eq!(pulled, stored);
     let before = pulled_files(dir);
 
-    // Each forged document carries the id its entries derive, so only the owner check refuses it.
     let long = "g".repeat(257);
     let bad = ["", " team", "team ", "te\u{7}am", long.as_str()];
     let blocks = serde_json::json!({});
@@ -1093,11 +999,6 @@ fn an_owner_is_stored_shown_and_pulled_and_a_malformed_one_is_refused() {
     }
 }
 
-/// An entry's `added_by` (#330) is imported, stored, shown and pulled like `owner`: the document
-/// holds it, `show` prints it right after `owner` and importing that output gives the same id,
-/// and `pull` writes the document as stored. A stored document whose `added_by` breaks a rule is
-/// listed as malformed, refused by `show` and by `pull`, which leaves the index directory's
-/// workspace state as it was.
 #[test]
 fn an_added_by_is_stored_shown_and_pulled_and_a_malformed_one_is_refused() {
     let Some(fleet) = Fleet::new("workspace_added_by", 3) else {
@@ -1140,7 +1041,6 @@ fn an_added_by_is_stored_shown_and_pulled_and_a_malformed_one_is_refused() {
     assert_eq!(pulled, stored);
     let before = pulled_files(dir);
 
-    // Each forged document carries the id its entries derive, so only the check refuses it.
     let long = "a".repeat(40);
     let bad = ["", "Ana", "ana.souza", "ana souza", long.as_str()];
     let blocks = serde_json::json!({});
@@ -1186,9 +1086,6 @@ fn an_added_by_is_stored_shown_and_pulled_and_a_malformed_one_is_refused() {
     }
 }
 
-/// `list` shows the versions newest first, with no version current until
-/// `{<key_prefix>}:workspace` names one; a malformed pointer refuses the listing naming its key,
-/// and a corrupted or forged document is listed as malformed.
 #[test]
 fn list_marks_the_current_version_and_names_what_is_malformed() {
     let Some(fleet) = Fleet::new("workspace_list", 3) else {
@@ -1248,9 +1145,6 @@ fn list_marks_the_current_version_and_names_what_is_malformed() {
     );
 }
 
-/// `show <id>` prints the entries in the `[[repository]]` shape, blocks included, and importing
-/// that output gives the same id; with no current version `show` names `meada workspace apply`,
-/// and with one it prints that one. A malformed id is refused first.
 #[test]
 fn show_prints_the_entries_import_reads_back() {
     let Some(fleet) = Fleet::new("workspace_show", 3) else {
@@ -1307,10 +1201,6 @@ fn show_prints_the_entries_import_reads_back() {
     assert_eq!(current, shown);
 }
 
-/// With `[workspace] source = "store"` and no version pulled, `index`, `status`, `export` and
-/// `snapshot publish` refuse naming `meada workspace pull`, `mcp --listen` without
-/// `--generations` refuses naming `--generations`, and a node's `--generations` commands serve
-/// as before.
 #[test]
 fn a_store_source_without_a_pulled_version_is_refused_and_nodes_serve_as_before() {
     let Some(fleet) = Fleet::new("workspace_store_source", 3) else {
@@ -1371,10 +1261,6 @@ fn a_store_source_without_a_pulled_version_is_refused_and_nodes_serve_as_before(
     });
 }
 
-// The heartbeat (#298): each round of `meada snapshot pull --every` writes the node's state.
-
-/// `meada snapshot pull --every 1` on `manifest` in `dir`, a companion that is killed when
-/// dropped.
 pub(crate) struct Companion(std::process::Child);
 
 impl Companion {
@@ -1386,7 +1272,6 @@ impl Companion {
         Self(command.spawn().expect("meada runs"))
     }
 
-    /// Kills it: what it wrote on stdout and on stderr.
     pub(crate) fn stop(mut self) -> (String, String) {
         use std::io::Read;
         let _ = self.0.kill();
@@ -1405,17 +1290,14 @@ impl Drop for Companion {
     }
 }
 
-/// The key of node `name` in `case`'s prefix.
 fn node_key(case: &str, name: &str) -> String {
     format!("{{{}}}:node:{name}", prefix(case))
 }
 
-/// The node set of `case`, `{<key_prefix>}:nodes`.
 fn nodes_key(case: &str) -> String {
     format!("{{{}}}:nodes", prefix(case))
 }
 
-/// The heartbeat document of node `name`, `None` while there is none.
 fn beat(valkey: &mut redis::Connection, case: &str, name: &str) -> Option<serde_json::Value> {
     let text: Option<String> = redis::cmd("GET")
         .arg(node_key(case, name))
@@ -1424,7 +1306,6 @@ fn beat(valkey: &mut redis::Connection, case: &str, name: &str) -> Option<serde_
     text.map(|t| serde_json::from_str(&t).unwrap())
 }
 
-/// The first heartbeat of `name` that `wanted` accepts, polled every 20 ms for 30 s.
 fn wait_beat(
     valkey: &mut redis::Connection,
     case: &str,
@@ -1440,7 +1321,6 @@ fn wait_beat(
     panic!("no heartbeat of {name} that was wanted");
 }
 
-/// Sets `[snapshot] node_name` of the node at `manifest` (relative to the fleet's directory).
 fn name_node(fleet: &Fleet, manifest: &str, name: &str) {
     let file = fleet.dir.join(manifest);
     let toml = fs::read_to_string(&file).unwrap();
@@ -1449,13 +1329,11 @@ fn name_node(fleet: &Fleet, manifest: &str, name: &str) {
     fs::write(&file, toml).unwrap();
 }
 
-/// Valkey's clock in Unix seconds.
 fn server_time(valkey: &mut redis::Connection) -> u64 {
     let (seconds, _): (u64, u64) = redis::cmd("TIME").query(valkey).unwrap();
     seconds
 }
 
-/// Whether `time` is an RFC 3339 UTC instant to the second.
 fn is_rfc3339_utc(time: &str) -> bool {
     let shape = b"dddd-dd-ddTdd:dd:ddZ";
     time.len() == shape.len()
@@ -1465,10 +1343,6 @@ fn is_rfc3339_utc(time: &str) -> bool {
         })
 }
 
-/// A round writes `{<key_prefix>}:node:<name>` with the node pointer file, the held
-/// directories, the readiness `status --generations` reports and the binary's version; the name
-/// is in `{<key_prefix>}:nodes` scored by the key's expiry in Unix seconds; the TTL is three
-/// periods. A round that swaps writes the new generation and its fence.
 #[test]
 fn every_round_of_pull_every_writes_the_nodes_heartbeat() {
     let Some(fleet) = Fleet::new("heartbeat_fields", 3) else {
@@ -1482,7 +1356,6 @@ fn every_round_of_pull_every_writes_the_nodes_heartbeat() {
 
     let companion = Companion::start(&fleet.dir, &node, &[]);
     let first = wait_beat(&mut valkey, fleet.case, name, |_| true);
-    // Right after the write: the TTL is three periods, and the score is the expiry.
     let ttl: i64 = (redis::cmd("PTTL"))
         .arg(node_key(fleet.case, name))
         .query(&mut valkey)
@@ -1530,7 +1403,6 @@ fn every_round_of_pull_every_writes_the_nodes_heartbeat() {
     assert_eq!(first["held"], serde_json::json!([g1]));
     assert_eq!(first["version"], env!("CARGO_PKG_VERSION"));
     assert!(is_rfc3339_utc(first["time"].as_str().unwrap()), "{first}");
-    // The readiness is the one `status --generations` exits on.
     let (_, stderr, code) = probe(&fleet.dir, &node);
     assert_eq!(
         (code, first["ready"].as_bool()),
@@ -1539,7 +1411,6 @@ fn every_round_of_pull_every_writes_the_nodes_heartbeat() {
     );
     companion.stop();
 
-    // A swap writes the new generation and fence: the pointer gets fence 5.
     next_commit(&fleet.dir, "chain-web", "second");
     let g2 = fleet.publish();
     let prefix = prefix(fleet.case);
@@ -1568,8 +1439,6 @@ fn every_round_of_pull_every_writes_the_nodes_heartbeat() {
     );
 }
 
-/// Once the companion stops the key expires; the next heartbeat another node writes removes the
-/// stale name from the node set.
 #[test]
 fn a_stopped_node_expires_and_the_next_heartbeat_removes_its_name() {
     let Some(fleet) = Fleet::new("heartbeat_expiry", 3) else {
@@ -1595,7 +1464,6 @@ fn a_stopped_node_expires_and_the_next_heartbeat_removes_its_name() {
         beat(&mut valkey, fleet.case, "node-one").is_none(),
         "expired"
     );
-    // The name outlives the key until another heartbeat cleans the set.
     let members = |valkey: &mut redis::Connection| -> Vec<String> {
         let mut members: Vec<String> = redis::cmd("ZRANGE")
             .arg(nodes_key(fleet.case))
@@ -1614,8 +1482,6 @@ fn a_stopped_node_expires_and_the_next_heartbeat_removes_its_name() {
     assert_eq!(members(&mut valkey), ["node-two"]);
 }
 
-/// A round that fails (a malformed pointer in Valkey) still writes the heartbeat of the node's
-/// unchanged state.
 #[test]
 fn a_failed_round_still_writes_the_heartbeat() {
     let Some(fleet) = Fleet::new("heartbeat_failed", 3) else {
@@ -1635,7 +1501,6 @@ fn a_failed_round_still_writes_the_heartbeat() {
         .exec(&mut valkey)
         .unwrap();
     let companion = Companion::start(&fleet.dir, &node, &[]);
-    // Rounds have failed for a while when the key is deleted and written again.
     std::thread::sleep(std::time::Duration::from_millis(2_500));
     redis::cmd("DEL")
         .arg(node_key(fleet.case, "node-one"))
@@ -1658,8 +1523,6 @@ fn a_failed_round_still_writes_the_heartbeat() {
     );
 }
 
-/// A single `pull` writes no heartbeat, and with `[valkey]` but no `[generations]` a `pull
-/// --every` writes none either.
 #[test]
 fn only_pull_every_with_generations_writes_a_heartbeat() {
     let Some(fleet) = Fleet::new("heartbeat_none", 3) else {
@@ -1677,7 +1540,6 @@ fn only_pull_every_with_generations_writes_a_heartbeat() {
     };
     assert_eq!(written(&mut valkey), Vec::<String>::new());
 
-    // A store without Valkey's pointer, and a node with `[valkey]` only.
     let case = "heartbeat_plain";
     let name = bucket_name(case);
     bucket(&fleet.endpoint, &name);
@@ -1700,15 +1562,12 @@ fn only_pull_every_with_generations_writes_a_heartbeat() {
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
-    // Two more rounds.
     std::thread::sleep(std::time::Duration::from_millis(2_500));
     let (stdout, stderr) = companion.stop();
     assert_eq!((stdout.trim(), stderr.as_str()), (id.trim(), ""));
     assert_eq!(written(&mut valkey), Vec::<String>::new());
 }
 
-/// With Valkey unreachable each round prints one warning naming the heartbeat and no password;
-/// the pointer file, stdout and `status --generations`' exit code are what they were.
 #[test]
 fn an_unreachable_valkey_costs_one_warning_per_round_and_nothing_else() {
     let Some(fleet) = Fleet::new("heartbeat_outage", 3) else {
@@ -1739,8 +1598,6 @@ fn an_unreachable_valkey_costs_one_warning_per_round_and_nothing_else() {
     std::thread::sleep(std::time::Duration::from_millis(3_500));
     let (stdout, stderr) = companion.stop();
     assert_eq!(stdout, "");
-    // Each round also fails to read the pointer from the same Valkey: its error is the
-    // pull's, and the heartbeat's is one line of its own.
     let beats: Vec<&str> = (stderr.lines())
         .filter(|l| l.starts_with("meada: heartbeat not written to "))
         .collect();
@@ -1756,7 +1613,6 @@ fn an_unreachable_valkey_costs_one_warning_per_round_and_nothing_else() {
     assert_eq!(after, before);
 }
 
-/// Without `[snapshot] node_name` the heartbeat carries the host name in lowercase.
 #[test]
 fn the_host_name_in_lowercase_names_a_node_by_default() {
     let Some(fleet) = Fleet::new("heartbeat_host", 3) else {
@@ -1778,14 +1634,8 @@ fn the_host_name_in_lowercase_names_a_node_by_default() {
     assert_eq!(beat["name"], host.as_str());
 }
 
-// Workspace versions on the machine (#302): `meada workspace pull` and the commands that read
-// the pulled version.
-
-/// The bootstrap manifest the store-source tests write beside the fleet's.
 const BOOTSTRAP: &str = "ops/bootstrap.toml";
 
-/// `ops/bootstrap.toml` in `dir`: the fleet manifest's sections, `[workspace] source = "store"`
-/// and `index_dir`, emptied of what a previous run left.
 fn store_bootstrap(dir: &Path, index_dir: &str) {
     let _ = fs::remove_dir_all(dir.join("ops").join(index_dir));
     let manifest = fs::read_to_string(dir.join(MANIFEST)).unwrap();
@@ -1795,14 +1645,11 @@ fn store_bootstrap(dir: &Path, index_dir: &str) {
     fs::write(dir.join(BOOTSTRAP), bootstrap).unwrap();
 }
 
-/// `meada <args> --workspace ops/bootstrap.toml` in `dir`, in English.
 fn on_bootstrap(dir: &Path, args: &[&str]) -> (String, String, Option<i32>) {
     let args = [args, &["--workspace", BOOTSTRAP]].concat();
     meada_in(dir, "en_US.UTF-8", &args)
 }
 
-/// Every file in `<dir>/indexes/workspace/` with its bytes, sorted by name; none when the
-/// directory does not exist.
 fn pulled_files(dir: &Path) -> Vec<(String, Vec<u8>)> {
     let Ok(read) = fs::read_dir(dir.join("indexes/workspace")) else {
         return Vec::new();
@@ -1818,10 +1665,6 @@ fn pulled_files(dir: &Path) -> Vec<(String, Vec<u8>)> {
     files
 }
 
-/// `meada workspace pull` refuses with no current version; then it writes the document as
-/// stored and the current file, says a second run is current and changes nothing, swaps after
-/// the pointer moves, keeps only the current version and the one it replaced, and refuses a
-/// pointer whose fence is not above the current file's, naming both and changing nothing.
 #[test]
 fn workspace_pull_swaps_the_current_file_and_never_lowers_its_fence() {
     let Some(fleet) = Fleet::new("workspace_pull", 3) else {
@@ -1910,10 +1753,6 @@ fn workspace_pull_swaps_the_current_file_and_never_lowers_its_fence() {
     }
 }
 
-/// Everything `meada workspace pull` reads is hostile: a malformed pointer id or fence, a
-/// document of another id, one whose id does not derive from its entries, an oversized one and
-/// one with invalid entries are each refused naming the key, leaving `<index_dir>/workspace/`
-/// as it was.
 #[test]
 fn workspace_pull_refuses_hostile_input_and_changes_nothing() {
     let Some(fleet) = Fleet::new("workspace_pull_hostile", 3) else {
@@ -1984,15 +1823,11 @@ fn workspace_pull_refuses_hostile_input_and_changes_nothing() {
     }
 }
 
-/// The chain's entries, three of them owned and three attributed, as a workspace version pulled into `dir`
-/// (`<index_dir>/workspace/`), as `meada workspace pull` leaves it at fence 1.
 fn write_pulled(dir: &Path) {
     let blocks = serde_json::json!({});
     let entries: Vec<(&str, String)> = (crate::manifest::CHAIN.iter())
         .map(|(repo, path)| (*repo, format!("../{path}")))
         .collect();
-    // The owners and logins the version holds: the pulled version is read with them and ignores
-    // them.
     let owners = [
         Some("team-web"),
         None,
@@ -2027,9 +1862,6 @@ fn write_pulled(dir: &Path) {
     fs::write(dir.join("current"), format!("{id} 1\n")).unwrap();
 }
 
-/// `meada index --workspace` over a pulled version, its `[snapshot]` and `[valkey]` ports held
-/// by this test, indexes the chain and opens no connection; `export` then gives the chain's
-/// export goldens, still with no connection.
 #[test]
 fn index_over_a_pulled_version_opens_no_connection() {
     let store = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -2060,12 +1892,6 @@ fn index_over_a_pulled_version_opens_no_connection() {
     }
 }
 
-/// The job's commands over a stored, applied and pulled version of the chain: `index` then
-/// `export` give the export goldens and `status` the same report as the same entries in a file;
-/// `publish` records the version in the generation document with the ids a file's publish
-/// gives, a stored document is never rewritten (not by a file's publish, nor after another
-/// version), a file's publish records none, and a node pulls and serves a generation that
-/// records one but refuses one whose field is not a version id.
 #[test]
 fn the_job_s_commands_read_the_pulled_version_and_publish_records_it() {
     let Some(fleet) = Fleet::new("workspace_job", 3) else {
@@ -2075,7 +1901,6 @@ fn the_job_s_commands_read_the_pulled_version_and_publish_records_it() {
     let key = workspace_pointer(fleet.case);
     let mut valkey = admin(&fleet.valkey);
     store_bootstrap(dir, "../store-indexes");
-    // The version holds owners; the job's commands give what the same entries give without.
     let text = fs::read_to_string(dir.join(MANIFEST)).unwrap();
     let owners = [
         Some("team-web"),
@@ -2119,7 +1944,6 @@ fn the_job_s_commands_read_the_pulled_version_and_publish_records_it() {
     let first = document(&g1);
     assert_eq!(field(&first), Some(v1.clone().into()));
 
-    // A node pulls and serves it; a fresh one refuses it once its field is no version id.
     let (node, _) = fleet.node("node");
     assert_eq!(fleet.pull(&node), g1);
     let (stdout, stderr, code) = probe(dir, &node);
@@ -2141,10 +1965,8 @@ fn the_job_s_commands_read_the_pulled_version_and_publish_records_it() {
     );
     crate::snapshot::put_stored(&s3, &generation_key(&g1), &first);
 
-    // The same bundles from the file: the same generation, its document as first stored.
     assert_eq!(fleet.publish(), g1);
     assert_eq!(document(&g1), first);
-    // Another version of the same entries (reversed): the same generation, still unchanged.
     let reversed: String = (crate::manifest::CHAIN.iter().rev())
         .map(|(repo, path)| format!("[[repository]]\nrepo = \"{repo}\"\npath = \"../{path}\"\n"))
         .collect();
@@ -2156,8 +1978,6 @@ fn the_job_s_commands_read_the_pulled_version_and_publish_records_it() {
     let (g, stderr, code) = on_bootstrap(dir, &["snapshot", "publish"]);
     assert_eq!((g.trim(), code), (g1.as_str(), Some(0)), "{stderr}");
     assert_eq!(document(&g1), first);
-    // The same entries with owners changed, cleared and set: no new generation, the stored
-    // document unchanged and still naming the version that first produced it.
     let other = [None, Some("team-b"), Some("team-c"), Some("team-web")];
     fs::write(dir.join("ops/reowned.toml"), owned(&text, &other)).unwrap();
     let (v3, _) = import(dir, "ops/reowned.toml", "reowned", "carol");
@@ -2168,8 +1988,6 @@ fn the_job_s_commands_read_the_pulled_version_and_publish_records_it() {
     assert_eq!((g.trim(), code), (g1.as_str(), Some(0)), "{stderr}");
     assert_eq!(document(&g1), first);
     assert_eq!(field(&document(&g1)), Some(v1.clone().into()));
-    // The same entries with only `added_by` changed, cleared and set: no new generation either,
-    // the stored document unchanged and still naming the version that first produced it.
     let relogged = [None, Some("dani"), Some("bia_acme"), Some("ana-souza")];
     let relogged = added(&owned(&text, &owners), &relogged);
     fs::write(dir.join("ops/relogged.toml"), relogged).unwrap();
@@ -2181,7 +1999,6 @@ fn the_job_s_commands_read_the_pulled_version_and_publish_records_it() {
     assert_eq!((g.trim(), code), (g1.as_str(), Some(0)), "{stderr}");
     assert_eq!(document(&g1), first);
     assert_eq!(field(&document(&g1)), Some(v1.clone().into()));
-    // A file's new generation records no version.
     next_commit(dir, "chain-web", "file_only");
     let g2 = fleet.publish();
     assert_ne!(g2, g1);

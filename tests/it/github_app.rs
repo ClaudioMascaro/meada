@@ -1,9 +1,3 @@
-//! The GitHub App module (ADR 0013, spec #289, feature `github-app`): `meada github-app
-//! credential` driven through git's credential-helper protocol on stdin and stdout, against a
-//! GitHub API the test serves on loopback (installations and token mints, each App's JWT
-//! verified against the test key under `tests/fixtures/github-app/`) and the local Valkey
-//! `MEADA_TEST_VALKEY_URL` names. Without the variable the tests that need Valkey print why and
-//! skip; with `MEADA_TEST_SERVICES_REQUIRED=1` they fail.
 #![cfg(feature = "github-app")]
 
 use std::collections::{HashMap, HashSet};
@@ -24,11 +18,9 @@ use crate::server::{Server, get as http_get};
 mod roles;
 
 const HOST: &str = "github.test";
-/// What the fake answers as every token's expiry, and its Unix time.
 const EXPIRES_AT: &str = "2099-01-01T00:00:00Z";
 const EXPIRES: u64 = 4_070_908_800;
 
-/// The local Valkey, or `None` with the reason printed.
 pub(crate) fn service() -> Option<String> {
     let url = std::env::var("MEADA_TEST_VALKEY_URL").ok();
     if url.is_none() {
@@ -45,63 +37,32 @@ pub(crate) fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-/// What the fake API holds and saw.
 #[derive(Default)]
 pub(crate) struct State {
-    /// Per App id: its installations, as id and account login.
     apps: HashMap<u64, Vec<(u64, String)>>,
-    /// Installations whose mint answers 429 with this `retry-after`.
     throttled: HashMap<u64, u64>,
-    /// Installations whose mint answers 500.
     failing: HashSet<u64>,
-    /// Every token minted, with its installation, in order.
     minted: Vec<(u64, String)>,
-    /// Every JWT received.
     jwts: Vec<String>,
     pub(crate) requests: usize,
-    /// Per `<owner>/<repo>`: its collaborators, login and `role_name`, in the order listed; a
-    /// repository not here answers 404.
     pub(crate) collaborators: HashMap<String, Vec<(String, String)>>,
-    /// Per installation id: the `<owner>/<repo>` names `GET /installation/repositories` lists
-    /// for it, in order; an installation not here lists none.
     pub(crate) covered: HashMap<u64, Vec<String>>,
-    /// The body every `/installation/repositories` page answers instead of the fake's own, when
-    /// set (a hostile or malformed one).
     pub(crate) covered_body: Option<String>,
-    /// Installations whose listings answer this status (403 or 429), with this `retry-after`.
     listing_throttled: HashMap<u64, (u16, Option<u64>)>,
-    /// The `<owner>/<repo>` whose collaborators answer a permission 403 (quota left), when set.
     pub(crate) listing_forbidden: Option<String>,
-    /// The bytes of padding after that permission 403's message (past `DENIAL_MAX`, a throttle).
     pub(crate) forbidden_padding: usize,
-    /// The status every listing answers, when set (a 5xx).
     pub(crate) listing_status: Option<u16>,
-    /// The status `GET /app/installations` answers, when set (a 5xx).
     pub(crate) installations_status: Option<u16>,
-    /// Every listing answers a body of this many bytes, when set.
     listing_bytes: Option<usize>,
-    /// The `Link` header every listing page answers instead of the fake's own `next`.
     link: Option<String>,
-    /// Every listing request: the installation whose token it carried, and its path and query.
     listings: Vec<(u64, String)>,
-    /// The next listing request waits while `holding` is set, which it sets itself.
     hold_next: bool,
     holding: bool,
-    /// Per personal access token: the login `GET /user` answers for it (#561); any other bearer
-    /// is a 401.
     pub(crate) users: HashMap<String, String>,
-    /// The status every `GET /user` answers, when set, with a body naming it.
     pub(crate) user_status: Option<u16>,
-    /// Every request that carried a bearer: its path and the bearer, in order.
     pub(crate) bearers: Vec<(String, String)>,
 }
 
-/// A GitHub API on loopback: `GET /app/installations` and `POST
-/// /app/installations/{id}/access_tokens`, each refused with 401 unless its JWT is RS256, signed
-/// by the key of the App its `iss` names, issued at least 50 s ago and expiring within 10
-/// minutes; and `GET /repos/{owner}/{repo}/collaborators` with a token it minted, 100 a page with
-/// a `Link` to the next page on `/repositories/<n>/` as GitHub's are. Each connection is answered
-/// on a thread of its own, so a held listing holds only itself.
 pub(crate) struct Api {
     pub(crate) base: String,
     state: Arc<Mutex<State>>,
@@ -171,14 +132,12 @@ impl Api {
         read(&mut self.state.lock().unwrap())
     }
 
-    /// The installation the fake minted `token` for.
     fn minted_for(&self, token: &str) -> u64 {
         let state = self.state.lock().unwrap();
         let found = state.minted.iter().find(|(_, t)| t == token);
         found.unwrap_or_else(|| panic!("not a minted token")).0
     }
 
-    /// Asserts `stderr` holds no part of a private key, a JWT or a token.
     pub(crate) fn clean(&self, stderr: &str) {
         let state = self.state.lock().unwrap();
         for jwt in &state.jwts {
@@ -201,7 +160,6 @@ impl Api {
     }
 }
 
-/// A token made now: another on each call, no literal credential.
 fn made_token() -> String {
     use std::hash::{BuildHasher, RandomState};
     format!(
@@ -210,8 +168,6 @@ fn made_token() -> String {
     )
 }
 
-/// The fake's answer to `method path` with `jwt` (a JWT, or a token for a listing), the fake
-/// served at `base`: status, extra header lines and body.
 fn answer(
     state: &Mutex<State>,
     keys: &HashMap<u64, DecodingKey>,
@@ -226,7 +182,6 @@ fn answer(
         return (401, String::new(), String::new());
     };
     state.bearers.push((path.to_string(), jwt.clone()));
-    // A login verification (#561): the login of a known personal access token.
     if path == "/user" {
         if let Some(status) = state.user_status {
             let body = json!({"message": format!("fake status {status}")}).to_string();
@@ -296,7 +251,6 @@ fn answer(
     }
 }
 
-/// The fake's answer to a collaborators listing: `listing` the `<owner>/<repo>` and the query.
 fn collaborators(
     state: &mut State,
     base: &str,
@@ -357,9 +311,6 @@ fn collaborators(
     (200, link, json!(rows).to_string())
 }
 
-/// The fake's answer to an installation's repositories listing (#341): 100 a page as
-/// `{"total_count", "repositories": [{"full_name"}]}`, for the installation `token` was minted
-/// for, with the throttles and failures the collaborators listing has.
 fn covered(
     state: &mut State,
     method: &str,
@@ -396,8 +347,6 @@ fn covered(
     (200, String::new(), body.to_string())
 }
 
-/// `<case>/meada.workspace.toml` with `[valkey]` at `valkey` (the case's own key prefix) and
-/// one `[[github_app]]` block per App id of `apps`, each signing with its fixture key.
 fn manifest(case: &str, valkey: &str, api: &str, apps: &[u64]) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(case);
     let _ = fs::remove_dir_all(&dir);
@@ -426,8 +375,6 @@ pub(crate) fn prefix(case: &str) -> String {
     format!("meada:test-{}-{case}", std::process::id())
 }
 
-/// `meada github-app credential --workspace meada.workspace.toml <action>` in `dir` with
-/// `input`: stdout, stderr and whether it exited 0.
 fn helper(dir: &Path, action: &str, input: &str) -> (String, String, bool) {
     let args = [
         "github-app",
@@ -441,7 +388,6 @@ fn helper(dir: &Path, action: &str, input: &str) -> (String, String, bool) {
     })
 }
 
-/// `get` for `https://<host>/<path>`.
 fn ask(dir: &Path, host: &str, path: &str) -> (String, String, bool) {
     helper(
         dir,
@@ -450,7 +396,6 @@ fn ask(dir: &Path, host: &str, path: &str) -> (String, String, bool) {
     )
 }
 
-/// The password a `get` for `HOST/<path>` answers, checking the rest of the answer.
 fn token(api: &Api, dir: &Path, path: &str) -> String {
     let (stdout, stderr, ok) = ask(dir, HOST, path);
     api.clean(&stderr);
@@ -462,7 +407,6 @@ fn token(api: &Api, dir: &Path, path: &str) -> String {
     lines[1].strip_prefix("password=").unwrap().to_string()
 }
 
-/// `meada github-app throttled` for `HOST/<path>`, with `retry_after`: its stderr.
 fn throttled(api: &Api, dir: &Path, path: &str, retry_after: Option<&str>) -> String {
     let url = format!("https://{HOST}/{path}");
     let mut args = vec![
@@ -487,7 +431,6 @@ fn admin(url: &str) -> redis::Connection {
     redis::Client::open(url).unwrap().get_connection().unwrap()
 }
 
-/// The TTL Valkey reports for `name` under the case's module keys.
 fn ttl(valkey: &mut redis::Connection, case: &str, name: &str) -> i64 {
     let key = format!("{}:github-app:{HOST}:{name}", prefix(case));
     redis::cmd("TTL").arg(key).query(valkey).unwrap()
@@ -504,19 +447,16 @@ fn a_covered_repository_gets_a_minted_token_and_a_second_get_mints_nothing() {
     assert_eq!(api.with(|s| s.minted.clone()), vec![(11, first.clone())]);
     assert_eq!(token(&api, &dir, "ACME/other"), first);
     assert_eq!(api.with(|s| s.minted.len()), 1);
-    // The cached token lives until 10 minutes before it expires.
     let mut admin = admin(&valkey);
     let left = ttl(&mut admin, "github_app_mint", "installation:11:token");
     let now = jsonwebtoken::get_current_timestamp() as i64;
     assert!((left - (EXPIRES as i64 - now - 600)).abs() <= 5, "{left}");
-    // `store` does nothing.
     let input =
         format!("protocol=https\nhost={HOST}\npath=acme/web\nusername=x\npassword={first}\n");
     assert_eq!(
         helper(&dir, "store", &input),
         (String::new(), String::new(), true)
     );
-    // A mint that fails is an error, and says nothing secret.
     api.with(|s| s.failing.insert(12));
     let (stdout, stderr, ok) = ask(&dir, HOST, "beta/web");
     assert!(!ok && stdout.is_empty(), "{stdout}");
@@ -536,7 +476,6 @@ fn two_apps_alternate_and_a_throttled_installation_is_skipped_until_its_retry_ti
         .map(|_| api.minted_for(&token(&api, &dir, "acme/web")))
         .collect();
     assert_eq!(served, vec![11, 21, 11, 21]);
-    // The last `get` for acme/web was served by 21: a fetch of it failed with 429.
     let stderr = throttled(&api, &dir, "acme/web", Some("1"));
     assert_eq!(stderr, "meada: installation 21: throttled for 1 s\n");
     for _ in 0..2 {
@@ -547,7 +486,6 @@ fn two_apps_alternate_and_a_throttled_installation_is_skipped_until_its_retry_ti
         .map(|_| api.minted_for(&token(&api, &dir, "acme/web")))
         .collect();
     assert_eq!(served, HashSet::from([11, 21]));
-    // Without a retry time: one minute, doubled on each repeat while it holds.
     let last = api.minted_for(&token(&api, &dir, "acme/web"));
     let mut admin = admin(&valkey);
     let mark = format!("installation:{last}:throttled");
@@ -555,7 +493,6 @@ fn two_apps_alternate_and_a_throttled_installation_is_skipped_until_its_retry_ti
     assert!((55..=60).contains(&ttl(&mut admin, case, &mark)));
     throttled(&api, &dir, "acme/web", None);
     assert!((115..=120).contains(&ttl(&mut admin, case, &mark)));
-    // A repository no `get` answered marks nothing.
     let stderr = throttled(&api, &dir, "acme/never", None);
     assert!(stderr.contains("nothing marked"), "{stderr}");
 }
@@ -569,7 +506,6 @@ fn a_mint_answered_429_marks_its_installation_and_another_one_answers() {
     api.with(|s| s.throttled.insert(11, 120));
     let case = "github_app_mint_429";
     let dir = manifest(case, &valkey, &api.base, &[1, 2]);
-    // The first in order is 11: its mint is throttled, so 21 answers this `get` and the next.
     let (stdout, stderr, ok) = ask(&dir, HOST, "acme/web");
     assert!(ok, "{stderr}");
     assert_eq!(stderr, "meada: installation 11: throttled for 120 s\n");
@@ -585,7 +521,6 @@ fn a_mint_answered_429_marks_its_installation_and_another_one_answers() {
     let mut admin = admin(&valkey);
     assert!((115..=120).contains(&ttl(&mut admin, case, "installation:11:throttled")));
     assert_eq!(api.with(|s| s.minted.len()), 1);
-    // With 21's mint throttled too, the `get` fails saying so, and tries nothing "anyway".
     api.with(|s| s.throttled.insert(21, 120));
     let cached = format!("{}:github-app:{HOST}:installation:21:token", prefix(case));
     let _: () = redis::cmd("DEL").arg(cached).query(&mut admin).unwrap();
@@ -617,7 +552,6 @@ fn a_token_whose_cache_ran_out_or_that_git_erased_is_minted_again() {
     std::thread::sleep(std::time::Duration::from_millis(20));
     let second = token(&api, &dir, "acme/web");
     assert_ne!(second, first);
-    // git erases a token it was refused with; another password erases nothing.
     let erase = |password: &str| {
         let input = format!(
             "protocol=https\nhost={HOST}\npath=acme/web\nusername=x-access-token\n\
@@ -642,7 +576,6 @@ fn a_token_whose_cache_ran_out_or_that_git_erased_is_minted_again() {
 fn an_uncovered_host_or_owner_gets_no_answer_and_one_line_naming_them() {
     let api = Api::new();
     api.install(1, 11, "acme");
-    // Valkey is not reached for a host no App serves.
     let valkey = service();
     let at = valkey.clone().unwrap_or("redis://127.0.0.1:1".into());
     let dir = manifest("github_app_uncovered", &at, &api.base, &[1]);
@@ -671,7 +604,6 @@ fn a_new_github_app_block_and_new_installations_are_used_after_the_refresh() {
     let case = "github_app_refresh";
     let dir = manifest(case, &valkey, &api.base, &[1]);
     assert_eq!(api.minted_for(&token(&api, &dir, "acme/web")), 11);
-    // App 1 is installed on another owner: unseen until its installations are listed again.
     api.install(1, 12, "beta");
     let (stdout, _, _) = ask(&dir, HOST, "beta/web");
     assert!(stdout.is_empty());
@@ -679,7 +611,6 @@ fn a_new_github_app_block_and_new_installations_are_used_after_the_refresh() {
     let listed = format!("{}:github-app:{HOST}:app:1:listed", prefix(case));
     let _: () = redis::cmd("DEL").arg(&listed).query(&mut admin).unwrap();
     assert_eq!(api.minted_for(&token(&api, &dir, "beta/web")), 12);
-    // A block added to the manifest lists its installations on the next `get`.
     let file = dir.join("meada.workspace.toml");
     fs::write(
         &file,
@@ -749,7 +680,6 @@ fn mcp_listen_over_a_manifest_with_github_app_makes_no_request() {
     assert_eq!(api.with(|s| s.requests), 0);
 }
 
-/// The console inspects only cached state: no private key read and no request to GitHub.
 #[cfg(feature = "ui")]
 #[test]
 fn console_reads_installation_expiry_and_throttle_without_secrets_or_api_calls() {
@@ -764,7 +694,6 @@ fn console_reads_installation_expiry_and_throttle_without_secrets_or_api_calls()
     front_end(&dir, Some(env!("CARGO_PKG_VERSION")));
     let file = dir.join("meada.workspace.toml");
     let text = fs::read_to_string(&file).unwrap();
-    // A missing private key is harmless to the read route: it must never open it.
     let text = text.replace(
         fixture("app1.pem").to_str().unwrap(),
         "/does/not/exist/private-key.pem",

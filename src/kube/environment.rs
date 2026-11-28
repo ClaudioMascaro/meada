@@ -1,5 +1,3 @@
-//! Environment targets are resolved within one namespace and evaluated overlay.
-
 use super::{Obj, list, text};
 use crate::iac::environment::{ENVIRONMENT_BYTES_MAX, Entry, literal};
 use serde_json::Value;
@@ -49,7 +47,6 @@ pub(super) fn read(container: &Value) -> Vec<Input> {
             }
         })
         .collect::<Vec<_>>();
-    // Explicit entries override envFrom regardless of their order in the document.
     entries.extend(list(container, &["env"]).filter_map(|e| {
         let name = text(e, &["name"])?;
         let source = if let Some(value) = text(e, &["value"]) {
@@ -80,8 +77,6 @@ pub(super) fn read(container: &Value) -> Vec<Input> {
     entries
 }
 
-/// Follow references while the objects they name are still in the same overlay stage.
-/// Child overlays have already transformed their own references before a parent combines them.
 pub(super) fn transform(objects: &mut [Obj], prefix: &str, suffix: &str, namespace: Option<&str>) {
     let mut names = BTreeMap::new();
     for o in objects
@@ -128,7 +123,6 @@ pub(super) fn transform(objects: &mut [Obj], prefix: &str, suffix: &str, namespa
             }
         }
         if !complete {
-            // Prefix expansion must not multiply a large overlay string by every reference.
             o.facts.environment.clear();
         }
         let mut room = ENVIRONMENT_BYTES_MAX;
@@ -170,7 +164,6 @@ fn add(entries: &mut Entries, room: &mut usize, entry: Entry) -> bool {
     true
 }
 
-/// An unread later source can replace any earlier imported name with this prefix.
 fn unknown(entries: &mut Entries, room: &mut usize, mut entry: Entry) -> bool {
     for ((container, name), previous) in
         entries.range_mut((entry.container.clone(), entry.name.clone())..)
@@ -272,7 +265,6 @@ pub(super) fn resolve(object: &Obj, configs: &Configs<'_>) -> Vec<Entry> {
             }
         };
         if !added {
-            // A truncated prefix could miss an overriding entry and invent a value.
             return Vec::new();
         }
     }

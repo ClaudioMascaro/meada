@@ -1,7 +1,3 @@
-//! Maven's literal project coordinates and direct dependencies. A `${name}` in a dependency's
-//! group or artifact reads as the literal the pom's `<properties>` or its `project.groupId` and
-//! `project.artifactId` give it; the parent poms' are the seam's `inherit` (`package/maven.rs`).
-
 use crate::lang::MAX_BYTES;
 use crate::package::{Entry, Summary};
 use crate::xml::{XML_NODES, within_limits};
@@ -35,19 +31,13 @@ fn text(at: Node<'_, '_>) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
-/// The longest chain of properties naming properties a `${..}` follows.
 // ponytail: real poms nest a few; this bounds the stack over a hostile chain.
 const PROPERTY_DEPTH: usize = 16;
 
-/// How many properties `fill` reads in one pom, all its dependencies together.
 // ponytail: a real pom reads a few dozen; this bounds a hostile one whose dependencies each walk
 // a wide web of properties. Past it a hole stays as written, so the coordinate stays computed.
 pub const FILL_BUDGET: usize = 100_000;
 
-/// `value` with each `${name}` that `lookup` gives a literal replaced by it, through the
-/// properties that name properties. A hole whose value has a hole left, or a value longer than a
-/// package name, stays as written. Each property is read once per call, a cycle included, and
-/// every read is charged to `budget`.
 pub fn fill<'a>(
     value: &str,
     lookup: &impl Fn(&str) -> Option<&'a str>,
@@ -73,7 +63,6 @@ fn fill_to<'a>(
         let hole = &rest[at..=at + end];
         let name = &hole[2..hole.len() - 1];
         if !read.contains_key(name) {
-            // Marked read before it is, so a property naming itself finds no literal.
             read.insert(name.to_string(), None);
             let literal = (depth > 0 && *budget > 0)
                 .then(|| lookup(name))
@@ -92,8 +81,6 @@ fn fill_to<'a>(
     out
 }
 
-/// The coordinate a dependency's group and artifact name, and whether a `${..}` hole is left,
-/// which makes it the pattern of the literal fragments.
 pub fn named(group: &str, artifact: &str) -> Option<(String, bool)> {
     let piece = |value: &str| match value.contains("${") {
         true => super::pattern(value),
@@ -104,7 +91,6 @@ pub fn named(group: &str, artifact: &str) -> Option<(String, bool)> {
     (name.len() <= crate::package::MAX_NAME).then_some((name, computed))
 }
 
-/// The `<properties>` of a pom whose name is written once and holds text, as written.
 fn properties(project: Node<'_, '_>) -> BTreeMap<String, String> {
     let mut found = BTreeMap::new();
     let list = child(project, "properties").into_iter();
@@ -196,10 +182,7 @@ pub fn read(src: &[u8]) -> Summary {
             let Some((name, computed)) = named(&group, &artifact) else {
                 continue;
             };
-            // A computed version keeps the coordinate literal; its range stays as written.
             let range = field(dep, "version");
-            // Only a `compile` dependency, the default, passes on to the module's dependents,
-            // and only when not `optional`; a value the reader cannot tell does not.
             let unset_or = |key, value: &str| {
                 let written = dep.children().any(|n| {
                     n.is_element()
@@ -213,7 +196,6 @@ pub fn read(src: &[u8]) -> Summary {
                 name,
                 range,
                 via: computed.then(|| "computed".into()),
-                // Only a pom under a parent has one whose properties could fill the rest.
                 template: (computed && parent.is_some()).then_some((group, artifact)),
                 private: !unset_or("scope", "compile") || !unset_or("optional", "false"),
                 ..Entry::default()
@@ -280,7 +262,6 @@ mod tests {
                 "${project.artifactId}",
                 ("example:web".to_string(), None),
             ),
-            // Any hole without a literal leaves the coordinate computed.
             ("${undeclared}", "models", computed("*:models")),
             ("example", "${deep}", computed("example:*")),
             ("example", "${twice}", computed("example:*")),
@@ -298,10 +279,8 @@ mod tests {
                 "{group}:{artifact}"
             );
         }
-        // A value that is no name skips the entry, as a written one does.
         let body = format!("{properties}{}", dependency("example", "${space}"));
         assert!(dependencies(&project("", &body)).is_empty());
-        // The parent's group fills `project.groupId` of a pom that writes none.
         let pom = format!(
             "<project><parent><groupId>example</groupId><artifactId>p</artifactId></parent>\
              <artifactId>web</artifactId>{}</project>",
@@ -312,8 +291,6 @@ mod tests {
 
     #[test]
     fn properties_naming_each_other_many_times_are_read_once() {
-        // Fifty holes per value over a chain as long as the depth bound would take 50^16 steps
-        // without the memo; the last value is a literal, and every value is longer than a name.
         let holes = "${p1}".repeat(40);
         let chain: String = (1..40)
             .map(|i| {
@@ -358,7 +335,6 @@ mod tests {
             summary.dependencies[0].template,
             Some(("${shared}".to_string(), "m${suffix}".to_string()))
         );
-        // Without a parent no pom could fill it.
         let alone = dependency("${shared}", "models");
         assert_eq!(
             read(project("", &alone).as_bytes()).dependencies[0].template,
@@ -425,7 +401,6 @@ mod tests {
             Some("example:web")
         );
         assert_eq!(name(&project(&declared(XML_NAMESPACES + 1), "")), None);
-        // Each nested element declaring its own namespace: the shape that costs roxmltree most.
         let nested: String = (0..XML_NAMESPACES + 1)
             .map(|i| format!("<a xmlns:p{i}='u'>"))
             .collect();
@@ -446,7 +421,6 @@ mod tests {
 
     #[test]
     fn elements_nested_past_the_limit_read_as_nothing() {
-        // The project element is one level; comments, CDATA and self-closing tags are none.
         let nested = |n: usize| {
             format!(
                 "{}<!-- <a> --><![CDATA[<a>]]><b/>{}",

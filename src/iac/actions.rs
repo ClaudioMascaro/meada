@@ -1,12 +1,3 @@
-//! GitHub Actions as IaC nodes (#823, ADR 0028): a pipeline (a file of `.github/workflows/` that
-//! holds `jobs`), an action (an `action.yml` or `action.yaml` that holds `runs`), each CI job and
-//! each CI step, with its file and lines. A file is one evaluation unit, its root the file's
-//! path, and only its first YAML document gives nodes. An address is the key path of the block
-//! (ADR 0025): `.` for the file, `jobs.build`, `jobs["publish-prd"]`, `jobs.build.steps[2]`,
-//! `runs.steps[0]`. References stay inside the file: a pipeline to its CI jobs, a CI job or a
-//! composite action to its CI steps, a CI job to the CI jobs its `needs` names. A
-//! `strategy.matrix` multiplies nothing: a CI job is one node.
-
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
@@ -27,51 +18,33 @@ use crate::render::rank;
 
 pub(crate) mod run;
 
-/// Where GitHub reads pipelines from: the files of this folder, none below it.
 const WORKFLOWS: &str = ".github/workflows/";
 
-/// The node types of this format. Prose says pipeline, action, CI job and CI step (ADR 0028).
 const WORKFLOW: &str = "workflow";
 pub(crate) const ACTION: &str = "action";
 pub(crate) const JOB: &str = "job";
 pub(crate) const STEP: &str = "step";
 
-/// The condition that a row of `iac_nodes` is a node of this format: its unit is its file, which
-/// no Terraform root or Kubernetes unit is, and its type is one of the four.
 pub(super) const ROWS: &str = "(root = path AND type IN ('workflow', 'action', 'job', 'step'))";
 
-/// What the reader keeps of a node besides its address and its name (ADR 0028). `id` and `uses`
-/// are what a query names a CI job or a CI step by: selectors, never identity. The rest is what
-/// the CI contract (`crate::ci`) reads of a provider and of a call.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub(crate) struct Facts {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uses: Option<String>,
-    /// A pipeline that `on.workflow_call` lets a CI job call.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub reusable: bool,
-    /// The keys of `with` beside a `uses`, as written, sorted.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub with: Vec<String>,
-    /// The keys of `secrets` beside a `uses`, as written, sorted, or the word `inherit`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secrets: Option<Secrets>,
-    /// The names its `env` defines with no config value: a null, or a list or a map that holds
-    /// none. Such a name keeps no row and still hides the ones of an `env` farther up.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hollow: Vec<String>,
-    /// The `permissions` block that governs a CI job: its own, else its pipeline's. None when
-    /// neither declares one, or when the one that governs is not read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permissions: Option<Permissions>,
 }
 
-/// The `permissions` block `value` declares: one of the words `read-all` and `write-all`, or a
-/// mapping whose every level is `none`, `read` or `write` (`{}` names none) and whose every
-/// name is letters, digits, `-` and `_`, so that a name writes no level of its own in an
-/// answer. Any other value is not read, as a block not declared: Meada guesses no level.
 fn permissions(value: Option<&Value>) -> Option<Permissions> {
     match value? {
         Value::String(word) => match word.as_str() {
@@ -98,8 +71,6 @@ fn permissions(value: Option<&Value>) -> Option<Permissions> {
     }
 }
 
-/// The names the `env` mapping `value` defines with no config value, among the names an
-/// expression can read (letters, digits and `_`).
 fn hollow(value: Option<&Value>) -> Vec<String> {
     fn empty(value: &Value) -> bool {
         match value {
@@ -119,8 +90,6 @@ fn hollow(value: Option<&Value>) -> Vec<String> {
     names.map(|(key, _)| key.clone()).collect()
 }
 
-/// The keys of the mapping `value`, each short enough to be kept and free of control
-/// characters, which no input or secret name holds and which would break an answer's line.
 fn keys(value: Option<&Value>) -> Vec<String> {
     let Some(Value::Object(map)) = value else {
         return Vec::new();
@@ -129,7 +98,6 @@ fn keys(value: Option<&Value>) -> Vec<String> {
     map.keys().filter(kept).cloned().collect()
 }
 
-/// Whether `on` holds `workflow_call`, in the three shapes it takes: a string, a list, a map.
 fn reusable(on: Option<&Value>) -> bool {
     const CALL: &str = "workflow_call";
     match on {
@@ -140,25 +108,21 @@ fn reusable(on: Option<&Value>) -> bool {
     }
 }
 
-/// Whether the file at `path` may be a pipeline or an action, by its place and name alone.
 pub(crate) fn is_file(path: &str) -> bool {
     is_workflow(path) || action_folder(path).is_some()
 }
 
-/// Whether `path` is where GitHub reads a pipeline from.
 pub(crate) fn is_workflow(path: &str) -> bool {
     path.strip_prefix(WORKFLOWS).is_some_and(|name| {
         !name.contains('/') && (name.ends_with(".yml") || name.ends_with(".yaml"))
     })
 }
 
-/// The folder (with its `/`, empty for the root) of an `action.yml` or `action.yaml`.
 pub(crate) fn action_folder(path: &str) -> Option<&str> {
     let folder = (path.strip_suffix("action.yml")).or_else(|| path.strip_suffix("action.yaml"))?;
     (folder.is_empty() || folder.ends_with('/')).then_some(folder)
 }
 
-/// The other action file name of the folder of `path`, which is an action file by its name.
 pub(crate) fn twin(path: &str) -> Option<String> {
     let folder = action_folder(path)?;
     let other = if path.ends_with(".yml") {
@@ -169,22 +133,16 @@ pub(crate) fn twin(path: &str) -> Option<String> {
     Some(format!("{folder}{other}"))
 }
 
-/// Whether `n` is a node of this format.
 pub(crate) fn owns(n: &Node) -> bool {
     n.root == n.path && matches!(n.ty.as_str(), WORKFLOW | ACTION | JOB | STEP)
 }
 
-/// The line and the end mark of a mapping, as the event reader closes it.
 type Lines = (usize, usize);
 
-/// The lines of the CI jobs and CI steps of the first document, gathered as each mapping closes:
-/// a CI step's before its CI job's. One an alias repeats closes nowhere and has none.
 #[derive(Default)]
 struct Spans {
-    /// The CI steps closed since the last CI job did, by index.
     open: HashMap<usize, Lines>,
     jobs: HashMap<String, (Lines, HashMap<usize, Lines>)>,
-    /// The CI steps of a composite action.
     runs: HashMap<usize, Lines>,
 }
 
@@ -217,20 +175,16 @@ impl Spans {
     }
 }
 
-/// A scalar a query may match: text short enough to be a name, a number or a boolean as written.
 fn text(value: Option<&Value>) -> Option<String> {
     scalar_text(value?).filter(|s| !s.is_empty() && s.len() <= VALUE_MAX)
 }
 
-/// The nodes and references of one file, within the ceilings of a unit.
 struct Unit<'a> {
     path: &'a str,
-    /// Whether the file holds several documents: its config values then start with `[0]`.
     several: bool,
     ends: KeyLines<'a>,
     nodes: Vec<Node>,
     references: Vec<Reference>,
-    /// The bytes of addresses, names and selectors still to store (`ROOT_STORED_MAX`).
     left: usize,
 }
 
@@ -245,8 +199,6 @@ impl Unit<'_> {
         }
     }
 
-    /// Adds the node at `address` with the mapping `body`, located at `lines` (its first line
-    /// and the reader's end mark), unless a ceiling is reached.
     fn node(&mut self, address: &str, ty: &str, body: &Map<String, Value>, lines: Lines) -> bool {
         let name = text(body.get("name"));
         let mut facts = Facts {
@@ -255,7 +207,6 @@ impl Unit<'_> {
             hollow: hollow(body.get("env")),
             ..Facts::default()
         };
-        // What a call passes: the keys only, the values stay config values.
         if facts.uses.is_some() {
             facts.with = keys(body.get("with"));
             facts.secrets = match body.get("secrets") {
@@ -300,8 +251,6 @@ impl Unit<'_> {
             name,
             path: self.path.to_string(),
             line,
-            // The mark is where the reader saw the mapping end, the next block's first line:
-            // the last line above it indented deeper than the key is the block's own.
             end_line: self.ends.end_of(line, mark),
             block,
             actions: (facts != Facts::default()).then_some(facts),
@@ -310,8 +259,6 @@ impl Unit<'_> {
         true
     }
 
-    /// Adds the reference from `source` to `target`, unless `source` holds `REFERENCES_MAX` or
-    /// the bytes are spent.
     fn reference(&mut self, source: &str, target: &str, via: Option<&str>, held: &mut usize) {
         let size = source.len() + target.len() + via.map_or(0, str::len);
         if *held < REFERENCES_MAX && self.take(size) {
@@ -325,8 +272,6 @@ impl Unit<'_> {
         }
     }
 
-    /// The CI steps of `body`, the mapping at `parent`, each a node that `source` references: the
-    /// CI job itself, or the action whose `runs` holds them.
     fn steps(
         &mut self,
         source: &str,
@@ -343,12 +288,10 @@ impl Unit<'_> {
             let Value::Object(step) = step else {
                 continue;
             };
-            // Before the address is written: a long job id times many steps is the hostile case.
             if self.left < parent.len() {
                 return;
             }
             let address = format!("{parent}.steps[{n}]");
-            // A step an alias repeats sits at its parent's first line.
             let lines = located.get(&n).copied().unwrap_or((fallback.0, fallback.0));
             if !self.node(&address, STEP, step, lines) {
                 return;
@@ -358,8 +301,6 @@ impl Unit<'_> {
     }
 }
 
-/// The nodes and references of the pipeline or action at `path`: none for any other file, one
-/// past the size ceiling or one that does not read.
 pub(crate) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
     let none = (Vec::new(), Vec::new());
     if !is_file(path) || src.len() > MAX_BYTES {
@@ -391,7 +332,6 @@ pub(crate) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
         references: Vec::new(),
         left: ROOT_STORED_MAX,
     };
-    // The file's own `id` and `uses` are no selector: only its name is kept.
     let named: Map<String, Value> = (doc.get("name").cloned())
         .map(|name| ("name".to_string(), name))
         .into_iter()
@@ -399,7 +339,6 @@ pub(crate) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
     if !unit.node(".", ty, &named, whole) {
         return none;
     }
-    // The file node ends at the last line, whatever its indent.
     unit.nodes[0].end_line = whole.1;
     if ty == WORKFLOW && reusable(doc.get("on")) {
         unit.nodes[0].actions = Some(Facts {
@@ -419,8 +358,6 @@ pub(crate) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
     };
     let address =
         |id: &str| config_values::key_path(&[Step::Key("jobs".into()), Step::Key(id.to_string())]);
-    // The block that governs a CI job is its own, else its pipeline's when that one is read:
-    // a block that is not read is declared by no CI job, and is copied to none.
     let inherited = (doc.get("permissions")).filter(|block| permissions(Some(*block)).is_some());
     for (id, job) in jobs {
         let Value::Object(job) = job else {
@@ -429,7 +366,6 @@ pub(crate) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
         let at = address(id);
         let located = spans.jobs.get(id);
         let lines = located.map_or((1, 1), |(lines, _)| *lines);
-        // A CI job is found by its id, which its address may quote.
         let mut body = job.clone();
         body.insert("id".into(), Value::String(id.clone()));
         if let (false, Some(block)) = (job.contains_key("permissions"), inherited) {
@@ -445,7 +381,6 @@ pub(crate) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
             Some(Value::String(one)) => vec![one.as_str()],
             _ => Vec::new(),
         };
-        // A CI job named twice is needed once.
         let mut seen = HashSet::new();
         for needed in needs {
             let other = matches!(jobs.get(needed), Some(Value::Object(_))) && needed != id;
@@ -460,9 +395,6 @@ pub(crate) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
     (unit.nodes, unit.references)
 }
 
-/// Replaces the stored nodes and references of the file at `path` with those of `src`, `None`
-/// for a file that left. `twin` says the other action file name sits in the folder: beside an
-/// `action.yml`, the file the runner loads, an `action.yaml` gives no action.
 pub(crate) fn refresh(tx: &Transaction, path: &str, src: Option<&[u8]>, twin: bool) -> Result<()> {
     super::forget(tx, Some(path), Owner::Actions)?;
     let (nodes, references) = src.map_or_else(Default::default, |src| evaluate(path, src));
@@ -473,9 +405,6 @@ pub(crate) fn refresh(tx: &Transaction, path: &str, src: Option<&[u8]>, twin: bo
     super::insert(tx, &nodes, &references)
 }
 
-/// The nodes of this format among `nodes` (repository `identity`) that `needle`, lowercased,
-/// matches by address, type, name, `id` or `uses`, as `search` hits: `<identity> <path>:<line>
-/// <address> (<type>[, id "<id>"][, name "<name>"][, uses "<uses>"])`, ordered as the IaC hits are.
 pub(crate) fn hits(identity: &str, nodes: &[Node], needle: &str) -> Vec<Hit> {
     let mut hits = Vec::new();
     for n in nodes.iter().filter(|n| owns(n)) {
@@ -504,10 +433,6 @@ pub(crate) fn hits(identity: &str, nodes: &[Node], needle: &str) -> Vec<Hit> {
     hits
 }
 
-/// Whether `text` names the node `n` of this format otherwise than by its address: the file node
-/// by its path, alone or after the repository identity; a CI step by a selector in place of its
-/// index (`jobs.build.steps[id=login]`, `name=` and `uses=` alike), alone, after the path or
-/// after the identity and the path, as an address is (ADR 0025).
 pub(super) fn names(identity: &str, n: &Node, text: &str) -> bool {
     if !owns(n) {
         return false;
@@ -536,7 +461,6 @@ pub(super) fn names(identity: &str, n: &Node, text: &str) -> bool {
     let Some((key, value)) = selector.split_once('=') else {
         return false;
     };
-    // A value may be quoted as a JSON string, as in a `via` selector (`config_values/sites.rs`).
     let quoted = serde_json::from_str::<String>(value).ok();
     let value = quoted
         .as_deref()
@@ -637,7 +561,6 @@ jobs:
                 "jobs.test -> jobs.test.steps[0]",
             ]
         );
-        // A block is the key path its config values start with; the file's is every value.
         assert_eq!(nodes[0].block, "");
         assert_eq!(nodes[3].block, "jobs.build.steps[1]");
         assert_eq!(nodes[0].name.as_deref(), Some("CI"));
@@ -669,7 +592,6 @@ jobs:
                 [". -> runs.steps[0]", ". -> runs.steps[1]"]
             );
         }
-        // A Docker or JavaScript action has no steps: the file alone.
         let (nodes, _) = evaluate("action.yml", b"runs:\n  using: node20\n  main: index.js\n");
         assert_eq!(shown(&nodes), [". action 1-3"]);
     }
@@ -679,7 +601,6 @@ jobs:
         let pipeline = PIPELINE.as_bytes();
         let action = b"runs:\n  using: composite\n  steps: []\n";
         for (path, src) in [
-            // A folder below `.github/workflows/` is not where GitHub reads pipelines.
             (".github/workflows/sub/ci.yml", pipeline),
             ("workflows/ci.yml", pipeline),
             (".github/workflows/ci.json", pipeline),
@@ -692,7 +613,6 @@ jobs:
         ] {
             assert_eq!(evaluate(path, src).0, [], "{path}");
         }
-        // An action file under the pipelines' folder that holds `jobs` is a pipeline.
         let (nodes, _) = evaluate(".github/workflows/action.yml", pipeline);
         assert_eq!(nodes[0].ty, WORKFLOW);
     }
@@ -733,18 +653,15 @@ jobs:
 
     #[test]
     fn a_unit_stops_at_its_ceilings() {
-        // More steps than a unit holds nodes: the rest of the file is left out.
         let steps = "      - run: x\n".repeat(NODES_MAX + 5);
         let src = format!("jobs:\n  a:\n    steps:\n{steps}");
         let (nodes, _) = evaluate(".github/workflows/many.yml", src.as_bytes());
         assert_eq!(nodes.len(), NODES_MAX);
-        // More steps than a node references: every step is a node, the first ones referenced.
         let steps = "      - run: x\n".repeat(REFERENCES_MAX + 5);
         let src = format!("jobs:\n  a:\n    steps:\n{steps}");
         let (nodes, references) = evaluate(".github/workflows/wide.yml", src.as_bytes());
         assert_eq!(nodes.len(), 2 + REFERENCES_MAX + 5);
         assert_eq!(references.len(), 1 + REFERENCES_MAX);
-        // A long job id repeated by each of its steps stops at the bytes of a unit.
         let id = "j".repeat(MAX_BYTES / 2);
         let steps = "      - run: x\n".repeat(1000);
         let src = format!("jobs:\n  {id}:\n    steps:\n{steps}");
@@ -783,7 +700,6 @@ jobs:
             "jobs.build.steps[id=absent]",
             "jobs.build.steps[run=make]",
             "other.yml::jobs.build.steps[id=login]",
-            // After the repository a selector needs the path, as an address does (ADR 0025).
             "example.com/acme/app::jobs.build.steps[id=login]",
             "jobs.build",
         ] {

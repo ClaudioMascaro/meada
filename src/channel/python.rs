@@ -1,9 +1,3 @@
-//! The channel kind's Python forms (spec #20, #73): the message libraries of the Python pack. A
-//! form is a method called on a client that traces back to the library's constructor
-//! (complete constructor evidence in `names/python`), imported from the library's package:
-//! a `produce` on anything else is no producer. The constructor is named by `Code::imported`, the
-//! head of its callee, not by the `outside` an origin carries, which reads the whole name.
-
 use super::message::{
     Handler, Message, bind, channel_name as name, consume, produce, publish, queue_name, topic,
     topics,
@@ -16,10 +10,8 @@ const CONFLUENT_PRODUCER: &str = "confluent_kafka.Producer";
 const CONFLUENT_CONSUMER: &str = "confluent_kafka.Consumer";
 const KAFKA_PRODUCER: &str = "kafka.KafkaProducer";
 const KAFKA_CONSUMER: &str = "kafka.KafkaConsumer";
-/// A pika channel is made by a connection.
 const PIKA_CHANNEL: &str = "pika.BlockingConnection.channel";
 const NATS_CLIENTS: [&str; 2] = ["nats.connect", "nats.aio.client.Client"];
-/// A boto3 client is made for a service, by the package or by a session.
 const BOTO3_CLIENTS: [&str; 3] = [
     "boto3.client",
     "boto3.Session.client",
@@ -34,7 +26,6 @@ const REDIS_CLIENTS: [&str; 7] = [
     "redis.asyncio.Redis.from_url",
     "redis.asyncio.from_url",
 ];
-/// The methods of a client that a form is made of.
 const METHODS: [&str; 12] = [
     "produce",
     "send",
@@ -49,13 +40,11 @@ const METHODS: [&str; 12] = [
     "send_message_batch",
     "receive_message",
 ];
-/// The calls on a client that make another one: a connection's channel, a session's client.
 const FACTORIES: [(&str, &str); 3] = [
     ("pika.BlockingConnection", "channel"),
     ("boto3.Session", "client"),
     ("boto3.session.Session", "client"),
 ];
-/// The callee of a call made on the result of another call, `pika.BlockingConnection(p).channel()`.
 const CALL: &str = "(call)";
 
 #[derive(Clone, Copy)]
@@ -78,8 +67,6 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
         let kafka = facts.imports.iter().any(|i| i.source == "kafka");
         for (n, call) in facts.calls.iter().enumerate() {
             let (receiver, method) = (call.callee.rsplit_once('.')).unwrap_or(("", &call.callee));
-            // kafka-python consumers take their topics from the constructor, however it is
-            // imported.
             if kafka
                 && imported(code, path, &call.scope, &call.callee).as_deref()
                     == Some(KAFKA_CONSUMER)
@@ -88,7 +75,6 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 out.extend(consume(code, path, n, "kafka", &read, None));
                 continue;
             }
-            // The receiver is a name, or a call written in place: `boto3.client("sqs").send_message`.
             let written = receiver == CALL || !receiver.starts_with('(');
             if receiver.is_empty() || !written || !METHODS.contains(&method) {
                 continue;
@@ -161,7 +147,6 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
     out
 }
 
-/// The client `maker` made, if it is one a form is written for.
 fn client(maker: &Construction) -> Option<Client> {
     Some(match maker.name.as_str() {
         CONFLUENT_PRODUCER | KAFKA_PRODUCER => Client::KafkaProducer,
@@ -176,8 +161,6 @@ fn client(maker: &Construction) -> Option<Client> {
     })
 }
 
-/// The definition of the repository that the callback argument `at` (or the keyword `key`) of
-/// the call is; a lambda and a callable that is no definition give none.
 fn callback<'a>(code: &Code<'a>, path: &'a str, n: usize, at: usize, key: &str) -> Option<Handler> {
     let call = code.call(path, n)?;
     let Some(Value::Ref(callback)) = call.args.get(at).or_else(|| call.keyword(key)) else {
@@ -190,31 +173,25 @@ fn callback<'a>(code: &Code<'a>, path: &'a str, n: usize, at: usize, key: &str) 
         })
 }
 
-/// The argument at position `at` of a call or, left out, the keyword `key`.
 fn arg<'v>(args: &'v [Value], kwargs: &'v Keywords, at: usize, key: &str) -> &'v Value {
     (args.get(at))
         .or_else(|| kwargs.iter().find(|(k, _)| k == key).map(|(_, v)| v))
         .unwrap_or(&Value::Undefined)
 }
 
-/// The channel name an argument gives (see `channel_name`).
 fn arg_name(args: &[Value], kwargs: &Keywords, at: usize, key: &str) -> Option<Option<String>> {
     name(arg(args, kwargs, at, key))
 }
 
-/// The one channel name an argument gives, as `read` answers it.
 fn one(args: &[Value], kwargs: &Keywords, at: usize, key: &str) -> Option<Vec<Option<String>>> {
     Some(vec![arg_name(args, kwargs, at, key)?])
 }
 
-/// The SQS queue the `QueueUrl` keyword names.
 fn queue(kwargs: &Keywords) -> Option<Vec<Option<String>>> {
     let url = kwargs.iter().find(|(k, _)| k == "QueueUrl").map(|(_, v)| v);
     Some(vec![queue_name(url)?])
 }
 
-/// The streams a redis-py `xreadgroup` reads: the keys of its third argument, a dict literal
-/// of stream and id.
 fn streams(args: &[Value], kwargs: &Keywords) -> Option<Vec<Option<String>>> {
     match arg(args, kwargs, 2, "streams") {
         Value::Object(entries) => entries
@@ -230,7 +207,6 @@ fn streams(args: &[Value], kwargs: &Keywords) -> Option<Vec<Option<String>>> {
     }
 }
 
-/// AWS source-channel operations, in addition to the existing SQS forms.
 pub(super) fn aws(code: &Code) -> Vec<crate::contract::Found> {
     if !code.pack().extensions().contains(&"py") {
         return Vec::new();
@@ -268,7 +244,6 @@ pub(super) fn aws(code: &Code) -> Vec<crate::contract::Found> {
     out
 }
 
-/// SQS queue arguments retain an environment read through the same exact expansion as URLs.
 fn sqs<'a>(code: &Code<'a>, path: &'a str, n: usize, consumer: bool) -> Vec<Message> {
     code.expand(crate::resolve::Expand::Call(path, n), &|_, keywords| {
         let names = queue(keywords)?;
@@ -317,7 +292,6 @@ mod tests {
     use crate::resolve::Resolver;
     use std::collections::BTreeMap;
 
-    /// The messages of the Python file `src` as lines.
     fn lines(src: &str) -> Vec<String> {
         let facts = Python.parse("x.py", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("x.py", &facts)]);

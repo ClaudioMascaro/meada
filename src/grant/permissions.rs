@@ -1,19 +1,3 @@
-//! The GitHub grant at admission (#332, ADR 0016): a process with the GitHub grant provider
-//! (`Manifest::github`, `[oidc.github]`) keeps the newest permissions set `meada github-app
-//! roles` wrote in memory, keyed by login. A thread
-//! reads, every `poll_every()` (`PERMISSIONS_POLL`, 60 seconds), the newest set's id, its
-//! `finished` and its age on Postgres's clock, and loads its rows whose `role` is in `roles` only
-//! when the id changed, in one read-only transaction that sees one set. Admission never waits on
-//! Postgres: before the first read the GitHub grant is empty. The console also reads the set's
-//! exclusions with the version it checked, for the workspace views' `excluded` flag (#333).
-//!
-//! The age is Postgres's current time minus `finished` at the last successful read, plus the
-//! process's monotonic time since; a later read of the same set never lowers it, so a clock moved
-//! back cannot extend a set's authority. Past `max_age_seconds` the GitHub grant is empty. A
-//! failed read is one stderr line per poll and keeps the set aging; a schema version this binary
-//! does not know is written once and counts as unreachable. Every row is hostile: a set or a row
-//! that fails its checks is skipped with one line naming its table, never a value.
-
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, RwLock, Weak};
 use std::time::{Duration, Instant};
@@ -30,8 +14,7 @@ use crate::workspaces::Reason;
 // this long after the refresh that recorded it; `MEADA_PERMISSIONS_POLL_MS` shortens it in debug
 // builds.
 const PERMISSIONS_POLL: Duration = Duration::from_secs(60);
-/// The statements of one read besides the version check's: the transaction's begin, the newest
-/// set, its counts, its rows and its exclusions, and with `[catalog]` its catalog.
+
 const STATEMENTS: u32 = 5 + cfg!(feature = "workspaces") as u32;
 
 // ponytail: the longest identity the catalog holds, in bytes, so that its pagination cursor (the
@@ -39,10 +22,6 @@ const STATEMENTS: u32 = 5 + cfg!(feature = "workspaces") as u32;
 #[cfg(feature = "workspaces")]
 const CATALOG_IDENTITY_MAX: usize = 192;
 
-/// How often a process reads the newest permissions set. In debug builds
-/// `MEADA_PERMISSIONS_POLL_MS` shortens it (a knob for tests and not documented, as
-/// `MEADA_DRAIN_MS` is; a release binary ignores it), and `super::max_age_min` lowers the floor
-/// of `max_age_seconds` with it.
 pub(super) fn poll_every() -> Duration {
     #[cfg(debug_assertions)]
     if let Some(ms) = poll_knob() {
@@ -51,15 +30,12 @@ pub(super) fn poll_every() -> Duration {
     PERMISSIONS_POLL
 }
 
-/// `MEADA_PERMISSIONS_POLL_MS`, when set to a positive number of milliseconds.
 #[cfg(debug_assertions)]
 pub(crate) fn poll_knob() -> Option<u64> {
     let ms = std::env::var("MEADA_PERMISSIONS_POLL_MS").ok()?;
     ms.parse().ok().filter(|ms| *ms > 0)
 }
 
-/// The cache of one process: the GitHub grant provider, the data layer it reads and what it last
-/// read.
 pub(super) struct Permissions {
     github: Github,
     postgres: crate::postgres::Config,
@@ -69,35 +45,23 @@ pub(super) struct Permissions {
 #[derive(Default)]
 struct State {
     set: Option<Set>,
-    /// Whether the schema version refusal was written: it is written once.
     version_said: bool,
 }
 
-/// A permissions set as loaded; what only the console shows is unread on nodes.
 #[cfg_attr(not(feature = "ui"), expect(dead_code))]
 struct Set {
     id: String,
-    /// When the job finished it, RFC 3339 on Postgres's clock.
     finished: String,
-    /// Its age at `read`.
     age: Duration,
     read: Instant,
-    /// The counts as the job wrote them: repositories listed, every row, the exclusions.
     repositories: i64,
     rows: i64,
     exclusions: i64,
-    /// The identities each login reads through an accepted role.
     logins: HashMap<String, Vec<String>>,
-    /// The workspace version the set was checked against, and the identities of its additions
-    /// the set left out (`excluded`).
     version: Option<String>,
     excluded: BTreeSet<String>,
-    /// The identities the set left out of each named workspace, by workspace id (#342): the
-    /// sponsor rule's exclusions.
     #[cfg(feature = "workspaces")]
     context_excluded: HashMap<String, BTreeSet<String>>,
-    /// With `[catalog]` (#341), the identities the catalog holds: the set's `catalog` and `both`
-    /// repositories GitHub showed (`listed`). Coverage, not entitlement.
     #[cfg(feature = "workspaces")]
     catalog: BTreeSet<String>,
 }
@@ -107,15 +71,12 @@ impl Set {
         self.age + now.saturating_duration_since(self.read)
     }
 
-    /// Another read of this set at `now` found `age` on Postgres's clock: the age never moves
-    /// back, whatever either clock did.
     fn seen(&mut self, age: Duration, now: Instant) {
         self.age = age.max(self.age(now));
         self.read = now;
     }
 }
 
-/// The newest set's age, as the catalog answer shows it.
 #[cfg(feature = "workspaces")]
 pub(crate) struct SetInfo {
     pub(crate) finished: String,
@@ -123,15 +84,11 @@ pub(crate) struct SetInfo {
     pub(crate) max_age_seconds: u64,
 }
 
-/// The catalog as one subject sees it: `reason` is why nothing is selectable (a condition of the
-/// platform or of the subject, the same for every identity), else `selectable` holds the
-/// identities it may select, sorted.
 #[cfg(feature = "workspaces")]
 pub(crate) struct Catalog {
     pub(crate) reason: Option<Reason>,
     pub(crate) set: Option<SetInfo>,
     pub(crate) selectable: BTreeSet<String>,
-    /// The GitHub grant provider's `host`: identities on it compare case-insensitively (#508).
     pub(crate) host: String,
 }
 
@@ -147,20 +104,15 @@ impl Catalog {
     }
 }
 
-/// What a read found: no set, the set already loaded at its age and the instant it was taken,
-/// or another one, loaded.
 enum Read {
     None,
     Same(Duration, Instant),
     New(Box<Set>),
 }
 
-/// Why a read failed: why, and whether it is the version refusal; `None` for a set row that
-/// failed its checks, its line already written.
 type Unread = Option<(String, bool)>;
 
 impl Permissions {
-    /// The cache of `github` over `postgres`, empty until `poll` starts.
     pub(super) fn new(github: Github, postgres: crate::postgres::Config) -> Arc<Self> {
         Arc::new(Self {
             github,
@@ -169,28 +121,20 @@ impl Permissions {
         })
     }
 
-    /// Starts the thread that reads the newest set now and every `poll_every()` while the cache
-    /// lives: once the listener printed its address, so that line stays the first on stderr.
     pub(super) fn poll(self: &Arc<Self>) {
         let cache = Arc::downgrade(self);
         std::thread::spawn(move || poll(cache, poll_every()));
     }
 
-    /// The GitHub grant provider's `host`.
     pub(super) fn host(&self) -> &str {
         &self.github.host
     }
 
-    /// The identities `login` reads through GitHub and the grant's state, both from one read
-    /// of the set at one instant: `current` with the set's rows while it is at most
-    /// `max_age_seconds` old, `expired` with none past it, `unread` with none while no set is
-    /// loaded. Never `*` (a row's identity is on `host`).
     pub(super) fn grant_and_state(&self, login: Option<&str>) -> (Vec<String>, GrantState) {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
         self.read_at(state.set.as_ref(), login, Instant::now())
     }
 
-    /// `grant_and_state` for `set` at `now`.
     fn read_at(
         &self,
         set: Option<&Set>,
@@ -215,9 +159,6 @@ impl Permissions {
         }
     }
 
-    /// The newest set's workspace version and the identities it excluded from that version
-    /// (#333), whatever the set's age: what the last role check left out. `None` before a set is
-    /// loaded or when it names no version.
     #[cfg_attr(not(feature = "ui"), expect(dead_code))]
     pub(super) fn excluded(&self) -> Option<(String, BTreeSet<String>)> {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
@@ -225,8 +166,6 @@ impl Permissions {
         Some((set.version.clone()?, set.excluded.clone()))
     }
 
-    /// The identities the newest set left out of the named workspace `context` (#342): the sponsor
-    /// rule's exclusions, whatever the set's age. Empty before a set is loaded.
     #[cfg(feature = "workspaces")]
     pub(super) fn excluded_in(&self, context: &str) -> BTreeSet<String> {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
@@ -236,8 +175,6 @@ impl Permissions {
             .unwrap_or_default()
     }
 
-    /// The admission view's `github` (#332): the grant provider's settings, the grant's state and
-    /// the newest set as loaded (null before one is), its counts as the job wrote them.
     #[cfg_attr(not(feature = "ui"), expect(dead_code))]
     pub(super) fn admission(&self) -> Value {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
@@ -267,11 +204,6 @@ impl Permissions {
         })
     }
 
-    /// The catalog as `login` may select from it (#341, ADR 0021): `administrator` the whole
-    /// catalog, anyone else the repositories its login holds an accepted role on in the newest
-    /// set. Pending (nothing selectable) while no set is loaded, while the set is past
-    /// `max_age_seconds` and, for anyone but the administrator, without a login. Never reads
-    /// Postgres.
     #[cfg(feature = "workspaces")]
     pub(super) fn catalog(&self, login: Option<&str>, administrator: bool) -> Catalog {
         let state = self.state.read().unwrap_or_else(|e| e.into_inner());
@@ -310,13 +242,11 @@ impl Permissions {
         }
     }
 
-    /// One poll: the newest set read, the cache updated, or the stderr line of a failure.
     fn refresh(&self) {
         let known = {
             let state = self.state.read().unwrap_or_else(|e| e.into_inner());
             state.set.as_ref().map(|set| set.id.clone())
         };
-        // The poll thread is the only reader: a Postgres that stops answering must not stop it.
         let bound = self.postgres.bound(STATEMENTS);
         let read = crate::modules::within(
             bound,
@@ -344,8 +274,6 @@ impl Permissions {
         }
     }
 
-    /// The newest set, its age on Postgres's clock, and its rows when its id is not `known`, in
-    /// one read-only transaction: one snapshot, so rows and counts are the set's own.
     async fn read(&self, known: Option<&str>) -> Result<Read, Unread> {
         let mut opened = crate::postgres::versioned(&self.postgres)
             .await
@@ -359,7 +287,6 @@ impl Permissions {
             .start()
             .await
             .map_err(failed)?;
-        // Taken before the age is: the time the rest of the read takes counts in the age.
         let at = Instant::now();
         let newest = format!(
             "SELECT id, to_char(finished AT TIME ZONE 'UTC', \
@@ -375,7 +302,6 @@ impl Permissions {
         let finished: Option<String> = row.try_get(1).ok();
         let age = (row.try_get::<_, f64>(2).ok()).and_then(|s| Duration::try_from_secs_f64(s).ok());
         let repositories = row.try_get::<_, i32>(3).ok().filter(|n| *n >= 0);
-        // A finished time ahead of Postgres's clock is no age: the set grants nothing new.
         let (Some(id), Some(finished), Some(age), Some(repositories)) = (
             id.filter(|id| set_id_ok(id)),
             finished.filter(|t| crate::postgres::is_time(t)),
@@ -388,8 +314,6 @@ impl Permissions {
         if known == Some(id.as_str()) {
             return Ok(Read::Same(age, at));
         }
-        // The version it checked only names what the console marks `excluded`: one that is no
-        // version id marks nothing, and the set still grants.
         let version = match row.try_get::<_, Option<String>>(4) {
             Ok(None) => None,
             Ok(Some(version)) if meada_core::ids::is_id(&version) => Some(version),
@@ -468,9 +392,6 @@ impl Permissions {
         })))
     }
 
-    /// The identities of the set's catalog, with `[catalog]` only: its `catalog` and `both`
-    /// repositories whose coverage is `listed`. A row that fails its checks is skipped with one
-    /// line naming its table.
     #[cfg(feature = "workspaces")]
     async fn read_catalog(
         &self,
@@ -500,8 +421,6 @@ impl Permissions {
         Ok(catalog)
     }
 
-    /// Whether a row's identity may enter a grant: on `host`, an identity a served repository
-    /// may have, with no control character or space.
     fn identity_ok(&self, identity: &str) -> bool {
         (identity.strip_prefix(&self.github.host)).is_some_and(|rest| rest.starts_with('/'))
             && meada_core::manifest::identity_problem(identity).is_none()
@@ -511,24 +430,19 @@ impl Permissions {
     }
 }
 
-/// Whether `id` is a set's id: 32 lowercase hex characters.
 fn set_id_ok(id: &str) -> bool {
     id.len() == 32 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
 
-/// Whether a row's login is one the job writes: GitHub's, lowercased.
 fn login_ok(login: &str) -> bool {
     meada_core::manifest::added_by_problem(login).is_none()
 }
 
-/// A subject's login: `login` when it is 1 to 39 ASCII letters, digits, `-` and `_`, lowercased,
-/// as GitHub compares logins; anything else is none.
 pub(super) fn login(login: Option<&str>) -> Option<String> {
     let login = login?.to_ascii_lowercase();
     login_ok(&login).then_some(login)
 }
 
-/// The poll thread: reads the newest set of `cache` now and every `every`, until it is gone.
 fn poll(cache: Weak<Permissions>, every: Duration) {
     loop {
         let Some(cache) = cache.upgrade() else {
@@ -565,7 +479,6 @@ mod tests {
         }
     }
 
-    /// A set read at `read` with `age` on Postgres's clock, granting `ana` one repository.
     fn set(age: u64, read: Instant) -> Set {
         Set {
             id: "0".repeat(32),
@@ -641,22 +554,18 @@ mod tests {
         let mut held = set(10, start);
         let later = start + Duration::from_secs(30);
         assert_eq!(held.age(later), Duration::from_secs(40));
-        // Postgres's clock moved back: the same set read again is not younger.
         held.seen(Duration::from_secs(5), later);
         assert_eq!(held.age(later), Duration::from_secs(40));
-        // Moved forward, it is older.
         held.seen(Duration::from_secs(100), later);
         assert_eq!(
             held.age(later + Duration::from_secs(1)),
             Duration::from_secs(101)
         );
-        // The process's clock never runs back either.
         assert_eq!(held.age(start), Duration::from_secs(100));
     }
 
     #[test]
     fn a_login_is_a_short_ascii_string_compared_in_lowercase() {
-        // A value that is no string is no login: the verifier reads none from it.
         let login = |v: Value| super::login(v.as_str());
         assert_eq!(login(json!("Ana-Souza_2")).as_deref(), Some("ana-souza_2"));
         assert_eq!(login(json!("a".repeat(39))), Some("a".repeat(39)));
@@ -694,9 +603,6 @@ mod tests {
         assert!(!set_id_ok(&"AB".repeat(16)) && !set_id_ok("abc"));
     }
 
-    /// The catalog against the shared Y/A/B table (`tests/fixtures/named-workspaces.json`,
-    /// ADR 0020): a set whose rows are the table's accepted ones and whose catalog holds Y, A and
-    /// B answers each caller's creation rows alike, at a fresh age and past `max_age_seconds`.
     #[cfg(feature = "workspaces")]
     #[test]
     fn the_catalog_follows_the_shared_table() {
@@ -775,8 +681,6 @@ mod tests {
                 let wanted = case.select.iter().map(|i| &table.identities[i]);
                 let all = wanted.clone().all(|i| seen.selectable.contains(i));
                 assert_eq!((seen.reason, all), (None, case.allowed), "{name}");
-                // Nothing beyond the caller's accepted rows, or the whole catalog for the
-                // administrator, is ever selectable.
                 let rows = caller
                     .rows
                     .iter()
@@ -791,9 +695,6 @@ mod tests {
         }
     }
 
-    /// Without a set the catalog is pending `no_set`; a row outside the catalog is not
-    /// selectable though its login holds a role on it (coverage is the catalog's, the role is
-    /// the login's, and only both select).
     #[cfg(feature = "workspaces")]
     #[test]
     fn the_catalog_needs_a_set_and_both_coverage_and_a_role() {
@@ -815,8 +716,6 @@ mod tests {
         assert_eq!(cache.catalog(None, true).selectable.len(), 1);
     }
 
-    /// The grant providers of the groups table `super::tests::table()` and a GitHub grant
-    /// provider whose cache holds `held`.
     fn providers(held: Option<Set>) -> super::super::Providers {
         let cache = cache(60);
         cache.state.write().unwrap().set = held;
@@ -839,10 +738,8 @@ mod tests {
             sorted(&granted.union()),
             only(&["b", "github.com/acme/api"])
         );
-        // `*` from a group stays all with the GitHub side beside it.
         let all = providers.grant(&groups(&["p"]), Some("ana"));
         assert_eq!(sorted(&all.union()), None);
-        // An unmapped group grants nothing, and the login's rows still do.
         let unmapped = providers.grant(&groups(&["unmapped"]), Some("ana"));
         assert_eq!(sorted(&unmapped.union()), only(&["github.com/acme/api"]));
         assert_eq!(providers.github(), Some("github.com"));

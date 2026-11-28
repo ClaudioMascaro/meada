@@ -13,7 +13,6 @@ struct Cli {
     command: Command,
 }
 
-// Command descriptions are set at runtime from the message catalog (ADR 0008).
 #[derive(Subcommand)]
 enum Command {
     Index {
@@ -87,7 +86,6 @@ enum Command {
         #[command(subcommand)]
         command: GithubAppCommand,
     },
-    // With a subcommand (`reset-admin`), `--listen` and `--workspace` belong to it alone.
     #[cfg(feature = "ui")]
     #[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
     Ui {
@@ -227,7 +225,6 @@ enum PostgresCommand {
 #[cfg(all(feature = "ui", feature = "accounts"))]
 #[derive(Subcommand)]
 enum UiCommand {
-    // Recovers the default account `admin` (its help comes from the message catalog).
     ResetAdmin {
         #[arg(long)]
         workspace: PathBuf,
@@ -270,8 +267,6 @@ enum WorkspaceCommand {
     },
 }
 
-/// `meada workspace`: the answer on stdout (an id, the listing, the entries), notes on stderr;
-/// on a failure every line on stderr and exit 1.
 #[cfg(feature = "generation-pointer")]
 fn workspace(command: WorkspaceCommand) -> ! {
     use meada::snapshot::versions;
@@ -336,7 +331,6 @@ fn workspace(command: WorkspaceCommand) -> ! {
         #[cfg(feature = "refresh-lock")]
         WorkspaceCommand::Apply { version, workspace } => {
             let author = versions::cli_author();
-            // The CLI holds the store's and Valkey's credentials: the global operator (ADR 0015).
             let operator = versions::Acting::operator();
             let id = meada_core::ids::is_id(&version).then(|| version.clone());
             meada::audit::cli(
@@ -350,7 +344,6 @@ fn workspace(command: WorkspaceCommand) -> ! {
             )
             .map(|applied| format!("{}\n", applied.line))
         }
-        // The id on stdout either way; that nothing changed on stderr.
         WorkspaceCommand::Pull { workspace } => versions::pull(&workspace).map(|pulled| {
             let id = match pulled {
                 versions::Pulled::Swapped(id) => id,
@@ -358,7 +351,6 @@ fn workspace(command: WorkspaceCommand) -> ! {
                     notes.push(Msg::WorkspaceAlreadyCurrent(&id).text());
                     id
                 }
-                // No deployment version (named workspaces alone): no id on stdout.
                 versions::Pulled::Empty => return String::new(),
             };
             format!("{id}\n")
@@ -381,7 +373,6 @@ fn workspace(command: WorkspaceCommand) -> ! {
     }
 }
 
-/// `meada workspaces`: the named workspaces' operations as the platform administrator (#343).
 #[cfg(feature = "workspaces")]
 fn workspaces(command: WorkspacesCommand) -> meada::Result<String> {
     use meada::workspaces::cli;
@@ -438,14 +429,11 @@ fn workspaces(command: WorkspacesCommand) -> meada::Result<String> {
             base,
             workspace,
         } => cli::operators(&workspace, &id, &add, &remove, base),
-        // Served by `main` itself, as `meada ui` is.
         #[cfg(feature = "proposals")]
         WorkspacesCommand::Mcp { .. } => unreachable!("served by main"),
     }
 }
 
-/// A pointer operation by `author` on `generation` under the audit of `workspace` (#328): an id
-/// that fails its check is refused by `op` with no record.
 #[cfg(feature = "refresh-lock")]
 fn pointer_audited(
     workspace: &Path,
@@ -491,8 +479,6 @@ enum GithubAppCommand {
     },
 }
 
-/// `meada github-app`: git's answer on stdout, notes on stderr; on a failure every line on
-/// stderr and exit 1, so git tries its next helper.
 #[cfg(feature = "github-app")]
 fn github_app(command: GithubAppCommand) -> ! {
     let reply = match command {
@@ -590,13 +576,9 @@ enum FenceCommand {
     },
 }
 
-/// `meada snapshot pull`: the generation id on stdout when the pointer file moved, or once
-/// when it already named the store's current one; a pull already running is no failure. With
-/// `every`, again and again: a failed round is reported and the next one runs.
 #[cfg(feature = "snapshot")]
 fn pull(manifest: &Path, every: Option<u64>) -> ! {
     use meada::snapshot::pull::Pulled;
-    // A host name that is no node name refuses to start; a round never refuses.
     #[cfg(feature = "generation-pointer")]
     if every.is_some()
         && let Err(e) = meada::snapshot::heartbeat::check(manifest)
@@ -645,9 +627,6 @@ fn pull(manifest: &Path, every: Option<u64>) -> ! {
     }
 }
 
-/// `serve`, a listener (`meada mcp --listen`, `meada ui`). In debug builds `MEADA_DRAIN_MS`
-/// shortens the drain bound (a knob for tests and not documented; a release binary has no way
-/// to shorten the bound).
 fn drained(serve: impl FnOnce() -> meada::Result<()>) -> meada::Result<()> {
     #[cfg(debug_assertions)]
     if let Some(bound) = std::env::var("MEADA_DRAIN_MS")
@@ -660,9 +639,6 @@ fn drained(serve: impl FnOnce() -> meada::Result<()>) -> meada::Result<()> {
     serve()
 }
 
-/// The blocks of a `meada trace --batch` file: a line `@@<label>` opens one, each other
-/// non-empty line is a path of the open block; paths before the first label form a block
-/// labelled "".
 fn blocks(text: &str) -> Vec<(String, Vec<String>)> {
     let mut blocks: Vec<(String, Vec<String>)> = Vec::new();
     for line in text.lines() {
@@ -678,8 +654,6 @@ fn blocks(text: &str) -> Vec<(String, Vec<String>)> {
     blocks
 }
 
-/// Prints `text` on stdout, as `print!` does, but a reader that closed its end early
-/// (`meada export | head`) is no error: the rest is dropped and the command ends as it would.
 fn out(text: impl std::fmt::Display) {
     use std::io::Write;
     let mut stdout = std::io::stdout().lock();
@@ -986,7 +960,6 @@ fn main() -> ExitCode {
         Command::Mcp {
             listen, workspace, ..
         } => {
-            // The MCP surface is English whatever `LANG` says (ADR 0008).
             msg::init(None);
             match (listen, workspace) {
                 (Some(listen), Some(manifest)) => {
@@ -1007,8 +980,6 @@ fn main() -> ExitCode {
         Command::Status {
             workspace: None, ..
         } => engine::status(here).map(out),
-        // Every repository's problem on its own line, then the stage and the count, exit 1;
-        // the others are refreshed all the same.
         Command::Index {
             workspace: Some(manifest),
         } => engine::index_workspace(&manifest).map(|problems| {
@@ -1020,7 +991,6 @@ fn main() -> ExitCode {
                 std::process::exit(1);
             }
         }),
-        // The generation id is the only line on stdout.
         #[cfg(feature = "snapshot")]
         Command::Snapshot {
             command: SnapshotCommand::Publish { workspace },
@@ -1029,7 +999,6 @@ fn main() -> ExitCode {
                 out(format_args!("{generation}\n"));
                 Ok(())
             }
-            // Every repository's problem on its own line, as `index --workspace` reports them.
             Err(e) => {
                 for line in e.to_string().lines() {
                     eprintln!("meada: {line}");
@@ -1045,8 +1014,6 @@ fn main() -> ExitCode {
         Command::GithubApp { command } => github_app(command),
         #[cfg(feature = "generation-pointer")]
         Command::Workspace { command } => workspace(command),
-        // Every problem that refuses the start on its own line; the tools answer in English, as
-        // the MCP surface does (ADR 0008).
         #[cfg(feature = "proposals")]
         Command::Workspaces {
             command: WorkspacesCommand::Mcp { listen, workspace },
@@ -1060,15 +1027,12 @@ fn main() -> ExitCode {
             }
             Ok(())
         }
-        // The answer is the only thing on stdout; a refusal's reason is on stderr, exit 1.
         #[cfg(feature = "workspaces")]
         Command::Workspaces { command } => workspaces(command).map(out),
-        // The version reached is the only line on stdout.
         #[cfg(feature = "postgres")]
         Command::Postgres {
             command: PostgresCommand::Migrate { workspace },
         } => meada::postgres::migrate(&workspace).map(|version| out(format_args!("{version}\n"))),
-        // The generated password, when there is one, is the only line on stdout.
         #[cfg(all(feature = "ui", feature = "accounts"))]
         Command::Ui {
             command: Some(UiCommand::ResetAdmin { workspace }),
@@ -1078,8 +1042,6 @@ fn main() -> ExitCode {
                 out(format_args!("{password}\n"));
             }
         }),
-        // Every problem that refuses the start on its own line. The API is English whatever
-        // `LANG` says, as the MCP surface is (ADR 0008).
         #[cfg(feature = "ui")]
         Command::Ui {
             listen: Some(listen),
@@ -1095,10 +1057,8 @@ fn main() -> ExitCode {
             }
             Ok(())
         }
-        // Without a subcommand clap requires both `--listen` and `--workspace`.
         #[cfg(feature = "ui")]
         Command::Ui { .. } => unreachable!("`meada ui` without --listen or --workspace"),
-        // The child's exit code, or 1 with the reason: the lock held elsewhere or lost.
         #[cfg(feature = "refresh-lock")]
         Command::Snapshot {
             command: SnapshotCommand::Lock { workspace, command },
@@ -1111,7 +1071,6 @@ fn main() -> ExitCode {
                 std::process::exit(1);
             }
         },
-        // The new state is the only line on stdout.
         #[cfg(feature = "refresh-lock")]
         Command::Snapshot {
             command:
@@ -1161,7 +1120,6 @@ fn main() -> ExitCode {
             pointer_audited(&workspace, &author, "pointer.drop", &generation, op)
                 .map(|id| out(format_args!("{id}\n")))
         }
-        // What could not be counted on stderr, the new fence on stdout.
         #[cfg(feature = "refresh-lock")]
         Command::Snapshot {
             command:
@@ -1175,7 +1133,6 @@ fn main() -> ExitCode {
         } => {
             let author = meada::snapshot::lock::cli_author();
             let at_least = at_least.as_deref();
-            // The floor as the console records it: its decimal digits, normalized.
             let arguments = match at_least.map(meada_core::ids::fence) {
                 None => Some(serde_json::json!({})),
                 Some(Some(floor)) => Some(serde_json::json!({"at_least": floor.to_string()})),
@@ -1252,7 +1209,6 @@ fn main() -> ExitCode {
             let direction = if up { Direction::Up } else { Direction::Down };
             let start = match (from.as_deref(), changes.as_deref()) {
                 (Some(from), _) => Ok(Start::From(from)),
-                // The affected set reads deletions and whole-file changes too.
                 (None, Some("uncommitted")) if affected => Err(Changes::Uncommitted),
                 (None, Some("uncommitted")) => Ok(Start::Uncommitted),
                 (None, Some(range)) => match range.split_once("..") {
@@ -1279,7 +1235,6 @@ fn main() -> ExitCode {
         }),
     };
     match result {
-        // A readiness probe (ADR 0011); returning, not exiting, flushes the status text.
         Ok(()) if unready => ExitCode::FAILURE,
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {

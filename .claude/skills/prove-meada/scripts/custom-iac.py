@@ -19,7 +19,6 @@ from provisions import write
 
 REMOTE = 'example.com/custom-iac-proof/'
 EXTERNAL = 'metadata.annotations.crossplane.io/external-name'
-# Explicit, bounded official inventory: group, kind, identity path, canonical contract kind.
 ROWS = [
  ('kafka.strimzi.io', 'KafkaTopic', 'spec.topicName', 'channel::kafka'),
  ('rabbitmq.com', 'Queue', 'spec.name', 'channel::amqp'),
@@ -342,7 +341,6 @@ export function enqueue() { return client.send(new SendMessageCommand({QueueUrl:
         appvalue = capture(binary, apps[name], run, name+'-environment', 'export')
         assert sorted(x['contract'] for x in appvalue.get('providers', [])) == ['channel::sqs::'+target, 'image::registry.example.com/probe671/'+name], appvalue
         assert all('JOBS' in x.get('via', '') for x in appvalue['providers'] if x['contract'].startswith('channel::')), appvalue
-    # A real operator binding must route a real publish; a same-named Exchange is not a queue.
     objects = [
         {'kind':'Queue','metadata':{'name':'queue-object'},'spec':{'name':'operator-jobs'}},
         {'kind':'Exchange','metadata':{'name':'exchange-object'},'spec':{'name':'operator-events','type':'topic'}},

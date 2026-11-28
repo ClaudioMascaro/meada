@@ -35,8 +35,6 @@ def main():
         git('init', '-q', cwd=root)
         git('remote', 'add', 'origin', f'https://{prefix}{name}.git', cwd=root)
         write(root, 'meada.toml', f'[[peer]]\nrepo = "{prefix}{peer}"\n')
-    # `minimum` has the three letters or digits a pattern's literal part needs; `short`'s two and a
-    # separator are no evidence, so it links to nothing (#711, #782).
     write(infra, 'main.tf', '''resource "aws_sqs_queue" "messages" { name = "${terraform.workspace}-notifications" }
 resource "aws_s3_bucket" "ledger" { bucket = "ledger-${terraform.workspace}" }
 resource "aws_s3_bucket" "minimum" { bucket = "xyz-${terraform.workspace}" }
@@ -137,7 +135,6 @@ def send():
     (infra / 'meada.decisions.toml').unlink()
     restored = json.loads(cli('restored', ['export']))
     assert restored['provisions'] == before['provisions']
-    # The unresolved side can also be an image builder or a resource use.
     write(infra, 'compose.yaml', 'services:\n  west:\n    image: ghcr.io/anchored/worker-west:v1\n  east:\n    image: ghcr.io/anchored/worker-east:v1\n')
     images = json.loads(cli('image-ambiguous', ['export']))
     assert len(images['links']) == 2 and all(l['level'] == 'ambiguous' for l in images['links'])

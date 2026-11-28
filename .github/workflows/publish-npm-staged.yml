@@ -1,21 +1,12 @@
-# Custom cargo-dist publish job (dist-workspace.toml `publish-jobs`): stages the npm package
-# built by the release instead of publishing it. A staged version stays private until a
-# maintainer approves it with 2FA (`npm stage approve <stage-id>` or the package's Staged
-# Packages tab on npmjs.com), so the NPM_TOKEN in this workflow can never make a version public.
 name: Stage npm package
 
 on:
   workflow_call:
     inputs:
-      # cargo-dist passes the plan to every custom publish job. This one reads the plan from the
-      # release's artifacts instead (plan-dist-manifest.json): as an environment variable it passed
-      # the kernel's 128 KiB limit per string at v1.3.0 (the plan holds the release's CHANGELOG
-      # section twice) and no step of the job could start.
       plan:
         required: true
         type: string
 
-# Permissions come from the caller job (dist-workspace.toml `github-custom-job-permissions`).
 
 jobs:
   stage-npm:
@@ -27,15 +18,12 @@ jobs:
           pattern: artifacts-*
           path: npm/
           merge-multiple: true
-      # Staged publishing needs Node >= 22.14.0 and npm >= 11.15.0.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
       - run: npm install --global npm@11.21.0
       - name: Stage npm packages
-        # The assignment, not a `for ... in $(jq ...)`, makes a missing or unreadable plan fail the
-        # step. A package the plan names and the artifacts lack fails in npm.
         run: |
           packages=$(jq --raw-output '.releases[].artifacts[] | select(endswith("-npm-package.tar.gz"))' npm/plan-dist-manifest.json)
           for pkg in $packages; do

@@ -1,6 +1,3 @@
-//! A line-oriented scanner for Gradle's literal assignments and dependency coordinates.
-//! Tokens only separate strings, comments and block boundaries; no build grammar is loaded.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::lang::MAX_BYTES;
@@ -36,7 +33,6 @@ impl Token {
     }
 }
 
-/// Scans quoted strings before comments, so a comment or string never supplies build code.
 pub(crate) fn tokens(src: &str) -> Vec<Token> {
     let mut out = Vec::new();
     let mut chars = src.chars().peekable();
@@ -52,8 +48,6 @@ pub(crate) fn tokens(src: &str) -> Vec<Token> {
             }
             '/' if chars.peek() == Some(&'*') => {
                 chars.next();
-                // Kotlin block comments nest; read so for Groovy too, where a nested opener is
-                // rare and only turns a coordinate into a miss, never into a wrong `exact`.
                 let mut depth = 1usize;
                 while let Some(c) = chars.next() {
                     match (c, chars.peek()) {
@@ -161,8 +155,6 @@ fn configuration(name: &str) -> bool {
             .any(|s| name.ends_with(s))
 }
 
-/// A value's text, with `*` for each part that is no string: `"g:a:" + v` is `g:a:*`. A string
-/// holding `*`, or a `$` that is no interpolation, is no coordinate.
 fn text(tokens: &[Token]) -> Option<String> {
     let mut text = String::new();
     for token in tokens {
@@ -180,7 +172,6 @@ fn text(tokens: &[Token]) -> Option<String> {
     Some(text)
 }
 
-/// A group or artifact as a literal, or as the pattern of its literal fragments (`true`).
 fn piece(part: &str) -> Option<(String, bool)> {
     match super::literal(part) {
         true => Some((part.to_string(), false)),
@@ -188,7 +179,6 @@ fn piece(part: &str) -> Option<(String, bool)> {
     }
 }
 
-/// The parts of `"group:artifact[:version]"`, split at the colons outside `${...}`.
 fn positional(text: &str) -> Option<(&str, &str, Option<&str>)> {
     let mut parts = Vec::new();
     let mut depth = 0usize;
@@ -214,8 +204,6 @@ fn positional(text: &str) -> Option<(&str, &str, Option<&str>)> {
     }
 }
 
-/// The `group`, `name` and `version` of map notation (`group: 'g', name: 'a'` or Kotlin's
-/// `group = "g", name = "a"`); `None` when the arguments are not named.
 fn named(args: &[Token]) -> Option<Option<(String, String, Option<String>)>> {
     let args = arguments(args);
     let key = |arg: &[Token]| match arg {
@@ -243,8 +231,6 @@ fn named(args: &[Token]) -> Option<Option<(String, String, Option<String>)>> {
     Some(group.zip(artifact).map(|(g, a)| (g, a, version)))
 }
 
-/// A template with each `$name` or `${name}` that `literals` gives a value replaced by it. A bare
-/// `$name.rest` stays: Groovy reads it as a property of `name`, Kotlin as `name` and `.rest`.
 fn filled(value: &str, literals: &BTreeMap<String, String>) -> String {
     let mut out = String::new();
     let mut rest = value;
@@ -278,8 +264,6 @@ fn filled(value: &str, literals: &BTreeMap<String, String>) -> String {
     out
 }
 
-/// `value` with each bare `$name` written `${name}`, the form `jvm::maven::fill` reads; a
-/// `$name.rest` stays, as `filled` leaves it.
 pub fn braced(value: &str) -> String {
     let mut out = String::new();
     let mut rest = value;
@@ -301,7 +285,6 @@ pub fn braced(value: &str) -> String {
     out
 }
 
-/// The names of the `${..}` holes of `value`.
 fn holes(value: &str) -> impl Iterator<Item = &str> {
     value
         .split("${")
@@ -309,8 +292,6 @@ fn holes(value: &str) -> impl Iterator<Item = &str> {
         .filter_map(|rest| rest.split_once('}').map(|(name, _)| name))
 }
 
-/// The `via` of a dependency written as a catalog accessor, `libs.models`, until
-/// `Maven::inherit` reads the catalog.
 pub const CATALOG: &str = "catalog ";
 
 fn dependency(
@@ -319,7 +300,6 @@ fn dependency(
     literals: &BTreeMap<String, String>,
     declared: &BTreeSet<String>,
 ) -> Option<Entry> {
-    // `libs.models` (or `libs.models` in parentheses): a name in a catalog, if one says so.
     let lone = match args {
         [Token::Mark('('), inner @ .., Token::Mark(')')] => inner,
         _ => args,
@@ -337,8 +317,6 @@ fn dependency(
             ..Entry::default()
         });
     }
-    // A call (`project(...)`, `files(...)`, `platform(...)`) or no string at all declares no
-    // `group:artifact` coordinate.
     let call = args
         .windows(2)
         .any(|w| matches!(w, [Token::Word(_), Token::Mark('(')]));
@@ -357,8 +335,6 @@ fn dependency(
         }
     };
     let (group, artifact) = (filled(&group, literals), filled(&artifact, literals));
-    // What the pom's seam can fill later: holes in the `${..}` form, none of them a name the
-    // script assigns (the script's value wins over `gradle.properties`, and is not a literal).
     let template = (braced(&group), braced(&artifact));
     let template = [&template.0, &template.1]
         .iter()
@@ -370,8 +346,6 @@ fn dependency(
         .filter(|(g, a)| holes(g).chain(holes(a)).all(|n| !declared.contains(n)));
     let (group, group_computed) = piece(&group)?;
     let (artifact, artifact_computed) = piece(&artifact)?;
-    // A coordinate without one literal fragment fits every provider: it names none, unless
-    // `gradle.properties` may still fill it (`Maven::inherit` drops it when it does not).
     if group == "*" && artifact == "*" && template.is_none() {
         return None;
     }
@@ -380,11 +354,7 @@ fn dependency(
         return None;
     }
     let computed = group_computed || artifact_computed;
-    // A computed version keeps the coordinate literal: the range is kept as written, a part
-    // that is no string leaves none.
     let range = range.filter(|v| !v.contains('*'));
-    // The script's own literals fill the version too; one naming a name the script assigns
-    // otherwise is unknown, and `gradle.properties` never overrides the script.
     let range = (range.map(|v| filled(&v, literals)))
         .filter(|v| holes(&braced(v)).all(|n| !declared.contains(n)));
     Some(Entry {
@@ -404,8 +374,6 @@ fn control(name: &str) -> bool {
     )
 }
 
-/// The names a statement assigns: `name =`, `name +=`, `val name =`, `val name: T =`, among its
-/// first tokens, or anywhere in a control statement.
 fn targets(tokens: &[Token]) -> impl Iterator<Item = &str> {
     let typed = matches!(tokens.first().and_then(Token::word), Some("val" | "var"))
         && matches!(tokens.get(2), Some(Token::Mark(':')));
@@ -433,15 +401,12 @@ fn assigns(tokens: &[Token], name: &str) -> bool {
     targets(tokens).any(|target| target == name)
 }
 
-/// The name and the string of a statement that only gives a name a string with no interpolation:
-/// `val name = "x"`, `def name = 'x'`, `name = 'x'`, `ext.name = 'x'`.
 fn literal_assignment(tokens: &[Token]) -> Option<(&str, &str)> {
     let typed = tokens.first().and_then(Token::word);
     let tokens = match typed {
         Some("val" | "def") => &tokens[1..],
         _ => tokens,
     };
-    // `val name: Type = "x"`
     if let [
         Token::Word(name),
         Token::Mark(':'),
@@ -461,7 +426,6 @@ fn literal_assignment(tokens: &[Token]) -> Option<(&str, &str)> {
     Some((name, assigned(tokens, target)??))
 }
 
-/// The arguments of a call, `f(a, b)` or `f a, b`, split at the commas outside brackets.
 fn arguments(args: &[Token]) -> Vec<&[Token]> {
     let args = match args {
         [Token::Mark('('), inner @ .., Token::Mark(')')] => inner,
@@ -479,9 +443,6 @@ fn arguments(args: &[Token]) -> Vec<&[Token]> {
     .collect()
 }
 
-/// The arguments of `include` that are a lone literal string, in `include(":a", ":b")` or
-/// `include ':a', ':b'`; an argument that computes its value (a call, a concatenation) names
-/// no project.
 fn included(args: &[Token]) -> Vec<&str> {
     (arguments(args).into_iter())
         .filter_map(|arg| match arg {
@@ -491,12 +452,9 @@ fn included(args: &[Token]) -> Vec<&str> {
         .collect()
 }
 
-/// The head of a statement as a dotted path, with an index by a literal name read as a member
-/// (`sourceSets["main"].java.srcDirs` is `sourceSets.main.java.srcDirs`), and what follows it.
 fn dotted(tokens: &[Token]) -> Option<(String, &[Token])> {
     let head = tokens.first()?.word()?;
     match &tokens[1..] {
-        // `sourceSets.getByName("test").kotlin`: the set is the literal in the call.
         [
             Token::Mark('('),
             Token::String(set, false),
@@ -521,15 +479,12 @@ fn dotted(tokens: &[Token]) -> Option<(String, &[Token])> {
     }
 }
 
-/// Whether `path` stays inside the directory it is relative to.
 fn relative(path: &str) -> bool {
     !path.is_empty()
         && !path.contains('\\')
         && path.split('/').all(|s| !matches!(s, "" | "." | ".."))
 }
 
-/// The accessor name and the file of `from(files("gradle/other.versions.toml"))` inside
-/// `versionCatalogs { create("name") { .. } }` (Groovy: `name { .. }`).
 fn catalog_file(tokens: &[Token], blocks: &[String]) -> Option<(String, String)> {
     let [.., parent, name] = blocks else {
         return None;
@@ -555,11 +510,6 @@ fn catalog_file(tokens: &[Token], blocks: &[String]) -> Option<(String, String)>
     .then(|| (name.clone(), path.to_string()))
 }
 
-/// The literal directories a statement adds to a source set of `sourceSets`, with whether the
-/// set is `main`: `srcDirs = ['a']`, `srcDirs += 'a'`, `srcDir 'a'`, `srcDirs("a", "b")`, inside
-/// `sourceSets { main { java { ... } } }` or written with the dotted path, for the `java` or the
-/// `kotlin` directories alike. A directory that is not a literal relative path (`file(..)`,
-/// `..`, a variable) is not read.
 fn source_dirs(tokens: &[Token], blocks: &[String]) -> Option<(bool, Vec<String>)> {
     let (head, rest) = dotted(tokens)?;
     let path: Vec<&str> = (blocks.iter().map(String::as_str))
@@ -570,13 +520,9 @@ fn source_dirs(tokens: &[Token], blocks: &[String]) -> Option<(bool, Vec<String>
     let [set, lang @ ("java" | "kotlin"), "srcDirs" | "srcDir"] = path[at + 1..] else {
         return None;
     };
-    // `named(set)` or `getByName(set)` with no literal name (`block_head`) is no known set.
     if matches!(set, "named" | "getByName") {
         return None;
     }
-    // A Java directory of a set other than `main` is a test one. A Kotlin set is told by its
-    // name (Gradle's `test`, the multiplatform `*Main` and `*Test`); any other is not read, as
-    // its files may be production code (`Summary::roots`).
     let main = match (lang, set) {
         (_, "main") => true,
         ("kotlin", set) if set.ends_with("Main") => true,
@@ -604,9 +550,6 @@ fn source_dirs(tokens: &[Token], blocks: &[String]) -> Option<(bool, Vec<String>
     Some((main, dirs))
 }
 
-/// The name a block's head line gives it: its first word, with a `named(..)`, `getByName(..)`,
-/// `create(..)` or `register(..)` of a literal name read as that name (`sourceSets.named("main")`
-/// is `sourceSets.main`, `create("libs")` in `versionCatalogs` is `libs`).
 fn block_head(line: &[Token]) -> String {
     if let Some((head, [])) = dotted(line) {
         return head;
@@ -630,28 +573,19 @@ fn block_head(line: &[Token]) -> String {
     head.to_string()
 }
 
-/// What a scan has read so far.
 #[derive(Default)]
 struct Scan {
     build: super::Build,
     summary: Summary,
-    /// The included project paths a `project(':p').name` or `.projectDir` assignment changes.
     moved: BTreeSet<String>,
-    /// Some assignment changes a project's name or directory without saying which.
     unplaced: bool,
-    /// The literal source directories of the source sets, with whether the set is `main`.
     sources: Vec<(bool, String)>,
-    /// Each name the script assigns, with its string when that is its one assignment, at the
-    /// top level or in `ext { }`, outside any condition.
     names: BTreeMap<String, Option<String>>,
-    /// The version catalogs a settings file names, `(accessor, path)`.
     catalogs: Vec<(String, String)>,
-    /// The `dependencies` statements, read once `names` is complete.
     pending: Vec<(String, Vec<Token>)>,
 }
 
 fn statement(tokens: &[Token], blocks: &[String], controlled: bool, scan: &mut Scan) {
-    // `allprojects` configures this project too, so its assignments are never literal here.
     let conditional = controlled
         || blocks.iter().any(|b| b == "allprojects")
         || tokens.first().and_then(Token::word).is_some_and(control);
@@ -660,7 +594,6 @@ fn statement(tokens: &[Token], blocks: &[String], controlled: bool, scan: &mut S
     for target in targets(tokens) {
         let name = target.rsplit('.').next().unwrap_or(target);
         let literal = sole.filter(|(n, _)| *n == name).map(|(_, v)| v.to_string());
-        // A second assignment leaves no literal.
         (scan.names.entry(name.to_string()))
             .and_modify(|v| *v = None)
             .or_insert(literal);
@@ -708,9 +641,6 @@ fn statement(tokens: &[Token], blocks: &[String], controlled: bool, scan: &mut S
             *value = None;
         }
     }
-    // Like the coordinates, a source directory counts only where it is certain to apply here:
-    // never in a block that configures other projects (`allprojects`, `subprojects` and their
-    // `.each`, `project(':x')`, `configure(..)`).
     let shared = blocks.iter().any(|b| {
         let head = b.split('.').next().unwrap_or(b);
         matches!(
@@ -773,7 +703,6 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
     for token in tokens(text) {
         match token {
             Token::Mark('{') => {
-                // The block's head is a statement too: `implementation("g:a:1") { ... }`.
                 statement(&line, &blocks, controls > 0, &mut scan);
                 if blocks.len() == GRADLE_DEPTH {
                     return Summary::default();
@@ -830,8 +759,6 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
         .next()
         .is_some_and(|p| p.starts_with("settings."));
     if !settings {
-        // Each directory once, a test one when any set other than `main` lists it; the defaults
-        // stay past the limit, and the test roots are among the kept ones.
         let mut dirs: BTreeMap<String, bool> = BTreeMap::new();
         for (main, dir) in sources {
             *dirs.entry(dir).or_insert(true) &= main;
@@ -850,7 +777,6 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
         }
         (summary.roots, summary.test_roots) = (roots, tests);
     }
-    // A renamed or moved project is not where, or not what, `include` says.
     build
         .includes
         .retain(|(_, path)| !unplaced && !moved.contains(path));
@@ -866,10 +792,6 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
     summary
 }
 
-/// The properties a `gradle.properties` gives, as `Summary::properties`: each `name=value` (or
-/// `name:value`) line whose name is a plain key and whose value is no longer than a package
-/// name and holds no escape, the last line of a name winning. Comments (`#`, `!`) and the other
-/// lines are skipped; a file past `MAX_BYTES` reads as nothing.
 pub fn properties(src: &[u8]) -> Summary {
     let text = (src.len() <= MAX_BYTES)
         .then(|| std::str::from_utf8(src).ok())
@@ -896,10 +818,6 @@ pub fn properties(src: &[u8]) -> Summary {
     }
 }
 
-/// The libraries of a version catalog (`gradle/libs.versions.toml`), as `Summary::properties`:
-/// each alias as Gradle's accessor spells it (`my-lib` and `my_lib` are `my.lib`) with its
-/// `group:artifact` and, when `[versions]` or the library gives one, `:version`. A file past
-/// `MAX_BYTES`, one that is no TOML, and a library with no literal coordinate read as nothing.
 pub fn catalog(src: &[u8]) -> Summary {
     use toml::Value;
     let table = (src.len() <= MAX_BYTES)
@@ -908,7 +826,6 @@ pub fn catalog(src: &[u8]) -> Summary {
         .and_then(|text| text.parse::<toml::Table>().ok())
         .unwrap_or_default();
     let versions = table.get("versions").and_then(Value::as_table);
-    // A version as a string, or a rich version's strictest bound.
     fn version(v: &Value) -> Option<&str> {
         match v {
             Value::String(s) => Some(s),
@@ -1132,7 +1049,6 @@ list = ["com.acme:list"]
                 Token::Mark('('),
             ]
         );
-        // An unclosed string ends the scan.
         assert_eq!(tokens("a 'open"), [Token::Word("a".into())]);
     }
 
@@ -1179,7 +1095,6 @@ list = ["com.acme:list"]
         assert!(names("findProject(':app')?.name = 'svc'\n").is_empty());
     }
 
-    /// The `(name, via)` of each dependency of a script.
     fn coordinates(src: &str) -> Vec<(String, Option<String>)> {
         let summary = read("build.gradle", src.as_bytes());
         (summary.dependencies.into_iter())
@@ -1199,7 +1114,6 @@ list = ["com.acme:list"]
             ("ext {\n s = 'pi'\n}", written("example:api")),
             ("project.ext.s = 'pi'", written("example:api")),
             ("s = 'pi'", written("example:api")),
-            // Assigned twice, however it is written, or not once at the top level.
             ("def s = 'pi'\ns = 'qa'", computed("example:a*")),
             ("def s = 'pi'\next.s = 'qa'", computed("example:a*")),
             ("def s = 'pi'\nif (c) { s = 'qa' }", computed("example:a*")),
@@ -1207,7 +1121,6 @@ list = ["com.acme:list"]
             ("val s: String = \"pi\"", written("example:api")),
             ("val s: String = \"pi\"\ns = \"qa\"", computed("example:a*")),
             ("def s = 'p'\ns += 'i'", computed("example:a*")),
-            // Not a plain string: interpolated, computed, in a condition, a block or a call.
             ("def s = \"p${i}\"", computed("example:a*")),
             ("def s = 'p' + 'i'", computed("example:a*")),
             ("def s = prop('s')", computed("example:a*")),
@@ -1215,7 +1128,6 @@ list = ["com.acme:list"]
             ("allprojects { ext.s = 'pi' }", computed("example:a*")),
             ("subprojects { def s = 'pi' }", computed("example:a*")),
             ("dependencies { def s = 'pi' }", computed("example:a*")),
-            // Declared nowhere in the script.
             ("def other = 'pi'", computed("example:a*")),
         ] {
             assert_eq!(
@@ -1244,7 +1156,6 @@ list = ["com.acme:list"]
                 ("example:models".to_string(), written),
             ]
         );
-        // A group the script sets again leaves every hole.
         let again = coordinates(&src("group = 'a'\ngroup = 'b'"));
         assert!(again.iter().all(|(_, via)| via.is_some()), "{again:?}");
     }
@@ -1281,7 +1192,6 @@ list = ["com.acme:list"]
             all
         };
         assert_eq!(roots(""), (with(&[]), test_roots(&[])));
-        // Groovy and Kotlin forms, nested or dotted, replacing or adding.
         for (src, main, test) in [
             (
                 "sourceSets { main { java { srcDirs = ['src/a', \"src/b/\"] } } }",
@@ -1298,7 +1208,6 @@ list = ["com.acme:list"]
                 &["src/a"],
                 &["src/i"],
             ),
-            // The Kotlin source directory set, Groovy and Kotlin DSL.
             (
                 "sourceSets { main { kotlin { srcDirs = ['src/a'] } } }",
                 &["src/a"],
@@ -1309,7 +1218,6 @@ list = ["com.acme:list"]
                 &["src/a"],
                 &["src/t", "src/u"],
             ),
-            // An indexed set, in the dotted path or as a block's head.
             (
                 "sourceSets[\"main\"].kotlin.srcDir(\"src/a\")\nsourceSets['it'].java.srcDirs += 'src/i'",
                 &["src/a"],
@@ -1320,7 +1228,6 @@ list = ["com.acme:list"]
                 &["src/a"],
                 &["src/t"],
             ),
-            // A set looked up by a literal name, then its directories.
             (
                 "sourceSets.getByName(\"test\").kotlin.srcDir(\"src/t\")",
                 &[],
@@ -1345,18 +1252,15 @@ list = ["com.acme:list"]
                 tests.iter().any(|t| t == "src/x"),
             )
         };
-        // Multiplatform: `*Main` is production, `*Test` is test code.
         for main in ["main", "commonMain", "jvmMain"] {
             assert_eq!(tested(main), (true, false), "{main}");
         }
         for test in ["test", "commonTest", "jvmTest", "integrationTest"] {
             assert_eq!(tested(test), (true, true), "{test}");
         }
-        // Any other set is read as nothing: its files resolve by their package.
         for other in ["integration", "val jvmMain by getting", "benchmarks"] {
             assert_eq!(tested(other), (false, false), "{other}");
         }
-        // A Java directory of a set other than `main` stays a test root.
         let (_, tests) = roots("sourceSets.integration.java.srcDirs = ['src/i']");
         assert!(tests.iter().any(|t| t == "src/i"));
     }
@@ -1406,7 +1310,6 @@ list = ["com.acme:list"]
             dirs.join(", ")
         );
         assert_eq!(roots(&src).0.len(), MAX_ROOTS);
-        // The defaults stay, and every test root is a kept root.
         let (all, tests) = roots(&src);
         assert!(all.iter().any(|r| r == "src/main/kotlin"), "{all:?}");
         assert!(tests.iter().all(|t| all.contains(t)), "{tests:?}");

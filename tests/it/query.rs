@@ -10,7 +10,6 @@ fn web(case: &str) -> Engine {
 
 #[test]
 fn search_ranks_exact_then_prefix_then_substring() {
-    // `a` is no symbol's name, the prefix of `add`, and inside `Badge` and `label`.
     let answer = web("search_ranking").search("A", None, None).unwrap();
 
     assert_golden("ts-basic.search-a.txt", &answer);
@@ -85,7 +84,6 @@ fn context_lists_candidates_instead_of_guessing() {
 
 #[test]
 fn context_lists_every_candidate_of_an_ambiguous_call() {
-    // `render(1)` in `main` fits `render` in both `view.tsx` and `widget.jsx`.
     let repo = fixture_repo(
         "context_ambiguous_call",
         "conformance-ts-js",
@@ -116,13 +114,10 @@ fn python_functions_are_found_by_name_and_list_callers_and_callees() {
         "conformance-python.search-scale.txt",
         &engine.search("scale", None, None).unwrap(),
     );
-    // Callers through an alias, a dotted import and the same file; a callee through a
-    // relative import.
     assert_golden(
         "conformance-python.context-scale.txt",
         &engine.context("scale", None).unwrap(),
     );
-    // A method's callers through `self`, annotations and constructors, and by name alone.
     assert_golden(
         "conformance-python.context-render.txt",
         &engine.context("Panel.render", None).unwrap(),
@@ -138,29 +133,22 @@ fn rust_items_are_found_by_name_and_list_callers_and_callees() {
     );
     let engine = Engine::open(&repo).unwrap();
 
-    // A struct and its methods, in a crate whose root `[lib] path` names.
     assert_golden(
         "conformance-rust.search-invoice.txt",
         &engine.search("Invoice", None, None).unwrap(),
     );
-    // Callers from another module of the crate; callees through `mod` declarations, `super::`
-    // and a method matched by name.
     assert_golden(
         "conformance-rust.context-serve.txt",
         &engine.context("serve", None).unwrap(),
     );
-    // A method's callers by the receiver's type (a `let`, a parameter, a field, `self`, a
-    // function's return type) at `exact`, and by name alone at `ambiguous`.
     assert_golden(
         "conformance-rust.context-bump.txt",
         &engine.context("Counter.bump", None).unwrap(),
     );
-    // A method with one name in the repository: `exact` by the type, `inferred` by name alone.
     assert_golden(
         "conformance-rust.context-reset.txt",
         &engine.context("Counter.reset", None).unwrap(),
     );
-    // A `reqwest::get` whose URL a function computes: the consumer shows with no contract.
     assert_golden(
         "conformance-rust.context-unresolved.txt",
         &engine.context("unresolved", None).unwrap(),
@@ -180,21 +168,16 @@ fn go_functions_are_found_by_name_and_list_callers_and_callees() {
         "conformance-go.search-new.txt",
         &engine.search("New", None, None).unwrap(),
     );
-    // Callers through an import, from a test file of the package and from the external test
-    // package; callees in another file of the package and in the standard library.
     assert_golden(
         "conformance-go.context-new.txt",
         &engine.context("store/store.go::New", None).unwrap(),
     );
-    // A method's callers by the receiver's written type (a parameter, a field, a `var`, a
-    // literal, a result, a package variable) at `exact`, and by name alone at `inferred`.
     assert_golden(
         "conformance-go.context-bump.txt",
         &engine
             .context("methods/types.go::Counter.Bump", None)
             .unwrap(),
     );
-    // An `http.Get` whose URL a function computes: the consumer shows with no contract.
     assert_golden(
         "conformance-go.context-unresolved.txt",
         &engine.context("client/net.go::Unresolved", None).unwrap(),
@@ -210,7 +193,6 @@ fn rust_programs_are_found_as_processes() {
     );
     let engine = Engine::open(&repo).unwrap();
 
-    // `src/main.rs`, `src/bin/` and a `[[bin]] path`, each with its own process.
     assert_golden(
         "conformance-rust.search-process-main.txt",
         &engine.search("main", Some("process"), None).unwrap(),
@@ -226,7 +208,6 @@ fn java_programs_are_found_as_processes() {
     );
     let engine = Engine::open(&repo).unwrap();
 
-    // Only `public static void main(String[])` and `String...` start a program.
     assert_golden(
         "conformance-java.search-process-main.txt",
         &engine.search("main", Some("process"), None).unwrap(),
@@ -240,7 +221,6 @@ fn kotlin_programs_are_found_as_processes() {
         "conformance-kotlin",
         Some("https://example.com/acme/conformance.git"),
     );
-    // Only the top-level `fun main` starts a program, not `Runner.main()`.
     assert_golden(
         "conformance-kotlin.search-process-main.txt",
         &Engine::open(&repo)
@@ -259,7 +239,6 @@ fn go_programs_are_found_as_processes() {
     );
     let engine = Engine::open(&repo).unwrap();
 
-    // `func main` in package `main`, not the one in package `store`.
     assert_golden(
         "conformance-go.search-process-main.txt",
         &engine.search("main", Some("process"), None).unwrap(),
@@ -275,7 +254,6 @@ fn python_programs_are_found_as_processes_and_shown_with_their_range() {
     );
     let engine = Engine::open(&repo).unwrap();
 
-    // A main guard and a console script, each with its own process.
     assert_golden(
         "conformance-python.search-process-main.txt",
         &engine.search("__main__", Some("process"), None).unwrap(),
@@ -284,7 +262,6 @@ fn python_programs_are_found_as_processes_and_shown_with_their_range() {
         "conformance-python.search-process-script.txt",
         &engine.search("build", Some("process"), None).unwrap(),
     );
-    // The range is the `if` block, up to its last line and not the `else` after it.
     assert_golden(
         "conformance-python.context-main.txt",
         &engine.context("jobs/sync.py::__main__", None).unwrap(),
@@ -293,7 +270,6 @@ fn python_programs_are_found_as_processes_and_shown_with_their_range() {
         "conformance-python.context-main-single.txt",
         &engine.context("jobs/single.py::__main__", None).unwrap(),
     );
-    // A decorated handler's range starts at its decorator.
     assert_golden(
         "conformance-python.context-decorated.txt",
         &engine.context("web/api.py::health", None).unwrap(),
@@ -302,7 +278,6 @@ fn python_programs_are_found_as_processes_and_shown_with_their_range() {
 
 #[test]
 fn answers_over_budget_say_where_they_stopped() {
-    // 30 tokens are 120 bytes: room for the cut note and one result line.
     let engine = web("budget_cut");
 
     assert_golden(

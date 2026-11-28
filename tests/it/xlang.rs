@@ -1,8 +1,3 @@
-//! A TypeScript repository and a Python one that call each other (spec #24): the storefront
-//! reaches the inventory service through a base URL variable and through a declared host, the
-//! inventory reaches the storefront the same two ways, with the base read from the environment
-//! in every form Python has. `trace` follows both directions across both boundaries.
-
 use crate::common;
 
 use std::fs;
@@ -60,8 +55,6 @@ fn trace_down_crosses_into_python_and_back_to_typescript() {
     assert_golden("xlang.trace-down.txt", &answer);
 }
 
-/// The storefront produces the Kafka topic `stock.restocked` in TypeScript; the inventory
-/// service consumes it in Python, the function that subscribes being the handler (spec #73).
 #[test]
 fn trace_down_from_a_typescript_producer_reaches_the_python_handler_of_the_topic() {
     let (storefront, _) = xlang("xlang_channel_down");
@@ -114,9 +107,6 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_python_file() {
     assert_golden("xlang.trace-uncommitted.txt", &answer);
 }
 
-/// The same chain with a Rust service (spec #30): the web app (TypeScript, Next.js) reaches the
-/// api (axum) through `API_URL` and through the api's declared host; the api reaches the web
-/// app with reqwest through `WEB_URL`, read from the environment, and through its declared host.
 #[test]
 fn rust_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
     let (web, api) = xlang_rust("xlang_rust_export");
@@ -152,9 +142,6 @@ fn trace_down_crosses_into_rust_and_back_to_typescript() {
     assert_golden("xlang-rust.trace-down.txt", &answer);
 }
 
-/// The web app produces the Kafka topic `orders.shipped` in TypeScript (kafkajs); the api
-/// service consumes it in Rust (rdkafka), the function that subscribes being the handler
-/// (spec #30).
 #[test]
 fn trace_down_from_a_typescript_producer_reaches_the_rust_handler_of_the_topic() {
     let (web, _) = xlang_rust("xlang_rust_channel_down");
@@ -174,9 +161,6 @@ fn trace_down_from_a_typescript_producer_reaches_the_rust_handler_of_the_topic()
     assert_golden("xlang-rust.trace-channel-down.txt", &answer);
 }
 
-/// The web app produces the Kafka topic `orders.shipped` in TypeScript (kafkajs); the api
-/// service consumes it in Go (sarama), the `ConsumeClaim` of the handler type being the handler
-/// (spec #25, #82).
 #[test]
 fn trace_down_from_a_typescript_producer_reaches_the_go_handler_of_the_topic() {
     let (web, _) = xlang_go("xlang_go_channel_down");
@@ -229,10 +213,6 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_rust_file() {
     assert_golden("xlang-rust.trace-uncommitted.txt", &answer);
 }
 
-/// The same chain with a Go service (spec #25): the web app (TypeScript, Next.js) reaches the api
-/// (net/http) through `API_URL` and through the api's declared host; the api reaches the web app
-/// with net/http and resty through `WEB_URL` and `STOCK_URL`, read from the environment, and
-/// through its declared host.
 #[test]
 fn go_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
     let (web, api) = xlang_go("xlang_go_export");
@@ -240,7 +220,6 @@ fn go_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_ho
     for (repo, name) in [(web, "web"), (api, "api")] {
         let export = Engine::open(&repo).unwrap().export().unwrap();
         if name == "api" {
-            // A struct field tagged `envconfig:"STOCK_URL"` is the base of `stockByTag`.
             assert!(
                 export.contains("tags.go::stockByTag::http.Get#0")
                     && export.contains("env:STOCK_URL")
@@ -253,8 +232,6 @@ fn go_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_ho
     }
 }
 
-/// Every shape of environment read the Go pack folds, and the near misses it leaves alone: the
-/// `via` of the request each function of `go-env-reads` makes.
 #[test]
 fn a_go_base_url_is_the_variable_of_exactly_one_environment_read() {
     let repo = common::fixture_repo(
@@ -408,12 +385,6 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_go_file() {
     assert_golden("xlang-go.trace-uncommitted.txt", &answer);
 }
 
-/// The same chain with a Java service (spec #26): the web app (TypeScript, Next.js) reaches the
-/// api (Spring MVC) through `API_URL` and through the api's declared host; the api reaches the
-/// web app with RestTemplate, WebClient and `java.net.http` through bases its Spring
-/// configuration gives `@Value` fields and a constructor parameter (a placeholder, a literal
-/// URL, a placeholder with a default a peer serves and one no peer serves) and through
-/// `System.getenv`.
 #[test]
 fn java_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
     let (web, api) = xlang_java("xlang_java_export");
@@ -449,9 +420,6 @@ fn trace_down_crosses_into_java_and_back_to_typescript() {
     assert_golden("xlang-java.trace-down.txt", &answer);
 }
 
-/// The web app produces the Kafka topic `orders.shipped` in TypeScript (kafkajs); the api
-/// service consumes it with a Spring `@KafkaListener` whose topic its configuration names, the
-/// annotated method being the handler (spec #26, #92).
 #[test]
 fn trace_down_from_a_typescript_producer_reaches_the_java_kafka_listener() {
     let (web, _) = xlang_java("xlang_java_channel_down");
@@ -488,8 +456,6 @@ fn trace_up_crosses_into_java_and_back_to_typescript() {
     assert_golden("xlang-java.trace-up.txt", &answer);
 }
 
-/// A route a Feign client calls: up from the route, through the interface method (a consumer at
-/// a definition), to the caller of the method and on to the web app that reaches it.
 #[test]
 fn trace_up_from_a_route_goes_through_the_feign_interface_method() {
     let (web, _) = xlang_java("xlang_java_up_feign");
@@ -504,7 +470,6 @@ fn trace_up_from_a_route_goes_through_the_feign_interface_method() {
         "xlang-java.trace-up-feign.txt",
         &up("http::GET::/api/inventory/{}"),
     );
-    // Without `url` the host is unresolved and the client's name is in the reason.
     let catalog = up("http::GET::/api/catalog");
     assert!(
         catalog.contains("host unresolved (Feign client catalog); the only repository serving it is example.com/xlang-java/web"),
@@ -531,11 +496,6 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_java_file() {
     assert_golden("xlang-java.trace-uncommitted.txt", &answer);
 }
 
-/// The same chain with a Kotlin service (spec #27): the web app (TypeScript, Next.js) reaches the
-/// api (Ktor) through `API_URL` and through the api's declared host; the api reaches the web app
-/// with the Ktor client through bases its Spring configuration gives `@Value` properties and a
-/// constructor property (a placeholder, a literal URL, a placeholder with a default a peer
-/// serves and one no peer serves) and through `System.getenv`, read both ways.
 #[test]
 fn kotlin_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
     let (web, api) = xlang_kotlin("xlang_kotlin_export");
@@ -574,9 +534,6 @@ fn trace_down_crosses_into_kotlin_and_back_to_typescript() {
     assert_golden("xlang-kotlin.trace-down.txt", &answer);
 }
 
-/// The web app produces the Kafka topic `orders.shipped` in TypeScript (kafkajs); the api
-/// service consumes it with a Spring `@KafkaListener` written in Kotlin whose topic its
-/// configuration names, the annotated function being the handler (spec #27, #104).
 #[test]
 fn trace_down_from_a_typescript_producer_reaches_the_kotlin_kafka_listener() {
     let (web, _) = xlang_kotlin("xlang_kotlin_channel_down");
@@ -630,12 +587,6 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_kotlin_file() {
     assert_golden("xlang-kotlin.trace-uncommitted.txt", &answer);
 }
 
-/// The same chain with a C# service (spec #28): the web app (TypeScript, Next.js) reaches the api
-/// (ASP.NET Core) through `API_URL` and through the api's declared host; the api reaches the web
-/// app with `HttpClient` through bases it reads from the environment (`WEB_URL`, through a
-/// fallback and `TrimEnd`) and from `appsettings.json` (a key whose literal host the web app
-/// serves, links by host; one whose host no peer serves, and one the file lacks, map to the
-/// variable `Section__Key`).
 #[test]
 fn csharp_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
     let (web, api) = xlang_csharp("xlang_csharp_export");
@@ -671,9 +622,6 @@ fn trace_down_crosses_into_csharp_and_back_to_typescript() {
         .trace(Start::From("syncOrders"), Direction::Down, None)
         .unwrap();
 
-    // Each way a base reaches the web app: the environment read through a fallback and
-    // `TrimEnd`, a configuration key mapped to its variable (a literal no peer serves, and
-    // `builder.Configuration` with no literal), and a literal whose host the web app serves.
     for link in [
         "→[inferred: base URL from API_URL, a base_url_env of peer example.com/xlang-csharp/api]",
         "→[exact: host api.example.com is served by example.com/xlang-csharp/api]",
@@ -686,8 +634,6 @@ fn trace_down_crosses_into_csharp_and_back_to_typescript() {
     assert_golden("xlang-csharp.trace-down.txt", &answer);
 }
 
-/// A typed client (spec #28, #113): the call inside it takes the base `AddHttpClient` gives the
-/// client its constructor takes, read from configuration, and reaches the web app's route.
 #[test]
 fn trace_down_from_a_csharp_typed_client_reaches_the_typescript_provider() {
     let (_, api) = xlang_csharp("xlang_csharp_typed");
@@ -707,9 +653,6 @@ fn trace_down_from_a_csharp_typed_client_reaches_the_typescript_provider() {
     assert_golden("xlang-csharp.trace-typed-client.txt", &answer);
 }
 
-/// The web app produces the Kafka topic `orders.shipped` in TypeScript (kafkajs); the api
-/// service consumes it with a Confluent.Kafka consumer written in C#, the method that subscribes
-/// being the handler (spec #28, #115).
 #[test]
 fn trace_down_from_a_typescript_producer_reaches_the_csharp_kafka_consumer() {
     let (web, _) = xlang_csharp("xlang_csharp_channel_down");
@@ -763,10 +706,6 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_csharp_file() {
     assert_golden("xlang-csharp.trace-uncommitted.txt", &answer);
 }
 
-/// The same chain with a Swift service (spec #29): the web app (TypeScript, Next.js) reaches the
-/// api (Vapor) through `API_URL` and through the api's declared host; the api reaches the web app
-/// with URLSession and Alamofire through bases it reads from `ProcessInfo` (`WEB_URL` through a
-/// fallback and a trim, `STOCK_URL` through a force unwrap) and through the web app's host.
 #[test]
 fn swift_and_typescript_repositories_link_to_each_other_through_a_variable_and_a_host() {
     let (web, api) = xlang_swift("xlang_swift_export");
@@ -780,8 +719,6 @@ fn swift_and_typescript_repositories_link_to_each_other_through_a_variable_and_a
     }
 }
 
-/// Every shape of environment read the Swift pack folds, and the near misses it leaves alone: the
-/// `via` of the request each function of `swift-env-reads` makes.
 #[test]
 fn a_swift_base_url_is_the_variable_of_exactly_one_process_environment_read() {
     let repo = common::fixture_repo(
@@ -918,8 +855,6 @@ fn trace_from_uncommitted_changes_starts_at_an_edited_swift_file() {
     assert_golden("xlang-swift.trace-uncommitted.txt", &answer);
 }
 
-/// The default's host two repositories serve (a mirror of the web app beside it): the one
-/// reading that applies links ambiguous, and it is one open item, the variable's reading gone.
 #[test]
 fn a_default_whose_host_two_repositories_serve_is_one_open_item() {
     let (_, api) = xlang_java_mirror("xlang_java_ambiguous_default", &["app/api/audit/route.ts"]);
@@ -938,9 +873,6 @@ fn a_default_whose_host_two_repositories_serve_is_one_open_item() {
     assert_eq!(audit[0].candidates.len(), 2);
 }
 
-/// A Feign client without `url` whose path two repositories serve (the web app and its mirror)
-/// and a Retrofit method whose URL is its `@Url` argument: consumers at a definition, which are
-/// open items like a call's, with the method as the excerpt (spec #26, ADR 0006).
 #[test]
 fn a_declarative_client_method_is_an_open_item_at_its_definition() {
     let (_, api) = xlang_java_mirror("xlang_java_open_declarative", &["app/api/catalog/route.ts"]);
@@ -993,7 +925,6 @@ fn a_declarative_client_method_is_an_open_item_at_its_definition() {
         "{}",
         search("unresolved")
     );
-    // The query matches the method's name, as it matches a call's enclosing symbol.
     assert!(
         engine
             .search("fetch", Some("unresolved"), None)
@@ -1008,13 +939,6 @@ fn a_declarative_client_method_is_an_open_item_at_its_definition() {
     assert!(list.contains(fetch), "{list}");
 }
 
-/// A Backstage service reads a base URL through `config.getString('a.b')` and the key holds
-/// `${VAR}` in `app-config*.yaml` (#617): the read is the variable, which the peer's
-/// `base_url_env` maps, so two providers of the route no longer leave the link `ambiguous`. A
-/// literal value gives its host, and another root may supply a second base. A key no file holds
-/// leaves the host unresolved. A `readonly`, `private` or
-/// `#x` field the constructor writes once with the read holds it in every method (#688). A value
-/// a partial gives through `$include`, and a `$env` value, read as if inline (#689).
 #[test]
 fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
     let case = "xlang_backstage";
@@ -1048,16 +972,12 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
         ),
         ("viaOptional", &[Some("env:OPT_URL")]),
         ("viaLocalFile", &[Some("env:LOCAL_URL")]),
-        // Through a partial's key path, a whole partial and `$env` (#689).
         ("viaIncludedKey", &[Some("env:API_URL")]),
         ("viaIncludedBlock", &[Some("env:API_URL")]),
         ("viaEnvValue", &[Some("env:API_URL")]),
         ("literalValue", &[Some("host:other.example.com")]),
         ("missingKey", &[None]),
-        // Another pack's config file (`application.yaml`) is no Backstage config.
         ("notAppConfig", &[None]),
-        // OrdersClient reads its own initializer. The two constructor parameters get the
-        // same base from makeClients; competing writes and the JS field stay unknown.
         (
             "OrdersClient.list",
             &[Some("env:API_URL"), Some("host:localhost:7007")],
@@ -1115,8 +1035,6 @@ fn a_backstage_config_read_is_the_variable_its_app_config_value_names() {
     assert_eq!(links, [link; 6]);
 }
 
-/// A method's context explains the inferred peer through its readonly field and an included
-/// config value (#683, story 16), and refreshes that reason when only the partial changes.
 #[test]
 fn context_names_the_base_url_and_selected_peer_after_a_partial_edit_and_restore() {
     let case = "xlang_backstage_context_reason";
@@ -1169,7 +1087,6 @@ fn context_names_the_base_url_and_selected_peer_after_a_partial_edit_and_restore
     let mut answers = Vec::new();
     for (variable, peer) in [("API_URL", "api"), ("ALT_URL", "other"), ("API_URL", "api")] {
         fs::write(&partial, original.replace("API_URL", variable)).unwrap();
-        // Context is the first query after the edit, so it must refresh its own evidence.
         let context = engine.context("PartialClient.orders", None).unwrap();
         let trace = engine
             .trace(Start::From("PartialClient.orders"), Direction::Down, None)
@@ -1231,9 +1148,6 @@ fn context_names_the_base_url_and_selected_peer_after_a_partial_edit_and_restore
     assert_eq!(answers[0], answers[2]);
 }
 
-/// Ordinary inferred links keep their plain context contract (#683's existing controls): a
-/// sole provider or a gateway rewrite does not make an environment-derived base URL. A base a
-/// parameter holds may carry a path of its own, so that call links to nothing (#801).
 #[test]
 fn context_keeps_non_environment_inferred_consumers_plain() {
     let case = "xlang_backstage_context_controls";
@@ -1344,8 +1258,6 @@ fn context_keeps_non_environment_inferred_consumers_plain() {
     );
 }
 
-/// An environment read alone does not select a peer: direct and proxy calls keep the plain
-/// contract until this repository declares that variable as the peer's base URL (#683).
 #[test]
 fn context_explains_only_a_base_url_that_selects_a_declared_peer() {
     let case = "xlang_backstage_context_unmapped";
@@ -1389,7 +1301,6 @@ fn context_explains_only_a_base_url_that_selects_a_declared_peer() {
             ("ordersUnknownEnv", 1, ""),
             ("ordersProxy", 2, " through the proxy endpoint /unknown"),
         ] {
-            // Context gets the first query; export and trace must keep the existing link.
             let context = engine.context(method, None).unwrap();
             let trace = engine
                 .trace(Start::From(method), Direction::Down, None)
@@ -1446,10 +1357,6 @@ fn context_explains_only_a_base_url_that_selects_a_declared_peer() {
     assert_eq!(answers[0], answers[2]);
 }
 
-/// A Python service reads a base URL from a pydantic-settings field (#619): the read is
-/// `<env_prefix><FIELD>`, or the field's `alias`, which the peer's `base_url_env` maps, so two
-/// providers of the route no longer leave the link `ambiguous`. A class that is not a
-/// `BaseSettings` subclass keeps the host unresolved.
 #[test]
 fn a_pydantic_settings_field_is_the_variable_it_reads() {
     let case = "xlang_py_settings";

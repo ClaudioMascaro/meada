@@ -236,13 +236,10 @@ pub fn compose_entries(
     kept.chain(added).collect()
 }
 
-/// `entry` with `added_by` set to `login`, or without it when there is none.
 fn attributed(entry: &Json, login: Option<&str>) -> Json {
     set(entry.clone(), "added_by", login)
 }
 
-/// `entry` with the `added_by_time` the console writes for it, `before` being the entry it
-/// replaces: `before`'s when the `added_by` is the same, else `now` when it has one.
 fn stamped(entry: Json, before: Option<&Json>, now: Option<&str>) -> Json {
     let time = match added_by(&entry) {
         None => None,
@@ -255,7 +252,6 @@ fn stamped(entry: Json, before: Option<&Json>, now: Option<&str>) -> Json {
     set(entry, "added_by_time", time.as_deref())
 }
 
-/// `entry` with `key` set to `value`, or without it when there is none.
 fn set(mut entry: Json, key: &str, value: Option<&str>) -> Json {
     if let Json::Object(fields) = &mut entry {
         match value {

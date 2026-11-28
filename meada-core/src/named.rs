@@ -20,8 +20,6 @@ pub const TEXT_MAX: usize = 64 << 10;
 pub const NAME_MAX: usize = 80;
 pub const DESCRIPTION_MAX: usize = 500;
 
-/// Whether `text` is a plain name of `min` to `max` characters: no control character and no
-/// whitespace at either end.
 fn text_ok(text: &str, min: usize, max: usize) -> bool {
     let chars = text.chars().count();
     let padded = text.chars().next().is_some_and(char::is_whitespace)
@@ -123,7 +121,6 @@ pub fn creation(selected: &[String], eligible: &BTreeSet<String>, grant: &Grant)
 /// overwrite an entry it does not read by submitting its identity. It is ADR 0015's composition
 /// without owners or attribution: a named entry holds neither.
 pub fn compose(grant: &Grant, current: &[Json], submitted: &[Json]) -> Vec<Json> {
-    // A named entry holds no `added_by`, and without a host no time is written.
     crate::authorize::compose_entries(grant, None, None, "", current, submitted)
 }
 
@@ -255,7 +252,6 @@ mod tests {
         ] {
             assert!(message_problem(bad).is_some(), "{bad:?}");
         }
-        // U+FEFF is no whitespace to Rust, U+3000 is.
         assert!(name_problem("\u{feff}x").is_none());
         assert!(name_problem("\u{3000}x").is_some());
     }
@@ -298,8 +294,6 @@ mod tests {
     fn a_composed_save_keeps_the_entries_its_author_cannot_read() {
         let current = [entry("y", &[]), entry("a", &[]), entry("b", &[])];
         let grant = Grant::Only(set(&["y", "a"]));
-        // The author submits only what it reads, edits y and drops a; b stays in place and an
-        // attempt to overwrite b is ignored.
         let submitted = [
             entry("y", &["y.example"]),
             entry("b", &["x"]),
@@ -309,7 +303,6 @@ mod tests {
         assert_eq!(identities(&stored), ["y", "b", "n"]);
         assert_eq!(stored[0], entry("y", &["y.example"]));
         assert_eq!(stored[1], entry("b", &[]));
-        // Only the edited and the new entries are rechecked: b and a removal are not.
         assert_eq!(changed(&current, &stored), ["y", "n"]);
         assert!(changed(&current, &current).is_empty());
     }

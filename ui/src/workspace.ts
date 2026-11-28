@@ -16,31 +16,21 @@ export function editorModel(text: string, current: string, locale: Language) {
 }
 
 export interface Entry { repo: string; path: string; owner?: string; added_by?: string; added_by_time?: string; [key: string]: unknown }
-/** The identities of a version's entries carrying the response metadata `flag`, present only when true. */
 const flagged = (flag: string) => (repositories: Record<string, unknown>[]): Set<string> =>
   new Set(repositories.filter(entry => entry[flag] === true).map(entry => String(entry.repo)));
-/** A version's entries the directory flagged (`owner_missing`). */
 export const ownerMissing = flagged('owner_missing');
-/** A version's entries the last role check left out (`excluded`, #333). */
 export const excludedEntries = flagged('excluded');
 export type Reason = 'outside_grant' | 'unattributed' | 'ownerless' | 'owner_change' | 'added_by_change' | 'not_your_team';
 export interface Refusal { identity: string; change: 'add' | 'edit' | 'remove'; reason: Reason }
-/**
- * What the session's token says it is: the teams' groups and what it reads; under the GitHub grant provider its login
- * (absent without a valid one) and the GitHub grant provider's host, which the core's functions take to attribute and authorize additions.
- */
 export interface Authority { groups: string[]; grant: '*' | string[]; login?: string; host?: string }
-/** An entry as a view shows it: whether the session may change it, and why not. */
 export interface EntryRow extends Entry { may_change: boolean; refusal?: Reason }
 
-/** The flags a view adds to an entry. They never enter a text, an id or a payload. */
 const ANNOTATIONS = ['may_change', 'refusal', 'owner_missing', 'excluded'];
 
 export function plainEntries(entries: Record<string, unknown>[]): Entry[] {
   return entries.map(entry => Object.fromEntries(Object.entries(entry).filter(([key]) => !ANNOTATIONS.includes(key)))) as Entry[];
 }
 
-/** A version's entries as the editor's TOML, without any view annotation. */
 export function versionText(repositories: Record<string, unknown>[]): string {
   return entriesText(JSON.stringify(plainEntries(repositories)));
 }
@@ -56,27 +46,17 @@ function refusals(who: Authority, current: Entry[], next: Entry[]): Refusal[] {
     JSON.stringify(current), JSON.stringify(next))) as Refusal[];
 }
 
-/** Each held entry with the answer of `authorize_entries` to its removal, the change of that entry alone. */
 export function entryRows(held: Entry[], who: Authority): EntryRow[] {
   const refused = new Map(refusals(who, held, []).map(refusal => [refusal.identity, refusal.reason]));
   return held.map(entry => ({ ...entry, may_change: !refused.has(entry.repo), ...refused.has(entry.repo) && { refusal: refused.get(entry.repo) } }));
 }
 
-/** The owners of the entries that differ between two lists, as the server's audit line names them (the core's own function; a reorder touches none). */
 const owners = (before: Entry[], after: Entry[]): string[] => JSON.parse(touchedOwners(JSON.stringify(before), JSON.stringify(after))) as string[];
 
-/**
- * A team operator's editor: the text holds the entries it reads. Each change is composed with the
- * current ones (its additions attributed from the login under the GitHub grant provider), diffed
- * and authorized by the core's own functions, so the server's refusals show before a save, an
- * identity the workspace holds outside the grant excepted. The partial text's id is not the saved
- * version's, so none is returned.
- */
 export function teamEditorModel(text: string, held: Entry[], who: Authority, locale: Language) {
   const current = JSON.stringify(held);
   const base = editorModel(text, entriesText(current), locale);
   if (base.errors.length) return { errors: base.errors, diff: undefined, refusals: [] as Refusal[], owners: [] as string[] };
-  // The server stamps its own clock on an `added_by` it writes (#454); this preview stamps the browser's.
   const now = new Date().toISOString().slice(0, 19) + 'Z';
   const composed = JSON.parse(composeEntries(JSON.stringify(who.grant), who.login, who.host, now, current, entriesJson(text))) as Entry[];
   const diff = JSON.parse(workspaceDiff(entriesText(current), entriesText(JSON.stringify(composed)))) as WorkspaceDiff;
@@ -89,7 +69,6 @@ export interface WorkspacePointer { id: string; fence: number | string }
 export interface CurrentWorkspace { current: WorkspacePointer | null; version: WorkspaceVersion | null }
 export interface WorkspaceVersions { current: WorkspacePointer | null; versions: VersionSummary[]; malformed: string[] }
 
-/** A confirmed write names its CLI command (the global operator) or the teams that authorize it, never both. */
 type Who = { command: string; teams?: never } | { teams: string[]; command?: never };
 export type SaveAction = { kind: 'save'; route: 'workspace/versions'; id?: string; body: { entries: string; message: string } } & Who;
 export type ApplyAction = { kind: 'apply'; route: 'workspace/apply'; rollback: boolean; body: { version: string } } & Who;
@@ -116,10 +95,6 @@ export function teamSaveAction(entries: string, message: string, teams: string[]
   return { kind: 'save', route: 'workspace/versions', teams, body: { entries, message } };
 }
 
-/**
- * The apply a team operator is offered, `undefined` when `authorize_entries` over the entries it
- * reads, the current ones against the stored version's, refuses any; the API still decides.
- */
 export function teamApplyAction(version: VersionSummary, current: string | undefined, versions: VersionSummary[],
   held: Entry[], stored: Entry[], who: Authority): ApplyAction | undefined {
   if (refusals(who, held, stored).length) return undefined;
@@ -127,16 +102,14 @@ export function teamApplyAction(version: VersionSummary, current: string | undef
     rollback: isRollback(version, current, versions), teams: owners(held, stored) };
 }
 
-/** The `owner = "<partial>` the caret is inside, as the picker's prefix (decoded) and where its text starts; `undefined` elsewhere. */
 export function ownerAt(text: string, caret: number): { prefix: string; start: number } | undefined {
   const line = caret > 0 ? text.lastIndexOf('\n', caret - 1) + 1 : 0;
   const match = /^\s*owner\s*=\s*"((?:[^"\\\n]|\\.)*)$/.exec(text.slice(line, caret));
   if (!match) return undefined;
   const written = match[1] ?? '';
   let prefix = written;
-  try { prefix = JSON.parse(`"${written}"`) as string; } catch { /* an escape still being typed stays as written */ }
+  try { prefix = JSON.parse(`"${written}"`) as string; } catch {  }
   return { prefix, start: caret - written.length };
 }
 
-/** `value` as the inside of a TOML basic string. */
 export const tomlEscaped = (value: string): string => JSON.stringify(value).slice(1, -1);

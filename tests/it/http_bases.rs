@@ -1,5 +1,3 @@
-//! HTTP bases and channel names read from TypeScript configuration.
-
 use crate::common::fixture_repo;
 use meada::engine::Engine;
 use serde_json::Value;

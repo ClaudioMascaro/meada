@@ -1,17 +1,13 @@
-//! Complete factory evidence: an opaque alternative invalidates a known constructor.
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 use crate::lang::{Call, Value, literal};
 use crate::resolve::{Code, EVAL_BUDGET, EVAL_DEPTH, Of, Target};
 
-/// The steps the factory questions one reader asks of one file take together, a question taking
-/// up to all that is left, and still `FACTORY_QUESTION_FLOOR` once they are spent.
 // ponytail: real files spend a few steps a question, a repeated walk answered from the file's
 // kept answers; 2^18 stops a file of thousands of questions each walking thousands of call
 // sites that a cycle keeps from being kept.
 const FACTORY_FILE_BUDGET: usize = 1 << 18;
-/// The steps a question takes however much of `FACTORY_FILE_BUDGET` is spent.
 // ponytail: a client constructed a few names or one factory away takes under ten steps.
 const FACTORY_QUESTION_FLOOR: usize = 16;
 
@@ -32,12 +28,9 @@ type Key<'a> = (&'a str, &'a str, Node<'a>, bool, bool);
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct Frame<'a> {
     function: Target<'a>,
-    // Unknown arguments are absent. Only complete constructor evidence affects this walk.
     arguments: BTreeMap<(usize, bool), Construction>,
 }
-/// A value visited in the frame of a call, by its index in `Factories::frames`, or in none.
 type Visit<'a> = (Key<'a>, Option<usize>);
-/// The values a function returns, or those its callers pass one of its parameters.
 type Listed<'a> = Rc<[(&'a str, &'a str, &'a Value)]>;
 
 pub(crate) struct Factories<'c, 'a> {
@@ -46,26 +39,16 @@ pub(crate) struct Factories<'c, 'a> {
     factories: &'c [(&'c str, &'c str)],
     keyword: &'c str,
     budget: usize,
-    /// The file of the questions so far, and what is left of its `FACTORY_FILE_BUDGET`.
     file: &'a str,
     left: usize,
-    // A visit in progress is unknown, so a cycle supplies no constructor.
     known: HashMap<Visit<'a>, Option<Construction>>,
-    /// The answers no ceiling or visit in progress cut, kept for the file's later questions:
-    /// about a value, and about the returns of a function in a frame. Each holds how much deeper
-    /// than its visit its walk went, and is read again only where that still fits `EVAL_DEPTH`.
     settled: HashMap<Visit<'a>, (Option<Construction>, usize)>,
     returns: HashMap<(usize, bool, bool), (Option<Construction>, usize)>,
-    /// Whether the walk so far met a ceiling or a visit in progress, and the deepest it went.
     cut: bool,
     reached: usize,
-    /// Each frame of the file's walks once, so a visit names its frame by index, and the
-    /// indexes of the frames the walk is in.
     frames: Vec<Rc<Frame<'a>>>,
     framed: HashMap<Rc<Frame<'a>>, usize>,
     stack: Vec<usize>,
-    /// What each function returns (`None`) and what its callers pass each parameter, listed
-    /// once, then read a step at a time.
     listed: HashMap<(Target<'a>, Option<usize>), Option<Listed<'a>>>,
 }
 
@@ -96,12 +79,6 @@ impl<'c, 'a> Factories<'c, 'a> {
         }
     }
 
-    /// Complete receiver construction, with at most one external factory level. Each question
-    /// has its own bound, at most what its file has left of `FACTORY_FILE_BUDGET` and at least
-    /// `FACTORY_QUESTION_FLOOR`, so an opaque chain cannot starve a later direct constructor.
-    /// The answers no ceiling or cycle cut are kept for the file's later questions, each visit
-    /// of a value still a step; the others belong to one question, so a previously checked
-    /// prefix does not shorten its ceiling.
     pub(crate) fn read(&mut self, path: &'a str, call: &'a Call) -> Option<Construction> {
         if path != self.file {
             (self.file, self.left) = (path, FACTORY_FILE_BUDGET);
@@ -139,7 +116,6 @@ impl<'c, 'a> Factories<'c, 'a> {
         self.value(path, &call.scope, Of::Name(receiver), through, false, depth)
     }
 
-    /// Whether a step is left, spending it; past a ceiling the walk is cut.
     fn step(&mut self, depth: usize) -> bool {
         self.reached = self.reached.max(depth);
         if depth >= EVAL_DEPTH || self.budget == 0 {
@@ -181,7 +157,6 @@ impl<'c, 'a> Factories<'c, 'a> {
         if !self.step(depth) {
             return None;
         }
-        // Visited before in this question: cut there, or in progress.
         if let Some(made) = self.known.get(&visit) {
             self.cut = true;
             return made.clone();
@@ -266,7 +241,6 @@ impl<'c, 'a> Factories<'c, 'a> {
         first
     }
 
-    /// The values listed under `key`, made by `list` the first time they are asked.
     fn listed(
         &mut self,
         key: (Target<'a>, Option<usize>),
@@ -277,7 +251,6 @@ impl<'c, 'a> Factories<'c, 'a> {
             .clone()
     }
 
-    /// The index of `frame` in `frames`, added the first time it is met.
     fn frame(&mut self, frame: Frame<'a>) -> usize {
         if let Some(&at) = self.framed.get(&frame) {
             return at;

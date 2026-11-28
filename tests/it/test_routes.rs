@@ -1,6 +1,3 @@
-//! Routes a test registers (#620): a test's router or fake upstream is no provider of its
-//! repository, `test_routes = true` in `meada.toml` keeps them, and the test code stays indexed.
-
 use crate::common;
 
 use std::fs;
@@ -10,7 +7,6 @@ use common::fixture_repo;
 use meada::engine::Engine;
 use serde_json::Value;
 
-/// The client `web` and its peer `api`, siblings: both register routes in test files.
 fn pair(case: &str) -> (PathBuf, PathBuf) {
     (
         fixture_repo(
@@ -30,7 +26,6 @@ fn export(repo: &Path) -> Value {
     serde_json::from_str(&Engine::open(repo).unwrap().export().unwrap()).unwrap()
 }
 
-/// The `site`s of the HTTP providers of an export.
 fn routes(export: &Value) -> Vec<&str> {
     let providers = export["providers"].as_array().unwrap();
     let http = providers
@@ -65,8 +60,6 @@ fn routes_a_test_registers_are_no_providers_and_the_calls_reach_only_the_real_se
                 .contains("the only repository serving it")
         );
     }
-    // The Go client joins a base only its test sets (`c.base`) with the path: an open item whose
-    // one candidate is the real server, never the test's fake upstream (#801).
     let items = Engine::open(&web).unwrap().open_items().unwrap();
     let candidates: Vec<&str> = (items.iter())
         .flat_map(|i| i.candidates.iter().map(|c| c.site.as_str()))
@@ -75,7 +68,6 @@ fn routes_a_test_registers_are_no_providers_and_the_calls_reach_only_the_real_se
         candidates,
         ["example.com/test-routes/api::main.go::main.GET /orders"]
     );
-    // No entry point or process of a route a test registers either.
     let entries = |e: &Value| -> Vec<String> {
         let processes = e["processes"].as_array().into_iter().flatten();
         processes

@@ -10,8 +10,6 @@ import './graph.css';
 const views = ['communities', 'contracts', 'links', 'provisions', 'images', 'alerts', 'ci', 'executions', 'drift', 'decisions'] as const;
 type View = typeof views[number];
 
-/** The views of one contract kind: its prefix and the copy keys of its sides table and of its
- * roles, the provider's first. */
 const kinds = {
   images: { prefix: 'image::', sides: 'imageSides', one: ['builder', 'runner'], many: ['builders', 'runners'] },
   alerts: { prefix: 'alert::', sides: 'alertSides', one: ['emitter', 'matcher'], many: ['emitters', 'matchers'] },

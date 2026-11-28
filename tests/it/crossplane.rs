@@ -1,9 +1,3 @@
-//! Crossplane objects among the Kubernetes nodes (#655, ADR 0025): composite resource
-//! definitions, compositions, claims and managed resources are recognized, each resource a
-//! composition creates from a literal base is a node under the composition, and the references
-//! run from a claim to its composite kind, from a composition to the type it composes and to the
-//! resources it creates, and from those to the definition of their kind.
-
 use std::fs;
 
 use meada::engine::{Direction, Engine, Start};
@@ -12,7 +6,6 @@ use crate::common::{assert_golden, fixture_repo};
 
 const ORIGIN: Option<&str> = Some("https://example.com/acme/platform.git");
 
-/// Each answer of `ask` over `questions`, in order, a blank line between two.
 fn answers(questions: &[&str], ask: impl Fn(&str) -> String) -> String {
     (questions.iter())
         .map(|q| ask(q))
@@ -20,12 +13,6 @@ fn answers(questions: &[&str], ask: impl Fn(&str) -> String) -> String {
         .join("\n")
 }
 
-/// The fixture: in `platform`, an XRD with a claim kind and a default composition, a second XRD
-/// with a composite resource of its kind, a composition of four resources (an external name, a
-/// name a patch set sets, a literal name only an outward patch reads, a nested composite whose
-/// name a patch sets), a pipeline composition (one patch-and-transform resource, one templated
-/// step that creates no node), a claim naming the pipeline composition, and a managed resource
-/// beside the definition of its kind; in `examples`, a claim away from its XRD.
 #[test]
 fn search_with_the_kind_iac_finds_crossplane_objects_and_composed_resources() {
     let repo = fixture_repo("xp_search", "crossplane-nodes", ORIGIN);
@@ -41,8 +28,6 @@ fn search_with_the_kind_iac_finds_crossplane_objects_and_composed_resources() {
     assert_golden("crossplane-nodes.search.txt", &answers(&queries, search));
 }
 
-/// `context` names each object's Crossplane role, the physical name of a composed resource (a
-/// pattern when a patch sets it), and the references both ways.
 #[test]
 fn context_on_a_crossplane_object_shows_its_role_name_and_references() {
     let repo = fixture_repo("xp_context", "crossplane-nodes", ORIGIN);
@@ -67,8 +52,6 @@ fn context_on_a_crossplane_object_shows_its_role_name_and_references() {
     );
 }
 
-/// `trace` walks from a claim down to its composite kind, the compositions and the resources
-/// they create, and up from a composed resource to the claim.
 #[test]
 fn trace_walks_from_a_claim_to_the_resources_its_composition_creates() {
     let repo = fixture_repo("xp_trace", "crossplane-nodes", ORIGIN);
@@ -89,8 +72,6 @@ fn trace_walks_from_a_claim_to_the_resources_its_composition_creates() {
     assert_golden("crossplane-nodes.trace.txt", &text.join("\n"));
 }
 
-/// A patch that starts setting a resource's name turns its name into a pattern at the next
-/// query, and an object of a kind no XRD defines any more loses its role.
 #[test]
 fn a_changed_composition_or_definition_changes_the_nodes_at_the_next_query() {
     let repo = fixture_repo("xp_fresh", "crossplane-nodes", ORIGIN);
@@ -120,7 +101,6 @@ fn a_changed_composition_or_definition_changes_the_nodes_at_the_next_query() {
     assert!(!gone.contains("role:"), "{gone}");
 }
 
-/// Only curated resources with complete identities enter the contract graph (#671).
 #[test]
 fn only_named_curated_crossplane_resources_enter_the_export() {
     let repo = fixture_repo("xp_export", "crossplane-nodes", ORIGIN);

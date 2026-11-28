@@ -1,4 +1,3 @@
-//! boto3 resource operations on clients traced to boto3's constructors.
 use super::aws::OPERATIONS;
 use crate::contract::Found;
 use crate::lang::Value;

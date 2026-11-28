@@ -1,8 +1,3 @@
-//! `trace` over the chain fixture (spec #3): `chain-web` (A) consumes from `chain-gateway` (B),
-//! an Express gateway that consumes from `chain-catalog` (C), a Next.js app. Between them sit a
-//! client wrapper, imported path constants, a base URL variable, a mount prefix, an absolute
-//! URL on a declared host, a path both B and C serve, an unresolved URL and a cycle in C.
-
 use crate::common;
 
 use std::fs;
@@ -42,8 +37,6 @@ fn trace_down_follows_calls_and_links_across_three_repositories() {
 #[test]
 fn trace_down_shows_every_consumer_a_wrapper_call_site_holds() {
     let (web, _, _) = chain("trace_wrapper_consumers");
-    // One call of a wrapper with three parameter-dependent fetch calls: three consumers on
-    // one site, one linked, one with no provider and one unresolved.
     fs::write(
         web.join("src/sync.ts"),
         "const BASE = process.env.GATEWAY_URL;\n\n\
@@ -82,8 +75,6 @@ fn trace_up_from_a_route_reaches_every_consumer_upstream() {
     assert_golden("chain.trace-up.txt", &answer);
 }
 
-/// The gateway's `cancelOrder` writes the `postgres` resource `orders`; the worker's
-/// `settleOrders` reads it.
 const WRITER: &str = "example.com/chain/gateway::src/orders.ts::cancelOrder";
 const READER: &str = "example.com/chain/worker::src/jobs.ts::settleOrders";
 
@@ -100,8 +91,6 @@ fn every_writer_links_to_every_reader_of_another_repository() {
             "\n[[resource]]\nkind = \"postgres\"\nid = \"orders\"\nrole = \"{role}\"\nvia = [{via}]\n"
         )
     };
-    // A second writer in the gateway; in the worker, a writer of its own, which links to no
-    // reader of the worker, and a `via` that names no symbol.
     append(&gateway, &entry("write", "\"src/orders.ts::listOrders\""));
     append(
         &worker,
@@ -158,8 +147,6 @@ fn a_resource_both_sides_read_and_write_closes_a_cycle() {
     );
 }
 
-/// The gateway's `createOrder` produces the Kafka topic `orders.created` through its
-/// `publish` wrapper; the worker's `onOrderCreated` handles it (spec #20).
 const PRODUCER: &str = "example.com/chain/gateway::src/checkout.ts::createOrder";
 const HANDLER: &str = "example.com/chain/worker::src/consumer.ts::onOrderCreated";
 
@@ -265,13 +252,8 @@ fn a_trace_over_budget_says_where_it_stopped_and_keeps_the_footer() {
     assert!(tokens <= 120, "{tokens} tokens");
 }
 
-/// How deep a trace follows one branch below where it starts: `WALK_DEPTH` of `src/trace.rs`,
-/// which this crate cannot see.
 const WALK_DEPTH: usize = 256;
 
-/// `trace` on a thread with the stack of a runtime worker (tokio's 2 MiB), where the MCP server
-/// and the HTTP transport answer: a recursion with no depth limit overflows it and aborts the
-/// process.
 fn trace_on_a_worker(
     repo: &Path,
     from: &str,
@@ -296,15 +278,12 @@ fn a_call_chain_past_the_depth_limit_is_cut_there_either_way_and_from_an_iac_nod
     let repo = Path::new(env!("CARGO_TARGET_TMPDIR")).join("trace_depth_limit/chain");
     let _ = fs::remove_dir_all(&repo);
     fs::create_dir_all(&repo).unwrap();
-    // 5,000 calls, each function calling the next: a debug build without the limit aborted
-    // at about 2,000 hops down and 3,200 up.
     let last = 5_000;
     let mut chain: String = (0..last)
         .map(|n| format!("def f{n}():\n    f{}()\n\n\n", n + 1))
         .collect();
     chain += &format!("def f{last}():\n    pass\n");
     fs::write(repo.join("chain.py"), chain).unwrap();
-    // A Compose service that runs the whole repository, so its trace goes on into the chain.
     fs::write(
         repo.join("compose.yaml"),
         "services:\n  chain:\n    build: .\n",
@@ -320,7 +299,6 @@ fn a_call_chain_past_the_depth_limit_is_cut_there_either_way_and_from_an_iac_nod
     let cases = [
         ("f0", Direction::Down, vec![None, far], "f256"),
         (end.as_str(), Direction::Up, vec![None, far], "f4744"),
-        // The service, then the line saying it runs the code, then the entry point `f0`.
         ("services.chain", Direction::Down, vec![far], "f254"),
     ];
 
@@ -394,7 +372,6 @@ fn in_a_repository_with_no_commits_every_file_is_uncommitted() {
     let a = "export function a() {\n  return 1;\n}\n";
     fs::write(repo.join("src/a.ts"), a).unwrap();
     fs::write(repo.join("src/b.ts"), a.replace('a', "b")).unwrap();
-    // One file staged, one not: neither is in a commit.
     common::git(&repo, &["add", "src/a.ts"]);
 
     let answer = Engine::open(&repo)
@@ -419,9 +396,7 @@ fn a_trace_with_no_single_start_says_why() {
     };
 
     assert_golden("chain.trace-none.txt", &trace("nothing"));
-    // Two route files of the catalog export a `GET`.
     assert_golden("chain.trace-fits-symbols.txt", &trace("GET"));
-    // Four functions of the workspace each make a first `fetch`.
     assert_golden("chain.trace-fits-calls.txt", &trace("fetch#0"));
     let clean = engine.trace(Start::Uncommitted, Direction::Down, None);
     assert_golden("chain.trace-clean.txt", &clean.unwrap());
@@ -633,13 +608,11 @@ client.send(new GetObjectCommand({Bucket:'shared'}));
     }
 }
 
-/// Commits every change of `repo` with `message`.
 fn commit_all(repo: &Path, message: &str) {
     common::git(repo, &["add", "-A"]);
     common::git(repo, &["commit", "-q", "-m", message]);
 }
 
-/// Edits the body of `add` in `ts-basic`'s `src/math.ts`.
 fn edit_add(repo: &Path) {
     let math = repo.join("src/math.ts");
     let text = fs::read_to_string(&math).unwrap();
@@ -675,7 +648,6 @@ fn a_range_over_a_dirty_tree_is_refused() {
         head: "HEAD",
     };
     let engine = Engine::open(&repo).unwrap();
-    // Once by a tracked edit, once by an untracked file.
     fs::write(repo.join("src/math.ts"), "export const x = 1;\n").unwrap();
     let tracked = engine.trace_changes(range(), Direction::Up, None);
     common::git(&repo, &["checkout", "--", "src/math.ts"]);
@@ -690,8 +662,6 @@ fn a_range_over_a_dirty_tree_is_refused() {
     }
 }
 
-/// A deleted file roots nothing: an edit plus a deletion answers as the edit alone, from the
-/// uncommitted changes as the MCP tool reads them and as `Changes::Uncommitted` reads them.
 #[test]
 fn an_uncommitted_deletion_answers_as_before() {
     let repo = fixture_repo("trace_uncommitted_deletion", "ts-basic", None);
@@ -712,7 +682,6 @@ fn an_uncommitted_deletion_answers_as_before() {
     assert_eq!(read, alone);
 }
 
-/// A committed range answers as the same edit did uncommitted.
 #[test]
 fn trace_changes_from_a_range_roots_the_edited_symbol() {
     let repo = fixture_repo("trace_range_roots", "ts-basic", None);

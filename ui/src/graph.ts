@@ -17,7 +17,6 @@ interface Stale { call: string; target: string; cause: string }
 interface Export { repository: string; communities?: Community[]; providers: Side[]; consumers: Side[]; links: Link[]; stale_decisions?: Stale[]; provisioners?: Provisioner[]; provisions?: Provision[]; uses?: ConfigUse[]; executions?: Execution[] }
 interface Contract { contract: string; providers: string[]; consumers: string[]; provisioners?: string[]; uses?: string[] }
 
-/** parseExport checks every field with the release's Rust types before any model is built. */
 export function graphModel(text: string) {
   const data = JSON.parse(parseExport(text)) as Export;
   const contracts = new Map<string, Contract>();
@@ -30,7 +29,6 @@ export function graphModel(text: string) {
         contracts.set(entry.contract, row);
       }
       const location = entry.at ? `${entry.site} (${entry.at})` : entry.site;
-      // The mark of a CI call whose path names no provider, worded as the CLI words it.
       const mark = entry.absent ? ' (absent at the indexed commit)' : '';
       row[side].push((entry.root ? `${location} (root ${entry.root})` : location) + mark);
     }

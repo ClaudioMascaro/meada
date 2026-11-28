@@ -1,7 +1,3 @@
-//! Base URL declarations (`[[base_url]]` in `meada.toml`): a consumer whose base URL comes from
-//! a declared variable links, `declared`, to the routes served under the declared directory of
-//! its own repository.
-
 use std::path::{Path, PathBuf};
 
 use crate::common::fixture_repo;
@@ -10,7 +6,6 @@ use serde_json::Value;
 
 const MONO: &str = "example.com/acme/mono";
 
-/// `tests/fixtures/base-url-mono`, as `example.com/acme/mono`.
 fn mono(case: &str) -> PathBuf {
     fixture_repo(
         case,
@@ -19,8 +14,6 @@ fn mono(case: &str) -> PathBuf {
     )
 }
 
-/// `mono` and `base-url-peer` as sibling clones; the mono's `meada.toml` keeps its
-/// `[[base_url]]` and names the peer, so both are in the workspace.
 fn with_peer(case: &str) -> PathBuf {
     fixture_repo(
         case,
@@ -34,7 +27,6 @@ fn with_peer(case: &str) -> PathBuf {
     repo
 }
 
-/// The HTTP links of the workspace `repo` opens.
 fn links(repo: &Path) -> Vec<Value> {
     let exported = Engine::open(repo).unwrap().export().unwrap();
     let data: Value = serde_json::from_str(&exported).unwrap();
@@ -45,14 +37,12 @@ fn links(repo: &Path) -> Vec<Value> {
         .collect()
 }
 
-/// The links whose consumer is a call of `site` (`<path>::<function>`).
 fn of<'a>(links: &'a [Value], site: &str) -> Vec<&'a Value> {
     let site = format!("::{site}::");
     let consumer = |l: &&Value| l["consumer"].as_str().unwrap().contains(&site);
     links.iter().filter(consumer).collect()
 }
 
-/// `(level, provider, reason)` of each link.
 fn shown(links: &[&Value]) -> Vec<(String, String, String)> {
     let text = |v: &Value| v.as_str().unwrap().to_string();
     let row = |l: &&Value| (text(&l["level"]), text(&l["provider"]), text(&l["reason"]));
@@ -82,7 +72,6 @@ fn without_the_declaration_the_link_is_what_it_was() {
     let repo = mono("base_url_undeclared");
     std::fs::remove_file(repo.join("meada.toml")).unwrap();
     let found = links(&repo);
-    // The base binary's answer: the compose host's route, inferred.
     let run = shown(&of(&found, "web/src/api.ts::runJob"));
     assert_eq!(run.len(), 1, "{found:#?}");
     assert_eq!(run[0].0, "inferred");
@@ -93,7 +82,6 @@ fn without_the_declaration_the_link_is_what_it_was() {
 
 #[test]
 fn a_directory_is_not_a_prefix_of_another() {
-    // `GET /status` is served only under `svc-b-ui/`.
     let found = links(&mono("base_url_prefix"));
     assert_eq!(of(&found, "web/src/api.ts::status"), Vec::<&Value>::new());
 }
@@ -112,7 +100,6 @@ fn a_declared_variable_keeps_the_proxy_endpoint_in_its_reason() {
 
 #[test]
 fn the_declaration_wins_over_an_infrastructure_value() {
-    // The compose file gives `web` `B_URL: http://svc-c:8080`.
     let repo = mono("base_url_compose");
     let compose = std::fs::read_to_string(repo.join("docker-compose.yml")).unwrap();
     assert!(compose.contains("B_URL: http://svc-c:8080"));
@@ -213,7 +200,6 @@ fn a_relative_url_its_package_does_not_serve_keeps_every_fit() {
 #[test]
 fn a_relative_url_drops_other_repositories_too() {
     let found = links(&with_peer("base_url_relative_peer"));
-    // The peer serves `POST /run` too.
     assert!(
         found.iter().any(|l| l["provider"]
             .as_str()
@@ -307,8 +293,6 @@ fn a_request_struct_change_reaches_both_consumers() {
     }
 }
 
-/// A `_test.go` file of the client's package: a helper builds the client on a test server's
-/// literal URL, and `probe` reads the client's base itself.
 const CLIENT_TEST: &str = r#"package client
 
 import "net/http"
@@ -318,7 +302,6 @@ func newTestClient() *Client { return New("http://127.0.0.1:8080") }
 func probe(c *Client) { _, _ = http.Post(c.base+"/run", "application/json", nil) }
 "#;
 
-/// `site` has no link: its base URL is unknown, so its call has no contract.
 fn assert_no_base(found: &[Value], site: &str) {
     assert_eq!(shown(&of(found, site)), [], "{site}");
 }
@@ -373,7 +356,6 @@ fn a_read_inside_a_test_file_keeps_every_caller() {
 #[test]
 fn a_declared_link_never_leaves_its_repository() {
     let repo = with_peer("base_url_peer_dir");
-    // The peer serves `POST /run` under a directory named like the declared one.
     let peer = repo.parent().unwrap().join("base-url-peer");
     crate::common::git(&peer, &["mv", "api", "svc-b"]);
     crate::common::git(&peer, &["commit", "-q", "-m", "svc-b"]);
@@ -421,7 +403,6 @@ func callRun() { _, _ = http.Post(os.Getenv("RUN_URL")+"/run", "application/json
     }
 }
 
-/// A `_test.go` file of another package that writes a field named like the client's base.
 const OTHER_TEST: &str = r#"package main
 
 import "testing"
@@ -435,7 +416,6 @@ func TestOther(t *testing.T) {
 }
 "#;
 
-/// Run and Cancel of the Go client link `declared` to their routes.
 fn assert_client_declared(found: &[Value]) {
     let reason =
         format!("base URL from B_BASE_URL, declared for svc-b/ in meada.toml; served by {MONO}");
@@ -484,7 +464,6 @@ fn a_function_local_type_elsewhere_does_not_cancel_the_client_base() {
 
 #[test]
 fn a_literal_of_a_type_that_binds_to_nothing_keeps_the_base_unknown() {
-    // Unknown, qualified or not: it may be the client's struct.
     for (case, ty) in [
         ("base_url_unbound_qualified", "missing.Pair"),
         ("base_url_unbound", "Missing"),
@@ -581,7 +560,6 @@ func other() { { Point := Point{1, 2}; _ = Point } }
 #[test]
 fn a_positional_literal_with_several_type_definitions_keeps_the_base_unknown() {
     let repo = mono("base_url_several_types");
-    // Go selects one legacy build tag. Both definitions are visible to the index.
     for (file, tag) in [("first.go", "variant"), ("second.go", "!variant")] {
         let source = format!("// +build {tag}\n\npackage main\ntype pair struct {{ n int }}\n");
         std::fs::write(repo.join("svc-b").join(file), source).unwrap();

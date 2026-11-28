@@ -1,4 +1,3 @@
-//! Azure Go exact package factories and receiver/positional-name forms.
 use super::{Code, Frame, Handle, Role, Stage, argument};
 
 pub(super) fn constructed<'a>(

@@ -14,7 +14,6 @@ import { namedCopy } from '../src/named-i18n';
 import { offered } from '../src/pages';
 import config from './fixtures/config.json';
 
-// The bundle is read from disk: a mocked `fetch` answers the page's routes, not the WebAssembly file.
 vi.mock('../src/core', async importOriginal => ({
   ...await importOriginal<typeof import('../src/core')>(),
   loadCore: async (language: 'en' | 'pt-BR') => { init(language); },
@@ -46,11 +45,9 @@ const detail: WorkspaceDetail = {
 };
 const session = { subject: 'alice', role: 'viewer' as const, grant: [Y, A] };
 
-/** A `fetch` answering by route, the way the console does: effects of a page may ask in any order. */
 function answers(table: Record<string, () => Response>) {
   return vi.fn(async (route: string, init?: RequestInit) => {
     const key = `${init?.method ?? 'GET'} ${route}`;
-    // The versions page reads its list beside the detail: an empty list unless the test says otherwise.
     const answer = table[key] ?? Object.entries(table).find(([k]) => key.startsWith(k) && !key.includes('/versions'))?.[1]
       ?? (key.includes('/versions') ? () => Response.json({ base: 1, versions: [], next: null }) : undefined);
     if (!answer) throw new Error(`unexpected ${key}`);
@@ -206,7 +203,6 @@ test('an operator edits the manifest text, reads the effective configuration bef
   expect((getByRole(host, 'button', { name: t.saveApply }) as HTMLButtonElement).disabled).toBe(true);
   await act(() => { fireEvent.change(editor, { target: { value: peerText } }); });
   await act(() => { fireEvent.change(editorBox().getByLabelText(t.message), { target: { value: 'link the gateway' } }); });
-  // The effective configuration is shown before anything is saved, in text: the repository's own file wins.
   await act(() => { fireEvent.click(getByRole(host, 'button', { name: t.checkEffective })); });
   await waitFor(() => expect(host.textContent).toContain(t.diagnostic_ignored_by_repository));
   expect(host.textContent).toContain(t.source_repository);
@@ -215,7 +211,6 @@ test('an operator edits the manifest text, reads the effective configuration bef
   expect(posts()).toEqual(['/api/v1/workspaces/effective']);
   const preview = fetch.mock.calls.find(([route]) => route === '/api/v1/workspaces/effective')![1] as RequestInit;
   expect(JSON.parse(preview.body as string)).toEqual({ entries: peerText });
-  // Review, then confirm: the saved payload is the reviewed text at the base the page read.
   await act(() => { fireEvent.click(getByRole(host, 'button', { name: t.saveApply })); });
   expect(posts()).toEqual(['/api/v1/workspaces/effective']);
   await act(() => { fireEvent.click(getAllByRole(host, 'button', { name: t.saveApply }).at(-1)!); });
@@ -223,7 +218,6 @@ test('an operator edits the manifest text, reads the effective configuration bef
   const body = (route: string) => JSON.parse((fetch.mock.calls.find(([r, i]) => r === route && i?.method === 'POST')![1] as RequestInit).body as string) as Record<string, unknown>;
   expect(body('/api/v1/workspaces/0123456789abcdef/versions')).toEqual({ entries: peerText, message: 'link the gateway', base: 1 });
   expect(body('/api/v1/workspaces/0123456789abcdef/apply')).toEqual({ version: 'aaaaaaaaaaaaaaaa', base: 1 });
-  // An applied change that something overrides is not shown as plainly applied: the finding is read beside it.
   await waitFor(() => expect(getByRole(host, 'alert', { name: t.findings }).textContent).toContain(`${Y}: ${t.diagnostic_ignored_by_repository}`));
 });
 

@@ -53,7 +53,6 @@ pub(crate) const VERSION_MAX: u64 = 4 << 20;
 
 /// The directory under `index_dir` where `pull` leaves the current version.
 pub const DIR: &str = "workspace";
-/// The current file in `DIR`: `<id> <fence>`.
 const CURRENT: &str = "current";
 
 /// A workspace version document (`workspaces/<id>.json`), never rewritten once stored.
@@ -69,18 +68,14 @@ pub struct Version {
     pub repositories: Vec<Json>,
 }
 
-/// The sections the workspace commands need from the bootstrap manifest.
 struct Sections {
     snapshot: Config,
     valkey: valkey::Config,
     index_dir: PathBuf,
-    /// With `[workspaces]`, where the named workspaces are read from (#342).
     #[cfg(feature = "workspaces")]
     named: Option<(crate::postgres::Config, crate::workspaces::Config)>,
 }
 
-/// `manifest`'s `[snapshot]` and `[valkey]`, or the error naming it when it has no
-/// `[generations]` (which needs both, `Manifest::read`).
 fn sections(manifest: &Path) -> crate::Result<Sections> {
     let read = Manifest::read(manifest)?;
     match (read.generations, read.snapshot, read.valkey) {
@@ -102,7 +97,6 @@ pub fn pointer_key(valkey: &valkey::Config) -> String {
     valkey.key("workspace", true)
 }
 
-/// The key of the version `id` in the store.
 pub(crate) fn version_key(snapshot: &Config, id: &str) -> String {
     snapshot.key(&format!("workspaces/{id}.json"))
 }
@@ -176,7 +170,6 @@ pub fn import(
     Ok(crate::modules::block_on(run)??)
 }
 
-/// The same text preparation for CLI import and HTTP save, before either opens a connection.
 fn prepared(file: &str, src: &str, message: &str, author: &str) -> Result<Version, Vec<String>> {
     let entries = validate_import(file, src)?;
     let (id, repositories) = versioned(&entries, entry_blocks(src));
@@ -224,17 +217,12 @@ async fn store_version(
     Ok(Imported { id, first })
 }
 
-/// A text validation refusal is different from a lock/store refusal at the HTTP boundary.
 #[cfg(all(feature = "ui", feature = "refresh-lock"))]
 pub(crate) enum SaveError {
     Invalid(Vec<String>),
-    /// An operation's own refusal: the lock held or lost.
     Refused(String),
-    /// Anything else: the manifest, the store or Valkey.
     Failed(String),
-    /// The entries a team operator may not change, as `authorize_entries` lists them.
     Unauthorized(Vec<Refusal>),
-    /// A team operator that the current version no longer makes one.
     RoleLost,
 }
 
@@ -262,7 +250,6 @@ impl Acting<'_> {
         }
     }
 
-    /// `authorize_entries` of the change from `current` to `new`.
     fn refused(&self, current: &[Json], new: &[Json]) -> Vec<Refusal> {
         let Acting {
             role,
@@ -275,18 +262,6 @@ impl Acting<'_> {
     }
 }
 
-/// The console's save is CLI import's text preparation and storage under the refresh lock.
-/// CLI import deliberately remains available with generation-pointer alone and takes no lock.
-/// Anyone but the global operator (`acting`) is authorized under the lock against the version
-/// then current, which two writes cannot move at once: its role recomputed, the submitted
-/// entries composed over the current entries its grant reads (`compose_entries`, which under the
-/// GitHub grant provider attributes its additions, so a forged `added_by` decides nothing, and
-/// which stamps each `added_by` it writes with the save's time, #454),
-/// `authorize_entries` over that change, an addition of an identity the version holds outside
-/// the grant refused `outside_grant` (`collisions`), then the version stored is
-/// `compose_entries`' over the whole current version (ADR 0015, #333). The global operator's
-/// text is stored as written, `added_by` included. Returns what was stored with the owner groups
-/// of the entries the change touches, for a team operator's audit line.
 #[cfg(all(feature = "ui", feature = "refresh-lock"))]
 pub(crate) fn save(
     manifest: &Path,
@@ -347,10 +322,6 @@ pub(crate) fn save(
     })?
 }
 
-/// `refused`, the refusals of a team operator's save over the entries its grant reads, with each
-/// entry of `seen` whose identity `current` holds outside the grant refused `outside_grant` as an
-/// addition, whatever else it failed (#333): the browser sees such an identity as new, so only
-/// the save can refuse it, named as the subject submitted it. In `seen` order, then the removals.
 #[cfg(all(feature = "ui", feature = "refresh-lock"))]
 fn collisions(
     grant: &Grant,
@@ -387,7 +358,6 @@ pub fn version_id(src: &str, message: &str, author: &str) -> Result<String, Vec<
     prepared("entries", src, message, author).map(|v| v.id)
 }
 
-/// The entries of the version current in Valkey, checked; `None` when there is no pointer.
 #[cfg(feature = "refresh-lock")]
 async fn current_entries(
     valkey: &Valkey,
@@ -408,14 +378,10 @@ async fn current_entries(
     ))
 }
 
-/// The version id of `entries`, their blocks being `blocks` (`entry_blocks`), and the entries as
-/// a version document holds them.
 fn versioned(entries: &[EntryFile], blocks: Vec<Json>) -> (String, Vec<Json>) {
     (entries_id(entries, &blocks), with_blocks(entries, blocks))
 }
 
-/// The version stored at `key`, checked as the version `id` (`checked`), with its entries in the
-/// `[[repository]]` shape; `None` when there is none.
 pub(crate) async fn stored(
     store: &Store,
     key: &str,
@@ -427,10 +393,6 @@ pub(crate) async fn stored(
     }
 }
 
-/// The document `bytes`, stored at `key`, checked as the version `id` before any of it is used:
-/// its id, its time's shape, its entries valid as a workspace's text (`meada_core::manifest`)
-/// and the id derived from them. Returns it with its entries in the `[[repository]]` shape,
-/// the text `import` reads back to the same id.
 fn checked(key: &str, id: &str, bytes: &[u8]) -> Result<(Version, String), String> {
     let not = || Msg::WorkspaceNotVersion(key).text();
     let version: Version = serde_json::from_slice(bytes).map_err(|_| not())?;
@@ -506,7 +468,6 @@ pub fn list(manifest: &Path) -> crate::Result<Listing> {
     Ok(crate::modules::block_on(run)??)
 }
 
-/// Every stored workspace version, checked and newest first, shared by the CLI and console.
 pub(crate) async fn documents(
     store: &Store,
     snapshot: &Config,
@@ -701,10 +662,6 @@ pub fn apply(
     done.map_err(failed)?
 }
 
-/// Points the workspace (`KEYS[2]`) at the version `ARGV[2]` with the fence `ARGV[3]` while the
-/// lock (`KEYS[1]`) holds the token `ARGV[1]`: 0 without the lock, -1 unless the fence is above
-/// the one the pointer holds (compared as decimal text), -2 when that one is no decimal; else
-/// the hash set, and 1.
 #[cfg(feature = "refresh-lock")]
 const APPLY: &str = r"
 if redis.call('GET', KEYS[1]) ~= ARGV[1] then
@@ -746,7 +703,6 @@ pub enum Pulled {
 pub fn pull(manifest: &Path) -> crate::Result<Pulled> {
     let sections = sections(manifest)?;
     let pointer = pointer_key(&sections.valkey);
-    // With `[workspaces]` a deployment with no current version is an empty deployment workspace.
     #[cfg(feature = "workspaces")]
     let empty_ok = sections.named.is_some();
     #[cfg(not(feature = "workspaces"))]
@@ -787,8 +743,6 @@ pub fn pull(manifest: &Path) -> crate::Result<Pulled> {
         .open(dir.join("pull.lock"))
         .map_err(&at)?;
     lock.lock().map_err(&at)?;
-    // The contexts file first: a reader that sees the new version finds the contexts at least as
-    // new, and the role check reads both before it writes the exclusions that name them.
     #[cfg(feature = "workspaces")]
     if let Some(contexts) = &contexts {
         crate::workspaces::write_contexts(&dir, contexts)?;
@@ -797,7 +751,6 @@ pub fn pull(manifest: &Path) -> crate::Result<Pulled> {
     #[cfg(not(feature = "workspaces"))]
     let _ = contexts;
     let Some((id, fence, bytes)) = deployment else {
-        // The deployment workspace is empty: no current file, no document.
         let file = dir.join(CURRENT);
         if let Err(e) = fs::remove_file(&file)
             && e.kind() != std::io::ErrorKind::NotFound
@@ -835,7 +788,6 @@ pub fn pull(manifest: &Path) -> crate::Result<Pulled> {
         }
         return Err(e.into());
     }
-    // Only the current version and the one it replaced; a failure is left for the next pull.
     let replaced = previous.map(|(id, _)| id);
     for entry in fs::read_dir(&dir).into_iter().flatten().flatten() {
         let name = entry.file_name();
@@ -848,9 +800,6 @@ pub fn pull(manifest: &Path) -> crate::Result<Pulled> {
     Ok(Pulled::Swapped(id))
 }
 
-/// Every named workspace not deleted with the entries of its current version, read in one
-/// `REPEATABLE READ` transaction and from the store (hostile input, bounded as the deployment
-/// version is): what the contexts file holds (#342).
 #[cfg(feature = "workspaces")]
 async fn named_contexts(
     postgres: &crate::postgres::Config,
@@ -890,8 +839,6 @@ pub fn pulled(dir: &Path) -> Result<Option<(String, Vec<EntryFile>, String)>, St
     Ok(Some((id, entries, text)))
 }
 
-/// The pulled version as `pulled` reads it: its id, its document, its entries' text and the path
-/// it was read from.
 fn pulled_version(dir: &Path) -> Result<Option<(String, Version, String, String)>, String> {
     let file = dir.join(CURRENT);
     let current = pull::pointer_file(&file, |shown| Msg::WorkspaceCurrentBad(shown).text())?;
@@ -942,7 +889,6 @@ const EXCLUDED_MAX: u64 = 128 << 20;
 /// (an empty deployment under `[workspaces]`, #342).
 pub const NO_VERSION: &str = "0000000000000000";
 
-/// The prefix of the exclusions file's line naming the contexts file it was written for (#342).
 const CONTEXTS_LINE: &str = "# contexts ";
 
 /// The identities the exclusions file of `dir` leaves out of the pulled version `version`. The
@@ -967,8 +913,6 @@ pub fn excluded_contexts(
     }
 }
 
-/// The exclusions file parsed: the deployment workspace's identities, each context's (a line
-/// `<context id>\t<identity>`) and the digest of the contexts file it names, if any.
 #[expect(clippy::type_complexity)]
 fn parse_excluded(
     dir: &Path,
@@ -1030,7 +974,6 @@ fn parse_excluded(
     Ok((deployment, contexts, digest))
 }
 
-/// The refusal of a reader of `manifest` with no version pulled into `dir`, naming the pull.
 pub(crate) fn not_pulled(manifest: &Path, dir: &Path) -> String {
     let (manifest, dir) = (manifest.display().to_string(), dir.display().to_string());
     Msg::WorkspaceNotPulled {
@@ -1109,8 +1052,6 @@ pub fn show_pulled(manifest: &Path) -> crate::Result<String> {
     };
     #[cfg(feature = "workspaces")]
     if let Some(section) = &read.workspaces {
-        // The repositories only named workspaces select, with the paths the fetch script
-        // provisions them at (ADR 0021): after the deployment workspace's own entries.
         let (version, deployment, text) = match found {
             Some((version, entries, text)) => (version, entries, text),
             None => (String::new(), Vec::new(), String::new()),
@@ -1141,8 +1082,6 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// An exclusions file past its bound is refused unread, and a context line must name an id
-    /// and an identity.
     #[test]
     fn the_exclusions_file_is_bounded_and_its_context_lines_are_checked() {
         let dir = std::env::temp_dir().join(format!("meada-excluded-{}", std::process::id()));
@@ -1174,8 +1113,6 @@ mod tests {
         assert!(excluded(&dir, version).is_err());
     }
 
-    /// An identity the version holds outside the grant is `outside_grant` whatever the core
-    /// found, an attribution missing included, in the submitted order and before the removals.
     #[test]
     fn a_collision_with_a_hidden_identity_is_outside_grant_first() {
         let entry = |repo: &str, owner: &str| json!({"repo": repo, "path": "p", "owner": owner});
@@ -1230,7 +1167,6 @@ mod tests {
             ]
         );
         assert_eq!(refused[1].change, Change::Add);
-        // Without a refusal of its own, a collision is still refused.
         let acting = Acting {
             login: Some("ana"),
             ..acting
@@ -1251,8 +1187,6 @@ mod tests {
 mod import_read_tests {
     use super::*;
 
-    /// The import file is read once, bounded: a file past `VERSION_MAX` is refused, and the text
-    /// read is the text whose id is audited.
     #[test]
     fn the_import_file_is_read_bounded_and_its_text_decides_the_id() {
         let dir = std::env::temp_dir().join(format!("meada-import-read-{}", std::process::id()));

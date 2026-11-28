@@ -36,7 +36,6 @@ impl Symbol<'_> {
         let tokens = budget.unwrap_or(render::DEFAULT_BUDGET);
         let cap = render::bytes(tokens);
         let head = [self.header.clone(), self.community.clone()];
-        // An answer that fits is cut nowhere, with every process named.
         let full = processes_line(&self.processes, usize::MAX);
         let whole: Vec<String> = (head.iter().cloned())
             .chain([full])
@@ -46,16 +45,11 @@ impl Symbol<'_> {
         if bytes(&whole) <= cap {
             return render::budgeted(&whole, budget);
         }
-        // The processes line may take what the head leaves less the widest note the final cut
-        // can write, so that cut never reaches it.
         let total = head.len() + 1 + self.span.len() + 1 + self.tail.len();
         let widest = render::note(total, total, tokens);
         let room = cap.saturating_sub(bytes(&head) + 1 + widest.len());
         let processes = processes_line(&self.processes, room);
         let left = cap.saturating_sub(bytes(&head) + render::line_bytes(&processes));
-        // The span gives up first: it keeps the lines the tail leaves, then its own note. With no
-        // room even for the note it is left out, and the agent reads it from the lines the
-        // header's range names.
         let span_room = left.saturating_sub(bytes(&self.tail));
         let (_, span) = render::cut(&self.span, span_room, tokens);
         let span = if span.len() > span_room {
@@ -107,7 +101,6 @@ pub fn processes_line(found: &[Process], room: usize) -> String {
         })
         .collect();
     let mut kept = Vec::new();
-    // The length of the summary and the entries kept, joined.
     let mut used = summary.len() + ": ".len();
     for (i, entry) in entries.iter().enumerate() {
         let len = used + if kept.is_empty() { 0 } else { ", ".len() } + entry.len();

@@ -1,5 +1,3 @@
-//! HTTP routing through evaluated Services, Ingresses and the workloads running code.
-
 use super::{Http, PROXY_VIA, contract, fits, gateway_contracts, join, route};
 use crate::contract::{ContractKind, Level, Link, ReceiverIdentity};
 use crate::iac::Node;
@@ -11,12 +9,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 type LinkKey = (String, String, String);
 type Aliases = BTreeMap<(String, String), Vec<Gateway>>;
-/// The expanded text of internal Ingress gateway forms per query; overflow makes all unread.
 // ponytail: sixteen source-file ceilings cover ordinary route tables; fan-out must not
 // multiply a hostile long route by every Ingress rule without bound.
 const ALIAS_BYTES_MAX: usize = 16 << 20;
 
-/// Prepared once per query. Presentation shares routing's structured resolution decision.
 #[derive(Clone, Default)]
 pub(crate) struct Prepared {
     pub(super) links: Vec<Link>,
@@ -37,7 +33,6 @@ fn key(link: &Link) -> LinkKey {
     )
 }
 
-/// Kubernetes DNS forms, with an optional numeric port. Other domains remain ordinary hosts.
 fn service_name(host: &str) -> Option<(&str, Option<&str>)> {
     let host = hostname(host)?;
     let label = |s: &str| {
@@ -125,7 +120,6 @@ impl<'a> Routing<'a> {
                 })
             })
             .collect();
-        // A chart environment runs code for channel resolution alone (front 6, Goal 2).
         let executions = Image
             .executions(exports, &links)
             .into_iter()
@@ -171,7 +165,6 @@ impl<'a> Routing<'a> {
         }
     }
 
-    /// Provider forms and matching share one complete, bounded prefix table.
     fn aliases(&self) -> Option<Aliases> {
         let mut aliases = BTreeMap::<_, Vec<_>>::new();
         let mut room = ALIAS_BYTES_MAX;
@@ -195,7 +188,6 @@ impl<'a> Routing<'a> {
                                     && inside(&provider.site, &repo.identity, &execution.path)
                                     && let Some((_, path)) = route(&provider.contract)
                                 {
-                                    // Include keys and reason text before cloning them or joining a path.
                                     let bytes = provider.site.len()
                                         + provider.contract.len()
                                         + path.len()
@@ -372,7 +364,6 @@ impl<'a> Routing<'a> {
                 }
             }
         }
-        // As in the ordinary gateway matcher, a code path wins within its repository.
         {
             let direct = candidates
                 .iter()
@@ -393,8 +384,6 @@ impl<'a> Routing<'a> {
         candidates
     }
 
-    /// The links a call to `host` takes through an Ingress or a Service, or `None` when no route
-    /// reaches code: the host is then left to `[serve] hosts`, as before infrastructure was read.
     fn links(
         &self,
         consumer: &Consumer,
@@ -489,9 +478,6 @@ impl<'a> Routing<'a> {
     }
 }
 
-/// The links of the routes a URL may take, or `None` when none reaches code. A route that
-/// reaches no code leaves the others ambiguous; routes to distinct providers become so as links
-/// collapse, and copies of one route to one provider (an overlay per environment) are one link.
 fn settle(routes: Vec<Vec<Link>>) -> Option<Vec<Link>> {
     let unknown = routes.iter().any(Vec::is_empty);
     let found = (routes.into_iter().flatten())
@@ -519,8 +505,6 @@ fn base_url(value: &str) -> Option<(&str, &str)> {
     Some((host, path))
 }
 
-/// A workload supplies the base after extraction. Replay an explicit TS strip before
-/// appending the written suffix, which can start in the middle of a path segment.
 fn workload_url<'a>(consumer: &'a Consumer, raw: &str) -> Option<(&'a str, String, String)> {
     let wanted = consumer.contract.as_deref().and_then(route);
     if let Some(ReceiverIdentity::HttpBase { strips, suffix }) = &consumer.identity {
@@ -607,8 +591,6 @@ pub(super) fn prepare(exports: &mut [Export], repositories: &[Repository]) {
             let (via, proxy) = via
                 .split_once(PROXY_VIA)
                 .map_or((via, None), |(v, p)| (v, Some(p)));
-            // A Base URL declaration wins over a host infrastructure gives the variable:
-            // `Http.link` below takes it.
             let undeclared = |v: &&str| repo.config.declared_dir(v).is_none();
             if let Some(variable) = via.strip_prefix("env:").filter(undeclared) {
                 let scoped =
@@ -718,8 +700,6 @@ pub(super) fn prepare(exports: &mut [Export], repositories: &[Repository]) {
 mod tests {
     use super::{Execution, Export, Level, Node, Repository, Routing, service_name};
 
-    /// A chart environment's execution runs code for channel resolution alone: HTTP routing
-    /// never takes it as a caller, while a Compose service's covering the same site stays one.
     #[test]
     fn routing_skips_helm_environment_executions() {
         let repo = Repository {

@@ -79,7 +79,7 @@ def main():
     key_path = Path(a.source_key).resolve()
     key = json.loads(key_path.read_text())
     if a.entry and a.entry in key:
-        key = key[a.entry]  # the frozen generic manifest separates its repository scopes
+        key = key[a.entry]
     if a.entry:
         prove.fetch(a.entry, src)
         source_pin = {"entry": a.entry, "binding": prove.infra()[a.entry]}
@@ -158,7 +158,6 @@ def main():
             client = prove.Stdio(binary, work, error_path)
         responses, answers, seconds = [], [], []
         try:
-            # The persistent reader sees edited source before any CLI refresh/export.
             for query in queries:
                 start = time.monotonic()
                 response = client.call("tools/call", {"name": query["tool"], "arguments": query["arguments"]})
@@ -223,7 +222,6 @@ def main():
         outcomes.append(result)
         save(run / "comparisons" / (label + ".json"), result)
 
-    # Index once, then keep the same MCP reader for every source-only phase.
     baseline_out = run / "head" / name
     baseline_out.mkdir(parents=True)
     save(baseline_out / "index.command.json", [binary, "index"])
@@ -255,9 +253,6 @@ def main():
                 if hashlib.sha256(changed).hexdigest() != edit["sha256_after"]:
                     raise RuntimeError("source edit changed beyond the frozen key")
                 target.write_bytes(changed)
-                # ADR 0004 hashes files whose mtime or size changed. Keep the
-                # same-size controls, with an explicit stat-visible timestamp.
-                # One second also works on filesystems with coarse timestamps.
                 changed_mtime = max(time.time_ns(), stamp.st_mtime_ns + 1_000_000_000)
                 os.utime(target, ns=(stamp.st_atime_ns, changed_mtime))
                 actual = target.stat()

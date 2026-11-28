@@ -1,7 +1,3 @@
-//! The management console's process (spec #293, ADR 0014, feature `ui`): `meada ui --listen
-//! <addr> --workspace <bootstrap manifest>` as a child process over a front end's files, talked
-//! to in plain HTTP as a browser and a foreign page would.
-
 #![cfg(feature = "ui")]
 
 use std::fs;
@@ -15,37 +11,27 @@ use serde_json::{Value, json};
 use crate::manifest::{MANIFEST, run_args};
 use crate::server::Server;
 
-/// With `[accounts]`: the console's own sign-in, the default account and its session tokens.
 #[cfg(feature = "accounts")]
 pub(crate) mod accounts;
 
-/// With `[oidc]`: the console's admission, its routes and the grant bounding every view.
 #[cfg(feature = "oidc")]
 mod oidc;
 
-/// The playground and the exports over the chain fixture, from `index_dir` or a pulled generation.
 pub(super) mod playground;
 
 mod reads;
 
-/// The console's own origin in every bootstrap manifest here.
 const PUBLIC: &str = "http://localhost:7999";
 
-/// This build's version, the one the front end's files must name.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const INDEX: &str = "<!doctype html><title>Meada</title>\n";
 
-/// The exact content security policy of every answer without `[oidc]`.
 const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; \
                    frame-ancestors 'none'";
 
-/// A file outside `[ui] dir` that no answer may carry.
 const OUTSIDE: &str = "outside-the-ui-dir-4f1c";
 
-/// A console's directory: `ui/` with a few files of a front end built for `version` (none
-/// without one), `outside.txt` beside it with symbolic links to it and to its directory from
-/// inside, and `ops/meada.workspace.toml` with `head`, then `[ui]` with `ui` as its body.
 pub(super) fn console_dir(case: &str, version: Option<&str>, head: &str, ui: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(case);
     let _ = fs::remove_dir_all(&dir);
@@ -60,7 +46,6 @@ pub(super) fn console_dir(case: &str, version: Option<&str>, head: &str, ui: &st
     dir
 }
 
-/// `<dir>/ui/`, a few files of a front end built for `version` (none without one). Returns it.
 pub(super) fn front_end(dir: &Path, version: Option<&str>) -> PathBuf {
     let files = dir.join("ui");
     fs::create_dir_all(files.join("assets")).unwrap();
@@ -82,12 +67,10 @@ pub(super) fn write_manifest(dir: &Path, head: &str, ui: &str) {
     fs::write(dir.join(MANIFEST), text).unwrap();
 }
 
-/// The `[ui]` body every console here starts with.
 pub(super) fn ui_section() -> String {
     format!("dir = \"../ui\"\npublic_url = \"{PUBLIC}\"\n")
 }
 
-/// `meada ui --listen <listen> --workspace ops/meada.workspace.toml` running in `dir`.
 pub(super) fn start(dir: &Path, listen: &str) -> Server {
     Server::start_command(
         dir,
@@ -97,10 +80,8 @@ pub(super) fn start(dir: &Path, listen: &str) -> Server {
     )
 }
 
-/// An answer read off the wire.
 pub(super) struct Reply {
     pub(super) status: u16,
-    /// Names in lowercase.
     pub(super) headers: Vec<(String, String)>,
     pub(super) body: String,
 }
@@ -115,7 +96,6 @@ impl Reply {
         serde_json::from_str(&self.body).unwrap_or_else(|_| panic!("JSON: {}", self.body))
     }
 
-    /// No cookie and no CORS header: no page of another origin reads an answer.
     pub(super) fn assert_no_cookie_or_cors(&self) {
         for (name, _) in &self.headers {
             assert!(
@@ -126,13 +106,10 @@ impl Reply {
     }
 }
 
-/// `method path` over a connection of its own to `console`, with `headers` (a `Host` of the
-/// bound address unless they name one), sent as written: nothing normalises the path.
 pub(super) fn send(console: &Server, method: &str, path: &str, headers: &[(&str, &str)]) -> Reply {
     send_body(console, method, path, headers, "")
 }
 
-/// `send` with `body`.
 pub(super) fn send_body(
     console: &Server,
     method: &str,
@@ -175,8 +152,6 @@ pub(super) fn get(console: &Server, path: &str) -> Reply {
     send(console, "GET", path, &[])
 }
 
-/// The three read routes answer their documents; an unknown API path is the JSON 404; the
-/// `manifest` route reports the file as it now stands on disk.
 #[test]
 fn serves_config_session_and_manifest() {
     let dir = console_dir("ui_routes", Some(VERSION), "", &ui_section());
@@ -249,8 +224,6 @@ fn serves_config_session_and_manifest() {
         json!({"error": {"code": "not_found", "message": "no API route at this path"}})
     );
 
-    // Broken on disk after the start: the next answer names the file, the line and the key,
-    // beside the configuration the console started with.
     write_manifest(&dir, "", &(ui_section() + "colour = \"blue\"\n"));
     let manifest = get(&console, "/api/v1/manifest").json();
     assert_eq!(
@@ -266,7 +239,6 @@ fn serves_config_session_and_manifest() {
     }
 }
 
-/// The address forms of `meada mcp --listen`, a port alone on loopback; both flags required.
 #[test]
 fn takes_the_listen_forms_of_the_node_and_needs_both_flags() {
     let dir = console_dir("ui_listen", Some(VERSION), "", &ui_section());
@@ -296,8 +268,6 @@ fn takes_the_listen_forms_of_the_node_and_needs_both_flags() {
     }
 }
 
-/// The `Host` check, then the `Origin` check, each with its fixed 403 body; a write needs an
-/// `Origin`.
 #[test]
 fn refuses_a_foreign_host_a_foreign_origin_and_a_write_without_origin() {
     let dir = console_dir("ui_checks", Some(VERSION), "", &ui_section());
@@ -313,7 +283,6 @@ fn refuses_a_foreign_host_a_foreign_origin_and_a_write_without_origin() {
         ("POST", &[], write),
         ("POST", &[foreign_host, foreign_origin], host),
         ("GET", &[foreign_host, foreign_origin], host),
-        // `public_url`'s origin with another port is another origin.
         ("GET", &[("Origin", "http://localhost:8000")], origin),
     ] {
         let reply = send(&console, method, "/api/v1/config", headers);
@@ -325,7 +294,6 @@ fn refuses_a_foreign_host_a_foreign_origin_and_a_write_without_origin() {
         assert_eq!(reply.header("content-security-policy"), Some(CSP));
         reply.assert_no_cookie_or_cors();
     }
-    // `public_url`'s host and port, and the console's own origin, pass.
     for headers in [
         &[("Host", "localhost:7999")][..],
         &[("Host", "localhost:7999"), ("Origin", PUBLIC)],
@@ -334,14 +302,11 @@ fn refuses_a_foreign_host_a_foreign_origin_and_a_write_without_origin() {
         let reply = send(&console, "GET", "/api/v1/config", headers);
         assert_eq!(reply.status, 200, "{headers:?}");
     }
-    // A write with the console's own origin reaches routing: no write route yet.
     let reply = send(&console, "POST", "/api/v1/config", &[("Origin", PUBLIC)]);
     assert_eq!(reply.status, 404);
     assert_eq!(reply.json()["error"]["code"], json!("not_found"));
 }
 
-/// Static files: their headers, the cache rules, no traversal, no listing, the front end's
-/// routes answered with `index.html`.
 #[test]
 fn serves_the_front_end_s_files_and_nothing_else() {
     let dir = console_dir("ui_static", Some(VERSION), "", &ui_section());
@@ -367,7 +332,6 @@ fn serves_the_front_end_s_files_and_nothing_else() {
             "no-cache",
             "User-agent: *\n",
         ),
-        // The front end's own routes, and a directory: `index.html`, never a listing.
         (
             "/repositories/web",
             "text/html; charset=utf-8",
@@ -408,7 +372,6 @@ fn serves_the_front_end_s_files_and_nothing_else() {
     }
 }
 
-/// Every problem that refuses the start, listed at once.
 #[test]
 fn refuses_to_start_naming_every_problem() {
     let at = format!("meada: {MANIFEST}");
@@ -493,7 +456,6 @@ fn refuses_to_start_naming_every_problem() {
             assert!(line.starts_with(expected.as_str()), "{case}: {line}");
         }
     }
-    // A bootstrap manifest with no `[ui]`.
     let dir = console_dir("ui_refuse_section", Some(VERSION), "", &ui_section());
     fs::write(dir.join(MANIFEST), "index_dir = \"../indexes\"\n").unwrap();
     let (_, stderr, code) = run_args(
@@ -507,7 +469,6 @@ fn refuses_to_start_naming_every_problem() {
     );
 }
 
-/// The `manifest` route names a secret's file, never what it holds; no answer carries it.
 #[cfg(feature = "valkey")]
 #[test]
 fn no_answer_carries_a_secret() {
@@ -541,8 +502,6 @@ fn no_answer_carries_a_secret() {
     }
 }
 
-/// SIGTERM during a slow request (the `manifest` route reading a FIFO no one writes yet): the
-/// listener closes, the answer is sent once the read ends, and the process exits 0.
 #[cfg(unix)]
 #[test]
 fn an_answer_in_flight_when_sigterm_arrives_is_received() {
@@ -560,12 +519,10 @@ fn an_answer_in_flight_when_sigterm_arrives_is_received() {
     let address = console.url.clone();
     let answer = std::thread::scope(|scope| {
         let answer = scope.spawn(|| get(&console, "/api/v1/manifest"));
-        // A margin for the request to reach the console and block on the FIFO.
         std::thread::sleep(Duration::from_millis(1500));
         terminate(&console);
         std::thread::sleep(Duration::from_millis(500));
         assert!(TcpStream::connect(address.trim_start_matches("http://")).is_err());
-        // The FIFO's writer: the read ends and the answer goes out.
         fs::write(&manifest, &text).unwrap();
         answer.join().unwrap()
     });

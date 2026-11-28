@@ -1,48 +1,31 @@
-//! `pyproject.toml`, parsed once for every reader of it: the source roots the Python pack
-//! resolves imports through, and the distribution and dependencies a package of the index
-//! stores (`package::pypi`), and the console scripts that start a program (`scripts`).
-
 use std::collections::HashSet;
 
 use crate::Result;
 
-/// The most `members` or `exclude` globs read of a uv workspace; the rest are left out.
 // ponytail: real workspaces list a few; this bounds the member walk over a hostile file.
 const MAX_GLOBS: usize = 256;
 
-/// A parsed `pyproject.toml`.
 pub struct Pyproject(toml::Table);
 
-/// A dependency a `pyproject.toml` declares, as written.
 #[derive(Debug, PartialEq)]
 pub enum Requirement<'a> {
-    /// An entry of `[project] dependencies`: a PEP 508 string.
     Pep508(&'a str),
-    /// An entry of `[tool.poetry.dependencies]`: the name, and the version constraint when it
-    /// is a string or the `version` of an inline table.
     Poetry(&'a str, Option<&'a str>),
 }
 
-/// Where `[tool.uv.sources]` says a dependency comes from, as written.
 #[derive(Debug, PartialEq)]
 pub enum UvSource<'a> {
-    /// `{ workspace = true }`: the member of the consumer's uv workspace.
     Workspace,
-    /// `{ path = "..." }`, relative to the directory of the `pyproject.toml`.
     Path(&'a str),
-    /// `{ git = "..." }`: the remote's URL.
     Git(&'a str),
-    /// `{ url = "..." }` or `{ index = "..." }`: from outside the workspace.
     Outside,
 }
 
 impl Pyproject {
-    /// Parses the bytes; an error for a file that is not UTF-8 or not TOML.
     pub fn parse(src: &[u8]) -> Result<Self> {
         Ok(Self(std::str::from_utf8(src)?.parse()?))
     }
 
-    /// The value at the dotted `path` of tables.
     fn at(&self, path: &[&str]) -> Option<&toml::Value> {
         let (first, rest) = path.split_first()?;
         rest.iter()
@@ -53,19 +36,14 @@ impl Pyproject {
         self.at(path)?.as_str()
     }
 
-    /// The distribution name as written: `[project] name` (PEP 621), else `[tool.poetry] name`.
     pub fn name(&self) -> Option<&str> {
         (self.text(&["project", "name"])).or_else(|| self.text(&["tool", "poetry", "name"]))
     }
 
-    /// The version as written, from the same table as `name`.
     pub fn version(&self) -> Option<&str> {
         (self.text(&["project", "version"])).or_else(|| self.text(&["tool", "poetry", "version"]))
     }
 
-    /// The dependencies of `[project] dependencies` and `[tool.poetry.dependencies]` (its
-    /// `python` key excepted), in order. Poetry groups and `[project.optional-dependencies]`
-    /// are not read; an entry of another type, and a Poetry `git` or `url` source, is left out.
     pub fn requirements(&self) -> Vec<Requirement<'_>> {
         let pep621 = self
             .at(&["project", "dependencies"])
@@ -78,8 +56,6 @@ impl Pyproject {
             .filter_map(|(name, v)| {
                 let version = match v {
                     toml::Value::String(s) => Some(s.as_str()),
-                    // A git or URL source is a direct reference, as `name @ url` is in PEP 508:
-                    // no entry, unless a `path` keeps the package local.
                     toml::Value::Table(t)
                         if !t.contains_key("path")
                             && (t.contains_key("git") || t.contains_key("url")) =>
@@ -94,9 +70,6 @@ impl Pyproject {
         pep621.chain(poetry).collect()
     }
 
-    /// The sources of `[tool.uv.sources]`, by the key as written: a table that names exactly one
-    /// of `workspace = true`, `path`, `git`, `url` and `index` (as a string). A list of sources
-    /// (one per marker), `workspace = false` and any other value give none.
     pub fn uv_sources(&self) -> Vec<(&str, UvSource<'_>)> {
         let table = self
             .at(&["tool", "uv", "sources"])
@@ -122,8 +95,6 @@ impl Pyproject {
             .collect()
     }
 
-    /// The `members` and `exclude` globs of `[tool.uv.workspace]`, the first `MAX_GLOBS` strings
-    /// of each list, when the file declares that table: it is then a uv workspace root.
     pub fn uv_workspace(&self) -> Option<(Vec<String>, Vec<String>)> {
         let table = self.at(&["tool", "uv", "workspace"])?.as_table()?;
         let globs = |key: &str| -> Vec<String> {
@@ -139,11 +110,6 @@ impl Pyproject {
         Some((globs("members"), globs("exclude")))
     }
 
-    /// The console scripts of `[project.scripts]` (else Poetry's `[tool.poetry.scripts]`) as
-    /// `(name, module, function)`, sorted by name: the key as written, which is the command
-    /// pip installs, and its `module:function` value, extras (`module:function [extra]`)
-    /// dropped. An empty name, and a value that is not a dotted module, a colon and a dotted
-    /// name, are left out.
     pub fn scripts(&self) -> Vec<(String, String, String)> {
         let table = (self.at(&["project", "scripts"]))
             .or_else(|| self.at(&["tool", "poetry", "scripts"]))
@@ -165,16 +131,10 @@ impl Pyproject {
         found
     }
 
-    /// The source roots it declares besides the directory holding it: setuptools'
-    /// `package-dir` and `packages.find` `where`, and Poetry's `packages` with `from`, each
-    /// relative to that directory and inside it.
     // ponytail: other build backends (hatch, pdm, flit) are not read.
     pub fn roots(&self) -> Vec<String> {
         let setuptools = self.at(&["tool", "setuptools"]);
         let mut roots: Vec<String> = Vec::new();
-        // `"" = "src"` roots every package in `src`; `"pkg" = "lib/pkg"` roots `pkg` in `lib`,
-        // and `"a.b" = "lib/a/b"` roots `a.b` in `lib`. A directory not named after its package
-        // says nothing about a root.
         let dirs = setuptools.and_then(|s| s.get("package-dir"));
         for (package, dir) in dirs.and_then(toml::Value::as_table).into_iter().flatten() {
             let (Some(dir), Some(package)) = (
@@ -212,9 +172,6 @@ impl Pyproject {
     }
 }
 
-/// The source roots of the package whose `pyproject.toml` sits in `dir` (`""` at the repository
-/// root) and declares `declared` (`Pyproject::roots`): `dir`, then the declared roots, or its
-/// `src` when none is. Both the pack's imports and the PyPI packages' modules use it.
 // ponytail: `src` is a root whether or not it holds packages, since neither reader sees the
 // file list.
 pub fn source_roots(dir: &str, declared: &[String]) -> Vec<String> {
@@ -230,8 +187,6 @@ pub fn source_roots(dir: &str, declared: &[String]) -> Vec<String> {
     roots
 }
 
-/// A relative directory in its plain form, `None` when it leaves the directory it is relative
-/// to.
 fn clean(path: &str) -> Option<String> {
     let mut parts = Vec::new();
     for part in path.split('/') {
@@ -286,8 +241,6 @@ h = "1"
 "#,
         );
         use Requirement::*;
-        // A git or URL source is a direct reference, as `name @ url` is: no entry. A path keeps
-        // it one.
         assert_eq!(
             p.requirements(),
             [
@@ -370,7 +323,6 @@ not-text = 3
 "#,
         );
         let script = |n: &str, m: &str, f: &str| (n.to_string(), m.to_string(), f.to_string());
-        // The name is kept as written (#832): pip installs the command under it, byte for byte.
         assert_eq!(
             p.scripts(),
             [

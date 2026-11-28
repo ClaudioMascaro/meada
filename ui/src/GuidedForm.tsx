@@ -6,10 +6,8 @@ import type { Entry, PeerDecl, ResourceDecl, ServeDecl } from './guided';
 import type { GuidedCopy } from './guided-i18n';
 import type { CatalogView } from './useCatalog';
 
-/** What the page says of one entry, already in words: the form shows it and decides nothing. */
 export interface EntryStatus { eligibility: string; ingestion: string; source?: string; diagnostics: string[] }
 
-/** A textarea of one value per line. It keeps the raw text while the person types, so a line break is not eaten. */
 function LinesField({ label, value, disabled, onChange }: { label: string; value: string[]; disabled: boolean; onChange: (lines: string[]) => void }) {
   const [raw, setRaw] = useState(value.join('\n'));
   useEffect(() => { if (lines(raw).join('\n') !== value.join('\n')) setRaw(value.join('\n')); }, [value, raw]);
@@ -28,7 +26,6 @@ function ServeFields({ serve, disabled, t, onChange }: { serve: ServeDecl | unde
   </fieldset>;
 }
 
-/** A role's label, or the role itself when the core lists one the copy does not name yet. */
 const roleLabel = (t: GuidedCopy, role: string): string =>
   ({ read: t.read, write: t.write, 'read-write': t['read-write'] } as Record<string, string>)[role] ?? role;
 
@@ -66,13 +63,6 @@ function PeerFields({ peers, targets, disabled, t, onChange }: { peers: PeerDecl
   </fieldset>;
 }
 
-/**
- * The guided controls over a named manifest (#345): repositories, and for each its serve settings,
- * resources and peers with their environment-variable names. It edits the entries the core reads;
- * the page rewrites the canonical text from them and checks it with the core, so this form holds no
- * rule about what an entry may contain. `status` is the eligibility, ingestion and effective
- * configuration of each entry, in words.
- */
 export function GuidedForm({ entries, roles, disabled, t, status, catalog, onChange }: {
   entries: Entry[]; roles: string[]; disabled: boolean; t: GuidedCopy; status: Record<string, EntryStatus>; catalog: CatalogView; onChange: (entries: Entry[]) => void;
 }) {

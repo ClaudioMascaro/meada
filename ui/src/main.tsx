@@ -19,7 +19,6 @@ root.render(<main><p role="status">{t.loading}</p></main>);
 let loadedConfig: Config | undefined;
 
 async function start() {
-  // Remove the one-time code from the address bar even if discovery or the exchange fails.
   const callback = location.pathname === '/auth/callback' ? new URLSearchParams(location.search) : undefined;
   if (callback) history.replaceState(null, '', '/config');
   const config = loadedConfig = await loadConfig();
@@ -29,8 +28,6 @@ async function start() {
     location.replace(config.public_url);
     return;
   }
-  // Local accounts (ADR 0024): the console's own sign-in page, the token in this tab's sessionStorage;
-  // under break glass (#563), for the tab on that page or holding its session.
   if (config.sign_in === 'accounts' || breakGlassTab(config, location.pathname)) {
     await loadCore(locale);
     root.render(<App api={new Api(new LocalAuth(config))} config={config} initialLanguage={locale} />);
@@ -39,7 +36,6 @@ async function start() {
   const auth = new Auth(config);
   if (callback) await auth.callback(callback);
   if (config.issuer && !auth.token) {
-    // Under break glass the identity provider's sign-in waits for a click, beside the discreet door.
     if (config.break_glass === true) { root.render(<main><SignInChoicePage locale={locale} onIdentityProvider={() => auth.login()} /></main>); return; }
     await auth.login(); return;
   }

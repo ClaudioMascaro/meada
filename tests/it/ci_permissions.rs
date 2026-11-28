@@ -1,7 +1,3 @@
-//! Declared permissions on a CI call and `permissions mismatch` on its link (#834, ADR 0028):
-//! the block that governs a CI job is its own, else its pipeline's, and the link says when a
-//! CI job of the called pipeline declares a permission above it. Declared, never granted.
-
 use std::fs;
 
 use meada::engine::Engine;
@@ -20,8 +16,6 @@ fn a_reusable_pipeline_shows_each_callers_declared_permissions_and_flags_the_one
     let answer = engine.context(PUBLISH, None).unwrap();
     let at = indexed(&workflows);
     let both = "permissions: contents: read, id-token: write";
-    // #820's table: only the CI job its pipeline's `contents: read` governs is below what the
-    // called pipeline declares.
     assert_eq!(
         listed(&answer, "  consumer: "),
         [
@@ -40,13 +34,11 @@ fn a_reusable_pipeline_shows_each_callers_declared_permissions_and_flags_the_one
         ],
         "{answer}"
     );
-    // What the CI jobs of the pipeline declare together: its block governs its one CI job.
     assert_eq!(
         listed(&answer, "  permissions: "),
         ["contents: read, id-token: write"],
         "{answer}"
     );
-    // A CI job with no block of its own or of its pipeline is shown so and never compared.
     let release = Engine::open(&wrapper).unwrap();
     let release =
         (release.context(&format!("github.com/acme/wrapper::{RELEASE}::."), None)).unwrap();
@@ -58,12 +50,10 @@ fn a_reusable_pipeline_shows_each_callers_declared_permissions_and_flags_the_one
         )],
         "{release}"
     );
-    // Declared, never granted: no answer says what a token holds at run time.
     let export = exported(&Engine::open(&app_b).unwrap()).to_string();
     for text in [&answer, &release, &export] {
         assert!(!text.to_lowercase().contains("grant"), "{text}");
     }
-    // The export: the block on the consumer row, left out where none is declared.
     let rows = |repo: &std::path::Path| {
         let export = exported(&Engine::open(repo).unwrap());
         let rows = export["consumers"].as_array().unwrap().clone();
@@ -96,15 +86,9 @@ fn a_reusable_pipeline_shows_each_callers_declared_permissions_and_flags_the_one
     assert_eq!(none[0].1, None, "{none:?}");
 }
 
-/// One caller and one called pipeline per row: the block of the caller's pipeline and of its
-/// CI job, the block of the called pipeline and of its CI jobs, then what the caller shows and
-/// the flag its link carries. The expected values follow GitHub's documented rules: a block is
-/// closed, a CI job's own block replaces its pipeline's, `read-all` and `write-all` give every
-/// permission that level, and the levels order as `none`, `read`, `write`.
 #[test]
 fn a_block_is_closed_a_job_replaces_its_pipeline_and_the_words_stand_for_every_permission() {
     let [workflows, _, _, _, app_c] = reproduction("ci_permissions_rules");
-    // (caller pipeline, caller job, called pipeline, called jobs, shown, flag)
     type Case = (
         &'static str,
         &'static str,
@@ -148,10 +132,8 @@ fn a_block_is_closed_a_job_replaces_its_pipeline_and_the_words_stand_for_every_p
             "contents: read",
             Some("contents write against read, every other permission write against none"),
         ),
-        // Not declared, on either side: shown so, never compared.
         ("", "", "write-all", &[""], "not declared", None),
         ("", "contents: read", "", &["", ""], "contents: read", None),
-        // The CI job's own block replaces its pipeline's, also to hold less.
         (
             "id-token: write",
             "contents: read",
@@ -168,7 +150,6 @@ fn a_block_is_closed_a_job_replaces_its_pipeline_and_the_words_stand_for_every_p
             "id-token: write",
             None,
         ),
-        // Any CI job of the called pipeline: the highest level one of them declares.
         (
             "",
             "contents: write",
@@ -177,7 +158,6 @@ fn a_block_is_closed_a_job_replaces_its_pipeline_and_the_words_stand_for_every_p
             "contents: write",
             Some("id-token write against none"),
         ),
-        // A permission named at `none` is declared, and holds nothing.
         (
             "",
             "contents: read, id-token: none",
@@ -186,7 +166,6 @@ fn a_block_is_closed_a_job_replaces_its_pipeline_and_the_words_stand_for_every_p
             "contents: read, id-token: none",
             Some("id-token read against none"),
         ),
-        // A block Meada does not read is as one not declared: no level is guessed.
         ("", "admin", "", &["write-all"], "not declared", None),
         (
             "",
@@ -196,7 +175,6 @@ fn a_block_is_closed_a_job_replaces_its_pipeline_and_the_words_stand_for_every_p
             "not declared",
             None,
         ),
-        // A name that could write a level of its own in an answer is no name.
         (
             "",
             "\"id-token: write\": read",
@@ -206,7 +184,6 @@ fn a_block_is_closed_a_job_replaces_its_pipeline_and_the_words_stand_for_every_p
             None,
         ),
     ];
-    // A block as YAML at `indent`: a word, `{}` or a mapping of `key: level` pairs.
     let block = |text: &str, indent: &str| match text {
         "" => String::new(),
         word if !word.contains(':') => format!("{indent}permissions: {word}\n"),
@@ -250,7 +227,6 @@ fn a_block_is_closed_a_job_replaces_its_pipeline_and_the_words_stand_for_every_p
         let flag = flag.map_or(String::new(), |above| {
             format!(", permissions mismatch: {above}")
         });
-        // The CI job sits below `on`, the pipeline's block and `jobs`.
         let line = 3 + block(pipeline, "").lines().count();
         assert_eq!(
             listed(&answer, "  consumer: "),
@@ -260,7 +236,6 @@ fn a_block_is_closed_a_job_replaces_its_pipeline_and_the_words_stand_for_every_p
             "case {n}: {answer}"
         );
     }
-    // What the called pipeline's CI jobs declare together, and `not declared` when none does.
     let together = |n: usize| {
         let answer = engine
             .context(&format!(".github/workflows/p{n}.yml"), None)
@@ -276,9 +251,6 @@ fn a_block_is_closed_a_job_replaces_its_pipeline_and_the_words_stand_for_every_p
     assert_eq!(together(10), ["contents: write, id-token: write"]);
 }
 
-/// A CI step calls an action: its link and its line carry no permissions text. A link with a
-/// commit id other than the indexed one and a permission below carries both flags, the ref
-/// first.
 #[test]
 fn only_a_ci_job_is_compared_and_both_flags_keep_one_order() {
     let [workflows, _, app_a, _, app_c] = reproduction("ci_permissions_flags");
@@ -317,8 +289,6 @@ fn only_a_ci_job_is_compared_and_both_flags_keep_one_order() {
     assert_golden("ci-permissions.context.txt", &(sides.join("\n") + "\n"));
 }
 
-/// Editing only the called pipeline's block, or only the caller's, changes the flag on the
-/// next query, as a cold index gives it.
 #[test]
 fn an_edited_block_on_either_side_changes_the_flag_as_a_cold_index_gives_it() {
     let [workflows, _, _, app_b, _] = reproduction("ci_permissions_edit");
@@ -335,7 +305,6 @@ fn an_edited_block_on_either_side_changes_the_flag_as_a_cold_index_gives_it() {
             .unwrap()
     };
     assert_eq!(flagged(&engine.context(PUBLISH, None).unwrap()), 1);
-    // The called pipeline stops declaring `id-token`: nothing is above any caller.
     let publish = workflows.join(PUBLISH);
     let text = fs::read_to_string(&publish).unwrap();
     fs::write(&publish, text.replace("  id-token: write\n", "")).unwrap();
@@ -344,7 +313,6 @@ fn an_edited_block_on_either_side_changes_the_flag_as_a_cold_index_gives_it() {
     assert_eq!(warm, cold());
     fs::write(&publish, &text).unwrap();
     assert_eq!(flagged(&engine.context(PUBLISH, None).unwrap()), 1);
-    // The caller's pipeline declares it: its CI job with no block of its own holds it now.
     let ci = app_b.join(CI);
     let caller = fs::read_to_string(&ci).unwrap();
     let declared = caller.replace(
@@ -358,8 +326,6 @@ fn an_edited_block_on_either_side_changes_the_flag_as_a_cold_index_gives_it() {
     assert_eq!(warm, cold());
 }
 
-/// The flag reads the blocks of the called pipeline in one pass per link: its cost grows with
-/// the CI jobs of that pipeline, not with their square (found by the verifier of #834).
 #[test]
 fn many_governed_ci_jobs_and_many_callers_are_flagged_in_bounded_time() {
     let [workflows, _, _, _, app_c] = reproduction("ci_permissions_growth");
@@ -397,6 +363,5 @@ fn many_governed_ci_jobs_and_many_callers_are_flagged_in_bounded_time() {
         .filter(|l| l["reason"].as_str().unwrap().ends_with(flag))
         .count();
     assert_eq!(flagged, 600, "{elapsed:?}");
-    // The square took 20 s here in a debug build.
     assert!(elapsed < std::time::Duration::from_secs(10), "{elapsed:?}");
 }

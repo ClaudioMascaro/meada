@@ -1,6 +1,3 @@
-//! OpenAPI 3.0 and 3.1 (spec #21): every path and method of a document is a route, with the
-//! shape of its 2xx JSON response.
-
 use std::collections::BTreeSet;
 
 use serde_json::Value;
@@ -9,13 +6,10 @@ use super::{Format, Problem, Route, Server, Summary, schema};
 use crate::http::{PARAM, normalize_path};
 use crate::shape::Source;
 
-/// The operations a path item may hold.
 const METHODS: &[&str] = &[
     "get", "put", "post", "delete", "options", "head", "patch", "trace",
 ];
 
-/// What `doc`, the document at `path`, gives: its routes when its `openapi` field is a 3.0 or
-/// 3.1 version, else the format it has instead.
 pub fn read(path: &str, doc: &Value) -> Summary {
     let field = |name: &str| text(doc.get(name)?);
     let version = field("openapi");
@@ -34,8 +28,6 @@ pub fn read(path: &str, doc: &Value) -> Summary {
         if !route.starts_with('/') {
             continue;
         }
-        // A path item may be a local reference (`#/components/pathItems/...`); an external
-        // one is not followed.
         let Some(item) = local(doc, item) else {
             let reference = item.get("$ref").and_then(Value::as_str);
             items.extend(reference.filter(|r| !r.starts_with('#')).map(String::from));
@@ -48,7 +40,6 @@ pub fn read(path: &str, doc: &Value) -> Summary {
             }
         }
     }
-    // Stable: of `/users/{id}` and `/users/{name}`, one route, the first key gives the shape.
     operations.sort_by(|a, b| (&a.0, &a.1).cmp(&(&b.0, &b.1)));
     operations.dedup_by(|a, b| (&a.0, &a.1) == (&b.0, &b.1));
     let mut work = schema::Work::default();
@@ -81,8 +72,6 @@ pub fn read(path: &str, doc: &Value) -> Summary {
     }
 }
 
-/// The `application/json` schema of `operation`'s lowest explicit 2xx response that has one,
-/// else of its `2XX` response. `application/*+json` is not read.
 fn response<'a>(doc: &'a Value, operation: &'a Value) -> Option<&'a Value> {
     let responses = operation.get("responses")?.as_object()?;
     let schema = |response: &'a Value| {
@@ -103,8 +92,6 @@ fn response<'a>(doc: &'a Value, operation: &'a Value) -> Option<&'a Value> {
         .or_else(|| schema(responses.get("2XX")?))
 }
 
-/// `value`, or the object its local `$ref` points to, through a few references; `None` for an
-/// external or missing one.
 pub(super) fn local<'a>(doc: &'a Value, mut value: &'a Value) -> Option<&'a Value> {
     for _ in 0..8 {
         let Some(reference) = value.get("$ref").and_then(Value::as_str) else {
@@ -115,9 +102,6 @@ pub(super) fn local<'a>(doc: &'a Value, mut value: &'a Value) -> Option<&'a Valu
     None
 }
 
-/// The root `servers` URLs of `doc`. Server variables take their default; a URL that still holds
-/// one has nothing to say. A relative URL gives its path only, a URL with neither host nor
-/// path nothing.
 fn servers(doc: &Value) -> Vec<Server> {
     let entries = doc.get("servers").and_then(Value::as_array);
     let mut found: Vec<Server> = (entries.into_iter().flatten())
@@ -155,8 +139,6 @@ fn servers(doc: &Value) -> Vec<Server> {
     found
 }
 
-/// `template` with each `{name}` that `value` knows replaced, in one pass over the template:
-/// the text a value brings is never read again, so a value naming a variable stays as written.
 fn substitute(template: &str, value: impl Fn(&str) -> Option<String>) -> String {
     let mut out = String::with_capacity(template.len());
     let mut rest = template;
@@ -175,7 +157,6 @@ fn substitute(template: &str, value: impl Fn(&str) -> Option<String>) -> String 
     out
 }
 
-/// A string, or a number as written in JSON (`openapi: 3.0` in YAML is a number).
 pub(super) fn text(value: &Value) -> Option<String> {
     match value {
         Value::String(s) => Some(s.clone()),
@@ -184,13 +165,11 @@ pub(super) fn text(value: &Value) -> Option<String> {
     }
 }
 
-/// `3.0`, `3.1` or any patch of them.
 fn supported(version: &str) -> bool {
     let mut parts = version.split('.');
     parts.next() == Some("3") && matches!(parts.next(), Some("0" | "1"))
 }
 
-/// `path` with every template (`{id}`) written as the parameter marker.
 fn template(path: &str) -> String {
     let mut out = String::with_capacity(path.len());
     let mut rest = path;
@@ -244,9 +223,6 @@ mod tests {
 
     #[test]
     fn server_variables_are_replaced_in_one_pass() {
-        // Each default names the next variable ten times: substituting into the substituted
-        // text again grows the URL tenfold per variable (a million copies here, a billion with
-        // three more). One pass leaves `{v1}` in it.
         let mut variables = serde_json::Map::new();
         for n in 0..6 {
             let default = format!("{{v{}}}", n + 1).repeat(10);
@@ -261,7 +237,6 @@ mod tests {
                     "a": {"default": "{b}"}, "b": {"default": "v2"}}},
             ],
         });
-        // The second URL: `{a}` gives `{b}` as written, which is not read again.
         assert_eq!(read("openapi.json", &doc).servers, vec![]);
     }
 

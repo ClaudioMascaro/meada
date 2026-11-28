@@ -1,7 +1,3 @@
-//! A workspace of any number of repositories: twelve small ones chained through `[[peer]]`
-//! (past the ten databases SQLite attaches to one connection) open, refresh and answer locally,
-//! from a manifest, from a held generation and under a grant.
-
 use crate::common;
 
 use std::fs;
@@ -10,17 +6,12 @@ use std::path::{Path, PathBuf};
 use common::git;
 use meada::engine::{Direction, Engine, Start};
 
-/// Twelve repositories: one more than the eleven a single connection reads.
 pub(crate) const REPOS: usize = 12;
 
 pub(crate) fn identity(n: usize) -> String {
     format!("example.com/wide/r{n}")
 }
 
-/// `REPOS` repositories `r0..` as siblings in `<CARGO_TARGET_TMPDIR>/<case>`, each a git
-/// repository of its own: `r<n>` serves `GET /api/r<n>` from `hop<n>` and `hop<n>` calls the
-/// route of `r<n+1>`, which `r<n>` names as its only peer. Returns the case directory and the
-/// manifest entries (identity, directory) in order.
 pub(crate) fn repos(case: &str) -> (PathBuf, Vec<(String, String)>) {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(case);
     let _ = fs::remove_dir_all(&dir);
@@ -63,8 +54,6 @@ pub(crate) fn repos(case: &str) -> (PathBuf, Vec<(String, String)>) {
     (dir, listed)
 }
 
-/// What a workspace of `REPOS` repositories must answer from `r0`: the chain's trace reaches
-/// the last repository and the first link's provider, `search` finds the symbol of the last.
 fn answers_across(engine: &Engine) {
     let trace = (engine.trace(Start::From("hop0"), Direction::Down, None)).unwrap();
     let last = identity(REPOS - 1);

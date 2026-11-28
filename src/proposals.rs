@@ -1,14 +1,8 @@
-//! The proposal server's section (ADR 0022, feature `proposals`): `[proposals]` names the URL
-//! agents reach `meada workspaces mcp` at and the audience its tokens carry. The server itself is
-//! the console's workspaces module answering over MCP with persistence off
-//! (`ui/workspaces/proposals.rs`).
-
 use serde::Deserialize;
 
 use crate::modules::{Problem, Shape};
 use crate::msg::Msg;
 
-/// `[proposals]` as written.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct File {

@@ -1,7 +1,3 @@
-//! IaC nodes (#649, ADR 0025): every Terraform resource, data block and module call with its
-//! address and root module, found by `search` with the kind `iac`, explained by `context` and
-//! walked by `trace` through the references between them.
-
 use std::fs;
 
 use meada::engine::{Direction, Engine, Start};
@@ -10,8 +6,6 @@ use crate::common::{assert_golden, fixture_repo};
 
 const ORIGIN: Option<&str> = Some("https://example.com/acme/infra.git");
 
-/// Terraform JSON and OpenTofu JSON keep unknown resource types visible and locate declared
-/// sides at their nodes, just as the corresponding native syntax does (independent #641 proof).
 #[test]
 fn terraform_json_nodes_locate_declared_resource_vias() {
     let repo = fixture_repo("iac_json_via", "terraform-json", ORIGIN);
@@ -49,8 +43,6 @@ fn terraform_json_nodes_locate_declared_resource_vias() {
     assert!(!status.contains("`via`"), "{status}");
 }
 
-/// JSON uses the same Terraform type table as native syntax. Unknown types and data blocks
-/// remain nodes without sides, and defining a physical name does not use its own contract.
 #[test]
 fn terraform_json_resources_keep_their_provisioner_roles() {
     let repo = fixture_repo("iac_json_contracts", "terraform-json-contracts", ORIGIN);
@@ -87,8 +79,6 @@ fn terraform_json_resources_keep_their_provisioner_roles() {
     }
 }
 
-/// HCL JSON allows repeated section properties and array bodies. Each block keeps its own
-/// source span and references; a later section cannot erase an earlier sensitive marker.
 #[test]
 fn terraform_json_repeated_sections_preserve_blocks_spans_and_privacy() {
     let repo = fixture_repo("iac_json_repeated", "terraform-json-repeated", ORIGIN);
@@ -139,8 +129,6 @@ fn terraform_json_repeated_sections_preserve_blocks_spans_and_privacy() {
     assert!(!index.windows(secret.len()).any(|w| w == secret.as_bytes()));
 }
 
-/// JSON nodes and their provisioning/value rows must answer the same way through the query's
-/// partial index and through a whole export, including bodies with array selectors.
 #[test]
 fn terraform_json_partial_answers_equal_all_index_rows() {
     let repo = fixture_repo("iac_json_partial", "terraform-json-contracts", ORIGIN);
@@ -166,7 +154,6 @@ fn terraform_json_partial_answers_equal_all_index_rows() {
     assert_eq!(ask(), meada::engine::with_every_row(ask));
 }
 
-/// Each answer of `ask` over `questions`, in order, a blank line between two.
 fn answers(questions: &[&str], ask: impl Fn(&str) -> String) -> String {
     (questions.iter())
         .map(|q| ask(q))
@@ -174,11 +161,6 @@ fn answers(questions: &[&str], ask: impl Fn(&str) -> String) -> String {
         .join("\n")
 }
 
-/// The fixture: a root module `envs/prod` with resources, a data block, a `count`, a `for_each`
-/// and a registry module, calling the local module `modules/queue` twice and `modules/worker`
-/// once with an output of the first; and a root `envs/stage` calling `modules/queue` once. A
-/// query matches the address, the type or the physical name, exact first, then prefix, then
-/// substring.
 #[test]
 fn search_with_the_kind_iac_finds_nodes_by_address_type_and_physical_name() {
     let repo = fixture_repo("iac_search", "terraform-nodes", ORIGIN);
@@ -195,9 +177,6 @@ fn search_with_the_kind_iac_finds_nodes_by_address_type_and_physical_name() {
     assert_golden("terraform-nodes.search.txt", &answers(&queries, search));
 }
 
-/// `context` on a node shows its type, physical name, root, its references both ways (each
-/// through the name it went by) and its config values; an address two roots hold lists both,
-/// each with what to pass.
 #[test]
 fn context_on_a_node_shows_its_type_name_root_references_and_values() {
     let repo = fixture_repo("iac_context", "terraform-nodes", ORIGIN);
@@ -214,8 +193,6 @@ fn context_on_a_node_shows_its_type_name_root_references_and_values() {
     assert_golden("terraform-nodes.context.txt", &answers(&questions, context));
 }
 
-/// `trace` walks the references down (what a node reaches, into the local modules through their
-/// inputs and outputs) and up (what reaches it).
 #[test]
 fn trace_walks_the_references_of_a_node_both_ways() {
     let repo = fixture_repo("iac_trace", "terraform-nodes", ORIGIN);
@@ -236,8 +213,6 @@ fn trace_walks_the_references_of_a_node_both_ways() {
     assert_golden("terraform-nodes.trace.txt", &text.join("\n"));
 }
 
-/// Default search leaves standalone IaC nodes out (ADR 0025), but finds provisioner contract
-/// sides (#657). An unlisted node still falls back to config values.
 #[test]
 fn the_default_search_leaves_nodes_out_but_finds_provisioned_contracts() {
     let repo = fixture_repo("iac_default", "terraform-nodes", ORIGIN);
@@ -264,8 +239,6 @@ fn the_default_search_leaves_nodes_out_but_finds_provisioned_contracts() {
     assert!(iac.contains("aws_sqs_queue.dlq[0]"), "{iac}");
 }
 
-/// A symbol of the code with the name of a node keeps its `context` and `trace` answers: a node
-/// answers only when nothing of the code has the name, and its path-qualified address reaches it.
 #[test]
 fn a_symbol_named_like_a_node_keeps_its_answers() {
     let repo = fixture_repo("iac_symbol", "terraform-nodes", ORIGIN);
@@ -294,8 +267,6 @@ fn a_symbol_named_like_a_node_keeps_its_answers() {
     assert!(node.contains("type: aws_sns_topic"), "{node}");
 }
 
-/// A budget too small for the walk cuts the node's trace, never the answer that no code has
-/// the name (prove round 2 on 750403d: budgets up to 18 hid the node).
 #[test]
 fn a_small_budget_cuts_the_trace_of_a_node() {
     let repo = fixture_repo("iac_budget", "terraform-nodes", ORIGIN);
@@ -312,7 +283,6 @@ fn a_small_budget_cuts_the_trace_of_a_node() {
     }
 }
 
-/// Nodes with no contract side and references stay out of `meada export` (ADR 0026).
 #[test]
 fn only_iac_nodes_holding_contract_sides_enter_the_export() {
     let repo = fixture_repo("iac_export", "terraform-nodes", ORIGIN);
@@ -353,8 +323,6 @@ fn only_iac_nodes_holding_contract_sides_enter_the_export() {
             ),
         ]
     );
-    // The checked-in registry module also creates its literal SQS queue (#642 story 37).
-    // Check the whole provisioner inventory, including every root and repeated queue.
     let provisioners: Vec<_> = json["provisioners"]
         .as_array()
         .unwrap()
@@ -433,8 +401,6 @@ fn only_iac_nodes_holding_contract_sides_enter_the_export() {
     assert!(json.get("iac_references").is_none());
 }
 
-/// An edited, an added and a deleted Terraform file change the nodes and references at the next
-/// query, as a cold index of the same files has them.
 #[test]
 fn a_changed_terraform_file_changes_the_nodes_at_the_next_query() {
     let repo = fixture_repo("iac_fresh", "terraform-nodes", ORIGIN);
@@ -471,7 +437,6 @@ fn a_changed_terraform_file_changes_the_nodes_at_the_next_query() {
         after.contains("envs/stage/topic.tf:1 aws_sns_topic.orders"),
         "{after}"
     );
-    // A deletion alone, with no other Terraform file read again.
     fs::remove_file(repo.join("envs/stage/topic.tf")).unwrap();
     let deleted = ask(&engine);
     assert!(!deleted.contains("envs/stage/topic.tf"), "{deleted}");
@@ -479,9 +444,6 @@ fn a_changed_terraform_file_changes_the_nodes_at_the_next_query() {
     assert_eq!(deleted, ask(&Engine::open(&repo).unwrap()));
 }
 
-/// A refresh with no Terraform file changed keeps the stored nodes as they are, rather than
-/// evaluating them again: a row rewritten by hand survives it, and an edit to a Terraform file
-/// replaces it.
 #[test]
 fn a_refresh_with_no_terraform_file_changed_keeps_the_nodes() {
     let repo = fixture_repo("iac_kept", "terraform-nodes", ORIGIN);
@@ -507,12 +469,6 @@ fn a_refresh_with_no_terraform_file_changed_keeps_the_nodes() {
     assert!(fresh.contains("(aws_sns_topic, "), "{fresh}");
 }
 
-/// #740's rows through the indexer (#783): the `terraform-set-retype` fixture holds one root per
-/// row, as the probe `a7-tf-set` of prove-meada does, a variable declared `set(string)` and
-/// retyped or given a default by override files, read by `for_each = { for k, v in var.s : k =>
-/// v }`. Each root's exact names are the ones Terraform v1.17.1 creates (the maintainer's column
-/// in #740); the roots Terraform rejects and those keyed by a set's elements, which Meada leaves
-/// unresolved, have none.
 #[test]
 fn each_root_of_a_retyped_set_names_what_terraform_creates() {
     let repo = fixture_repo("iac_set_retype", "terraform-set-retype", ORIGIN);
@@ -543,10 +499,6 @@ fn each_root_of_a_retyped_set_names_what_terraform_creates() {
     assert_eq!(exact, terraform.into_iter().collect());
 }
 
-/// Compose (#652): a project is a Compose file with its override, each service a node
-/// `services.<name>` with `depends_on`, `links` and shared networks as references, its image and
-/// build context recorded; `${VAR:-default}` is marked overridable, `${VAR}` stays unresolved, and
-/// a build context outside the repository, a URL or an unresolved path is not recorded.
 #[test]
 fn compose_services_are_nodes_with_references_image_and_build_context() {
     let repo = fixture_repo("iac_compose", "compose-nodes", ORIGIN);
@@ -575,7 +527,6 @@ fn compose_services_are_nodes_with_references_image_and_build_context() {
     assert_golden("compose-nodes.trace.txt", &trace.join("\n"));
 }
 
-/// A change to the override file changes the nodes at the next query, as a cold index gives them.
 #[test]
 fn an_edited_override_file_changes_the_compose_nodes() {
     let repo = fixture_repo("iac_compose_edit", "compose-nodes", ORIGIN);
@@ -597,15 +548,8 @@ fn an_edited_override_file_changes_the_compose_nodes() {
     assert!(!gone.contains("services.cache ("), "{gone}");
 }
 
-/// The fixture `terraform-names`: a root `envs/prod` whose names come from locals, variables
-/// (defaults, `terraform.tfvars`, `regions.auto.tfvars`), functions, a `for_each` over a literal
-/// set and one over a variable, a local module's input and output, `terraform.workspace`, a data
-/// source and a registry module; and a root `envs/stage` calling the same module with its own
-/// var file.
 const NAMES: &str = "terraform-names";
 
-/// Static evaluation (#650): `search` shows each name as it will be created, and a name with an
-/// unresolved part as a pattern.
 #[test]
 fn search_shows_names_as_static_evaluation_resolves_them() {
     let repo = fixture_repo("iac_names_search", NAMES, ORIGIN);
@@ -615,8 +559,6 @@ fn search_shows_names_as_static_evaluation_resolves_them() {
     assert_golden("terraform-names.search.txt", &answers(&queries, search));
 }
 
-/// `context` on a node shows its evaluated name, `(pattern)` when a part is unresolved, and the
-/// overridable values (a variable's default, a var file's value) the name went through.
 #[test]
 fn context_shows_an_evaluated_name_and_the_overridable_values_it_went_through() {
     let repo = fixture_repo("iac_names_context", NAMES, ORIGIN);
@@ -636,10 +578,6 @@ fn context_shows_an_evaluated_name_and_the_overridable_values_it_went_through() 
     assert_golden("terraform-names.context.txt", &answers(&questions, context));
 }
 
-/// The evaluation unit is a root module with its local module calls (ADR 0025): a changed var
-/// file evaluates its root again and keeps every other root's rows as they are (a row rewritten
-/// by hand in `envs/prod` survives an edit to `envs/stage/terraform.tfvars`), and the answers then
-/// equal a cold index of the same files.
 #[test]
 fn a_changed_var_file_evaluates_its_unit_again_and_nothing_else() {
     let repo = fixture_repo("iac_names_unit", NAMES, ORIGIN);
@@ -665,7 +603,6 @@ fn a_changed_var_file_evaluates_its_unit_again_and_nothing_else() {
         .search("aws_sqs_queue.orders", Some("iac"), None)
         .unwrap();
     assert!(kept.contains("(kept, "), "{kept}");
-    // The var file of `envs/prod` evaluates `envs/prod` again.
     fs::write(
         repo.join("envs/prod/terraform.tfvars"),
         "environment = \"live\"\n",
@@ -678,7 +615,6 @@ fn a_changed_var_file_evaluates_its_unit_again_and_nothing_else() {
         prod.contains("(aws_sqs_queue, name \"shop-live-orders\""),
         "{prod}"
     );
-    // A var file that leaves its root takes the root back to its defaults.
     fs::remove_file(repo.join("envs/stage/terraform.tfvars")).unwrap();
     let warm = ask(&engine);
     assert!(warm.contains("\"shop-dev-billing-queue\""), "{warm}");
@@ -686,8 +622,6 @@ fn a_changed_var_file_evaluates_its_unit_again_and_nothing_else() {
     assert_eq!(warm, ask(&Engine::open(&repo).unwrap()));
 }
 
-/// A Kubernetes manifest added to a repository that holds Compose nodes evaluates the Kubernetes
-/// objects again without touching the Compose nodes, and the other way round (they share tables).
 #[test]
 fn compose_and_kubernetes_nodes_keep_each_other_when_one_changes() {
     let repo = fixture_repo("iac_compose_kube", "compose-nodes", ORIGIN);
@@ -725,8 +659,6 @@ fn compose_and_kubernetes_nodes_keep_each_other_when_one_changes() {
     );
 }
 
-/// A template's resource type owns its rows even when its filename is a Compose name. Cold
-/// indexing and either reader's warm refresh preserve the other reader's nodes and references.
 #[test]
 fn a_cloudformation_template_named_compose_keeps_its_nodes_and_references() {
     let repo = fixture_repo("iac_cfn_compose_name", "compose-nodes", ORIGIN);
@@ -785,11 +717,6 @@ fn a_cloudformation_template_named_compose_keeps_its_nodes_and_references() {
     );
 }
 
-/// CloudFormation and SAM (#653): the fixture `cloudformation-nodes` holds a SAM application
-/// (`sam/template.yaml`), a plain template with parameters (`cfn/stack.yaml`), a JSON template
-/// and a file with `Resources` but no version or transform, which is no template. Each resource
-/// is a node at its logical id, its type `AWS::...`, its root the template's path, its name
-/// resolved within the template.
 #[test]
 fn cloudformation_and_sam_resources_are_nodes_with_references_and_names() {
     let repo = fixture_repo("iac_cfn", "cloudformation-nodes", ORIGIN);
@@ -832,13 +759,10 @@ fn cloudformation_and_sam_resources_are_nodes_with_references_and_names() {
         answers(&["OrdersQueue", "JobsDeadLetter", "Stream"], up),
     ];
     assert_golden("cloudformation-nodes.trace.txt", &trace.join("\n"));
-    // A file with `Resources` and no version or transform is no template.
     let none = engine.search("ignored", Some("iac"), None).unwrap();
     assert!(!none.contains("not-a-template"), "{none}");
 }
 
-/// A `NoEcho` parameter's default is stored as `redacted` among the config values, and no name
-/// is resolved through it.
 #[test]
 fn a_no_echo_parameter_keeps_its_default_redacted() {
     let repo = fixture_repo("iac_cfn_noecho", "cloudformation-nodes", ORIGIN);
@@ -859,9 +783,6 @@ fn a_no_echo_parameter_keeps_its_default_redacted() {
     );
 }
 
-/// A change to a template changes its nodes at the next query, as a cold index gives them; an
-/// added template, a deleted one, and a file that stops being a template do the same, and a
-/// template no change reached keeps its stored rows (one rewritten by hand survives).
 #[test]
 fn a_changed_template_is_evaluated_again_alone() {
     let repo = fixture_repo("iac_cfn_edit", "cloudformation-nodes", ORIGIN);
@@ -878,7 +799,6 @@ fn a_changed_template_is_evaluated_again_alone() {
         [],
     )
     .unwrap();
-    // The SAM template changes: its nodes follow, the JSON template's row is not rewritten.
     let sam = repo.join("sam/template.yaml");
     let text = fs::read_to_string(&sam).unwrap();
     fs::write(&sam, text.replace("Default: dev", "Default: qa")).unwrap();
@@ -890,14 +810,12 @@ fn a_changed_template_is_evaluated_again_alone() {
         [],
     )
     .unwrap();
-    // An added template.
     let extra = "AWSTemplateFormatVersion: '2010-09-09'\nResources:\n  Extra:\n    Type: AWS::SNS::Topic\n    Properties:\n      TopicName: extra\n";
     fs::write(repo.join("cfn/extra.yaml"), extra).unwrap();
     let added = ask(&engine);
     assert!(added.contains("name: \"extra\""), "{added}");
     fs::remove_dir_all(repo.join(".meada")).unwrap();
     assert_eq!(added, ask(&Engine::open(&repo).unwrap()));
-    // A file that stops saying it is a template, and one that leaves.
     let engine = Engine::open(&repo).unwrap();
     fs::write(
         repo.join("cfn/extra.yaml"),
@@ -926,8 +844,6 @@ fn a_changed_template_is_evaluated_again_alone() {
     );
 }
 
-/// Templates, Kubernetes objects, Compose services and Terraform share the node tables: a change
-/// to one kind leaves the others' rows as they are.
 #[test]
 fn template_and_kubernetes_nodes_keep_each_other_when_one_changes() {
     let repo = fixture_repo("iac_cfn_kube", "cloudformation-nodes", ORIGIN);
@@ -973,8 +889,6 @@ fn template_and_kubernetes_nodes_keep_each_other_when_one_changes() {
     );
 }
 
-/// A file past the per-file size ceiling is no template (config values count it unreadable): its
-/// nodes are not stored, and a small one in the same directory is.
 #[test]
 fn a_template_past_the_size_ceiling_adds_no_node() {
     let repo = fixture_repo("iac_cfn_big", "cloudformation-nodes", ORIGIN);
@@ -998,11 +912,6 @@ fn a_template_past_the_size_ceiling_adds_no_node() {
     );
 }
 
-/// Serverless Framework (#654): the fixture `serverless-nodes` holds two services and a
-/// `serverless.yml` that is none. Each function is a node `functions.<name>` with its handler and
-/// events, its name `<service>-<stage>-<function>` or its own, and the `resources` section is read
-/// as CloudFormation: `${self:...}` resolves, the default of `${opt:...}` resolves and is
-/// overridable, `${env:...}` and `${ssm:...}` are unresolved parts.
 #[test]
 fn serverless_functions_are_nodes_with_handler_events_and_resources_beside_them() {
     let repo = fixture_repo("iac_sls", "serverless-nodes", ORIGIN);
@@ -1039,14 +948,10 @@ fn serverless_functions_are_nodes_with_handler_events_and_resources_beside_them(
         answers(&["OrdersQueue", "OrdersTable"], up),
     ];
     assert_golden("serverless-nodes.trace.txt", &trace.join("\n"));
-    // A `serverless.yml` with no `service` is no service.
     let none = engine.search("ignored", Some("iac"), None).unwrap();
     assert!(!none.contains("misc/"), "{none}");
 }
 
-/// A change to a service file changes its nodes at the next query, as a cold index gives them; a
-/// service that stops being one, and one that leaves, do the same, and a service no change
-/// reached keeps its stored rows (one rewritten by hand survives).
 #[test]
 fn a_changed_service_is_evaluated_again_alone() {
     let repo = fixture_repo("iac_sls_edit", "serverless-nodes", ORIGIN);
@@ -1075,7 +980,6 @@ fn a_changed_service_is_evaluated_again_alone() {
         edited.replace("Serverless::Kept", "Serverless::Function"),
         ask(&cold)
     );
-    // The file stops being a service, then leaves.
     fs::write(&api, text.replace("service: shop", "other: shop")).unwrap();
     let stopped = cold.search("createOrder", Some("iac"), None).unwrap();
     assert!(!stopped.contains("api/serverless.yml"), "{stopped}");
@@ -1090,8 +994,6 @@ fn a_changed_service_is_evaluated_again_alone() {
     assert!(!gone.contains("api/serverless.yml"), "{gone}");
 }
 
-/// A service file past the per-file size ceiling is no service: its nodes are not stored, and a
-/// small one in the same repository is.
 #[test]
 fn a_service_past_the_size_ceiling_adds_no_node() {
     let repo = fixture_repo("iac_sls_big", "serverless-nodes", ORIGIN);
@@ -1116,8 +1018,6 @@ fn a_service_past_the_size_ceiling_adds_no_node() {
     );
 }
 
-/// A symbol and a CloudFormation resource share a name: the name answers with the symbol, and
-/// the node stays reachable by its own lookups.
 #[test]
 fn a_symbol_comes_before_an_iac_node_of_its_name() {
     let repo = fixture_repo("iac_cfn_symbol_first", "cloudformation-nodes", ORIGIN);

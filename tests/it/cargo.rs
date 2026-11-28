@@ -1,7 +1,3 @@
-//! Cargo packages (spec #30): a named `Cargo.toml` of a workspace repository provides
-//! `package::cargo::<name>`, the dependency entries of `Cargo.toml` consume it, and a `use` of
-//! the crate crosses into its public items, through their re-exports.
-
 use crate::common;
 
 use std::fs;
@@ -11,7 +7,6 @@ use common::{age, assert_golden, fixture_repo, without_processes};
 use meada::engine::{Direction, Engine, Start};
 use serde_json::Value;
 
-/// The shared crates and their consumer as siblings: `web` names `lib` as its peer.
 fn pair(case: &str) -> (PathBuf, PathBuf) {
     let repo = |name: &str| {
         let origin = format!("https://example.com/cargo/{name}.git");
@@ -37,8 +32,6 @@ fn crates_and_their_use_link_to_the_crate_in_the_workspace() {
     assert_golden("cargo-lib.export.json", &without_processes(&export(&lib)));
 }
 
-/// The `(consumer, provider, level, reason)` of every link of `json` whose consumer starts
-/// with `site`.
 fn links<'j>(json: &'j Value, site: &str) -> Vec<(&'j str, &'j str, &'j str, &'j str)> {
     (json["links"].as_array().into_iter().flatten())
         .filter(|l| l["consumer"].as_str().unwrap().starts_with(site))
@@ -57,7 +50,6 @@ fn each_dependency_form_links_to_the_crate_it_names() {
     let core = format!("{LIB}core/Cargo.toml");
     let extras = format!("{LIB}extras/Cargo.toml");
 
-    // By version, with the requirement as the range and the provider's own version.
     let version = "package::cargo::shared-core ^1.1 (local 1.2.0), range unchecked";
     assert_eq!(
         at("app/Cargo.toml::dependencies::shared-core"),
@@ -68,7 +60,6 @@ fn each_dependency_form_links_to_the_crate_it_names() {
             version
         )]
     );
-    // By git: the repository whose identity is the normalized URL, under the real crate name.
     let git = "package::cargo::shared-extras none (local 0.3.0), range unchecked";
     assert_eq!(
         at("app/Cargo.toml::dependencies::extras"),
@@ -79,8 +70,6 @@ fn each_dependency_form_links_to_the_crate_it_names() {
             git
         )]
     );
-    // `workspace = true`: the requirement of `[workspace.dependencies]`; a renamed one by
-    // version: the real name behind the key.
     let inherited = "package::cargo::shared-core 1.0 (local 1.2.0), range unchecked";
     let renamed = "package::cargo::shared-core 1 (local 1.2.0), range unchecked";
     let found: Vec<_> = at("worker/Cargo.toml")
@@ -104,7 +93,6 @@ fn each_dependency_form_links_to_the_crate_it_names() {
             ),
         ]
     );
-    // A path that lands in a sibling workspace repository links to the crate at that path.
     assert_eq!(
         at("app/Cargo.toml::dependencies::away"),
         [(
@@ -114,8 +102,6 @@ fn each_dependency_form_links_to_the_crate_it_names() {
             git
         )]
     );
-    // A path that lands in no workspace repository, and a crate outside the workspace, link to
-    // nothing: `Cargo.lock` and crates.io are never read.
     let manifest = at("app/Cargo.toml");
     assert_eq!(manifest.len(), 3, "{manifest:?}");
 }
@@ -128,8 +114,6 @@ fn a_use_of_the_crate_reaches_the_item_through_its_re_exports() {
     let exact =
         |range: &str| format!("package::cargo::{range}, range unchecked; import crate name");
 
-    // A `pub use text::{greet, shout}` of a private module, under the key and under a rename,
-    // and a name reached through a `pub mod` and an `impl`.
     let shared = exact("shared-core ^1.1 (local 1.2.0)");
     for (caller, target, reason) in [
         (
@@ -174,8 +158,6 @@ fn a_use_of_the_crate_reaches_the_item_through_its_re_exports() {
             "{caller}"
         );
     }
-    // A path that lands in no workspace repository, a crate outside the workspace, and an item
-    // behind a private module add nothing.
     for caller in ["haunt", "encode", "peek"] {
         assert!(
             at(&format!("app/src/main.rs::{caller}::")).is_empty(),
@@ -229,8 +211,6 @@ fn trace_down_crosses_the_package_hop_and_onward() {
     assert_golden("cargo-web.trace-down.txt", &down);
 }
 
-/// Bumps the library, narrows the requirement of `app`, moves the workspace requirement of
-/// `worker` and renames the git dependency's key.
 fn edit(lib: &Path, web: &Path) {
     let replace = |repo: &Path, file: &str, from: &str, to: &str| {
         let text = fs::read_to_string(repo.join(file)).unwrap();
@@ -253,7 +233,6 @@ fn a_remote_dependency_links_only_to_the_repository_of_its_url() {
     let (_, web) = pair("cargo_remote_elsewhere");
     let manifest = web.join("app/Cargo.toml");
     let text = fs::read_to_string(&manifest).unwrap();
-    // The same crate name, from a remote that is not in the workspace.
     fs::write(
         &manifest,
         text.replace("cargo/lib.git", "cargo/elsewhere.git"),
@@ -280,19 +259,16 @@ fn an_edited_cargo_manifest_relinks_like_a_cold_export() {
     edit(&cold_lib, &cold_web);
     assert_ne!(refreshed, before);
     assert_eq!(refreshed, both(&cold_lib, &cold_web));
-    // The renamed key no longer matches the `use`: that call crosses no more.
     let json: Value = serde_json::from_str(&refreshed[0]).unwrap();
     assert!(links(&json, &format!("{WEB}app/src/main.rs::lift::")).is_empty());
 }
 
-/// Replaces `from` by `to` in `file` of `repo`, which must hold it.
 fn replace(repo: &Path, file: &str, from: &str, to: &str) {
     let text = fs::read_to_string(repo.join(file)).unwrap();
     assert!(text.contains(from), "{file} lacks {from}");
     fs::write(repo.join(file), text.replace(from, to)).unwrap();
 }
 
-/// The `(provider, level)` pairs of the links of `json` whose consumer starts with `site`.
 fn ends<'j>(json: &'j Value, site: &str) -> Vec<(&'j str, &'j str)> {
     let found = links(json, site);
     found.into_iter().map(|(_, p, l, _)| (p, l)).collect()
@@ -337,7 +313,6 @@ fn a_version_dependency_on_a_crate_two_repositories_provide_is_ambiguous() {
         said.iter()
             .all(|(.., r)| r.starts_with("2 providers fit; "))
     );
-    // The git dependency still names one repository.
     assert_eq!(
         both("app/Cargo.toml::dependencies::extras"),
         [("example.com/cargo/lib::extras/Cargo.toml", "exact")]
@@ -376,7 +351,6 @@ fn a_library_name_is_what_a_use_writes_unless_the_key_renames_the_crate() {
     let at = |caller: &str| ends(&json, &format!("{WEB}{caller}"));
     let greet = ("example.com/cargo/lib::core/src/text.rs::greet", "exact");
     assert_eq!(at("app/src/main.rs::welcome::"), [greet]);
-    // `use shared_core` in `worker` no longer names the library; its renamed key still does.
     assert!(at("worker/src/lib.rs::run::").is_empty());
     let shout = ("example.com/cargo/lib::core/src/text.rs::shout", "exact");
     assert_eq!(at("worker/src/lib.rs::loud::"), [shout]);

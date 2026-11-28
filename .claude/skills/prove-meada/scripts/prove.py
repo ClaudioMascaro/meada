@@ -38,14 +38,13 @@ import urllib.request
 from collections import Counter
 from pathlib import Path
 
-import yaml  # PyYAML: the A7 oracle's own YAML reader
+import yaml
 
 HERE = Path(__file__).resolve().parent
 ROOT = Path(subprocess.check_output(["git", "rev-parse", "--show-toplevel"], cwd=HERE, text=True).strip())
 CACHE = Path(os.environ.get("PROVE_MEADA_CACHE", Path.home() / ".cache/prove-meada"))
-# Budgets set by the maintainer (2026-11-02): head over base, per corpus repository.
 TIME, RSS, SIZE = 1.25, 1.25, 1.50
-TIME_FLOOR = 2.0  # seconds: below it, timing noise outweighs the budget
+TIME_FLOOR = 2.0
 TIMEOUT = 900
 KEYED = {
     "symbols": ("id",),
@@ -102,9 +101,9 @@ def infra():
 def fetch(name, into):
     """A clean git checkout of corpus or infra entry `name` at `into`."""
     _, url, sha = {**infra(), **corpus()}[name]
-    if url.startswith("probe:"):  # an A7 probe of this skill, a repository of its own
+    if url.startswith("probe:"):
         shutil.copytree(HERE / url[len("probe:"):], into, symlinks=True)
-        if (into / ".gitignore").is_file():  # one file stays on disk, ignored by .gitignore
+        if (into / ".gitignore").is_file():
             (into / "zz-gitignored.yaml").write_text("ignored: gitignored-zzprove\n")
         git("-c", "init.defaultBranch=main", "init", "-q", cwd=into)
         git("remote", "add", "origin", f"https://github.com/zz-prove/{name}.git", cwd=into)
@@ -133,8 +132,6 @@ def fetch(name, into):
     shutil.copytree(cached, into, symlinks=True)
 
 
-# Linux carries a forked child's pre-exec peak into its ru_maxrss, so a child of this (large)
-# process would report this process's size: a small fresh interpreter spawns and measures it.
 MEASURE = """import json,os,subprocess,sys,threading,time
 out,err,limit,cmd=sys.argv[1],sys.argv[2],float(sys.argv[3]),sys.argv[4:]
 with open(out,"wb") as o,open(err,"wb") as e:
@@ -243,7 +240,7 @@ def answer(msg):
 
 
 def short_name(sym):
-    return sym.rsplit("::", 1)[-1].split("(")[0].rsplit(".", 1)[-1]  # Kotlin and Swift signatures carry dots
+    return sym.rsplit("::", 1)[-1].split("(")[0].rsplit(".", 1)[-1]
 
 
 def auto_queries(export):
@@ -263,13 +260,12 @@ def auto_queries(export):
     if top:
         sym, name = top[0], short_name(top[0])
         queries += [{"tool": "search", "arguments": {"query": name, "budget": 300}},
-                    {"tool": "search", "arguments": {"query": name, "kind": "contract"}},  # a symbol name: contracts only
+                    {"tool": "search", "arguments": {"query": name, "kind": "contract"}},
                     {"tool": "context", "arguments": {"symbol": sym, "budget": 300}},
                     {"tool": "trace", "arguments": {"from": sym, "direction": "up", "budget": 300}}]
     contracts = sorted({p["contract"] for p in export.get("providers", [])})
     if contracts:
         queries.append({"tool": "search", "arguments": {"query": contracts[0], "kind": "contract"}})
-    # Error parity: an unknown kind and an unknown symbol must be refused the same way by both binaries.
     queries.append({"tool": "search", "arguments": {"query": "zz_prove_missing", "kind": "zz_prove_kind"}})
     queries.append({"tool": "context", "arguments": {"symbol": "zz_prove_missing"}})
     return queries
@@ -327,11 +323,11 @@ def drive(bin, repo, out, queries_file):
     rec["deterministic"] = cold1 == (out / "export2.json").read_bytes()
     tracked = git("ls-files", cwd=repo).splitlines()
     if tracked:
-        os.utime(repo / tracked[0])  # same bytes, new mtime: the freshness path must give the same export
+        os.utime(repo / tracked[0])
         rec["refresh"] = timed([bin, "export"], repo, out / "export3.json", out / "export3.err")
         rec["refresh_equal"] = (out / "export3.json").read_bytes() == cold1
     edited = rename_in_place(repo, export)
-    if edited:  # same size, new bytes: the warm export must equal a cold index of the edited tree
+    if edited:
         path, original, rec["content_refresh_edit"], old_id, new_id = edited
         rec["content_refresh"] = timed([bin, "export"], repo, out / "export4.json", out / "export4.err")
         shutil.rmtree(repo / ".meada", ignore_errors=True)
@@ -343,13 +339,13 @@ def drive(bin, repo, out, queries_file):
             return rec
         warm, cold = (out / "export4.json").read_bytes(), (out / "export5.json").read_bytes()
         rec["content_refresh_equal"] = body(warm) == body(cold)
-        rec["content_refresh_changed"] = body(cold) != body(cold1)  # else the edit reached nothing indexed: inconclusive
-        rec["content_refresh_stale"] = body(warm) == body(cold1)  # the edit never reached the index: the M7 symptom itself
-        rec["content_refresh_renamed"] = quoted(new_id) in warm  # the direct question: is the renamed symbol in the warm export
+        rec["content_refresh_changed"] = body(cold) != body(cold1)
+        rec["content_refresh_stale"] = body(warm) == body(cold1)
+        rec["content_refresh_renamed"] = quoted(new_id) in warm
         if rec["content_refresh_equal"]:
             (out / "export4.json").unlink()
             (out / "export5.json").unlink()
-        path.write_bytes(original)  # back through the refresh path: the queries below are about the original tree
+        path.write_bytes(original)
         rec["restore"] = timed([bin, "export"], repo, out / "export6.json", out / "export6.err")
         back = (out / "export6.json").read_bytes()
         rec["restore_equal"] = body(back) == body(cold1)
@@ -357,7 +353,7 @@ def drive(bin, repo, out, queries_file):
         if rec["restore_equal"]:
             (out / "export6.json").unlink()
     rec["export_bytes"] = len(cold1)
-    for n in ("export2.json", "export3.json"):  # kept only when they differ: an export can be 28 MB
+    for n in ("export2.json", "export3.json"):
         if (out / n).exists() and (out / n).read_bytes() == cold1:
             (out / n).unlink()
     if not queries_file.exists():
@@ -385,7 +381,7 @@ def drive_queries(bin, repo, out, queries, rec):
             rec['answers'].append(answer(mcp.call('tools/call', {'name': q['tool'], 'arguments': q['arguments']})))
             (out / 'record.json').write_text(json.dumps(rec, indent=1, sort_keys=True))
         mcp.close()
-    except Exception as e:  # a crashed server is BLOCKED, never an empty answer
+    except Exception as e:
         rec["failed"] = f"mcp stdio: {e!r}, see {out}/mcp.err"
     rec["queries"] = queries
     rec['phase'] = 'complete'
@@ -613,7 +609,7 @@ def cmd_run(a):
         src = run / "work" / "src" / name
         if not src.exists():
             fetch(name, src)
-            if a.overlay:  # a probe: the same changed source reaches both binaries
+            if a.overlay:
                 shutil.copytree(a.overlay, src, dirs_exist_ok=True)
                 git("add", "-A", cwd=src)
                 git("commit", "-q", "-m", "probe overlay", cwd=src)
@@ -621,7 +617,7 @@ def cmd_run(a):
         qfile.parent.mkdir(exist_ok=True)
         if a.queries and not qfile.exists():
             shutil.copy(a.queries, qfile)
-        for side, bin in (("head", a.head_bin), ("base", a.base_bin)):  # head first: it writes the auto queries
+        for side, bin in (("head", a.head_bin), ("base", a.base_bin)):
             repo = run / "work" / side / name
             shutil.rmtree(repo, ignore_errors=True)
             shutil.copytree(src, repo, symlinks=True)
@@ -648,7 +644,7 @@ def cmd_run(a):
                       + ("" if not any(r.get("content_refresh_stale") for r in (b, h)) else
                          f"  STALE: the edit never reached the index (base {b.get('content_refresh_stale')}, head {h.get('content_refresh_stale')})")
                       + ("" if all(det) else "  NOT DETERMINISTIC"))
-        if not all(det):  # the diff the checker would otherwise make by hand on 28 MB; a head-only move shows next to a shared one
+        if not all(det):
             for side in ("base", "head"):
                 d = run / side / name
                 for label, x, y in (("warm vs cold (edited tree)", "export4.json", "export5.json"),
@@ -733,7 +729,7 @@ def cmd_rebless(a):
     print(f"full report: {run}/rebless.md")
 
 
-COMPOSE = (  # name, files and profiles, env file: the renders scripts/compose-check checks
+COMPOSE = (
     ("local", ["-f", "compose.yaml", "--profile", "local"], ".env.example"),
     ("generations", ["-f", "compose.yaml", "--profile", "generations"], ".env.example"),
     ("console", ["-f", "compose.yaml", "-f", "compose.console.yaml", "--profile", "generations", "--profile", "console"], ".env.example"),
@@ -755,13 +751,10 @@ def renders(root, out):
                            cwd=compose, capture_output=True, text=True)
         text = r.stdout if r.returncode == 0 else f"render failed ({r.returncode}): {r.stderr}"
         (out / f"compose-{name}.json").write_text(text.replace(str(root), "<root>"))
-    # A render carries a mounted file's path, never its text (audit 2026-11-03, D3): the files the
-    # stack mounts join the diff as they are.
     for f in sorted(p for pat in ("Caddyfile*", "*.toml", "*.sh", ".env*") for p in compose.glob(pat)) if compose.is_dir() else ():
         shutil.copy(f, out / f"mounted-{f.name}")
     if shutil.which("helm"):
         chart = root / "deploy/helm/meada"
-        # The overlays render in the stack their headers name, as scripts/helm-check does.
         stacks = {"values-identity": ["values-console", "values-identity"],
                   "values-workspaces": ["values-console", "values-identity", "values-workspaces"]}
         for values in sorted(chart.glob("values*.yaml")):
@@ -818,7 +811,7 @@ def cmd_selftest(_):
              "content": [{"type": "text", "text": "no matches for `privacy-canary`\n"}]}}
     original = copy.deepcopy(empty)
     assert "privacy-canary" not in json.dumps(capture.privacy_response(query, empty))
-    assert empty == original  # raw evidence stays complete
+    assert empty == original
     assert capture.privacy_response({"tool": "context", "arguments": query["arguments"]}, empty) == empty
     assert capture.privacy_response({"tool": "search", "arguments": {"query": "other"}}, empty) == empty
     for path, value in [
@@ -851,7 +844,7 @@ def cmd_selftest(_):
     assert "level: None -> exact: 1" in text and "level: exact -> None: 1" in text, text
     assert "target: None -> set: 1" in text and "target: set -> None: 1" in text, text
     assert "candidates: [2 items] -> [3 items]: 1" in text, text
-    assert "communities" not in text and len(sample) == 0, (text, sample)  # no repo: nothing rendered
+    assert "communities" not in text and len(sample) == 0, (text, sample)
     assert export_diff(base, json.loads(json.dumps(base))) == ([], [])
     subscription = {"source": "channel::sns::events", "target": "channel::sqs::jobs",
                     "node": "infra::main.tf::aws_sns_topic_subscription.jobs", "root": "dev"}
@@ -875,8 +868,6 @@ def cmd_selftest(_):
     assert export_diff({"open_items": [item, item]}, {"open_items": [item]})[0][0] == "  open_items: +0 -1 ~0"
     assert export_diff({"open_items": [item, changed_item]}, {"open_items": [changed_item, item]})[0] == [
         "  open_items: order changed"]
-    # #661: repository-level sites need their at locator in both keys. Otherwise
-    # two references to one contract silently collapse in the comparison dictionary.
     uses = [{"contract": "channel::sqs::parcel", "site": "app", "at": f"values.yaml#worker.{key}"}
             for key in ["queue", "secondary.queue"]]
     provisions = [{"side": "app", "provisioner": "infra::main.tf::aws_sqs_queue.parcel", "root": ".",
@@ -896,8 +887,6 @@ def cmd_selftest(_):
     text = "\n".join(lines)
     assert "provisions: +0 -0 ~1" in text and "level: inferred -> exact: 1" in text, text
     assert uses[0]["at"] in text and uses[1]["at"] not in text, text
-    # Retain the failure mechanism: removing at from the feature's identity key leaves the two
-    # rows apart only as a shared key's `#2`, without the locator each one needs.
     fields = KEYED["provisions"]
     try:
         KEYED["provisions"] = tuple(f for f in fields if f != "at")
@@ -906,18 +895,13 @@ def cmd_selftest(_):
         assert uses[0]["at"] not in "\n".join(m for m in mutant if "provisions" in m or "aws_sqs" in m), mutant
     finally:
         KEYED["provisions"] = fields
-    # #648 (P14): an image link keeps its evaluation root, rows sharing one key stay apart, and
-    # executions and stale decisions are compared too, so a goldens rebless cannot call them
-    # formatting.
     link = {"consumer": "d::k.yaml::Deployment/api", "provider": "app", "contract": "image::docker.io/a/b"}
     lines, _ = export_diff({}, {"links": [dict(link, root=r) for r in ("overlays/dev", "overlays/prod")]})
     assert "links: +2 -0 ~0" in "\n".join(lines), lines
-    # Rows sharing a key pair identical rows first: one added row is no change to another.
     use = {"contract": "channel::sqs::q", "site": "a.ts", "root": ""}
     lines, _ = export_diff({"consumers": [dict(use, via="b")]},
                            {"consumers": [dict(use, via="a"), dict(use, via="b")]})
     assert "consumers: +1 -0 ~0" in "\n".join(lines), lines
-    # A crash or a refusal is BLOCKED (exit 2): prove-ci reads exit 1 as a difference.
     with tempfile.TemporaryDirectory() as temp:
         for args in (["run", "--base-bin", "x", "--head-bin", "y", "--repos", "no-such-entry"],
                      ["rebless", "--base", "0" * 40]):
@@ -949,9 +933,6 @@ def cmd_selftest(_):
         assert f.read_bytes() == b"fn foQ() {}\nfn fooBar() { foQ() }\n", f.read_bytes()
         assert rename_in_place(Path(d), {"symbols": [{"id": "r::a.rs::ab", "span": {"path": "a.rs"}}]}) is None
         assert rename_in_place(Path(d), {"symbols": [{"id": "r::other::fooBar", "span": {"path": "a.rs"}}]}) is None
-        # NoEcho applies only to recognized CFN/SAM templates. AliasLoader deliberately
-        # preserves use-site lines, so the privacy scanner must unwrap aliases without
-        # changing the value walk's location. These are source controls, not product keys.
         header = 'AWSTemplateFormatVersion: "2010-09-09"\n'
         params = 'Parameters:\n  Example:\n    NoEcho: true\n    Default: neutral-default\n'
         cases = [
@@ -973,8 +954,6 @@ def cmd_selftest(_):
             assert row['value'] == (None if private else 'neutral-default'), (i, row)
             if 'Default: *default' in source:
                 assert row['line'] == next(n for n, line in enumerate(source.splitlines(), 1) if 'Default: *default' in line), row
-        # YAML test suite L24T/01 and JEF9/02 treat the EOF of a block
-        # content line as its final break. PyYAML omits it without this shim.
         for source, value in [
             ('foo: |\n  x\n   ', 'x\n \n'),
             ('- |+\n   ', '\n'),
@@ -1011,8 +990,6 @@ def cmd_selftest(_):
         assert check_value_answer(identity, rows, 'team-b', bad, budget_cut=True, budget=50), bad
     tiny = '… cut after 0 of 5 lines (budget 1 tokens); raise budget for more\n'
     assert not check_value_answer(identity, rows, 'team-b', tiny, budget_cut=True, budget=1)
-    # The public SAM template supplies CodeUri on the function and Handler in Globals.
-    # Validate those fields without shifting the references or swallowing the value tail.
     import cfn_oracle as cfn
     source = yaml.load('''Transform: AWS::Serverless-2016-10-31
 Globals:
@@ -1037,29 +1014,27 @@ Resources:
         assert check_iac_context(identity, 'template.yaml', header, changed, complete), changed
     worker['Properties']['Handler'] = {'Ref': 'RuntimeHandler'}
     assert cfn.sam_code_fields('template.yaml', source, worker) == {'build': 'target/lambda/worker'}
-    # A probe's Terraform key: an exact name must be Terraform's, an absent one is no failure.
     key = terraform_key(HERE / "a7-tf-set")["aws_sqs_queue"]
     assert key["list"] == {'aws_sqs_queue.q["0"]': "queue-0-a", 'aws_sqs_queue.q["1"]': "queue-1-b"}
     assert key["tuple"] == {} and len(key) == 12, key
     hit = lambda root, name, index="0": f'a7-tf-set {root}/main.tf:4 aws_sqs_queue.q["{index}"] (aws_sqs_queue, name "{name}", root {root})'
     right = "\n".join([hit("list", "queue-1-b", "1"), hit("list", "queue-0-a"), 'x any/main.tf:4 aws_sqs_queue.q (aws_sqs_queue, pattern "queue-*-*", root any)'])
     assert key_problems(key, right) == ([], [r for r in key if r not in ("list", "tuple", "tuple-pair")])
-    assert key_problems(key, hit("list", "queue-0-b") + "\n" + hit("list", "queue-1-a"))[0]  # #740's wrong names
+    assert key_problems(key, hit("list", "queue-0-b") + "\n" + hit("list", "queue-1-a"))[0]
     swapped = hit("list", "queue-0-a", "1") + "\n" + hit("list", "queue-1-b")
     problems, _ = key_problems(key, swapped)
     assert len(problems) == 2 and all("Terraform" in problem for problem in problems), problems
     assert key_problems(key, hit("tuple", "queue-0-a"))[0] and key_problems(key, hit("zz", "queue-0-a"))[0]
-    unused = lambda line: line + " (no use in the workspace)"  # a provisioner no code reads, as here
+    unused = lambda line: line + " (no use in the workspace)"
     assert key_problems(key, "\n".join(map(unused, right.splitlines())))[0] == []
     assert key_problems(key, unused(hit("list", "queue-0-b")))[0]
-    # A wrong exact name exits 3, never 1: CI records exit 1 as a difference from the base.
     assert key_failed(key_problems(key, hit("list", "queue-0-b"))[0])
     assert not key_failed(["differs from base: a symbol's answer must not change", "contract-role extension differs from its base key:\n"])
     try:
         import tf_oracle as tf
-    except ImportError:  # python-hcl2, as `iac` needs it: SKILL.md's Gotchas
+    except ImportError:
         print("selftest: python-hcl2 missing, the IaC oracle's registry names not checked")
-    else:  # #782: a registry source's call is named by the input #671's type table reads
+    else:
         with tempfile.TemporaryDirectory() as tmp:
             calls = {"q": 'source = "terraform-aws-modules/sqs/aws"\n name = "q"',
                      "b": 'source = "registry.terraform.io/terraform-aws-modules/s3-bucket/aws"\n bucket = "b"',
@@ -1067,7 +1042,7 @@ Resources:
                      "nameless": 'source = "terraform-aws-modules/lambda/aws"\n handler = "h"',
                      "gated": 'source = "terraform-aws-modules/s3-bucket/aws"\n bucket = "g"\n putin_khuylo = false',
                      "local": 'source = "./m"\n name = "x"', "other": 'source = "terraform-aws-modules/vpc/aws"\n name = "v"'}
-            subprocess.run(["git", "init", "-q", tmp], check=True)  # the oracle lists files with git
+            subprocess.run(["git", "init", "-q", tmp], check=True)
             Path(tmp, "main.tf").write_text("".join(f'module "{k}" {{\n {v}\n}}\n' for k, v in calls.items()))
             got = {n["address"]: "unchecked" if n["unchecked"] else n["name"] for n in tf.evaluate(Path(tmp))[0]}
         assert got == {"module.q": "q", "module.b": "b", "module.fifo": "unchecked", "module.nameless": "unchecked", "module.gated": "unchecked",
@@ -1075,8 +1050,6 @@ Resources:
     print("selftest passed")
 
 
-# A7 config values: the oracle reads what ADR 0025 and #642's user stories 6 to 13 say Meada
-# reads, on its own (PyYAML's composer and Python's json), and never looks at Meada's tables.
 LOCKFILES = {"package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "packages.lock.json"}
 HIDDEN_CI = {".github", ".gitlab-ci.yml", ".gitlab", ".circleci", ".buildkite", ".drone.yml"}
 CONFIG_MAX_BYTES, VALUE_MAX, DOCUMENTS_MAX = 1 << 20, 1024, 1000
@@ -1116,7 +1089,7 @@ def config_candidates(repo):
     r = subprocess.run(["git", "-c", f"core.excludesFile={excludes}", "check-ignore", "--no-index", "--stdin", "-z"], cwd=repo,
                        input="\0".join(listed), capture_output=True, text=True)
     excludes.unlink()
-    if r.returncode not in (0, 1):  # 1: nothing ignored; anything else is a broken oracle, never "nothing ignored"
+    if r.returncode not in (0, 1):
         raise RuntimeError(f"git check-ignore failed in {repo}: {r.stderr.strip()}")
     ignored = set(r.stdout.split("\0"))
     out, hidden = [], []
@@ -1149,7 +1122,7 @@ class AliasRef:
 
 class AliasLoader(yaml.SafeLoader):
     def compose_scalar_node(self, anchor):
-        explicit = self.peek_event().tag not in (None, "!")  # `!!str 123`, `!Ref x`: written, not resolved
+        explicit = self.peek_event().tag not in (None, "!")
         node = super().compose_scalar_node(anchor)
         node.explicit = explicit
         return node
@@ -1170,7 +1143,7 @@ def scalar_kind(node):
     scalar's line is its first line of text, one past its `|` or `>`."""
     if node.style is not None:
         return "string"
-    if getattr(node, "explicit", False):  # `!!str`, `!!int`, `!!bool`, `!!null`; a custom tag (`!Ref`) keeps its text
+    if getattr(node, "explicit", False):
         tag = node.tag.rsplit(":", 1)[-1]
         return {"int": "number", "float": "number", "bool": "boolean", "null": None}.get(tag, "string")
     v = node.value
@@ -1195,7 +1168,6 @@ def walk_values(node, path, rows, secret=False, depth=0, root=True, line=None):
     elif isinstance(node, yaml.ScalarNode):
         kind = scalar_kind(node)
         if kind:
-            # PyYAML leaves an escaped pair (`\ud83d\ude00`) as two surrogates; a lone one is no text
             value = node.value.encode("utf-16", "surrogatepass").decode("utf-16")
             rows.append({"key": path or ".", "value": None if secret else value, "kind": kind,
                          "line": line or node.start_mark.line + 1 + (node.style in ("|", ">"))})
@@ -1223,7 +1195,7 @@ def read_config(repo, rel, lockfiles=True):
     try:
         text = data.decode("utf-8")
         if rel.endswith(".json"):
-            json.loads(text)  # JSON's own rules: a JSONC file with comments is unreadable
+            json.loads(text)
         docs = config_documents(text.replace("\t", " ") if rel.endswith(".json") else text)
         if len(docs) > DOCUMENTS_MAX:
             return ("unreadable", f"more than {DOCUMENTS_MAX} documents")
@@ -1324,20 +1296,12 @@ def iac_existing_suffixes(lines, baseline):
     old = baseline.splitlines()
     result = []
     for line in lines:
-        # An explicitly unsupported physical-name expression is already a documented
-        # gap. Its trusted existing answer still fixes the name and optional annotation;
-        # do not accidentally reject that annotation when the independent name is unknown.
         pattern = re.escape(line).replace(re.escape("\x00"), r'(, (?:name|pattern) "(?:[^"\\]|\\.)*")?')
         result.append(next((b for b in old if b == line or b.startswith(line + " ")
                             or "\x00" in line and re.fullmatch(pattern + r'(?: .*)?', b)), line))
     return result
 
 
-# Problems whose key is the base ("must not change", "as base"): a change may move them on purpose,
-# so they exit 1 for the judge, as `run`'s differences do, and so does `iac`'s status line, keyed on
-# the base and the source's NoEcho defaults. A problem against an independent key (the oracle,
-# Terraform's names, a refusal, transport parity) exits 3, as does an oracle line that keeps an
-# existing node's base annotation (`iac_existing_suffixes`), the one part of the oracle the base sets.
 BASE_PROBLEMS = ("differs from base", "contract-role extension differs from its base key")
 
 
@@ -1383,7 +1347,7 @@ def key_problems(key, answer):
     """Check every exact hit, retaining the existing absent-root and partial-set semantics."""
     got, problems = {}, []
     for line in answer.splitlines():
-        m = re.search(r', name ("(?:[^"\\]|\\.)*"), root ([^)]*)\)', line)  # a note may follow
+        m = re.search(r', name ("(?:[^"\\]|\\.)*"), root ([^)]*)\)', line)
         if not m:
             continue
         address = re.search(r':\d+(?:-\d+)? (.+) \([^,]+$', line[:m.start()])
@@ -1412,7 +1376,7 @@ def iac_context_tail(identity, path, lines):
         raise ValueError("missing values section")
     values, at = [], 1
     while at < len(lines) and lines[at].startswith(f"{identity} {path}:"):
-        parse_hit(lines[at])  # malformed value lines must not become accepted extension text
+        parse_hit(lines[at])
         values.append(lines[at])
         at += 1
     if not values:
@@ -1441,7 +1405,7 @@ def same_shown(expected_row, got):
     try:
         exact = int(v, 0) if v.lstrip("+-").startswith(("0x", "0o")) else int(v) if re.fullmatch(r"[-+]?[0-9]+", v) else None
         if exact is not None and re.fullmatch(r"-?[0-9]+", got):
-            return int(got) == exact  # no float: an integer past 2^53 must not pass by rounding
+            return int(got) == exact
         return float(got) == float(exact if exact is not None else v)
     except ValueError:
         return want == got
@@ -1455,7 +1419,7 @@ def value_rank(r, q):
         return 1
     if q in k or (v is not None and q in v):
         return 2
-    return None  # a redacted value never matches by its text (story 13)
+    return None
 
 
 def expected_hits(rows, query):
@@ -1509,8 +1473,6 @@ def check_value_answer(identity, rows, query, text, budget_cut=False, budget=Non
     if budget is not None:
         if note and int(note.group(3)) != budget:
             problems.append(f"budget: cut note names {note.group(3)}, request used {budget}")
-        # The documented exception is only a cut note that cannot itself fit. Ordinary
-        # answers and any retained hit must fit the requested four-byte token estimate.
         note_only_overflow = note and not lines and len((note.group(0) + '\n').encode('utf-8')) > 4 * budget
         if len(text.encode('utf-8')) > 4 * budget and not note_only_overflow:
             problems.append(f"budget: {len(text.encode('utf-8'))} UTF-8 bytes exceed {budget} tokens")
@@ -1576,7 +1538,7 @@ def mcp_answers(bin, repo, queries, log):
 
 
 def cmd_values(a):
-    os.environ["LANG"] = "C.UTF-8"  # every answer below is read as English: status, `no matches`, refusals
+    os.environ["LANG"] = "C.UTF-8"
     run = Path(a.run).resolve()
     run.mkdir(parents=True, exist_ok=True)
     report, differences, hard, blocked = [], 0, 0, False
@@ -1590,7 +1552,7 @@ def cmd_values(a):
             outcomes[rel] = read_config(src, rel)
             if outcomes[rel][0] == "read":
                 rows += outcomes[rel][1]
-        for rel in outside + [f for f, o in outcomes.items() if o[0] == "lockfile"]:  # values that must stay out
+        for rel in outside + [f for f, o in outcomes.items() if o[0] == "lockfile"]:
             o = read_config(src, rel, lockfiles=False) if (src / rel).is_file() else ("gone",)
             outside_rows += o[1] if o[0] == "read" else []
         read = [f for f, o in outcomes.items() if o[0] == "read"]
@@ -1655,8 +1617,6 @@ def cmd_values(a):
             queries.append({"tool": "search", "label": "budget", "arguments": {
                 "query": query, "kind": "value", "budget": value_cut_budget(identity, rows, query)}})
         fallback = [q for label, q in picked if label in ("exact", "nothing")][:3]
-        # Symbol names too: values added to a default search a symbol answers show only there
-        # (audit 2026-11-04, M6: caught on one entry by luck of a value equal to a symbol name).
         symbols = json.loads((run / "head" / name / "export1.json").read_text()).get("symbols", [])
         fallback += sorted({short_name(x["id"]) for x in symbols if len(short_name(x["id"])) >= 3})[:3]
         queries += [{"tool": "search", "label": "default search", "arguments": {"query": q, "budget": 200000}} for q in fallback]
@@ -1676,14 +1636,14 @@ def cmd_values(a):
             label = q["label"]
             if args.get("kind") == "value":
                 problems = check_value_answer(identity, rows, args["query"], ans, budget_cut=label == "budget", budget=args["budget"])
-            elif "kind" not in args:  # story 5: as base when a symbol or contract matches, else the value hits
+            elif "kind" not in args:
                 base_ans = b["answers"][i]
                 if not base_ans.startswith("no matches"):
                     problems = [] if ans == base_ans else ["differs from base, which found a symbol or contract"]
                 else:
                     problems = check_value_answer(identity, rows, args["query"], ans)
             else:
-                listed = ans.rsplit(", not `", 1)[0]  # the refusal echoes the unknown kind (`values`) after the list
+                listed = ans.rsplit(", not `", 1)[0]
                 problems = [] if ans.startswith(("TOOL ERROR", "ERROR")) and "`value`" in listed else [f"not refused or `value` not listed: {ans[:200]}"]
             fails += bool(problems)
             hard += key_failed(problems)
@@ -1712,9 +1672,9 @@ def cmd_iac(a):
     `context` and `trace` both ways over stdio (and HTTP with `--http`); the base answers the
     default search, existing annotations/contract roles, `meada status` and every export field.
     Provision/orphan flows separately assert new semantics against their source/spec keys."""
-    sys.dont_write_bytecode = True  # no __pycache__ left in the skill's folder
-    import cfn_oracle as cfn  # needs PyYAML: see SKILL.md's Gotchas
-    import tf_oracle as tf  # needs python-hcl2: see SKILL.md's Gotchas
+    sys.dont_write_bytecode = True
+    import cfn_oracle as cfn
+    import tf_oracle as tf
     os.environ["LANG"] = "C.UTF-8"
     run = Path(a.run).resolve()
     run.mkdir(parents=True, exist_ok=True)
@@ -1725,7 +1685,6 @@ def cmd_iac(a):
         if not src.exists():
             fetch(name, src)
         nodes, references, unreadable = tf.evaluate(src)
-        # #653: the CloudFormation and SAM templates join the Terraform nodes, in the same shape.
         cf_nodes, cf_references, cf_unreadable = cfn.evaluate(src)
         nodes, references, unreadable = nodes + cf_nodes, sorted(references + cf_references), unreadable + cf_unreadable
         recs = {}
@@ -1751,9 +1710,6 @@ def cmd_iac(a):
             continue
         identity = json.loads((run / "head" / name / "export1.json").read_text())["repository"]
         roots = sorted({n["root"] for n in nodes})
-        # #650: a root with a `count` or `for_each` the oracle cannot evaluate is left out of the
-        # comparison (its lines dropped on both sides), a node whose name it cannot evaluate
-        # matches any name; both are counted, never hidden.
         unsure = sorted({n["root"] for n in nodes if n.get("root_unchecked")})
         names_unchecked = sum(1 for n in nodes if n.get("unchecked"))
         report.append(f"Oracle (#650 names): {names_unchecked} names unchecked, roots left out: {unsure}")
@@ -1765,7 +1721,6 @@ def cmd_iac(a):
         same = body((run / "base" / name / "export1.json").read_bytes()) == body((run / "head" / name / "export1.json").read_bytes())
         differences += not same
         report.append(f"meada export: {'byte-equal to base, every optional field retained' if same else 'DIFFERS from base'}")
-        # The sample: nodes with references both ways first, then the rest, spread over the list.
         linked = {r[1] for r in references} & {r[2] for r in references}
         ordered = sorted(nodes, key=lambda n: (n["address"] not in linked, n["path"], n["line"], n["address"], n["root"]))
         ordered = [n for n in ordered if not n.get("unchecked")]
@@ -1787,8 +1742,6 @@ def cmd_iac(a):
                 queries.append({"tool": "trace", "label": f"trace {d}", "node": n, "arguments": {"from": passed, "direction": d, "budget": 200000}})
         for t in sorted({n["type"] for n in nodes})[:3]:
             search("type", t, kind="iac", budget=200000)
-        # A base may already implement #653. Probe each actual private key rather than adding
-        # its defaults to the redacted count a second time. The head must independently redact.
         config_rows, private_rows = [], []
         for rel, _, source in cfn.templates(src, []):
             outcome = read_config(src, rel)
@@ -1802,7 +1755,6 @@ def cmd_iac(a):
         shared = sorted(k for k, c in counts.items() if c > 1)[:2]
         for addr in shared:
             queries.append({"tool": "context", "label": "several", "arguments": {"symbol": addr, "budget": 200000}})
-        # A root the oracle leaves out can still answer to the probe's own Terraform key.
         for kind, roots_key in terraform_key(src).items():
             queries.append({"tool": "search", "label": "terraform key", "key": roots_key,
                             "arguments": {"query": kind, "kind": "iac", "budget": 200000}})
@@ -1810,8 +1762,6 @@ def cmd_iac(a):
         for n in sample[:3]:
             search("default search", n["address"], budget=200000)
         search("unknown kind", "x", kind="iacs")
-        # The code keeps its answers: a symbol named like a node (`a7-iac`'s `zz_code.py`) answers
-        # `context` and `trace` as on the base (the prover's finding on 09f2aae, 2026-11-04).
         symbols = json.loads((run / "head" / name / "export1.json").read_text()).get("symbols", [])
         for sym in sorted({x["id"].rsplit("::", 1)[-1] for x in symbols}, key=lambda n: ("." not in n, n))[:3]:
             queries.append({"tool": "context", "label": "code answer", "arguments": {"symbol": sym, "budget": 200000}})
@@ -1962,8 +1912,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # Exit 1 is a difference from the base (prove-ci reads it so): a crash or a refusal is
-    # BLOCKED, never evidence.
     try:
         main()
     except SystemExit as stop:

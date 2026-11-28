@@ -1,8 +1,3 @@
-//! Server mode's HTTP server (spec #259, ADR 0011): `meada mcp --listen <addr> --workspace
-//! <manifest>` as a child process over the chain's mirrors, driven by rmcp's streamable HTTP
-//! client as an agent drives it, and by plain HTTP requests where no MCP client goes (the
-//! 404, calls with no session to two servers).
-
 use crate::common;
 
 use std::fs;
@@ -25,16 +20,12 @@ use rmcp::{
 
 const WEB: &str = "example.com/chain/web";
 
-/// The chain's identities in manifest order, as the 404 lists them.
 const SERVED: &str = "example.com/chain/web\nexample.com/chain/gateway\nexample.com/chain/catalog\n\
                       example.com/chain/worker\n";
 
-/// `meada mcp --listen <listen> --workspace ops/meada.workspace.toml` running in `dir`, killed
-/// when dropped. `url` is the address its first stderr line names.
 pub(crate) struct Server {
     child: Child,
     pub(crate) url: String,
-    // Kept open, so a later line on stderr does not fail on a closed pipe.
     stderr: BufReader<ChildStderr>,
 }
 
@@ -43,17 +34,14 @@ impl Server {
         Self::start_with(dir, listen, &[])
     }
 
-    /// `start` with more environment variables.
     fn start_with(dir: &Path, listen: &str, env: &[(&str, &str)]) -> Self {
         Self::start_args(dir, &["--listen", listen, "--workspace", MANIFEST], env)
     }
 
-    /// `meada mcp <args>` in `dir`, with more environment variables.
     pub(crate) fn start_args(dir: &Path, args: &[&str], env: &[(&str, &str)]) -> Self {
         Self::start_command(dir, "mcp", args, env)
     }
 
-    /// `meada <command> <args>` in `dir`, a listener (`mcp`, or `ui` with feature `ui`).
     pub(crate) fn start_command(
         dir: &Path,
         command: &str,
@@ -79,7 +67,6 @@ impl Server {
         Self { child, url, stderr }
     }
 
-    /// What the server wrote on stderr after its first line, read once it is killed.
     #[cfg_attr(not(feature = "oidc"), expect(dead_code))]
     pub(crate) fn stderr(mut self) -> String {
         use std::io::Read;
@@ -90,7 +77,6 @@ impl Server {
         rest
     }
 
-    /// The next line the server writes on stderr, waiting for it, without its newline.
     #[cfg_attr(not(feature = "accounts"), expect(dead_code))]
     pub(crate) fn next_line(&mut self) -> String {
         let mut line = String::new();
@@ -98,7 +84,6 @@ impl Server {
         line.trim_end_matches('\n').to_string()
     }
 
-    /// An MCP client of the endpoint at `path`.
     pub(crate) async fn client(&self, path: &str) -> RunningService<RoleClient, ()> {
         crate::common::crypto_provider();
         let transport = StreamableHttpClientTransport::from_uri(format!("{}{path}", self.url));
@@ -113,7 +98,6 @@ impl Drop for Server {
     }
 }
 
-/// SIGTERM to `server`.
 #[cfg(unix)]
 pub(crate) fn terminate(server: &Server) {
     let kill = Command::new("kill")
@@ -123,7 +107,6 @@ pub(crate) fn terminate(server: &Server) {
     assert!(kill.success());
 }
 
-/// The exit code of `server` if it exits within `wait`.
 #[cfg(unix)]
 pub(crate) fn exit_within(server: &mut Server, wait: Duration) -> Option<Option<i32>> {
     let start = Instant::now();
@@ -136,17 +119,11 @@ pub(crate) fn exit_within(server: &mut Server, wait: Duration) -> Option<Option<
     None
 }
 
-/// Waits for a call just sent to reach the server and block on the index lock. The server shows
-/// nothing when it has read a request, so this is a margin, not a signal: a SIGTERM that won
-/// the race would find an idle connection and close it, failing the test. A loaded machine
-/// needs far less than a second to read one request.
 #[cfg(unix)]
 async fn in_flight() {
     tokio::time::sleep(Duration::from_millis(1500)).await;
 }
 
-/// `WEB`'s index held under a commit in progress until dropped: a call to the server waits
-/// for it (the busy timeout is 10 seconds), so it stays in flight as long as the test wants.
 #[cfg(unix)]
 fn commit_in_progress(dir: &Path) -> rusqlite::Connection {
     let db = rusqlite::Connection::open(dir.join("indexes").join(WEB).join("index.db")).unwrap();
@@ -154,12 +131,10 @@ fn commit_in_progress(dir: &Path) -> rusqlite::Connection {
     db
 }
 
-/// `name` called with `arguments`.
 pub(crate) fn call(name: &'static str, arguments: serde_json::Value) -> CallToolRequestParams {
     CallToolRequestParams::new(name).with_arguments(arguments.as_object().unwrap().clone())
 }
 
-/// A tool result's text.
 pub(crate) fn text(result: &CallToolResult) -> &str {
     &result
         .content
@@ -169,8 +144,6 @@ pub(crate) fn text(result: &CallToolResult) -> &str {
         .text
 }
 
-/// The tool list as the budget counts it: one token per four bytes of description and
-/// parameter schema (ADR 0008).
 pub(crate) fn tokens(tools: &[Tool]) -> usize {
     let bytes: usize = (tools.iter())
         .map(|t| {
@@ -181,7 +154,6 @@ pub(crate) fn tokens(tools: &[Tool]) -> usize {
     bytes.div_ceil(4)
 }
 
-/// An HTTP agent that reads 4xx and 5xx answers instead of failing on them.
 fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
         .http_status_as_error(false)
@@ -189,12 +161,10 @@ fn agent() -> ureq::Agent {
         .new_agent()
 }
 
-/// `GET url`: status, `Content-Type` and body.
 pub(crate) fn get(url: &str) -> (u16, String, String) {
     get_with(url, &[])
 }
 
-/// `get` with more `headers`.
 pub(crate) fn get_with(url: &str, headers: &[(&str, &str)]) -> (u16, String, String) {
     let mut request = agent().get(url);
     for (name, value) in headers {
@@ -209,14 +179,10 @@ pub(crate) fn get_with(url: &str, headers: &[(&str, &str)]) -> (u16, String, Str
     (response.status().as_u16(), kind, body)
 }
 
-/// One JSON-RPC message POSTed to `url` alone, as a client with no session sends it: the
-/// status, whether a session id came back, the `Content-Type` and the body as JSON (a string
-/// when it is not JSON).
 fn post(url: &str, message: serde_json::Value) -> (u16, bool, String, serde_json::Value) {
     post_with(url, message, &[])
 }
 
-/// `post` with more `headers`.
 fn post_with(
     url: &str,
     message: serde_json::Value,
@@ -240,7 +206,6 @@ fn post_with(
     (response.status().as_u16(), session, kind, json)
 }
 
-/// `trace` from `dashboard` over stdio, in a chain of its own: the answer server mode matches.
 async fn stdio_trace(case: &str) -> (Vec<Tool>, String) {
     let (web, _, _) = chain(case);
     let transport = TokioChildProcess::new(
@@ -258,9 +223,6 @@ async fn stdio_trace(case: &str) -> (Vec<Tool>, String) {
     (tools, text(&answer).to_string())
 }
 
-/// The HTTP smoke test: the stdio server's tools within the budget, the stdio `trace` byte for
-/// byte, the 404 with the identities served, the `uncommitted` refusal, the behind line before
-/// and after `meada index`, an index problem at query time, and nothing written by a call.
 #[tokio::test]
 async fn serves_each_repository_over_http_as_the_stdio_server_answers_it() {
     let dir = chain_manifest("server_http");
@@ -296,7 +258,6 @@ async fn serves_each_repository_over_http_as_the_stdio_server_answers_it() {
     let (stdio_tools, stdio_trace) = stdio_trace("server_http_stdio").await;
     assert_eq!(text(&trace), stdio_trace);
     assert_golden("chain.trace-down.txt", text(&trace));
-    // The same definitions: names, descriptions and parameter schemas.
     let shape = |tools: &[Tool]| {
         let mut shape: Vec<String> = (tools.iter())
             .map(|t| serde_json::json!([t.name, t.description, t.input_schema]).to_string())
@@ -306,7 +267,6 @@ async fn serves_each_repository_over_http_as_the_stdio_server_answers_it() {
     };
     assert_eq!(shape(&tools), shape(&stdio_tools));
 
-    // A trailing slash names the same repository.
     let slash = server.client(&format!("/{WEB}/")).await;
     let answer = (slash.call_tool(call("trace", serde_json::json!({"from": "dashboard"}))))
         .await
@@ -314,12 +274,10 @@ async fn serves_each_repository_over_http_as_the_stdio_server_answers_it() {
     assert_eq!(text(&answer), stdio_trace);
     slash.cancel().await.unwrap();
 
-    // No default repository: the root and an unlisted identity list the ones served.
     for path in ["", "/", "/example.com/chain/nope", "/example.com/chain"] {
         let (status, kind, body) = get(&format!("{}{path}", server.url));
         assert_eq!((status, body.as_str()), (404, SERVED), "{path}");
         assert!(kind.starts_with("text/plain"), "{kind}");
-        // A browser's request (DNS rebinding) gets 403 before routing, without the listing.
         let origin = [("Origin", "http://evil.example")];
         let (status, _, body) = get_with(&format!("{}{path}", server.url), &origin);
         assert_eq!(status, 403, "{path}");
@@ -342,7 +300,6 @@ async fn serves_each_repository_over_http_as_the_stdio_server_answers_it() {
     assert!(fresh.contains("async function dashboard() {"), "{fresh}");
     assert!(contents(&indexes) == indexed, "a call wrote an index");
 
-    // The mirror moves and the server, which refreshes nothing, says the index is behind.
     let file = dir.join("chain-web/src/dashboard.ts");
     let source = fs::read_to_string(&file).unwrap();
     fs::write(&file, format!("{source}\n// moved\n")).unwrap();
@@ -366,8 +323,6 @@ async fn serves_each_repository_over_http_as_the_stdio_server_answers_it() {
     assert!(run(&dir, "index").2);
     assert_eq!(text(&context().await.unwrap()), fresh);
 
-    // At query time the named repository's mirror alone is checked again: a mirror that is no
-    // checkout any more refuses its own endpoint, and the others answer.
     let worker = dir.join("chain-worker");
     let root = worker.canonicalize().unwrap();
     fs::rename(worker.join(".git"), worker.join("moved.git")).unwrap();
@@ -390,7 +345,6 @@ async fn serves_each_repository_over_http_as_the_stdio_server_answers_it() {
     assert_ne!(search.is_error, Some(true), "{}", text(&search));
     fs::rename(worker.join("moved.git"), worker.join(".git")).unwrap();
 
-    // At query time an index the server cannot read is a tool error naming the fix.
     let catalog = indexes.join("example.com/chain/catalog/index.db");
     fs::write(&catalog, "not an index\n").unwrap();
     let search = (client.call_tool(call("search", serde_json::json!({"query": "dashboard"}))))
@@ -409,9 +363,6 @@ async fn serves_each_repository_over_http_as_the_stdio_server_answers_it() {
     assert_nothing_else_written(&dir, &all);
 }
 
-/// A node that receives a built index mounts `index_dir` and the mirrors read-only (spec #259):
-/// the server answers `trace` as the golden has it, `status` and `export` answer as on a
-/// writable layout, and nothing is created anywhere.
 #[cfg(unix)]
 #[tokio::test]
 async fn serves_from_read_only_indexes_and_mirrors_and_creates_nothing() {
@@ -446,9 +397,6 @@ async fn serves_from_read_only_indexes_and_mirrors_and_creates_nothing() {
     assert!(contents(&dir) == before, "something was created or changed");
 }
 
-/// Stateless with JSON responses: no session comes back, and calls sent alternately to two
-/// servers over one manifest, none of them initialized there, are answered alike. `:0` with
-/// no host binds the loopback interface.
 #[test]
 fn two_servers_over_one_manifest_answer_alternate_calls_with_no_session() {
     let dir = chain_manifest("server_two");
@@ -467,8 +415,6 @@ fn two_servers_over_one_manifest_answer_alternate_calls_with_no_session() {
     let (status, session, kind, _) = post(&format!("{}/{WEB}", one.url), initialize.clone());
     assert_eq!((status, session), (200, false));
     assert!(kind.starts_with("application/json"), "{kind}");
-    // A reverse proxy forwards its own hostname; a browser's page (DNS rebinding) sends an
-    // `Origin`, which no MCP client does.
     let url = format!("{}/{WEB}", one.url);
     let proxied = post_with(&url, initialize.clone(), &[("Host", "meada.internal")]);
     assert_eq!(proxied.0, 200, "{proxied:?}");
@@ -478,7 +424,6 @@ fn two_servers_over_one_manifest_answer_alternate_calls_with_no_session() {
         &[("Origin", "http://meada.internal")],
     );
     assert_eq!(browser.0, 403, "{browser:?}");
-    // The path is percent-decoded before it names a repository.
     let encoded = post(
         &format!("{}/example.com%2Fchain%2Fweb", one.url),
         initialize,
@@ -505,8 +450,6 @@ fn two_servers_over_one_manifest_answer_alternate_calls_with_no_session() {
     }
 }
 
-/// Before `meada index`, every repository's missing index refuses the start, each named with
-/// the fix; and `--listen` and `--workspace` go together.
 #[test]
 fn refuses_to_start_listing_every_repository_that_cannot_be_served() {
     let dir = chain_manifest("server_refuse");
@@ -518,7 +461,6 @@ fn refuses_to_start_listing_every_repository_that_cannot_be_served() {
             .expect("meada runs");
         (String::from_utf8(out.stderr).unwrap(), out.status.code())
     };
-    // Nothing listens while the checks fail: the port is free before and after.
     let port = std::net::TcpListener::bind("127.0.0.1:0")
         .unwrap()
         .local_addr()
@@ -547,7 +489,6 @@ fn refuses_to_start_listing_every_repository_that_cannot_be_served() {
     assert!(code == Some(2) && stderr.contains("--listen"), "{stderr}");
 }
 
-/// SIGTERM after a completed call: the server stops and exits 0 (graceful stop, spec #259).
 #[cfg(unix)]
 #[tokio::test]
 async fn exits_zero_on_sigterm_after_a_call() {
@@ -560,8 +501,6 @@ async fn exits_zero_on_sigterm_after_a_call() {
         .await
         .unwrap();
     assert!(!text(&result).is_empty());
-    // The client keeps its connection open: the stop does not wait for it.
-    // (A SIGTERM sent right after the address, with no call, is the next test.)
     let kill = Command::new("kill")
         .args(["-TERM", &server.child.id().to_string()])
         .status()
@@ -570,8 +509,6 @@ async fn exits_zero_on_sigterm_after_a_call() {
     assert_eq!(server.child.wait().unwrap().code(), Some(0));
 }
 
-/// SIGTERM sent the moment the address is read, before any call: still a clean exit 0, since
-/// the handlers are installed before the address is printed.
 #[cfg(unix)]
 #[test]
 fn exits_zero_on_sigterm_right_after_the_listening_line() {
@@ -588,8 +525,6 @@ fn exits_zero_on_sigterm_right_after_the_listening_line() {
     }
 }
 
-/// An answer in flight when SIGTERM arrives is finished and received: the listener closes at
-/// once, the process outlives the signal until the answer is sent, and then exits 0.
 #[cfg(unix)]
 #[tokio::test]
 async fn an_answer_in_flight_when_sigterm_arrives_is_received() {
@@ -606,7 +541,6 @@ async fn an_answer_in_flight_when_sigterm_arrives_is_received() {
     in_flight().await;
     terminate(&server);
     tokio::time::sleep(Duration::from_millis(500)).await;
-    // Still draining, and no longer accepting.
     assert_eq!(server.child.try_wait().unwrap(), None);
     let address = server.url.trim_start_matches("http://");
     assert!(TcpStream::connect(address).is_err());
@@ -619,8 +553,6 @@ async fn an_answer_in_flight_when_sigterm_arrives_is_received() {
     );
 }
 
-/// Past the drain bound what is left is dropped and the exit is still 0: a connection that sent
-/// part of a request and went quiet does not hold the exit, nor does an answer still waiting.
 #[cfg(all(unix, debug_assertions))]
 #[tokio::test]
 async fn the_drain_bound_drops_an_idle_connection_and_an_answer_still_waiting() {
@@ -653,8 +585,6 @@ async fn the_drain_bound_drops_an_idle_connection_and_an_answer_still_waiting() 
     assert!(answer.await.unwrap().is_err());
 }
 
-/// A second signal during the drain ends it at once, with the default 25-second bound and an
-/// answer still waiting: the exit is 0 and the answer is dropped.
 #[cfg(unix)]
 #[tokio::test]
 async fn a_second_signal_ends_the_drain_at_once() {
@@ -670,8 +600,6 @@ async fn a_second_signal_ends_the_drain_at_once() {
     });
     in_flight().await;
     terminate(&server);
-    // Draining: the answer is still waiting. (Signals that arrive together count as one, so
-    // the second comes after the server has seen the first.)
     tokio::time::sleep(Duration::from_millis(700)).await;
     assert_eq!(server.child.try_wait().unwrap(), None);
     terminate(&server);

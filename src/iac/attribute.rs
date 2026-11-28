@@ -1,5 +1,3 @@
-//! Exact resource attributes share the evaluator's aliases, instance selection and budgets.
-
 use super::*;
 
 pub(super) struct At<'m> {
@@ -26,7 +24,6 @@ impl<'m> Eval<'m> {
         }
         through
     }
-    /// A collapsed unknown module expansion is a declaration, never one selected instance.
     pub(super) fn bound_instance(&self, mut at: usize) -> bool {
         while let Some((parent, block)) = self.instances[at].parent {
             if self.instances[at].call.is_none()
@@ -76,7 +73,6 @@ impl<'m> Eval<'m> {
         Some((reference, through))
     }
 
-    /// Follow expression aliases, never arbitrary resource contents or sensitive variables.
     pub(super) fn unalias(
         &mut self,
         at: usize,

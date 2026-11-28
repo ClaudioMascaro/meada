@@ -1,5 +1,3 @@
-//! A private-CA TLS front end over the local S3 test service, exercised through the CLI.
-
 use std::fs;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -16,7 +14,6 @@ use super::{
 const CA: &[u8] = include_bytes!("../../fixtures/tls/ca.pem");
 const WRONG_CA: &[u8] = include_bytes!("../../fixtures/tls/wrong-ca.pem");
 
-/// TLS is terminated here; the real store still checks signatures and stores every object.
 fn front(endpoint: &str) -> String {
     let endpoint = reqwest::Url::parse(endpoint).unwrap();
     assert_eq!(

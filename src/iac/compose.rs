@@ -1,21 +1,3 @@
-//! Compose projects as IaC nodes (#652, ADR 0025): each service of a Compose file is a node
-//! `services.<name>` of type `service`, with its `depends_on`, `links` and shared networks as
-//! references, and its build context and image recorded for the image contract.
-//!
-//! A directory's Compose file (`compose.yaml`, `compose.yml`, `docker-compose.yaml` or
-//! `docker-compose.yml`, the first that exists) and the override file of the same family
-//! (`compose.override.*`, `docker-compose.override.*`) are one evaluation unit, rooted at the
-//! directory (`.` for the repository root). The override is merged as Compose does for the fields
-//! read: a scalar it sets replaces the base's, the lists add to it, a `build` mapping with no
-//! `context` keeps the base's, and a field tagged `!reset` (gone) or `!override` replaces the
-//! base's.
-//!
-//! `${VAR:-default}` and `${VAR-default}` resolve to the default and mark the field overridable;
-//! `${VAR}`, `$VAR` and the other forms stay in the text as `${VAR}`, the unresolved part. A
-//! build context is kept only when it is a path inside the repository, normalized from the root.
-//! A build's `dockerfile` (a path from the context) or `dockerfile_inline` is kept beside it (#744),
-//! merged with the override like the context.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
@@ -26,11 +8,9 @@ use super::{
 use crate::config_values;
 use crate::document::events::{self, Step, Syntax};
 
-/// How deep a default may nest another (`${A:-${B:-x}}`); a deeper one is left unresolved.
 // ponytail: a default naming another variable nests once or twice; 8 stops a built chain.
 const DEFAULT_DEPTH_MAX: usize = 8;
 
-/// The names Compose looks for, in order, and the override file of each family.
 const BASES: [(&str, &str); 4] = [
     ("compose.yaml", "compose.override.yaml"),
     ("compose.yml", "compose.override.yml"),
@@ -38,7 +18,6 @@ const BASES: [(&str, &str); 4] = [
     ("docker-compose.yml", "docker-compose.override.yml"),
 ];
 
-/// The names of the Compose files and of their override files.
 pub(super) const NAMES: [&str; 8] = [
     "compose.yaml",
     "compose.override.yaml",
@@ -50,7 +29,6 @@ pub(super) const NAMES: [&str; 8] = [
     "docker-compose.override.yml",
 ];
 
-/// Whether the file at `path` is a Compose file or an override file by its name.
 pub(crate) fn is_file(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
     BASES
@@ -58,16 +36,12 @@ pub(crate) fn is_file(path: &str) -> bool {
         .any(|(base, over)| *base == name || *over == name)
 }
 
-/// A text with its variables expanded.
 #[derive(Debug, PartialEq)]
 pub(crate) struct Expanded {
     pub text: String,
-    /// Whether a default was used: a deployer's environment can replace the value.
     pub overridable: bool,
 }
 
-/// `text` with its Compose variables expanded: `$$` is `$`, `${VAR:-d}` and `${VAR-d}` are `d`
-/// (itself expanded) and mark the result overridable, every other form stays as `${VAR}`.
 pub(crate) fn expand(text: &str) -> Expanded {
     let mut out = Expanded {
         text: String::new(),
@@ -98,7 +72,6 @@ fn expand_into(text: &str, out: &mut Expanded, depth: usize) {
             out.text.push('$');
             i += 2;
         } else if let Some(body) = rest.strip_prefix('{') {
-            // The matching brace, counting the ones a nested default opens.
             let mut open = 1usize;
             let close = body.char_indices().find(|&(_, c)| {
                 match c {
@@ -123,7 +96,6 @@ fn expand_into(text: &str, out: &mut Expanded, depth: usize) {
                     expand_into(d, out, depth + 1);
                 }
                 _ if n > 0 && n == inner.len() => out.text.push_str(&format!("${{{inner}}}")),
-                // `${VAR:?err}`, `${VAR:+alt}` and the like: the variable is the unresolved part.
                 _ if n > 0 => out.text.push_str(&format!("${{{}}}", &inner[..n])),
                 _ => out.text.push_str(&format!("${{{inner}}}")),
             }
@@ -141,7 +113,6 @@ fn expand_into(text: &str, out: &mut Expanded, depth: usize) {
     }
 }
 
-/// A service as read from one file.
 #[derive(Default)]
 struct Service {
     path: String,
@@ -155,21 +126,14 @@ struct Service {
     depends_on: BTreeSet<String>,
     links: BTreeSet<String>,
     networks: BTreeSet<String>,
-    /// Whether the file sets `image`, `build` or `network_mode`: a merge takes the override's
-    /// even when it recorded nothing (a context outside the repository).
     image_set: bool,
     build_set: bool,
-    /// Whether `build` names its context (a string, or a mapping with `context`).
     context_set: bool,
-    /// Whether `build` names its Dockerfile (`dockerfile` or `dockerfile_inline`).
     dockerfile_set: bool,
     network_mode: bool,
-    /// The fields tagged `!reset` or `!override`: they replace the base's.
     replaced: BTreeSet<&'static str>,
 }
 
-/// A service field without its override tag, and whether it had one: `!reset` leaves nothing,
-/// `!override` its value (Compose's merge, https://docs.docker.com/reference/compose-file/merge/).
 fn tagged(value: Option<&Value>) -> (Option<&Value>, bool) {
     if let Some(Value::Object(map)) = value
         && let [(key, inner)] = map.iter().collect::<Vec<_>>()[..]
@@ -183,7 +147,6 @@ fn tagged(value: Option<&Value>) -> (Option<&Value>, bool) {
     (value, false)
 }
 
-/// Map and list environments share Compose's merge-by-variable rule. Bare names stay unknown.
 fn environment(value: Option<&Value>) -> BTreeMap<String, super::environment::Entry> {
     let entries = match value {
         Some(Value::Object(map)) => map
@@ -227,7 +190,6 @@ fn environment(value: Option<&Value>) -> BTreeMap<String, super::environment::En
                 .and_then(|v| super::environment::literal(&v.text));
             let entry = super::environment::Entry {
                 contract: None,
-                // Shared service fields are added only after their full expansion fits.
                 container: String::new(),
                 image: None,
                 name: name.clone(),
@@ -239,8 +201,6 @@ fn environment(value: Option<&Value>) -> BTreeMap<String, super::environment::En
         .collect()
 }
 
-/// The names a `depends_on`, `links` or `networks` holds: a list's strings or a mapping's keys,
-/// a link without its alias.
 fn names(value: Option<&Value>, links: bool) -> BTreeSet<String> {
     let items: Vec<&str> = match value {
         Some(Value::Array(list)) => list.iter().filter_map(Value::as_str).collect(),
@@ -255,9 +215,6 @@ fn names(value: Option<&Value>, links: bool) -> BTreeSet<String> {
         .collect()
 }
 
-/// The build context of a service in the directory `dir`: the text after expansion, normalized
-/// from the repository root, or `None` when it is not a path inside it (absolute, a URL, climbing
-/// out of the root, or still holding an unresolved part).
 fn context(dir: &str, build: &Value) -> Option<Resolved> {
     let written = match build {
         Value::String(s) => s.as_str(),
@@ -277,10 +234,6 @@ fn context(dir: &str, build: &Value) -> Option<Resolved> {
     Some(Resolved { text, overridable })
 }
 
-/// The Dockerfile a `build` mapping names, `None` for one that names none (it builds `Dockerfile`
-/// in its context). `dockerfile_inline` is exclusive with `dockerfile`: Compose refuses a project
-/// that sets both, so the inline one is the one read. A value that is no text is an empty one,
-/// which no reader takes for a Dockerfile.
 fn dockerfile(build: &Value) -> Option<Dockerfile> {
     let inline = build.get("dockerfile_inline");
     let written = inline.or_else(|| build.get("dockerfile"))?;
@@ -292,14 +245,10 @@ fn dockerfile(build: &Value) -> Option<Dockerfile> {
     })
 }
 
-/// A build context Docker reads as a URL or a git repository, never as a directory.
 pub(crate) fn remote(context: &str) -> bool {
     context.contains("://") || context.starts_with("git@") || context.starts_with("github.com/")
 }
 
-/// `value` with every YAML merge key (`<<: *anchor`, or a list of anchors) resolved, wherever it
-/// is and however the anchors chain: a key a mapping sets itself wins, and an earlier mapping of
-/// a list wins over a later. The reader bounds the nesting, so the recursion is shallow.
 fn unmerge(value: &Value) -> Value {
     match value {
         Value::Object(map) => {
@@ -326,10 +275,8 @@ fn unmerge(value: &Value) -> Value {
     }
 }
 
-/// How many lines `KeyLines::end_of` steps back one by one before it looks the block's end up.
 const WALK_BACK: usize = 64;
 
-/// The indent of `line`, the leading blanks (a blank line has none).
 fn indent(line: &str) -> usize {
     if line.trim().is_empty() {
         0
@@ -338,8 +285,6 @@ fn indent(line: &str) -> usize {
     }
 }
 
-/// `table[p][i]` is the greatest indent among the `2^p` lines from line `i` (0-based) on; a level
-/// has one entry per window that fits. `log(lines)` levels, each as long as the text.
 fn windows(indents: &[u32]) -> Vec<Vec<u32>> {
     let mut table: Vec<Vec<u32>> = vec![indents.to_vec()];
     while let Some(last) = table.last() {
@@ -355,8 +300,6 @@ fn windows(indents: &[u32]) -> Vec<Vec<u32>> {
     table
 }
 
-/// A plain key at the start of `line` and what follows it: up to the first `:` that ends the line
-/// or is followed by a blank (`a:b:` is the key `a:b`).
 fn plain_key(line: &str) -> Option<(&str, &str)> {
     let mut chars = line.char_indices().peekable();
     while let Some((i, c)) = chars.next() {
@@ -367,17 +310,11 @@ fn plain_key(line: &str) -> Option<(&str, &str)> {
     None
 }
 
-/// The line of each entry of a section's mapping (`services`, `Resources`): the key line the event
-/// reader gave, else, for an entry that came by an alias (`services: *all`), the nearest line
-/// above the first scalar that starts with the key, found in one pass over the text.
 pub(super) struct KeyLines<'a> {
     lines: &'a [&'a str],
     read: BTreeMap<&'a str, usize>,
-    /// The 1-based lines that start a key, by the key's text, built when an entry has no read line.
     by_text: std::cell::OnceCell<BTreeMap<String, Vec<usize>>>,
-    /// The indent of each line, found once: a line of blanks costs its length to trim.
     indents: Vec<u32>,
-    /// The maximum indent over each window of `2^p` lines (`windows`), built when `end_of` needs it.
     windows: std::cell::OnceCell<Vec<Vec<u32>>>,
 }
 
@@ -395,12 +332,6 @@ impl<'a> KeyLines<'a> {
         }
     }
 
-    /// The last line of the block that starts at line `line` and whose last scalar is at `last`:
-    /// the last line at or before it that is indented deeper than the key (a null value reports
-    /// the line after it; a blank line, or one no deeper, ends nothing). A block ends within a few
-    /// lines of `last`, except for the entries of an aliased section, which all begin at the
-    /// alias's line, and for flat text: those look it up in a table of the maximum indent over
-    /// the windows of the text, in `log(lines)` steps.
     pub(super) fn end_of(&self, line: usize, last: usize) -> usize {
         let key_indent = self.indents.get(line - 1).map_or(0, |&i| i as usize);
         let from = last.max(line).min(self.lines.len().max(line));
@@ -416,10 +347,8 @@ impl<'a> KeyLines<'a> {
             }
             end -= 1;
         }
-        // Every window of `2^p` lines ending at `pos` that holds nothing deeper is skipped, the
-        // widest first: what is left is the first line from `end` back that is deeper.
         let table = self.windows.get_or_init(|| windows(&self.indents));
-        let mut pos = end.min(self.lines.len()); // 1-based, the last line not yet ruled out
+        let mut pos = end.min(self.lines.len());
         for (p, level) in table.iter().enumerate().rev() {
             let width = 1usize << p;
             if pos >= width && level[pos - width] as usize <= key_indent {
@@ -429,7 +358,6 @@ impl<'a> KeyLines<'a> {
         pos.max(line)
     }
 
-    /// The line of the entry `name` whose first scalar is at line `first`.
     pub(super) fn of(&self, name: &str, first: usize) -> usize {
         if let Some(&line) = self.read.get(name) {
             return line;
@@ -457,10 +385,8 @@ impl<'a> KeyLines<'a> {
     }
 }
 
-/// The services of the Compose file `src` at `path`, in name order.
 fn read(path: &str, src: &[u8]) -> BTreeMap<String, Service> {
     let dir = config_values::parent(path);
-    // The first and last line of the scalars under each service.
     let mut spans: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     let documents = events::read_keyed(Syntax::Yaml, src, true, |scalar| {
         if let [Step::Key(top), Step::Key(name), ..] = scalar.path
@@ -534,7 +460,6 @@ fn read(path: &str, src: &[u8]) -> BTreeMap<String, Service> {
     found
 }
 
-/// The services of a unit: the base's, then the override's merged in.
 fn merge(
     base: BTreeMap<String, Service>,
     over: BTreeMap<String, Service>,
@@ -548,11 +473,9 @@ fn merge(
                     m.image = s.image;
                 }
                 if s.build_set {
-                    // A build mapping with no context keeps the context the base builds from.
                     if s.context_set || replaced("build") || !s.builds || !m.builds {
                         m.build = s.build;
                     }
-                    // The same for the Dockerfile: one the override does not name stays.
                     if s.dockerfile_set || replaced("build") || !s.builds || !m.builds {
                         m.dockerfile = s.dockerfile;
                     }
@@ -582,9 +505,6 @@ fn merge(
     merged
 }
 
-/// The IaC nodes and references of the Compose files `files` (path and bytes), one unit per
-/// directory, in directory order. `left` is the budget of stored bytes the whole repository still
-/// has; it shrinks by what is stored.
 pub(super) fn evaluate(
     files: &[(String, Vec<u8>)],
     left: &mut usize,
@@ -609,7 +529,6 @@ pub(super) fn evaluate(
         if let Some(src) = named.get(over) {
             services = merge(services, read(&at(over), src));
         }
-        // A service with no `networks:` after the merge is on the project's `default` network, unless it sets a `network_mode`.
         for s in (services.values_mut()).filter(|s| s.networks.is_empty() && !s.network_mode) {
             s.networks.insert("default".into());
         }
@@ -641,7 +560,6 @@ pub(super) fn evaluate(
                     .checked_add(image_size)?;
                 (size <= super::environment::ENVIRONMENT_BYTES_MAX).then_some(size)
             });
-            // Check repeated names and images before making any owned copies.
             let environment = if environment_size.is_some() {
                 s.environment
                     .values()
@@ -743,7 +661,6 @@ mod tests {
             ("worker".into(), "i".repeat(400 << 10)),
             ("w".repeat(400 << 10), "image".into()),
         ] {
-            // Explicit keys keep this valid YAML past the implicit-key length limit.
             let text = format!(
                 "services:\n  ? {name}\n  :\n    image: {image}\n    environment:\n{entries}"
             );
@@ -860,7 +777,6 @@ mod tests {
                 .iter()
                 .any(|r| r.source == "services.web" && r.target == "services.db")
         );
-        // An override with no base of its family is no project; the family picks its override.
         assert!(unit(&[("compose.override.yaml", over)]).0.is_empty());
         let (nodes, _) = unit(&[
             ("docker-compose.yml", BASE),
@@ -871,12 +787,10 @@ mod tests {
 
     #[test]
     fn an_override_build_keeps_the_base_context_and_reset_or_override_replace() {
-        // A build mapping with no context merges into the base's build, as Compose merges.
         let over = "services:\n  web:\n    build: {dockerfile: Dockerfile.dev}\n";
         let (nodes, _) = unit(&[("p/compose.yaml", BASE), ("p/compose.override.yaml", over)]);
         let web = nodes.iter().find(|n| n.address == "services.web").unwrap();
         assert_eq!(web.build.as_ref().map(|b| b.text.as_str()), Some("p/web"));
-        // `!reset` drops the base's field; `!override` replaces a list rather than adding to it.
         let over = "services:\n  web:\n    image: !reset null\n    build: !reset null\n    depends_on: !override [db]\n    networks: !reset []\n";
         let (nodes, references) =
             unit(&[("p/compose.yaml", BASE), ("p/compose.override.yaml", over)]);
@@ -892,8 +806,6 @@ mod tests {
         );
     }
 
-    /// The Dockerfile of service `web` as (text, overridable, inline), after the merge of `over`
-    /// into `base`.
     fn dockerfile_of(base: &str, over: Option<&str>) -> Option<(String, bool, bool)> {
         let mut files = vec![("p/compose.yaml", base)];
         files.extend(over.map(|o| ("p/compose.override.yaml", o)));
@@ -919,7 +831,6 @@ mod tests {
             of("{context: ., dockerfile: \"${DF}\"}"),
             Some(("${DF}".into(), false, false))
         );
-        // Inline text is the Dockerfile; with both set, the inline one is read.
         assert_eq!(
             of("{dockerfile_inline: \"FROM x\"}"),
             Some(("FROM x".into(), false, true))
@@ -928,7 +839,6 @@ mod tests {
             of("{dockerfile: A, dockerfile_inline: \"FROM x\"}"),
             Some(("FROM x".into(), false, true))
         );
-        // A value that is no text names no readable Dockerfile.
         assert_eq!(of("{dockerfile: 7}"), Some((String::new(), false, false)));
     }
 
@@ -941,18 +851,14 @@ mod tests {
             of("{dockerfile: Dockerfile.dev}"),
             Some("Dockerfile.dev".into())
         );
-        // A build with no Dockerfile of its own, or with only a context, keeps the base's.
         assert_eq!(of("{args: {A: b}}"), Some("Dockerfile.base".into()));
         assert_eq!(of("./other"), Some("Dockerfile.base".into()));
-        // An inline Dockerfile in the override replaces the base's file.
         assert_eq!(
             dockerfile_of(base, Some(&over("{dockerfile_inline: \"FROM y\"}"))),
             Some(("FROM y".into(), false, true))
         );
-        // `!reset` and `!override` drop the base's Dockerfile with its build.
         assert_eq!(of("!reset null"), None);
         assert_eq!(of("!override {context: ../other}"), None);
-        // A service the base does not build takes the override's.
         let plain = "services:\n  web:\n    image: x\n";
         assert_eq!(
             dockerfile_of(plain, Some(&over("{dockerfile: D}"))).map(|d| d.0),
@@ -974,7 +880,6 @@ mod tests {
         assert_eq!(build("../.."), None);
         assert_eq!(build("/abs"), None);
         assert_eq!(build("https://github.com/a/b.git"), None);
-        // Docker reads these as git repositories, not as directories.
         assert_eq!(build("git@github.com:a/b.git"), None);
         assert_eq!(build("github.com/a/b"), None);
         assert_eq!(build("git://h/a/b.git"), None);
@@ -1041,7 +946,6 @@ mod tests {
 
     #[test]
     fn units_past_the_ceilings_are_cut() {
-        // More dependencies than REFERENCES_MAX keep the first REFERENCES_MAX in address order.
         let n = REFERENCES_MAX + 5;
         let mut text = String::from("services:\n  hub:\n    networks: [n]\n");
         for i in 0..n {
@@ -1056,13 +960,11 @@ mod tests {
                 .count(),
             REFERENCES_MAX
         );
-        // More services than NODES_MAX keep the first NODES_MAX in name order.
         let many: String = (0..NODES_MAX + 3)
             .map(|i| format!("  s{i:06}: {{networks: [n{i}]}}\n"))
             .collect();
         let (nodes, _) = unit(&[("compose.yaml", &format!("services:\n{many}"))]);
         assert_eq!(nodes.len(), NODES_MAX);
-        // A budget that holds a node but not its references stops there.
         let files = [("compose.yaml".to_string(), BASE.as_bytes().to_vec())];
         let (nodes, _) = evaluate(&files, &mut 40);
         assert!(nodes.len() < 3);
@@ -1113,12 +1015,10 @@ mod tests {
 
     #[test]
     fn flat_text_and_entries_at_every_indent_are_walked_in_linear_time() {
-        // JSON with nothing indented: no line is deeper than any key.
         let entries: String = (0..20_000)
             .map(|i| format!("\"s{i}\": {{\n\"image\": \"a\"\n}},\n"))
             .collect();
         let flat = format!("{{\n\"services\": {{\n{entries}\"z\": {{}}\n}}\n}}\n");
-        // Flow entries of an aliased section, each at a smaller indent than the one before.
         let deep: String = (0..1_400)
             .map(|i| format!("{}s{i}: {{image: a}},\n", " ".repeat(1_500 - i)))
             .collect();
@@ -1137,8 +1037,6 @@ mod tests {
 
     #[test]
     fn a_block_ends_at_its_last_deeper_line_however_far_the_walk_goes() {
-        // The entry's last scalar is far below it (an alias), past a long run of lines no deeper: the
-        // walk back finds the entry's own last line.
         let run = "  other: 1\n".repeat(500);
         let text = format!("x: &all\n  a:\n    image: a\n{run}services: *all\n");
         let (nodes, _) = unit(&[("compose.yaml", &text)]);
@@ -1148,7 +1046,6 @@ mod tests {
 
     #[test]
     fn a_long_line_of_blanks_above_an_alias_is_read_once() {
-        // Every entry of the aliased section walks back from the alias line over the blank line.
         let entries: String = (0..10_000)
             .map(|i| format!("  s{i}: {{image: a}}\n"))
             .collect();

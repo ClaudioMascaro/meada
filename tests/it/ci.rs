@@ -1,6 +1,3 @@
-//! CI nodes (#823, ADR 0028): a pipeline, an action, a CI job and a CI step are IaC nodes of the
-//! GitHub Actions format, found by `search` with the kind `ci` and explained by `context`.
-
 use std::fs;
 
 use meada::engine::Engine;
@@ -11,15 +8,11 @@ const ORIGIN: Option<&str> = Some("https://example.com/acme/app.git");
 const REPO: &str = "example.com/acme/app";
 const CI: &str = ".github/workflows/ci.yml";
 
-/// The answers to `questions`, a blank line between two, as the output grammar's check reads a
-/// golden of several answers.
 fn answers(questions: &[&str], ask: impl Fn(&str) -> String) -> String {
     let answers: Vec<_> = questions.iter().map(|q| ask(q)).collect();
     answers.join("\n")
 }
 
-/// The lines of `answer` that are hits of the kind `ci`: every line, each of the shape
-/// `<repository> <path>:<line> <address> (<type>...)`.
 fn hits(answer: &str) -> Vec<&str> {
     let lines: Vec<&str> = answer.lines().collect();
     for line in &lines {
@@ -28,24 +21,17 @@ fn hits(answer: &str) -> Vec<&str> {
     lines
 }
 
-/// The fixture: a pipeline with three CI jobs (one with a matrix and three CI steps, one that
-/// needs it, one that calls a reusable pipeline and needs both), a composite action at the
-/// root, a folder with both action file names, one with `action.yaml` alone, a `dependabot.yml`
-/// that is no pipeline, and a symbol named like a CI job.
 #[test]
 fn pipelines_actions_jobs_and_steps_are_nodes_found_by_the_kind_ci() {
     let repo = fixture_repo("ci_nodes", "ci-nodes", ORIGIN);
     let engine = Engine::open(&repo).unwrap();
     let ci = |q: &str| engine.search(q, Some("ci"), None).unwrap();
-    // A CI step by its `id`, its `name` and its `uses`: the same node, at its key path.
     let login = format!(
         "{REPO} {CI}:15 jobs.build.steps[1] (step, id \"login\", name \"Log in\", uses \"docker/login-action@v3\")"
     );
     for query in ["login", "Log in", "docker/login-action@v3"] {
         assert_eq!(hits(&ci(query)), [&login], "{query}");
     }
-    // A CI job by its id: one node for the job with a matrix, and a quoted key where the id is
-    // no plain identifier.
     let build = ci("build");
     let jobs: Vec<_> = (hits(&build).into_iter())
         .filter(|line| line.contains(" (job"))
@@ -62,13 +48,11 @@ fn pipelines_actions_jobs_and_steps_are_nodes_found_by_the_kind_ci() {
             "{REPO} {CI}:33 jobs[\"publish-prd\"] (job, id \"publish-prd\", uses \"acme/workflows/.github/workflows/publish.yml@v1\")"
         )]
     );
-    // Every node of a type, counted over the whole answer.
     let of = |answer: &str, ty: &str| {
         (hits(answer).iter())
             .filter(|line| line.contains(&format!(" ({ty}")))
             .count()
     };
-    // A type word also matches the addresses under `jobs`: the CI jobs come first, by rank.
     let by_type = ci("job");
     assert_eq!(of(&by_type, "job"), 3, "{by_type}");
     assert!(
@@ -78,8 +62,6 @@ fn pipelines_actions_jobs_and_steps_are_nodes_found_by_the_kind_ci() {
         "{by_type}"
     );
     assert_eq!(hits(&by_type).len(), 3 + 4, "{by_type}");
-    // Three in `build`, one in `test`, two in the root action, one in `tools/setup/action.yml`:
-    // the `action.yaml` beside it gives none, and a JavaScript action has no steps.
     assert_eq!(of(&ci("step"), "step"), 7, "{}", ci("step"));
     assert_eq!(hits(&ci("step")).len(), 7, "{}", ci("step"));
     let actions = ci("action");
@@ -113,7 +95,6 @@ fn pipelines_actions_jobs_and_steps_are_nodes_found_by_the_kind_ci() {
         "references:\n{REPO} {CI}:7 jobs.build\n{REPO} {CI}:28 jobs.test\n{REPO} {CI}:33 jobs[\"publish-prd\"]\nreferenced by: none\n"
     );
     assert!(pipeline.contains(&listed), "{pipeline}");
-    // A CI job: its CI steps and the CI jobs it needs below, the pipeline and who needs it above.
     let test = context("jobs.test");
     let (down, up) = test.split_once("referenced by").unwrap();
     assert!(
@@ -127,7 +108,6 @@ fn pipelines_actions_jobs_and_steps_are_nodes_found_by_the_kind_ci() {
     let needing =
         format!(":\n{REPO} {CI}:1 .\n{REPO} {CI}:33 jobs[\"publish-prd\"] via needs\nvalues:\n");
     assert!(up.starts_with(&needing), "{test}");
-    // A CI step, named by a selector: its lines and the values of its `with` and `env`.
     let step = context("jobs.build.steps[id=login]");
     assert!(
         step.starts_with(&format!(
@@ -154,7 +134,6 @@ fn pipelines_actions_jobs_and_steps_are_nodes_found_by_the_kind_ci() {
         step,
         context(&format!("{REPO}::{CI}::jobs.build.steps[name=\"Log in\"]"))
     );
-    // A composite action shows its CI steps; the `action.yaml` beside an `action.yml` is no node.
     let action = context("action.yml");
     assert!(
         action.starts_with(&format!(
@@ -184,9 +163,6 @@ fn pipelines_actions_jobs_and_steps_are_nodes_found_by_the_kind_ci() {
     assert_golden("ci-nodes.context.txt", &answers(&questions, context));
 }
 
-/// The kind `iac`, the default search and the kind `value` answer as before, and the export
-/// holds only the CI nodes that hold a side (#826): the three actions, and the CI step of a
-/// composite action whose `./tools/setup` is unresolved.
 #[test]
 fn ci_nodes_stay_out_of_the_kind_iac_the_default_search_and_the_export() {
     let repo = fixture_repo("ci_nodes_others", "ci-nodes", ORIGIN);
@@ -195,14 +171,12 @@ fn ci_nodes_stay_out_of_the_kind_iac_the_default_search_and_the_export() {
         let iac = engine.search(query, Some("iac"), None).unwrap();
         assert!(!iac.contains(REPO), "{iac}");
     }
-    // A symbol named like the CI job: the default search shows it and no CI node.
     let default = engine.search("build", None, None).unwrap();
     assert!(default.contains("src/build.ts"), "{default}");
     assert!(
         !default.contains("jobs.build") && !default.contains(CI),
         "{default}"
     );
-    // Every scalar of a pipeline stays a config value.
     let value = engine
         .search("docker/login-action@v3", Some("value"), None)
         .unwrap();
@@ -232,9 +206,6 @@ fn ci_nodes_stay_out_of_the_kind_iac_the_default_search_and_the_export() {
     assert!(export["files"].is_array(), "{export:#}");
 }
 
-/// Editing a pipeline changes the answers at the next query, as a cold index gives them: a CI
-/// step inserted above another renumbers it, a file that leaves takes its nodes, and with both
-/// action file names in a folder the action follows `action.yml` as it leaves and returns.
 #[test]
 fn an_edited_pipeline_or_action_changes_its_nodes_as_a_cold_index_gives_them() {
     let repo = fixture_repo("ci_nodes_edit", "ci-nodes", ORIGIN);
@@ -262,7 +233,6 @@ fn an_edited_pipeline_or_action_changes_its_nodes_as_a_cold_index_gives_them() {
     );
     assert_eq!(warm, cold("login", "ci"));
     assert_eq!(ci("step"), cold("step", "ci"));
-    // Both action file names in `tools/setup`: the action is `action.yml` until it leaves.
     let yml = repo.join("tools/setup/action.yml");
     let setup = fs::read_to_string(&yml).unwrap();
     assert!(ci("Setup").contains("tools/setup/action.yml:1 . (action, name \"Setup\")"));
@@ -285,7 +255,6 @@ fn an_edited_pipeline_or_action_changes_its_nodes_as_a_cold_index_gives_them() {
     assert!(!back.contains("tools/setup/action.yaml"), "{back}");
     assert_eq!(back, cold("Setup", "ci"));
     assert_eq!(ci("step"), cold("step", "ci"));
-    // A file that is no pipeline any more, then gone.
     fs::write(&path, "on: push\n").unwrap();
     assert!(!ci("job").contains(CI), "{}", ci("job"));
     assert_eq!(ci("job"), cold("job", "ci"));

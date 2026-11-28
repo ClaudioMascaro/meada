@@ -71,14 +71,11 @@ def seed(root):
     write(repos['code-only'], 'worker.py', queue_code(['parcel-live']))
     write(repos['code-only'], 'meada.toml', declare('s3', 'archive-live', 'write'))
     write(repos['iac-only'], 'regional/main.tf', infra)
-    # Same spelling across different kind/broker groups is not matching evidence.
     write(repos['isolation'], 'main.tf',
           'resource "aws_sqs_queue" "queue" { name = "parcel-live" }\n'
           'resource "aws_s3_bucket" "bucket" { bucket = "archive-live" }\n')
     write(repos['isolation'], 'worker.py', queue_code([], amqp=True))
     write(repos['isolation'], 'meada.toml', declare('gcs', 'archive-live') + declare('sqs', 'parcel-live'))
-    # Multiple roots with the same literal are normal. Patterns require whole segments
-    # and three literal characters; their lack of a link is itself orphan evidence.
     for env in ['east', 'west']:
         write(repos['patterns'], f'{env}/main.tf',
               'resource "aws_s3_bucket" "archive" { bucket = "archive-live" }\n')
@@ -225,8 +222,6 @@ class Probe:
             lines = [l for l in h.splitlines() if l.strip().startswith('orphan ')]
             expected = {'channel::sqs::parcel-idle': 'no use', 'channel::sqs::parcel-lost': 'no provisioner'} if name.startswith('mixed-') else {}
             if name == 'patterns':
-                # The exact base does not create provisioner sides for unsupported
-                # interior/short patterns. A supported unused pattern is a provisioner.
                 expected = {'resource::s3::reserve-*': 'no use',
                             'resource::s3::archive': 'no provisioner', 'resource::s3::a-live': 'no provisioner'}
             self.check(name + ' exact orphan set', orphan_set_matches(h, expected), repr(lines))
@@ -266,10 +261,6 @@ class Probe:
                 self.check('multiple roots not orphaned', all(NO_USE not in t for t in texts[:2]))
                 self.check('bounded pattern used', NO_USE not in texts[2] and 'archive-cold' in texts[2])
         self.negative_controls()
-        # Visibility: a server manifest containing ONLY the app has no provisioner even
-        # though its explicitly declared peer lives beside it on disk. Compare against
-        # an isolated local copy with its peer absent, retaining configuration,
-        # identity and source locations (including any missing-peer note).
         head = all_repos['head']
         isolated = self.run / 'visibility-local-copy' / 'mixed-app'
         shutil.copytree(self.run / 'input/mixed-app', isolated)
@@ -278,7 +269,6 @@ class Probe:
         self.check('visibility isolated side marker', NO_PROVIDER in texts[0])
         if self.http:
             self.parity({'mixed-app': head['mixed-app']}, 'mixed-app', qs, texts, tools, 'visibility-http')
-        # Refresh: both directions, on a persistent stdio server, after same-size edits.
         repo = head['mixed-infra']
         path = repo / 'regional/main.tf'
         original = path.read_text()
@@ -337,7 +327,6 @@ class Probe:
         self.check('cross-kind whole status parity', status_before_855(captures['base'][1]) == status_before_855(captures['head'][1]))
         self.check('cross-kind no orphan status lines', orphan_set_matches(captures['head'][1], {}))
         for i, text in enumerate(captures['head'][2]):
-            # `channel::sqs` has a provisioner and no use; `resource::sqs` no group at all.
             wanted = [NO_USE] if i < 2 else []
             ok = all((m in text) == (m in wanted) for m in [NO_USE, NO_PROVIDER])
             self.check(f'cross-kind marker {i}', ok, text)

@@ -15,7 +15,6 @@ type Kind = 'role' | 'groups' | 'suspend' | 'reactivate' | 'reset' | 'removeGith
 interface Target { account: ManagedAccount; kind: Kind }
 const post = (body: object): RequestInit => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-/** The global operator's accounts page: the list, a create form, and each change behind the shared confirmation dialog. */
 export function AccountsPage({ api, locale }: { api: Api; locale: Language }) {
   const t = accountsCopy[locale];
   const common = copy[locale];
@@ -118,7 +117,6 @@ function CreateForm({ api, locale, onCreated }: { api: Api; locale: Language; on
   </form>;
 }
 
-/** One change of one account behind the shared dialog: what it takes (a role, groups, a password) is asked inside it, and a refusal is shown inside it too. */
 function ChangeDialog({ api, locale, target, onDone, onCancel }: { api: Api; locale: Language; target: Target; onDone: () => void; onCancel: () => void }) {
   const t = accountsCopy[locale];
   const { account, kind } = target;

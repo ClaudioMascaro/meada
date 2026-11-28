@@ -148,7 +148,7 @@ def selftest():
     assert "exact_call: Grep 'fn exact_call' in src" in text, text
     assert "printed_as_written: grep -rn 'printed_as_written' src/" in text, text
     assert "TemplateExpr: rg -A 3 TemplateExpr" in text, text
-    assert "x: " not in text, text  # a one-file grep reads that file, no graph question
+    assert "x: " not in text, text
     assert "tool calls: 7; Bash 3, Grep 1, Read 1" in text, text
     assert "depth" not in text and "panic" not in text and "grep: " not in text, text
     print("usage.py selftest passed")

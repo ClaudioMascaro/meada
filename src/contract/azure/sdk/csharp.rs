@@ -1,4 +1,3 @@
-//! New Azure .NET forms. Legacy Service Bus sends/processors remain in channel/csharp.
 use super::{Code, Frame, Handle, Role, Stage, Value, argument};
 
 pub(super) fn constructed<'a>(

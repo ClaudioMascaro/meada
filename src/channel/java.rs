@@ -1,29 +1,3 @@
-//! The channel kind's Java forms (spec #26): Spring Kafka (`kafka`), Spring AMQP (`amqp`), Spring
-//! JMS (`jms`), the SQS client of the AWS SDK v2 (`sqs`), jnats (`nats`) and the Jedis and Lettuce
-//! Redis clients (`redis`).
-//!
-//! A client counts by the type the source writes for its receiver (a field, a parameter, a
-//! local: `Follow::Declarations`, as the HTTP kind reads a RestTemplate), and a listener
-//! annotation by `Code::outside`: each through the one spelling in this module's table
-//! (`names::one`), so a class of the repository with the same name, or a name two on-demand
-//! imports may bind, is none. A name is evaluated like a URL: constants, `final` fields and the
-//! arguments of a wrapper's callers fold (`Code::expand`), a field or a constructor parameter
-//! with Spring's `@Value("${key}")` holds the key from the module's configuration
-//! (`jvm::spring::inject`), and an annotation's text has its placeholders resolved the same way
-//! (`jvm::spring::resolved`). A name that cannot be evaluated is an unresolved side.
-//!
-//! An annotated listener's handler is the annotated method. Every other client polls (or calls
-//! back through a lambda, which the Java pack keeps in the method that writes it), so its
-//! handler is the method holding the call that names the topic or the queue: the call itself,
-//! or the call of a wrapper that passes the name (`consume`'s default), wherever the receive
-//! loop runs.
-//!
-//! The pack reads an annotation written as an element value (`@QueueBinding(value = @Queue(..),
-//! exchange = @Exchange(..), key = ..)`) as `Value::New(name, [Object(elements)])`, its unnamed
-//! element as `value`; like every argument, it lives only while the contracts are extracted. Java
-//! types an element by the annotation that declares it, so a nested annotation is read by its
-//! element's key, never by its own name.
-
 use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
 
@@ -44,17 +18,12 @@ const JMS_LISTENER: &str = "org.springframework.jms.annotation.JmsListener";
 const LISTENERS: &[&str] = &[KAFKA_LISTENER, RABBIT_LISTENER, JMS_LISTENER];
 
 const BINDING_BUILDER: &str = "org.springframework.amqp.core.BindingBuilder.bind";
-/// The types `BindingBuilder.bind(..).to(..).with(..)` reads a queue and an exchange name off,
-/// as `new` writes them (`new Queue("orders")`): `with` follows only a topic or a direct
-/// exchange.
 const QUEUES: &[&str] = &["Queue"];
 const EXCHANGES: &[&str] = &["TopicExchange", "DirectExchange"];
-/// The exchange Spring Boot gives the `RabbitTemplate` it configures; empty, the default one.
 const TEMPLATE_EXCHANGE: &str = "spring.rabbitmq.template.exchange";
 const AMQP_POST_PROCESSOR: &str = "org.springframework.amqp.core.MessagePostProcessor";
 const CORRELATION_DATA: &str = "org.springframework.amqp.rabbit.connection.CorrelationData";
 const JMS_POST_PROCESSOR: &str = "org.springframework.jms.core.MessagePostProcessor";
-/// Spring AMQP's constants of the exchange types, the value of `@Exchange(type = ..)`.
 const EXCHANGE_TYPES: &str = "org.springframework.amqp.core.ExchangeTypes.";
 const STREAM_OFFSET: &str = "io.lettuce.core.XReadArgs.StreamOffset";
 
@@ -69,7 +38,6 @@ enum Client {
     Lettuce,
 }
 
-/// Each client by the types the source may write for it.
 const CLIENTS: &[(Client, &[&str])] = &[
     (
         Client::Kafka,
@@ -110,7 +78,6 @@ const CLIENTS: &[(Client, &[&str])] = &[
     ),
 ];
 
-/// The methods a form is made of.
 const METHODS: &[&str] = &[
     "send",
     "convertAndSend",
@@ -125,7 +92,6 @@ const METHODS: &[&str] = &[
 ];
 
 pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
-    // Read the first time a form needs them: a repository without one parses none.
     let configs = OnceCell::new();
     let configs = || configs.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
     let inject = |code: &Code<'a>, path: &'a str, on: Injected<'a>| {
@@ -133,14 +99,10 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
     };
     let mut out = Vec::new();
     for (path, facts) in jvm_files(code) {
-        // The file's methods, built the first time a listener's annotation is met.
         let methods: OnceCell<HashSet<&str>> = OnceCell::new();
-        // The file's calls by range, built the first time a Kotlin binding chain is read.
         let starts: OnceCell<HashMap<(usize, usize), &Call>> = OnceCell::new();
         for (n, stored) in facts.calls.iter().enumerate() {
             if let Some(target) = &stored.decorates {
-                // A listener's annotation on a method; one on a class is not read. The
-                // annotation is asked first: most are no listener's (`@Override`).
                 let listener = annotation(code, path, stored, |s| LISTENERS.contains(&s));
                 let methods = || {
                     methods.get_or_init(|| {
@@ -169,8 +131,6 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
             let Some(client) = client(code, path, stored) else {
                 continue;
             };
-            // Kotlin keeps its existing typed SQS form. Java's AWS form is shared with the other
-            // services in `aws`, where a declared SQS client type still stands for construction.
             if client == Client::Sqs && !kotlin(path) {
                 continue;
             }
@@ -188,7 +148,6 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
                     out.extend(consume_with(code, call(), inject, broker, &first, None));
                 }
                 (Client::Jedis, "xreadGroup") | (Client::Lettuce, "xreadgroup") => {
-                    // Kotlin writes `Map.of(k, v)` as `mapOf(k to v)`.
                     let map_of = kotlin(path)
                         && known(code, path, &stored.scope, "mapOf", |s| {
                             s == "kotlin.collections.mapOf"
@@ -239,7 +198,6 @@ pub(super) fn messages<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Message> {
     out
 }
 
-/// The broker kind of `client`'s contracts, its listener's included.
 fn broker(client: Client) -> &'static str {
     match client {
         Client::Kafka => "kafka",
@@ -251,8 +209,6 @@ fn broker(client: Client) -> &'static str {
     }
 }
 
-/// The client the call `call` of `path` is made on, by the type the source writes for its
-/// receiver.
 fn client<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Option<Client> {
     let (receiver, _) = call.callee.rsplit_once('.')?;
     let typed = typed(code, path, &call.scope, receiver);
@@ -262,20 +218,15 @@ fn client<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Option<Client> 
     found.map(|(client, _)| *client)
 }
 
-/// The name the first argument gives (`channel_name`).
 fn first(a: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
     Some(vec![channel_name(a.first()?)?])
 }
 
-/// The queue of an SQS request read whole (`Expand::Chain`): the last segment of the outermost
-/// `queueUrl(..)` of the request's builder chain. A request built elsewhere, or by a lambda
-/// (`sendMessage(b -> b.queueUrl(..))`), names none.
 fn queue_url(a: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
     let url = match a {
         [Value::Call(call)] => match call.args.first() {
             Some(Value::Call(request)) => steps(request)
                 .find_map(|step| (member(&step.callee) == "queueUrl").then(|| step.args.first())),
-            // A wrapper's parameter: read at each caller.
             Some(Value::Ref(_)) => return None,
             _ => None,
         },
@@ -284,7 +235,6 @@ fn queue_url(a: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
     Some(vec![queue_name(url.flatten())?])
 }
 
-/// The calls of a builder chain, outermost first.
 fn steps(top: &Invocation) -> impl Iterator<Item = &Invocation> {
     std::iter::successors(Some(top), |step| match step.receiver.as_deref() {
         Some(Value::Call(next)) => Some(next),
@@ -292,12 +242,6 @@ fn steps(top: &Invocation) -> impl Iterator<Item = &Invocation> {
     })
 }
 
-/// The streams of a Redis group read, read whole (`Expand::Chain`): the keys of a
-/// `Map.of(key, id, ..)`, `Map.entry(key, id)` or `Collections.singletonMap(key, id)` (Jedis)
-/// and of each `XReadArgs.StreamOffset.from(key, ..)`, `lastConsumed(key)` or `latest(key)`
-/// (Lettuce); in Kotlin, with `map_of`, the keys of a standard `mapOf(key to id, ..)` too, an
-/// entry written any other way being an unresolved stream. One unresolved stream when none is
-/// written so, unless an argument is a wrapper's parameter.
 fn streams(a: &[Value], map_of: bool) -> Option<Vec<Option<String>>> {
     let [Value::Call(call)] = a else {
         return Some(vec![None]);
@@ -312,7 +256,6 @@ fn streams(a: &[Value], map_of: bool) -> Option<Vec<Option<String>>> {
                 Some(Value::External(s)) if one(s, |s| s == class).is_some())
         };
         if map_of && made.receiver.is_none() && made.callee == "mapOf" {
-            // The pack reads an entry `k to v` as its key `k`; any other entry is no key.
             for entry in &made.args {
                 names.push(channel_name(entry)?);
             }
@@ -342,20 +285,12 @@ fn streams(a: &[Value], map_of: bool) -> Option<Vec<Option<String>>> {
     Some(names)
 }
 
-/// Whether `target` is a class of the repository.
 fn is_class(code: &Code, target: Target) -> bool {
     (code.files()[target.path].defs.iter()).any(|d| d.name == target.name && d.kind == Kind::Class)
 }
 
-/// Whether the argument at `at` of `call`, as written, is of the outside type `class`: what
-/// picks the overload of `convertAndSend`. `Some(false)` for a literal, a `new` of another type
-/// and a name the source writes another type for; `None` (either overload) for a lambda (Java's
-/// is unknown, Kotlin's a function), a call, a name with no written type and any expression the
-/// pack cannot read.
 fn of<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, at: usize, class: &str) -> Option<bool> {
     let spelled = match call.args.get(at)? {
-        // Kotlin writes a `new` as a call by the type's name: of the repository or outside; a
-        // function's result (`buildMpp()`) is not told.
         Value::Call(made) if kotlin(path) && made.receiver.is_none() => {
             let ty = made.callee.rsplit('.').next().unwrap_or(&made.callee);
             if !ty.starts_with(char::is_uppercase) {
@@ -378,12 +313,6 @@ fn of<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, at: usize, class: &str
     Some(one(&spelled, |s| s == class).is_some())
 }
 
-/// What a `RabbitTemplate.convertAndSend` reads, by its overload: `(exchange, routingKey,
-/// message, ..)`, or `(routingKey, message)`, `(routingKey, message, correlation)` and
-/// `(routingKey, message, postProcessor, ..)` to
-/// the template's exchange (the default one, unless the module's configuration names one).
-/// `(message)` and `(message, postProcessor)` use the template's routing key, and an overload
-/// the arguments do not tell, an unresolved producer.
 #[expect(clippy::type_complexity)]
 fn rabbit<'a>(
     code: &Code<'a>,
@@ -392,10 +321,6 @@ fn rabbit<'a>(
     config: Option<&Properties>,
 ) -> Box<dyn Fn(&[Value], &Keywords) -> Option<(Option<String>, Option<String>)>> {
     let post = |at| of(code, path, call, at, AMQP_POST_PROCESSOR);
-    // Whether the exchange is the first argument; `None` for no routing key the call gives. The
-    // third argument tells: a `MessagePostProcessor` is `(routingKey, message, postProcessor,
-    // ..)`, a `CorrelationData` `(routingKey, message, correlation)` unless a
-    // `MessagePostProcessor` before it makes it `(message, postProcessor, correlation)`.
     let exchanged = match call.args.len() {
         2 => (post(1) == Some(false)).then_some(false),
         3.. => match (post(2), of(code, path, call, 2, CORRELATION_DATA)) {
@@ -420,11 +345,6 @@ fn rabbit<'a>(
     Box::new(move |a, _| Some((exchange.clone(), channel_name(a.first()?)?)))
 }
 
-/// The argument of a `JmsTemplate` call that names its destination, by its overload: the first
-/// of `send(destination, creator)`, `convertAndSend(destination, message)` and
-/// `convertAndSend(destination, message, postProcessor)`. `None` for one that sends to the
-/// template's default destination (`send(creator)`, `convertAndSend(message)`,
-/// `convertAndSend(message, postProcessor)`) or that the arguments do not tell.
 fn jms<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, method: &str) -> Option<usize> {
     let named = match (method, call.args.len()) {
         ("send", 2) | ("convertAndSend", 3) => true,
@@ -434,10 +354,6 @@ fn jms<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, method: &str) -> Opti
     named.then_some(0)
 }
 
-/// The binding `BindingBuilder.bind(queue).to(exchange).with(key)` at `n` of `path`, read whole
-/// (`Expand::Chain`): the queue and the exchange as their `new` writes them (`QUEUES`,
-/// `EXCHANGES`), through constants, `final` fields and a wrapper's arguments. A queue or an
-/// exchange made any other way (a `@Bean` method's parameter, a builder) leaves it unread.
 fn binding<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -445,13 +361,10 @@ fn binding<'a>(
     starts: &OnceCell<HashMap<(usize, usize), &'a Call>>,
     inject: &Inject<'a, '_>,
 ) -> Vec<Message> {
-    // What the kept facts rule out is ruled out before the call's values are read: `Code::call`
-    // parses the file again on a refresh.
     let calls = &code.files()[path].calls;
     let on = |call: &Call| call.on.and_then(|at| calls.get(at));
     let kotlin = kotlin(path);
     if kotlin {
-        // The Kotlin pack gives no call `Call::on`: the chain is checked as it is read.
         if calls[n].callee != "(call_expression).with" {
             return Vec::new();
         }
@@ -483,7 +396,6 @@ fn binding<'a>(
             made(to.args.first(), EXCHANGES, kotlin)?,
             channel_name(with.args.first()?)?,
         );
-        // A direct exchange routes by the key as written.
         let direct = matches!(constructed(to.args.first(), kotlin),
             Some((ty, _)) if ty.rsplit('.').next() == Some("DirectExchange"));
         match found.2.as_deref() {
@@ -494,9 +406,6 @@ fn binding<'a>(
     bind_with(code, Expand::Chain(path, n), Some(inject), &read)
 }
 
-/// Whether the steps `to` and `bind` of a Kotlin chain are `BindingBuilder.bind(..).to(..)`: the
-/// pack gives no `Call::on`, so the first call of the chain is found by its range among the
-/// file's calls (`starts`) and asked for the name it spells.
 fn binds<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -518,13 +427,10 @@ fn binds<'a>(
         })
 }
 
-/// Whether a routing key holds a word a topic exchange reads as a wildcard (`*`, `#`).
 fn wildcard(key: &str) -> bool {
     key.split('.').any(|w| w == "*" || w == "#")
 }
 
-/// What `value` constructs: the type and the arguments of a `new` and, in Kotlin (which writes
-/// no `new`), of a call by the type's name.
 fn constructed(value: Option<&Value>, kotlin: bool) -> Option<(&str, &[Value])> {
     match value {
         Some(Value::New(ty, args)) => Some((ty, args)),
@@ -533,8 +439,6 @@ fn constructed(value: Option<&Value>, kotlin: bool) -> Option<(&str, &[Value])> 
     }
 }
 
-/// The name a `new` of one of `types` (by its last segment) gives as its first argument: `None`
-/// while it is a wrapper's parameter.
 fn made(value: Option<&Value>, types: &[&str], kotlin: bool) -> Option<Option<String>> {
     match constructed(value, kotlin) {
         Some((ty, args)) if types.contains(&ty.rsplit('.').next().unwrap_or(ty)) => {
@@ -545,13 +449,10 @@ fn made(value: Option<&Value>, types: &[&str], kotlin: bool) -> Option<Option<St
     }
 }
 
-/// The text of a folded annotation value, its placeholders resolved against `config`; `None`
-/// when it is no literal (`jvm::spring::resolved`).
 fn text(value: &Value, config: Option<&Properties>) -> Option<String> {
     channel_name(&spring::resolved(value, config)).flatten()
 }
 
-/// The items of an array element, or the one value written in its place.
 fn items(value: &Value) -> Vec<&Value> {
     match value {
         Value::List(items) => items.iter().collect(),
@@ -559,9 +460,6 @@ fn items(value: &Value) -> Vec<&Value> {
     }
 }
 
-/// The elements of the array the argument `key` of the annotation `call` holds, as written: the
-/// items of `[..]` or `{..}`, the arguments of Kotlin's `arrayOf(..)` (the standard library's,
-/// not a function of the repository by that name), or the one value written in their place.
 fn array<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, key: &str) -> Vec<&'a Value> {
     match call.keyword(key) {
         Some(value) => match array_of(code, path, &call.scope, value) {
@@ -572,7 +470,6 @@ fn array<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, key: &str) -> Vec<&
     }
 }
 
-/// The element `key` of an annotation written as an element value (see the module).
 fn element<'v>(annotation: &'v Value, key: &str) -> Option<&'v Value> {
     let Value::New(_, args) = annotation else {
         return None;
@@ -583,16 +480,11 @@ fn element<'v>(annotation: &'v Value, key: &str) -> Option<&'v Value> {
     elements.iter().find(|(k, _)| k == key).map(|(_, v)| v)
 }
 
-/// The name of a nested `@Queue` or `@Exchange`: its `value` or its `name`; `None` for an
-/// anonymous queue, which the broker names.
 fn named(annotation: &Value, config: Option<&Properties>) -> Option<String> {
     let given = element(annotation, "value").or(element(annotation, "name"))?;
     text(given, config).filter(|n| !n.is_empty())
 }
 
-/// The type of the `@Exchange` written as `exchange` in the annotation `call` of `path`: its
-/// `type`, a string or a member of Spring's `ExchangeTypes` (lower-cased, as its value is), and
-/// `direct` without one; `None` when it cannot be read.
 fn exchange_type<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -613,9 +505,6 @@ fn exchange_type<'a>(
     text(&code.value(path, &call.scope, written), config)
 }
 
-/// The sides the listener annotation `listener` at `n` of `path` gives the method `target`: a
-/// consumer per topic, queue or destination it names, and for `@RabbitListener` a binding per
-/// key of each `@QueueBinding`. One unresolved consumer when it names none it can read.
 fn listen<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -624,12 +513,10 @@ fn listen<'a>(
     listener: &str,
     config: Option<&Properties>,
 ) -> Vec<Message> {
-    // The index keeps no argument: they come from the full facts of the file.
     let Some(call) = code.call(path, n) else {
         return Vec::new();
     };
     let folded = |key: &str| call.keyword(key).map(|v| code.value(path, &call.scope, v));
-    // The elements of an array argument, each folded: an item that folds to an array holds more.
     let all = |key: &str| -> Vec<Value> {
         let fold = |v: &'a Value| code.value(path, &call.scope, v);
         let folded: Vec<Value> = array(code, path, call, key).into_iter().map(fold).collect();
@@ -681,9 +568,6 @@ fn listen<'a>(
                 };
                 let kind = element(written, "exchange")
                     .and_then(|e| exchange_type(code, path, call, e, config));
-                // The keys the exchange routes by: a direct or fanout exchange reads a key as
-                // written, a headers or custom one reads none, and one whose type is not read
-                // follows topic rules.
                 let routes = |key: &String| match kind.as_deref() {
                     None | Some("topic") => true,
                     Some("direct" | "fanout") => !wildcard(key),
@@ -730,9 +614,6 @@ mod tests {
     const KOTLIN: &str = "api/src/main/kotlin/a/C.kt";
     const CONFIG: &str = "api/src/main/resources/application.properties";
 
-    /// The messages of the class body `body` in `MODULE` (with the imports `imports`), the
-    /// other files of the repository and the module's `application.properties`, as lines
-    /// (`message::lines`), handlers without the file.
     fn sides(imports: &str, body: &str, others: &[(&str, &str)], config: &str) -> Vec<String> {
         let src = format!("package a;\n{imports}\nclass C {{\n{body}\n}}\n");
         let mut parsed = vec![(MODULE, Java.parse(MODULE, src.as_bytes()).unwrap())];
@@ -742,8 +623,6 @@ mod tests {
         lines(&parsed, MODULE, config)
     }
 
-    /// `sides` for Kotlin: `body` after `imports` in `a/C.kt`, which Java's resolver reads with
-    /// the Java files (`others`, by extension).
     fn kt(imports: &str, body: &str, others: &[(&str, &str)], config: &str) -> Vec<String> {
         use crate::lang::kotlin::Kotlin;
         let src = format!("package a\n{imports}\n{body}\n");
@@ -840,8 +719,6 @@ mod tests {
         );
     }
 
-    /// A listener's annotation in a class whose base comes from outside the repository is read
-    /// through the imports: a field of the base is no annotation (#354).
     #[test]
     fn a_listener_in_a_class_with_an_outside_base_has_a_handler() {
         let imports = format!("{KAFKA}import com.corp.shared.Base;\n");
@@ -856,9 +733,6 @@ mod tests {
         );
     }
 
-    /// A repository's `KafkaListener` or `KafkaTemplate` (in the same package, or through an
-    /// on-demand import of a repository package beside Spring's) is no Spring Kafka's; a
-    /// listener on a class is not read.
     #[test]
     fn a_kafka_name_that_is_not_springs_makes_no_side() {
         let others = [
@@ -877,7 +751,6 @@ mod tests {
         let spring = "import org.springframework.kafka.annotation.*;\n\
             import org.springframework.kafka.core.*;\n";
         assert!(sides(spring, body, &others, "").is_empty());
-        // An annotation type of the package hides Spring's annotation as a class does.
         let annotation = [(
             "api/src/main/java/a/KafkaListener.java",
             "package a;\npublic @interface KafkaListener { String[] topics(); }\n",
@@ -899,7 +772,6 @@ mod tests {
         );
         let body = "@KafkaListener(topics = \"orders.paid\") class Inner {}";
         assert!(read(KAFKA, body).is_empty());
-        // A parameter hides the field of the same name.
         let body = "KafkaTemplate<String, String> kafka;\n\
             void f(Local kafka) { kafka.send(\"orders.paid\", \"m\"); }";
         assert!(read(KAFKA, body).is_empty());
@@ -914,9 +786,6 @@ mod tests {
         import org.springframework.amqp.core.BindingBuilder;\n\
         import org.springframework.amqp.core.TopicExchange;\n";
 
-    /// `(exchange, key, message)` publishes to the exchange; `(key, message)` and `(key,
-    /// message, postProcessor)` to the default exchange, which is the queue the key names; an
-    /// overload the arguments do not tell, or the template's own key, is unresolved.
     #[test]
     fn a_rabbit_template_publishes_by_its_overload() {
         let body = "RabbitTemplate rabbit;\n\
@@ -942,9 +811,6 @@ mod tests {
         );
     }
 
-    /// A `CorrelationData` at the third place is `(routingKey, message, correlation)`, unless a
-    /// `MessagePostProcessor` before it makes it `(message, postProcessor, correlation)`; with
-    /// four and five arguments the third place decides as with three.
     #[test]
     fn a_correlation_data_takes_the_routing_key_form() {
         let imports =
@@ -970,8 +836,6 @@ mod tests {
         );
     }
 
-    /// A call, or a name the source writes no type for, may be a `MessagePostProcessor`: the
-    /// overload is not told, so the producer is unresolved.
     #[test]
     fn an_argument_of_unknown_type_does_not_tell_the_overload() {
         let body = "static final String PAYLOAD = \"p\";\n\
@@ -990,7 +854,6 @@ mod tests {
         );
     }
 
-    /// A parameter of a class of the repository is the message.
     #[test]
     fn a_message_of_a_repository_type_tells_the_overload() {
         let body = "class JOrder {}\n\
@@ -1005,9 +868,6 @@ mod tests {
         );
     }
 
-    /// An `@Exchange` is `direct` unless its `type` says otherwise, and a `DirectExchange`
-    /// routes by the key as written: a wildcard key binds only on a topic exchange (or one whose
-    /// type is not read), and a headers exchange routes by no key.
     #[test]
     fn a_wildcard_key_binds_only_on_a_topic_exchange() {
         let imports = format!(
@@ -1039,7 +899,6 @@ mod tests {
         );
     }
 
-    /// The exchange Spring Boot gives its template is where a routing key alone publishes.
     #[test]
     fn a_configured_template_exchange_takes_a_routing_key_alone() {
         let body = "RabbitTemplate rabbit;\n\
@@ -1133,8 +992,6 @@ mod tests {
         import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;\n\
         import org.springframework.beans.factory.annotation.Value;\n";
 
-    /// The queue is the last segment of the request's `queueUrl`; a polling consumer's handler
-    /// is the method that names the queue, wherever the receive loop runs.
     #[test]
     fn an_sqs_client_sends_and_receives_on_the_queue_its_url_names() {
         let body = "static final String URL = \"https://sqs.us-east-1.amazonaws.com/123/orders\";\n\
@@ -1156,7 +1013,6 @@ mod tests {
                 "sqs orders consumer a.C.run()",
             ]
         );
-        // A builder held in a local that receives another call names no queue.
         let body = "SqsClient sqs;\n\
             void send() {\n\
             var b = SendMessageRequest.builder().queueUrl(\"https://sqs/1/old\");\n\
@@ -1220,8 +1076,6 @@ mod tests {
         );
     }
 
-    /// A name a wrapper takes as its parameter is read at each caller, whose method handles
-    /// what a polling client receives.
     #[test]
     fn a_wrapper_parameter_is_read_at_each_caller() {
         let body = "Connection nc;\n\
@@ -1264,7 +1118,6 @@ mod tests {
         );
     }
 
-    /// A request a wrapper takes as its parameter is read at each caller.
     #[test]
     fn an_sqs_request_a_wrapper_takes_is_read_at_each_caller() {
         let body = "SqsClient sqs;\n\
@@ -1273,8 +1126,6 @@ mod tests {
         assert_eq!(read(SQS, body), ["sqs shipments producer"]);
     }
 
-    /// A declared client is the SDK's through the imports alone: a repository type of that
-    /// name hides it.
     #[test]
     fn a_repository_type_named_like_the_sqs_client_hides_it() {
         let body = "static class SqsClient { void sendMessage(Object request) {} }\n\
@@ -1283,8 +1134,6 @@ mod tests {
         assert!(read(SQS, body).is_empty());
     }
 
-    /// A parameter or a typed local declared with the SDK's SQS client type is a client
-    /// whatever made it, also through a plain alias.
     #[test]
     fn a_declared_sqs_client_is_read_through_an_alias() {
         let body = "void send(SqsClient conduit, foreign.Factory opaque) {\n\
@@ -1299,9 +1148,6 @@ mod tests {
         );
     }
 
-    /// A wrapper reached only by a name match (a call on a receiver whose type the source does
-    /// not tell) is read where it stands, its parameter unknown: the caller's argument never
-    /// names the channel.
     #[test]
     fn a_wrapper_reached_by_a_name_match_feeds_no_channel() {
         let body = "Connection nc;\n\
@@ -1310,9 +1156,6 @@ mod tests {
         assert_eq!(read(NATS, body), ["nats unresolved producer"]);
     }
 
-    /// The Kotlin forms of a template, a listener, a binding and a client, written as the Java
-    /// pack's are (spec #27, #104): named arguments, array literals and `arrayOf`, string
-    /// templates, `const val` names and a constructor-injected template.
     const KT_KAFKA: &str = "import org.springframework.kafka.core.KafkaTemplate\n\
         import org.springframework.kafka.annotation.KafkaListener\n\
         import org.springframework.kafka.annotation.TopicPartition\n\
@@ -1365,9 +1208,6 @@ mod tests {
         );
     }
 
-    /// What a Kotlin file does not say is not read (the probes): a name of the repository that
-    /// Spring's hides, a type no import binds, a parameter or a local that hides the template, a
-    /// listener in a class with an outside base, `arrayOf` and `mapOf` of the repository.
     #[test]
     fn a_kotlin_name_that_is_not_springs_makes_no_side() {
         let own = [
@@ -1387,12 +1227,10 @@ mod tests {
             import org.springframework.kafka.core.*\n";
         assert!(kt(spring, body, &own, "").is_empty());
         assert_eq!(kt(spring, body, &[], "").len(), 2);
-        // An outside class with a channel-like method and no import evidence is none.
         let body = "class C(private val kafka: Client, private val other: Other) {\n\
             fun f() { kafka.send(\"orders.paid\", \"m\"); other.publish(\"orders.paid\", \"m\") }\n}";
         let imports = "import com.corp.shared.Client\nimport com.corp.shared.Other\n";
         assert!(kt(imports, body, &[], "").is_empty());
-        // A parameter or a local of another type hides the property of the same name.
         let body = "class C(private val kafka: KafkaTemplate<String, String>) {\n\
             fun f(kafka: Local) { kafka.send(\"orders.paid\", \"m\") }\n\
             fun g() { val kafka = Local(); kafka.send(\"orders.paid\", \"m\") }\n\
@@ -1401,7 +1239,6 @@ mod tests {
             kt(KT_KAFKA, body, &[], ""),
             ["kafka orders.shipped producer"]
         );
-        // A class whose base is outside hides no import from its annotations.
         let imports = format!("{KT_KAFKA}import com.corp.shared.Base\n");
         let body = "class Based : Base() { @KafkaListener(topics = [\"t\"]) fun on(m: String) {} }\n\
             class Own { @KafkaListener(topics = [\"t\"]) fun on(m: String) {} }";
@@ -1412,7 +1249,6 @@ mod tests {
                 "kafka t consumer a.Own.on(String)"
             ]
         );
-        // An `arrayOf` of the repository is no array of the annotation.
         let own = [(
             "api/src/main/kotlin/a/Own.kt",
             "package a\nfun arrayOf(vararg s: String): Array<String> = emptyArray()\n",
@@ -1514,8 +1350,6 @@ mod tests {
         );
     }
 
-    /// A message the call constructs is of a type, as Java's `new Order()`: a class of the
-    /// repository or an outside one is no post-processor, a function's result may be.
     #[test]
     fn a_kotlin_message_constructed_in_the_call_picks_the_overload() {
         let imports = format!(
@@ -1626,7 +1460,6 @@ mod tests {
                 "redis e consumer a.C.run()",
             ]
         );
-        // A `mapOf` of the repository is no standard map: its keys are no streams.
         let own = [(
             "api/src/main/kotlin/a/Own.kt",
             "package a\nfun mapOf(vararg s: Pair<String, StreamEntryID>): Map<String, StreamEntryID> = emptyMap()\n",
@@ -1643,8 +1476,6 @@ mod tests {
         );
     }
 
-    /// A call on an implicit receiver (an extension function of the template, `apply` and `with`
-    /// blocks) names no receiver whose written type the reader could ask: it makes no side.
     #[test]
     fn a_kotlin_call_on_an_implicit_receiver_makes_no_side() {
         let body = "fun KafkaTemplate<String, String>.publish(topic: String, v: String) { send(topic, v); this.send(topic, v) }\n\
@@ -1653,11 +1484,6 @@ mod tests {
         assert!(kt(KT_KAFKA, body, &[], "").is_empty());
     }
 
-    /// A member of an implicit receiver comes before the names around it (Kotlin's resolution
-    /// order): inside `with(h)`, `h.run`, `h.apply` and an extension of `Holder`, `kafka` is the
-    /// property of `Holder` when the repository's class has one, and unknown when the receiver's
-    /// type is not the repository's; only a repository class without the member lets the lookup
-    /// reach the property of the class around.
     #[test]
     fn a_member_of_an_implicit_receiver_hides_the_template() {
         let body = "class Holder(val kafka: Other)\n\
@@ -1683,8 +1509,6 @@ mod tests {
         );
     }
 
-    /// Many annotated methods are read in time linear in their number: a method's annotation
-    /// is asked whether it is a listener's before its method is looked up.
     #[test]
     fn many_annotated_methods_are_read_in_linear_time() {
         let time = |n: usize| {
@@ -1716,13 +1540,9 @@ mod tests {
                 .unwrap()
         };
         let (small, large) = (time(8000), time(32000));
-        // Linear is about 4x; reading every method per annotation would be about 16x.
         assert!(large < small * 9, "{small:?} then {large:?}");
     }
 
-    /// Many binding chains in a Kotlin file are read in time linear in their number: the pack
-    /// gives no `Call::on`, so the first call of each chain is found among the file's calls by
-    /// its range, through a map built once.
     #[test]
     fn many_kotlin_binding_chains_are_read_in_linear_time() {
         use crate::lang::kotlin::Kotlin;
@@ -1757,12 +1577,9 @@ mod tests {
                 .unwrap()
         };
         let (small, large) = (time(500), time(2000));
-        // Linear is about 4x; finding each chain's start among the calls would be about 16x.
         assert!(large < small * 9, "{small:?} then {large:?}");
     }
 
-    /// An annotation written as an element value is its name and its elements, the unnamed one
-    /// as `value`.
     #[test]
     fn the_pack_reads_a_nested_annotation_as_its_name_and_elements() {
         let src = "package a;\nclass C {\n\
@@ -1786,7 +1603,6 @@ mod tests {
         let call = facts.calls.iter().find(|c| c.decorates.is_some()).unwrap();
         assert!(matches!(call.keyword("q"), Some(Value::New(n, args))
             if n == "Queue" && matches!(args.as_slice(), [Value::Object(e)] if e.is_empty())));
-        // Nesting past the pack's value depth ends in an unknown value.
         let deep = format!("{}1{}", "@A(x = ".repeat(200), ")".repeat(200));
         let src = format!("package a;\nclass C {{\n{deep} void f() {{}}\n}}\n");
         let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();

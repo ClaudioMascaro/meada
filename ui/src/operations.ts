@@ -1,7 +1,6 @@
 import type { OperationsCopy } from './operations-i18n';
 import type { GithubGrant } from './api';
 
-/** A large integer remains decimal text at the HTTP boundary. */
 export type Integer = number | string;
 export interface Missing { requires: string[] }
 export interface Pointer { id: string; fence: Integer }
@@ -110,28 +109,22 @@ export function credentialsModel(data: Credentials | Missing, t: OperationsCopy)
   };
 }
 
-/** With `[accounts]` (#558): how the console signs in and its public key's fingerprint. */
 export interface LocalAdmission { mode: 'accounts' | 'break_glass'; public_key: string }
-/** The identity provider's admission, with `[accounts]` under break glass beside it. */
 export interface OidcAdmission {
   type: string; issuer: string; metadata: unknown; jwks_uri: string; keys: (string | null)[]; refreshed: string;
   failed: { time: string; reason: string } | null; identities_claim: string; groups_claim: string | null;
   groups: Record<string, string[]> | null; scopes: string[];
-  /** With `[directory]`: its counts and the last SCIM write; null when it could not be read. */
   directory?: { users: number; groups: number; last_write: string | null } | null;
-  /** With `[oidc.github]`: the grant provider's settings, the grant's state and the newest permissions set as loaded, its counts the job's. */
   github?: {
     host: string; login_claim: string; roles: string[]; max_age_seconds: number; grant: GithubGrant;
     set: { id: string; finished: string; age_seconds: number; repositories: number; rows: number; exclusions: number } | null;
   };
   accounts?: LocalAdmission;
 }
-/** Local accounts alone (#558): the mode, the key, the groups table bounded by the session's grant. */
 export interface AccountsAdmission {
   accounts: LocalAdmission; groups: Record<string, string[]> | null; github?: OidcAdmission['github'];
 }
 export type Admission = OidcAdmission | AccountsAdmission;
-/** Whether `data` is the identity provider's admission, rather than local accounts' alone. */
 export function isOidcAdmission(data: Admission): data is OidcAdmission {
   return 'issuer' in data;
 }
@@ -156,7 +149,6 @@ function githubRows(github: OidcAdmission['github'], t: OperationsCopy): [string
     ] as [string, string][],
   ];
 }
-/** The admission page's fields: the identity provider's type beside the issuer, then the JWKS cache and the claims, local accounts, the directory and the GitHub grant provider; with local accounts alone, their mode and key, and the GitHub grant provider. */
 export function admissionModel(data: Admission, t: OperationsCopy): [string, string][] {
   if (!isOidcAdmission(data)) return [...localRows(data.accounts, t), ...githubRows(data.github, t)];
   return [
@@ -171,7 +163,6 @@ export function admissionModel(data: Admission, t: OperationsCopy): [string, str
 export interface CheckResult {
   checks: Record<'signature' | 'issuer' | 'audience' | 'lifetime' | 'scopes', boolean | null>;
   identities: string[] | null;
-  /** With `[oidc.github]`: the admitted identities by side, each sorted; null when a check failed. */
   sources?: { claims: '*' | string[]; github: string[] } | null;
 }
 export function checkModel(data: CheckResult, t: OperationsCopy) {

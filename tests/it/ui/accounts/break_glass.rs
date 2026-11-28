@@ -1,22 +1,12 @@
-//! Break glass (#563, ADR 0024): `[accounts] break_glass = true` beside `[oidc]`. Only the default
-//! account signs in to the console, as the global operator, and its session token is admitted
-//! beside the identity provider's, each bearer routed to one verifier by its issuer. The section
-//! rules and the start check need no service; the sign-in runs against the local Postgres of
-//! `MEADA_TEST_POSTGRES_URL` and skips without it.
-
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 
 use super::*;
 use crate::oidc::{Issuer, key, set, sign};
 
-/// The nodes' public URL, which `[oidc] public_url` names.
 const NODES: &str = "https://meada.example";
-/// The identity provider's subject of every token here.
 const SUBJECT: &str = "alice-563";
-/// The boolean claim that makes an identity provider's token the global operator's.
 const OPERATOR_CLAIM: &str = "meada_operator";
 
-/// `[oidc]` for `issuer`.
 fn oidc(issuer: &str) -> String {
     format!(
         "\n[oidc]\nissuer = \"{issuer}\"\npublic_url = \"{NODES}\"\n\
@@ -24,13 +14,10 @@ fn oidc(issuer: &str) -> String {
     )
 }
 
-/// `[accounts]` under break glass, over `keys`' files, the initial password read from
-/// `ADMIN_ENV`.
 fn break_glass_section() -> String {
     section() + "break_glass = true\n"
 }
 
-/// `[ui]` of an OIDC console with operations and its operator claim.
 fn ui_oidc() -> String {
     ui_section()
         + &format!(
@@ -38,10 +25,6 @@ fn ui_oidc() -> String {
         )
 }
 
-/// Each break-glass rule names its sections or its key: `break_glass` needs `[oidc]`, and
-/// `[accounts]` beside `[oidc]` without it is still the error naming both; the grant tables cannot
-/// sit under it. With `[oidc]` the section is accepted: `status` reads the manifest and stops at
-/// the Postgres it cannot reach.
 #[test]
 fn break_glass_needs_oidc_and_refuses_the_grant_tables() {
     let postgres = "\n[postgres]\nurl_env = \"MEADA_TEST_NO_POSTGRES_563\"\n";
@@ -75,7 +58,6 @@ fn break_glass_needs_oidc_and_refuses_the_grant_tables() {
             "`accounts.github`: [accounts.github] cannot sit under `break_glass = true`",
         ),
     ] {
-        // Without `[oidc]`, `[ui]` names no operator claim, which needs it.
         let ui = match head.contains("[oidc]") {
             true => ui_oidc(),
             false => ui_section(),
@@ -94,9 +76,6 @@ fn break_glass_needs_oidc_and_refuses_the_grant_tables() {
     assert!(!both.contains("accounts"), "{both}");
 }
 
-/// Under break glass a bearer's issuer picks its verifier, so the identity provider's issuer must
-/// not be the console's own `public_url`: the start is refused naming the key, before any account
-/// or key is read.
 #[test]
 fn the_console_refuses_an_identity_provider_issuing_as_itself() {
     let (_, jwk) = key("k1");
@@ -119,24 +98,18 @@ fn the_console_refuses_an_identity_provider_issuing_as_itself() {
         ),
         "{stderr}"
     );
-    // Refused before the key pair is read: no key file exists here.
     assert!(!stderr.contains("public_key_file"), "{stderr}");
 }
 
-/// An OIDC console with break glass over a Postgres schema of `case`'s own, running.
 struct BreakGlass {
     audit: Audited,
     console: Server,
     keys: (String, String),
     issuer: Issuer,
-    /// The identity provider's signing key, `k1`.
     signing: EncodingKey,
-    /// The default account's generated first password.
     first: String,
 }
 
-/// The console of `case`: `[oidc]` over a loopback issuer, `[accounts]` under break glass,
-/// `operations = true`.
 fn break_glass_console(case: &'static str) -> Option<BreakGlass> {
     let (signing, jwk) = key("k1");
     let issuer = Issuer::new(set(&[&jwk]));
@@ -163,7 +136,6 @@ fn break_glass_console(case: &'static str) -> Option<BreakGlass> {
 }
 
 impl BreakGlass {
-    /// A console token of the identity provider, `operator` by its boolean claim, with `edit`.
     fn identity_provider(&self, operator: bool, edit: impl FnOnce(&mut Value)) -> String {
         let mut claims = json!({
             "iss": self.issuer.base, "aud": PUBLIC, "sub": SUBJECT,
@@ -174,7 +146,6 @@ impl BreakGlass {
         sign(&self.signing, "k1", Algorithm::ES256, &claims)
     }
 
-    /// A token signed with the console's own key: a session token of `subject` by default.
     fn meada(&self, subject: &str, edit: impl FnOnce(&mut Value)) -> String {
         let now = jsonwebtoken::get_current_timestamp();
         let mut claims = json!({
@@ -187,17 +158,6 @@ impl BreakGlass {
     }
 }
 
-/// The demo: with the identity provider's tokens still admitted, the default account signs in
-/// with the first password the console generated, changes its password and is the global
-/// operator, reaching a pointer recovery; a colleague's local account, and every other username,
-/// gets the wrong password's 401, recorded `not_break_glass`. Account administration, agent
-/// tokens and login verification answer 404. A bearer reaches one verifier by its issuer: a token
-/// of the console's issuer signed by the identity provider, one of the identity provider's issuer
-/// signed by the console's key, a colleague's session token from before the switch and a token
-/// for another surface are all 401s, and an identity provider's session gets the password
-/// change's 404. With the identity
-/// provider's keys unreachable, the default account still signs in. No answer, record or stderr
-/// line holds a password, a hash or a token.
 #[test]
 fn the_break_glass_account_signs_in_beside_the_identity_provider() {
     let Some(glass) = break_glass_console("accounts_break_glass") else {
@@ -216,7 +176,6 @@ fn the_break_glass_account_signs_in_beside_the_identity_provider() {
     );
     assert_eq!(document["issuer"], json!(glass.issuer.base));
 
-    // The identity provider's tokens: a viewer's and an operator's sessions, unchanged.
     let viewer = glass.identity_provider(false, |_| {});
     let session = ask(console, "/api/v1/session", &viewer);
     assert_eq!(session.status, 200, "{}", session.body);
@@ -231,8 +190,6 @@ fn the_break_glass_account_signs_in_beside_the_identity_provider() {
     let missing = get(console, "/api/v1/session");
     assert_eq!(missing.status, 401);
 
-    // The default account: its first password opens the password change alone, then the global
-    // operator.
     let first = login(console, "admin", generated);
     let changing = token(&first);
     assert_eq!(first.json()["change_required"], true);
@@ -247,7 +204,6 @@ fn the_break_glass_account_signs_in_beside_the_identity_provider() {
                "account": true})
     );
     assert_eq!(ask(console, "/api/v1/manifest", &operator).status, 200);
-    // The admission view is the identity provider's, with break glass's mode and key (#558).
     let admission = ask(console, "/api/v1/admission", &operator).json();
     assert_eq!(admission["issuer"], json!(glass.issuer.base), "{admission}");
     assert_eq!(admission["accounts"]["mode"], "break_glass", "{admission}");
@@ -256,7 +212,6 @@ fn the_break_glass_account_signs_in_beside_the_identity_provider() {
     let again = login(console, "admin", CHANGED);
     assert_eq!(again.json()["change_required"], false);
 
-    // A colleague's local account, an unknown username and a wrong password: the same 401.
     glass.audit.admin.run(&format!(
         "INSERT INTO \"{0}\".accounts (username, password_hash, role, change_required) SELECT \
          'colleague', password_hash, 'operator', false FROM \"{0}\".accounts WHERE username = \
@@ -270,7 +225,6 @@ fn the_break_glass_account_signs_in_beside_the_identity_provider() {
     assert_eq!(colleague.body, wrong.body);
     assert_eq!(unknown.body, wrong.body);
 
-    // Nothing else of local accounts exists.
     for (method, route) in [
         ("GET", "accounts"),
         ("POST", "accounts"),
@@ -290,8 +244,6 @@ fn the_break_glass_account_signs_in_beside_the_identity_provider() {
         );
     }
 
-    // A pointer recovery: authorized as the global operator and recorded as its subject, whatever
-    // the fleet then says.
     #[cfg(feature = "refresh-lock")]
     {
         let recover = post(console, "fence/recover", Some(&operator), "{}");
@@ -304,7 +256,6 @@ fn the_break_glass_account_signs_in_beside_the_identity_provider() {
         replies.push(recover);
     }
 
-    // One verifier per issuer.
     let crossed = [
         (
             "the console's issuer, the identity provider's key",
@@ -347,14 +298,11 @@ fn the_break_glass_account_signs_in_beside_the_identity_provider() {
         200
     );
 
-    // An identity provider's session has no password here: the change is not its route.
     let body = json!({"current": CHANGED, "new": "another long password"}).to_string();
     let foreign = post(console, "account/password", Some(&viewer), &body);
     assert_eq!(refusal(&foreign), (404, "not_found".into()));
     replies.push(foreign);
 
-    // The identity provider's keys unreachable: a token of a key the console has not cached is
-    // refused, and the break-glass account still signs in and is served.
     glass.issuer.serve(None);
     let (rotated, _) = key("k2");
     let unverifiable = sign(

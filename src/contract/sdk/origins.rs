@@ -1,5 +1,3 @@
-//! Complete, memoized constructor evidence. An opaque alternative invalidates the evidence;
-//! kind policies retain receiver-carried names without a second value-resolution walk.
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::rc::Rc;
@@ -8,8 +6,6 @@ use super::{Client, Language, go, java};
 use crate::lang::{Invocation, Value};
 use crate::resolve::{Code, Frame, Of, Target};
 
-/// Syntax-neutral evidence supplied by the contract kind. Only listed constructors and
-/// child factories can establish a handle; an unknown step is absent evidence.
 pub(crate) trait Policy<'a> {
     type Evidence: Clone + Eq + Hash;
     type Argument: Clone + Eq + Hash + Default;
@@ -38,11 +34,9 @@ pub(crate) trait Policy<'a> {
         parent: Self::Evidence,
         frames: &[Frame<'a>],
     ) -> Option<Self::Evidence>;
-    /// Legacy boolean evidence does not depend on constructor arguments.
     fn contextual(&self) -> bool {
         true
     }
-    /// The identity-bearing part of an argument, for memoizing equivalent exact frames.
     fn argument(
         &self,
         _code: &Code<'a>,
@@ -75,7 +69,6 @@ struct Context<'a, E, A> {
     arguments: Vec<Argument<E, A>>,
 }
 
-/// A value visited in a context, by its index in `Evidence::contexts`, or in none.
 type Key<'a> = (&'a str, &'a str, Node<'a>, bool, Option<usize>);
 type Shared<'a, P> = Rc<Context<'a, <P as Policy<'a>>::Evidence, <P as Policy<'a>>::Argument>>;
 
@@ -85,9 +78,6 @@ pub(crate) struct Evidence<'c, 'a, P: Policy<'a>> {
     budget: usize,
     known: HashMap<Key<'a>, Option<P::Evidence>>,
     frames: Vec<Frame<'a>>,
-    /// Each context of the file's walks once, so a key names its context by index and a call
-    /// forwarding thousands of arguments is not copied into the key of every value it reads, and
-    /// the indexes of the contexts the walk is in.
     contexts: Vec<Shared<'a, P>>,
     interned: HashMap<Shared<'a, P>, usize>,
     stack: Vec<usize>,
@@ -107,7 +97,6 @@ impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
         }
     }
 
-    /// The index of `context` in `contexts`, added the first time it is met.
     fn context(&mut self, context: Context<'a, P::Evidence, P::Argument>) -> usize {
         if let Some(&at) = self.interned.get(&context) {
             return at;
@@ -134,8 +123,6 @@ impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
         if let Some(receiver) = self.code.receiver(path, index) {
             return self.value(path, scope, Of::Value(receiver), false, depth);
         }
-        // Packs without a stored receiver write an in-place receiver as a node kind.
-        // Their next same-start call is the longest proper receiver, in parse order.
         if call.callee.starts_with('(') {
             let next = self.code.files()[path].calls.get(index + 1)?;
             if next.range.start != call.range.start || next.range.end >= call.range.end {
@@ -168,7 +155,6 @@ impl<'c, 'a, P: Policy<'a>> Evidence<'c, 'a, P> {
             Of::Name(n) => Node::Name(n),
             Of::Value(Value::Call(c)) => Node::Call(c.range.start, c.range.end),
             Of::Value(Value::New(n, a)) => Node::New(n, a.as_ptr() as usize),
-            // Await has its own node: awaiting an already-awaited value is unknown.
             Of::Value(Value::Await(v)) => {
                 if awaited || depth >= crate::resolve::EVAL_DEPTH || self.budget == 0 {
                     return None;
@@ -401,7 +387,6 @@ impl<'a> Policy<'a> for Aws<'_> {
     }
 }
 
-/// Compatible boolean API for existing AWS operation tables.
 pub(super) struct Origins<'c, 'a> {
     code: &'c Code<'a>,
     language: Language,
@@ -431,12 +416,6 @@ impl<'c, 'a> Origins<'c, 'a> {
             .is_some()
     }
 
-    /// Whether the receiver of the call at `index` of `path` is declared with one of `types`, as
-    /// the SQS forms read it before constructor evidence: the type the source writes for the
-    /// field, property, parameter or local (`names::declared` in Java and Go, the type as written
-    /// in C#), through the locals bound to another name (`Code::local`; Go binds none). Neither a
-    /// call nor a name match supplies the type, and a repository type of that name hides the
-    /// SDK's.
     pub(super) fn declared(&self, path: &'a str, index: usize, types: &[&str]) -> bool {
         let Some(call) = self.code.call(path, index).filter(|_| !types.is_empty()) else {
             return false;
@@ -458,7 +437,6 @@ impl<'c, 'a> Origins<'c, 'a> {
                     return crate::names::one(&typed, known).is_some();
                 }
             } else if let Some((at, within, ty)) = self.code.written(path, scope, held) {
-                // C# keeps outside types out of `externs`: read the type as written.
                 return crate::names::known(self.code, at, within, ty, known).is_some();
             }
             match self

@@ -1,8 +1,3 @@
-//! The team operator (ADR 0015, #324): the role admission computes from the token's groups, its
-//! grant and the current workspace version, `session`'s fields, the save and apply of its teams'
-//! entries, `entries_refused` and the owners in the stderr line. Real Valkey and store, like
-//! `writes`, and the `oidc` module's loopback issuer minting tokens with chosen `groups`.
-
 use super::{PUBLIC, VERSION, ask, bearer, claims, oidc};
 use crate::generations::{Fleet, admin, prefix, send, workspace};
 use crate::manifest::MANIFEST;
@@ -25,8 +20,6 @@ pub(super) const VAULT: &str = "e.test/team/vault";
 pub(super) const DOCS: &str = "e.test/team/docs";
 pub(super) const INVOICES: &str = "e.test/team/invoices";
 
-/// Version 1: who owns what. `team-billing` reads billing, ledger, shared, joint and invoices;
-/// `team-search` reads search and joint; `team-docs` reads nothing; the vault is read by nobody.
 pub(super) const ENTRIES: [(&str, Option<&str>); 7] = [
     (BILLING, Some("team-billing")),
     (LEDGER, Some("team-billing")),
@@ -45,7 +38,6 @@ pub(super) fn entries(list: &[(&str, Option<&str>)]) -> String {
     list.iter().map(entry).collect()
 }
 
-/// The `[oidc]` of the team console: its groups table is the grant of each team.
 fn team_oidc(issuer: &str) -> String {
     let mapped = oidc(issuer)
         .split_once("[oidc.groups]")
@@ -63,17 +55,13 @@ pub(super) struct Team {
     encoding: EncodingKey,
     pub(super) issuer: Issuer,
     pub(super) console: Server,
-    /// The version applied before the console started.
     pub(super) v1: String,
 }
 
-/// A fleet whose current workspace version is `ENTRIES` (imported and applied through the CLI)
-/// and a console over its store with `operations`.
 pub(super) fn team(case: &'static str, operations: bool) -> Option<Team> {
     team_with(case, operations, &[])
 }
 
-/// `team` with more environment variables for the console.
 fn team_with(case: &'static str, operations: bool, env: &[(&str, &str)]) -> Option<Team> {
     let fleet = Fleet::new(case, 2)?;
     let (encoding, jwk) = key("team");
@@ -129,7 +117,6 @@ impl Team {
         sign(&self.encoding, "team", Algorithm::ES256, &claims)
     }
 
-    /// A token for exactly `claims`, signed by the team's key.
     #[cfg_attr(
         not(any(feature = "directory", feature = "github-app")),
         expect(dead_code)
@@ -138,7 +125,6 @@ impl Team {
         sign(&self.encoding, "team", Algorithm::ES256, claims)
     }
 
-    /// The claims `token` mints for `subject`: the base of `sign`.
     #[cfg_attr(
         not(any(feature = "directory", feature = "github-app")),
         expect(dead_code)
@@ -175,7 +161,6 @@ impl Team {
         ask(&self.console, &format!("/api/v1/{route}"), token).json()
     }
 
-    /// The current version's id, as the global operator reads it.
     fn current(&self, operator: &str) -> String {
         self.get("workspace", operator)["current"]["id"]
             .as_str()
@@ -190,13 +175,11 @@ impl Team {
             .len()
     }
 
-    /// The pointer key in Valkey.
     fn pointer(&self) -> String {
         format!("{{{}}}:workspace", prefix(self.fleet.case))
     }
 }
 
-/// The audit lines a console wrote, once it is killed.
 pub(super) fn audit(console: Server) -> Vec<String> {
     let stderr = console.stderr();
     stderr
@@ -213,9 +196,6 @@ fn refusals(reply: &Reply) -> (Value, Value) {
     (error["refused"].clone(), error["hidden"].clone())
 }
 
-/// The role is the global operator's, a team operator's or a viewer's, per request: an owning
-/// group whose grant reads the entry makes a team operator; `operations = false`, a missing
-/// or unreadable pointer, or a file workspace make a viewer; the fields follow #294's formats.
 #[test]
 fn the_session_role_follows_the_groups_the_grant_and_the_current_version() {
     let Some(team) = team("ui_team_session", true) else {
@@ -232,7 +212,6 @@ fn the_session_role_follows_the_groups_the_grant_and_the_current_version() {
     let session = team.get("session", &both);
     assert_eq!(session["role"], "team_operator");
     assert_eq!(session["teams"], json!(["team-billing", "team-search"]));
-    // Owns only an entry outside its grant, or nothing at all.
     for (subject, groups) in [("bob", &["team-docs"][..]), ("dee", &["other"][..])] {
         let session = team.get("session", &team.token(subject, groups, false));
         assert_eq!(session["role"], "viewer");
@@ -240,7 +219,6 @@ fn the_session_role_follows_the_groups_the_grant_and_the_current_version() {
         assert_eq!(session["grant"], json!([]));
         assert!(session.get("teams").is_none());
     }
-    // The global operator stays one whatever it owns.
     let operator = team.token("root", &["team-billing"], true);
     let session = team.get("session", &operator);
     assert_eq!(session["role"], "operator");
@@ -249,7 +227,6 @@ fn the_session_role_follows_the_groups_the_grant_and_the_current_version() {
         json!([BILLING, INVOICES, JOINT, LEDGER, SHARED])
     );
     assert!(session.get("teams").is_none());
-    // No pointer, a pointer to a missing document, a malformed pointer: a viewer, never a write.
     let pointer = team.pointer();
     send(&mut admin(&team.fleet.valkey), &["DEL", &pointer]);
     assert_eq!(team.get("session", &ana)["role"], "viewer");
@@ -263,7 +240,6 @@ fn the_session_role_follows_the_groups_the_grant_and_the_current_version() {
     assert_eq!(team.get("session", &ana)["role"], "viewer");
     hset(&team.v1, "2");
     assert_eq!(team.get("session", &ana)["role"], "team_operator");
-    // Operations off: everyone who is not the operator stays a viewer.
     let source = fs::read_to_string(team.fleet.dir.join("ops/console.toml")).unwrap();
     let off = source.replace("operations = true", "operations = false");
     fs::write(team.fleet.dir.join("ops/console.toml"), off).unwrap();
@@ -273,7 +249,6 @@ fn the_session_role_follows_the_groups_the_grant_and_the_current_version() {
     assert_eq!(session["groups"], json!(["eng", "team-billing"]));
 }
 
-/// With a file workspace nobody is a team operator, though the owners are recorded.
 #[test]
 fn a_file_workspace_has_no_team_operator() {
     let Some(team) = team("ui_team_file", true) else {
@@ -302,8 +277,6 @@ fn a_file_workspace_has_no_team_operator() {
     assert_eq!(post.status, 403);
 }
 
-/// A team operator sees a viewer's view: its grant bounds the versions, the team's entries
-/// outside the grant included; every role sees each entry's owner.
 #[test]
 fn a_team_operator_sees_its_grant_and_every_role_sees_the_owners() {
     let Some(team) = team("ui_team_views", true) else {
@@ -333,7 +306,6 @@ fn a_team_operator_sees_its_grant_and_every_role_sees_the_owners() {
         .cloned()
         .collect();
     assert_eq!(seen, expected);
-    // Its own team's vault entry is absent from every bounded answer.
     for route in ["workspace", "workspace/versions"] {
         let body = ask(&team.console, &format!("/api/v1/{route}"), &ana).body;
         assert!(
@@ -341,7 +313,6 @@ fn a_team_operator_sees_its_grant_and_every_role_sees_the_owners() {
             "{route}: {body}"
         );
     }
-    // Without `[oidc.github]` no entry carries the role check's mark (#333).
     for route in [
         "workspace".to_string(),
         format!("workspace/versions/{}", team.v1),
@@ -359,8 +330,6 @@ fn a_team_operator_sees_its_grant_and_every_role_sees_the_owners() {
     );
 }
 
-/// A save that edits, removes and adds entries of its team stores the composed version with the
-/// subject as author; its apply moves the pointer; an older version applied rolls back.
 #[test]
 fn a_team_operator_saves_and_applies_its_entries() {
     let Some(team) = team("ui_team_save", true) else {
@@ -382,7 +351,6 @@ fn a_team_operator_saves_and_applies_its_entries() {
     let repos: Vec<_> = (version["repositories"].as_array().unwrap().iter())
         .map(|e| e["repo"].as_str().unwrap())
         .collect();
-    // Ledger removed, the entries outside the grant kept in place, the addition appended.
     assert_eq!(
         repos,
         [BILLING, SEARCH, SHARED, JOINT, VAULT, DOCS, INVOICES]
@@ -392,7 +360,6 @@ fn a_team_operator_saves_and_applies_its_entries() {
     let reply = team.apply(&ana, &saved);
     assert_eq!(reply.status, 200, "{}", reply.body);
     assert_eq!(team.current(&operator), saved);
-    // An older version applied is checked against the current one: its own entries roll back.
     let reply = team.apply(&ana, &team.v1);
     assert_eq!(reply.status, 200, "{}", reply.body);
     assert_eq!(team.current(&operator), team.v1);
@@ -410,8 +377,6 @@ fn a_team_operator_saves_and_applies_its_entries() {
     )));
 }
 
-/// A team operator in two teams changes an entry of each in one save; the owners of the line are
-/// both, sorted.
 #[test]
 fn a_team_operator_in_two_teams_changes_an_entry_of_each() {
     let Some(team) = team("ui_team_two", true) else {
@@ -436,8 +401,6 @@ fn a_team_operator_in_two_teams_changes_an_entry_of_each() {
     );
 }
 
-/// Each way a save can exceed the team's rights is a 403 `entries_refused` naming the entry, its
-/// change and its reason, and writes nothing: no version, no pointer move, no lock left held.
 #[test]
 fn a_save_beyond_the_team_s_rights_is_refused_and_writes_nothing() {
     let Some(team) = team("ui_team_refused", true) else {
@@ -445,7 +408,6 @@ fn a_save_beyond_the_team_s_rights_is_refused_and_writes_nothing() {
     };
     let operator = team.token("root", &[], true);
     let ana = team.token("ana", &["team-billing"], false);
-    // What ana reads, as she would submit it unchanged.
     let seen: Vec<_> = (ENTRIES.iter())
         .filter(|(repo, _)| [BILLING, LEDGER, SHARED, JOINT].contains(repo))
         .copied()
@@ -456,28 +418,24 @@ fn a_save_beyond_the_team_s_rights_is_refused_and_writes_nothing() {
         format!("{base}[[repository]]\nrepo = \"{repo}\"\npath = \"../v\"\nowner = \"{owner}\"\n")
     };
     let cases = [
-        // Another owner's entry.
         (
             base.replace(&path(JOINT), "path = \"../j\""),
             JOINT,
             "edit",
             "not_your_team",
         ),
-        // An owner changed, cleared included.
         (
             base.replacen("owner = \"team-billing\"", "owner = \"team-search\"", 1),
             BILLING,
             "edit",
             "owner_change",
         ),
-        // An ownerless entry.
         (
             base.replace(&path(SHARED), "path = \"../s\""),
             SHARED,
             "edit",
             "ownerless",
         ),
-        // An identity outside the grant, which the team's own vault is.
         (add(VAULT, "team-billing"), VAULT, "add", "outside_grant"),
         (add(SEARCH, "team-search"), SEARCH, "add", "outside_grant"),
     ];
@@ -496,7 +454,6 @@ fn a_save_beyond_the_team_s_rights_is_refused_and_writes_nothing() {
         );
         assert_eq!((team.current(&operator), team.versions(&operator)), before);
     }
-    // The lock was released each time: a save that is allowed still goes through.
     let ok = team.save(&ana, &base.replace(&path(BILLING), "path = \"../b\""));
     assert_eq!(ok.status, 200, "{}", ok.body);
     let lines = audit(team.console);
@@ -509,7 +466,6 @@ fn a_save_beyond_the_team_s_rights_is_refused_and_writes_nothing() {
     );
 }
 
-/// An apply names the refused entries its grant reads and counts the others; nothing moves.
 #[test]
 fn an_apply_beyond_the_team_s_rights_names_only_what_it_reads() {
     let Some(team) = team("ui_team_apply_refused", true) else {
@@ -517,7 +473,6 @@ fn an_apply_beyond_the_team_s_rights_names_only_what_it_reads() {
     };
     let operator = team.token("root", &[], true);
     let ana = team.token("ana", &["team-billing"], false);
-    // The global operator may change anything: the joint entry, the search team's and the vault.
     let changed: Vec<_> = ENTRIES.iter().map(|&(repo, owner)| (repo, owner)).collect();
     let mut text = entries(&changed);
     for repo in [JOINT, SEARCH, VAULT] {
@@ -539,7 +494,6 @@ fn an_apply_beyond_the_team_s_rights_names_only_what_it_reads() {
         "{}",
         reply.body
     );
-    // The lock is free: the global operator applies the same version.
     assert_eq!(team.apply(&operator, &id).status, 200);
     let lines = audit(team.console);
     assert_eq!(lines.len(), 3);
@@ -558,7 +512,6 @@ fn an_apply_beyond_the_team_s_rights_names_only_what_it_reads() {
     assert!(!lines[1].contains(SEARCH) && !lines[1].contains(VAULT));
 }
 
-/// A version saved against an older current one is checked against the current one.
 #[test]
 fn an_apply_is_checked_against_the_version_current_then() {
     let Some(team) = team("ui_team_current", true) else {
@@ -579,7 +532,6 @@ fn an_apply_is_checked_against_the_version_current_then() {
     let saved = team.save(&ana, &own("mine"));
     assert_eq!(saved.status, 200, "{}", saved.body);
     let mine = saved.json()["result"].as_str().unwrap().to_string();
-    // Meanwhile the global operator changes the ownerless entry and applies it.
     let other = entries(&ENTRIES).replace(
         &format!("path = \"../{SHARED}\""),
         "path = \"../elsewhere\"",
@@ -589,7 +541,6 @@ fn an_apply_is_checked_against_the_version_current_then() {
         .unwrap()
         .to_string();
     assert_eq!(team.apply(&operator, &other).status, 200);
-    // Applying ana's version would revert the ownerless entry: refused against the current one.
     let reply = team.apply(&ana, &mine);
     let (refused, _) = refusals(&reply);
     assert_eq!(
@@ -599,14 +550,12 @@ fn an_apply_is_checked_against_the_version_current_then() {
     assert_eq!(team.current(&operator), other);
 }
 
-/// A team that removes its last entry is a viewer on its next request.
 #[test]
 fn a_team_that_removes_its_last_entry_is_a_viewer_next() {
     let Some(team) = team("ui_team_last", true) else {
         return;
     };
     let sam = team.token("sam", &["team-search"], false);
-    // team-search owns the search and joint entries; sam reads both and removes both.
     let saved = team.save(&sam, "");
     assert_eq!(saved.status, 200, "{}", saved.body);
     let id = saved.json()["result"].as_str().unwrap().to_string();
@@ -626,8 +575,6 @@ fn a_team_that_removes_its_last_entry_is_a_viewer_next() {
     );
 }
 
-/// The generation operations stay the global operator's: a team operator gets the role refusal
-/// naming the global operator before its body is read, and a line with its teams.
 #[test]
 fn a_team_operator_cannot_move_generations() {
     let Some(team) = team("ui_team_generations", true) else {
@@ -635,7 +582,6 @@ fn a_team_operator_cannot_move_generations() {
     };
     let ana = team.token("ana", &["team-billing"], false);
     for route in ["pointer", "fence/recover"] {
-        // A body that would be a 400 or a 413 if it were read.
         let reply = team.post(route, &ana, json!("not even the right shape"));
         assert_eq!(reply.status, 403, "{route}: {}", reply.body);
         let message = reply.json()["error"]["message"]
@@ -653,14 +599,9 @@ fn a_team_operator_cannot_move_generations() {
     }
 }
 
-/// The knob's file, relative to the console's directory: `.reached` and `.go` are written beside
-/// it, and the console removes it when a request pauses.
 #[cfg(debug_assertions)]
 const PAUSE_FILE: &str = "pause";
 
-/// Runs `request` (a write of a team operator the console admits), holds it at the debug knob
-/// between admission and the refresh lock, and meanwhile has the global operator save and apply
-/// `list`. Answers the request's reply and the version then current with the versions stored.
 #[cfg(debug_assertions)]
 fn lose_the_role_in_flight(
     team: &Team,
@@ -669,7 +610,6 @@ fn lose_the_role_in_flight(
     request: impl FnOnce() -> Reply + Send,
 ) -> (Reply, (String, usize)) {
     let pause = team.fleet.dir.join(PAUSE_FILE);
-    // The directory outlives a run: a `.reached` or `.go` left by an earlier one would skip a wait.
     for end in ["reached", "go"] {
         let _ = fs::remove_file(team.fleet.dir.join(format!("{PAUSE_FILE}.{end}")));
     }
@@ -693,11 +633,6 @@ fn lose_the_role_in_flight(
     })
 }
 
-/// What a team operator whose last entry went between admission and the lock is answered: the
-/// viewer's 403 `forbidden` with the text of an admission refusal, nothing stored, the pointer
-/// where the global operator put it. Its stderr line tells the two apart: it names the teams
-/// admission found (`as ["team-billing"]`), which an admitted viewer's line never has. `lines`
-/// is the count of lines the console wrote.
 #[cfg(debug_assertions)]
 fn assert_role_lost(
     team: Team,
@@ -721,7 +656,6 @@ fn assert_role_lost(
     );
 }
 
-/// What ana reads, with the billing entry's path changed: a save her team may make.
 #[cfg(debug_assertions)]
 fn billing_edit() -> String {
     let seen: Vec<_> = (ENTRIES.iter())
@@ -731,13 +665,9 @@ fn billing_edit() -> String {
     entries(&seen).replace(&format!("path = \"../{BILLING}\""), "path = \"../mine\"")
 }
 
-/// Entries that no team-billing entry survives in: the search team's alone.
 #[cfg(debug_assertions)]
 const WITHOUT_BILLING: [(&str, Option<&str>); 1] = [(SEARCH, Some("team-search"))];
 
-/// A save admitted as a team operator whose team loses its last entry before the lock is taken
-/// is answered as a viewer's, because the role is recomputed under the lock: nothing is stored
-/// and the pointer stays where the global operator put it.
 #[cfg(debug_assertions)]
 #[test]
 fn a_save_whose_role_is_lost_before_the_lock_is_refused_as_a_viewer() {
@@ -751,12 +681,9 @@ fn a_save_whose_role_is_lost_before_the_lock_is_refused_as_a_viewer() {
     let answered = lose_the_role_in_flight(&team, &operator, &WITHOUT_BILLING, || {
         team.save(&ana, &text)
     });
-    // The operator's save and apply, then ana's refused save.
     assert_role_lost(team, &operator, answered, "workspace save -", 3);
 }
 
-/// The same for an apply: ana's own version, stored while she was a team operator, is not applied
-/// once the current one has none of her team's entries.
 #[cfg(debug_assertions)]
 #[test]
 fn an_apply_whose_role_is_lost_before_the_lock_is_refused_as_a_viewer() {
@@ -773,7 +700,6 @@ fn an_apply_whose_role_is_lost_before_the_lock_is_refused_as_a_viewer() {
     let answered = lose_the_role_in_flight(&team, &operator, &WITHOUT_BILLING, || {
         team.apply(&ana, &mine)
     });
-    // Ana's save, the operator's save and apply, then ana's refused apply.
     let arguments = format!("workspace apply {mine}");
     assert_role_lost(team, &operator, answered, &arguments, 4);
 }

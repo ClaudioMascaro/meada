@@ -1,35 +1,22 @@
-//! The gate of the command table (ADR 0028, "The `run` script and the command table"): the
-//! `run` script of a CI step in, its commands and their words out. No shell is evaluated: an
-//! assignment, `cd`, a function call and a called script are not followed, and the rows that
-//! give a command its side live in the kinds (`package`, `image`).
-
 use std::cell::{Cell, OnceCell};
 use std::collections::HashSet;
 
 use crate::config_values::VALUE_MAX;
 
-/// A part of a word.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Part {
-    /// Literal text, its quotes removed.
     Text(String),
-    /// What static evaluation leaves open, as written: a `${{ }}` expression or a variable no
-    /// literal `env` gives, a command substitution, any other expansion.
     Open(String),
 }
 
-/// A word of a command: its parts in order, adjacent text joined.
 pub(crate) type Word = Vec<Part>;
 
-/// The commands a CI step's `run` script holds, by the identity of the CI step.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Script {
     pub site: String,
     pub commands: Vec<Vec<Word>>,
 }
 
-/// A command as an answer shows it: its words joined by one space, a quoted word without its
-/// quotes and an open part as written.
 pub(crate) fn written(command: &[Word]) -> String {
     let word = |word: &Word| -> String {
         let parts = word
@@ -40,7 +27,6 @@ pub(crate) fn written(command: &[Word]) -> String {
     command.iter().map(word).collect::<Vec<_>>().join(" ")
 }
 
-/// The text of a word with no open part.
 pub(crate) fn literal(word: &[Part]) -> Option<&str> {
     match word {
         [] => Some(""),
@@ -49,15 +35,10 @@ pub(crate) fn literal(word: &[Part]) -> Option<&str> {
     }
 }
 
-/// The words that open a command of a compound: the command inside `if` or a loop counts, since
-/// the CI step may run it.
 const KEYWORDS: [&str; 9] = [
     "if", "then", "else", "elif", "do", "while", "until", "!", "{",
 ];
 
-/// The names `script` mentions other than by reading them (`$NAME`, `${NAME}`, `env.NAME`): an
-/// assignment, `export`, `read`, `for NAME in`, a line written to `GITHUB_ENV`. Such a name may
-/// hold another value than the one a literal `env` gives.
 pub(crate) fn rebound(script: &str) -> HashSet<&str> {
     let word = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
     let bytes = script.as_bytes();
@@ -83,12 +64,7 @@ pub(crate) fn rebound(script: &str) -> HashSet<&str> {
     names
 }
 
-/// Whether `script` names the environment file (`GITHUB_ENV`, `github.env`, `github[...]`), and
-/// then whether each line that does is an `echo` of `NAME=...`, so that `rebound` holds every
-/// name it writes. Any other line (a file appended to it, a name an expansion gives, another
-/// command's output, a backslash) may write a name the script does not show.
 pub(crate) fn environment_file(script: &str) -> Option<bool> {
-    // How many times a line names the file: a second write on a line is not read.
     let named = |line: &str| {
         let lower = line.to_ascii_lowercase();
         let times = |word: &&str| lower.matches(*word).count();
@@ -103,7 +79,6 @@ pub(crate) fn environment_file(script: &str) -> Option<bool> {
         let name = text
             .bytes()
             .take_while(|&b| b.is_ascii_alphanumeric() || b == b'_');
-        // `sh` prints an escape of `echo` as a new line, which may hold a second name.
         text[name.count()..].starts_with('=') && !text.starts_with('=') && !line.contains('\\')
     };
     let lines = script.lines().map(|line| (line, named(line)));
@@ -112,10 +87,6 @@ pub(crate) fn environment_file(script: &str) -> Option<bool> {
     Some(lines.all(|(line, times)| times == 1 && shown(line)))
 }
 
-/// The offset past the bracket that closes the one at `at`, over quotes and nested ones of its
-/// kind. Between parentheses the shell reads words, so a comment runs to the end of its line
-/// and a `${...}` is passed whole, whatever they hold. `None` when it is left open or holds a
-/// heredoc.
 fn closed(bytes: &[u8], at: usize) -> Option<usize> {
     let (opens, closes) = match bytes[at] {
         b'(' => (b'(', b')'),
@@ -150,26 +121,10 @@ fn closed(bytes: &[u8], at: usize) -> Option<usize> {
     }
 }
 
-/// The first word of a command, when it has no open part.
 fn first(words: &[Word]) -> Option<&str> {
     words.first().and_then(|word| literal(word))
 }
 
-/// The commands of `script`: a command is the first word of a line or the one after `&&` or
-/// `;` (a trailing `\` joins two lines), with the words up to the next operator. What follows
-/// `||`, a pipe, `&`, a redirection or a parenthesis is not read up to the next line, `&&` or
-/// `;`. A parenthesis that opens a command is a subshell, whose commands count; two of them
-/// are an arithmetic command, and any other parenthesis (an array, a function's `()`) is
-/// passed over to the one that closes it, lines included. The name of a function before its
-/// `()` and a pattern of `case` are no command. A reserved word written bare opens
-/// no command of its own (`KEYWORDS`); quoted, escaped or given by a variable it is a word
-/// like any other. Text in a string or a comment gives no command. `None` for a script that
-/// is not read: one that holds a heredoc (also the `<<` of an arithmetic expansion) or leaves
-/// a quote, a parenthesis, an expansion or an expression open.
-///
-/// `env` gives the literal an `env` of the CI step, its CI job or its pipeline holds for a
-/// name. It resolves `${{ env.NAME }}`, `$NAME` and `${NAME}` when the script does not rebind
-/// the name (`rebound`) and the literal holds only characters the shell reads as they are.
 pub(crate) fn commands<'v>(
     script: &str,
     env: impl Fn(&str) -> Option<&'v str>,
@@ -193,15 +148,10 @@ pub(crate) fn commands<'v>(
     let mut out: Vec<Vec<Word>> = Vec::new();
     let mut words: Vec<Word> = Vec::new();
     let mut word: Option<Word> = None;
-    // Whether the words read belong to a command: not after an operator that ends one.
     let mut reading = true;
-    // Whether the word being read is written bare: no quote, escape or expansion in it.
     let mut bare = true;
-    // The subshells left open.
     let mut subshells = 0usize;
-    // Whether the next word is a pattern of `case`: after its `in` and after each `;;`.
     let mut patterns = false;
-    // The word read joins its command, unless it is a reserved word that opens it.
     let finish = |words: &mut Vec<Word>, word: &mut Option<Word>, bare: &mut bool, reading| {
         let keyword = |w: &Word| literal(w).is_some_and(|t| KEYWORDS.contains(&t));
         let opens = *bare && words.is_empty();
@@ -223,7 +173,6 @@ pub(crate) fn commands<'v>(
     let mut i = 0;
     while i < bytes.len() {
         let rest = &script[i..];
-        // What ends the command, and whether the next words start one.
         let mut ends = None;
         match bytes[i] {
             b'\\' => match rest[1..].chars().next() {
@@ -240,7 +189,6 @@ pub(crate) fn commands<'v>(
             }
             b'\n' | b';' => (ends, i) = (Some(true), i + 1),
             b'&' if rest.starts_with("&&") => (ends, i) = (Some(true), i + 2),
-            // A `|` between two patterns of `case`: what it follows is no command.
             b'|' if patterns => {
                 finish(&mut words, &mut word, &mut bare, reading);
                 match first(&words) {
@@ -250,8 +198,6 @@ pub(crate) fn commands<'v>(
                 i += 1;
             }
             b'&' | b'|' => (ends, i) = (Some(false), i + 1),
-            // It closes a subshell, or a pattern of `case`, whose words are no command: where
-            // one is due, where no subshell is open and right after `case ... in`.
             b')' => {
                 finish(&mut words, &mut word, &mut bare, reading);
                 let header = first(&words) == Some("case");
@@ -263,17 +209,13 @@ pub(crate) fn commands<'v>(
                 }
                 (ends, i) = (Some(false), i + 1);
             }
-            // The parenthesis a pattern of `case` may open with.
             b'(' if patterns && word.is_none() && words.is_empty() => i += 1,
             b'(' if word.is_none() && words.is_empty() && reading => match bytes.get(i + 1) {
-                // Arithmetic: no command inside.
                 Some(b'(') => (ends, i) = (Some(false), closed(bytes, i)?),
-                // A subshell, whose commands the CI step runs.
                 _ => (subshells, i) = (subshells + 1, i + 1),
             },
             b'(' => {
                 let end = closed(bytes, i)?;
-                // `name()` defines a function: the name is no command.
                 if script[i + 1..end - 1].trim().is_empty() {
                     word = None;
                     words.clear();
@@ -283,7 +225,6 @@ pub(crate) fn commands<'v>(
             b'<' if rest.starts_with("<<<") => (ends, i) = (Some(false), i + 3),
             b'<' if rest.starts_with("<<") => return None,
             b'<' | b'>' => {
-                // The digits right before a redirection are its file descriptor.
                 let descriptor =
                     |w: &Word| literal(w).is_some_and(|t| t.bytes().all(|b| b.is_ascii_digit()));
                 word = word.filter(|w| !descriptor(w));
@@ -293,7 +234,6 @@ pub(crate) fn commands<'v>(
             b'\'' => {
                 bare = false;
                 let end = rest[1..].find('\'')?;
-                // GitHub replaces an expression before the shell reads the quotes.
                 let mut inner = &rest[1..1 + end];
                 text(&mut word, "");
                 while let Some(at) = inner.find("${{") {
@@ -364,13 +304,9 @@ pub(crate) fn commands<'v>(
     }
     finish(&mut words, &mut word, &mut bare, reading);
     out.extend(Some(words).filter(|w| !w.is_empty()));
-    // A subshell left open is a script the shell does not run.
     (subshells == 0).then_some(out)
 }
 
-/// The expansion `rest` starts with (`$` or a backtick), as a part and its length in bytes:
-/// text when `value` resolves it or the `$` stands alone, else open as written. `None` when it
-/// is left unclosed or holds a heredoc.
 fn expansion<'v>(rest: &str, value: impl Fn(&str) -> Option<&'v str>) -> Option<(Part, usize)> {
     let name = |text: &str| {
         let plain = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
@@ -431,7 +367,6 @@ fn expansion<'v>(rest: &str, value: impl Fn(&str) -> Option<&'v str>) -> Option<
 mod tests {
     use super::*;
 
-    /// Each command on a line of its own, an open part between `<` and `>`.
     fn read(script: &str) -> Option<Vec<String>> {
         let env = |name: &str| match name {
             "PKG" => Some("acme-lib"),
@@ -456,7 +391,6 @@ mod tests {
     #[test]
     fn the_gate_reads_a_script_one_rule_at_a_time() {
         let cases: &[(&str, &str, Option<&[&str]>)] = &[
-            // Unit: each line, a trailing backslash joined.
             (
                 "lines",
                 "pip install a\npip install b",
@@ -472,7 +406,6 @@ mod tests {
                 "pip install a\r\npip install b\r\n",
                 Some(&["pip install a", "pip install b"]),
             ),
-            // A heredoc leaves the whole script unread; a here-string is a redirection.
             ("heredoc", "pip install a\ncat <<EOF\nx\nEOF", None),
             ("heredoc, tabs stripped", "cat <<-EOF\n\tx\n\tEOF", None),
             (
@@ -495,7 +428,6 @@ mod tests {
                 "cat <<< \"pip install a\" && pip install b",
                 Some(&["cat", "pip install b"]),
             ),
-            // Command: the first word of a line, or the one after `&&` or `;`.
             (
                 "and",
                 "cd x && pip install a",
@@ -529,7 +461,6 @@ mod tests {
                 "X=1 pip install a",
                 Some(&["X=1 pip install a"]),
             ),
-            // Text inside `echo`, a string or a comment gives no command.
             ("echo", "echo pip install a", Some(&["echo pip install a"])),
             (
                 "string",
@@ -556,7 +487,6 @@ mod tests {
                 "pip install a#b",
                 Some(&["pip install a#b"]),
             ),
-            // A command inside `if` or a loop counts.
             (
                 "if",
                 "if pip install a; then pip install b; else pip install c; fi",
@@ -592,7 +522,6 @@ mod tests {
                 "(cd x && pip install a) && pip install b",
                 Some(&["cd x", "pip install a", "pip install b"]),
             ),
-            // The name of a function a script defines is no command.
             (
                 "function",
                 "f() {\n  pip install a\n}",
@@ -604,7 +533,6 @@ mod tests {
                 "g ()\n{\n  y\n}\nh(){ x; }\ni() (\n  x\n)\nz",
                 Some(&["y", "}", "}", "z"]),
             ),
-            // Nor is a pattern of `case`, with `|`, quotes or its opening parenthesis.
             (
                 "case",
                 "case $1 in\n  a) pip install a ;;\n  *)\n    pip install b\n    ;;\nesac",
@@ -630,7 +558,6 @@ mod tests {
                 "case $1 in\n  a)\n    case $2 in\n      b) x ;;\n    esac ;;\n  (c) x ;;\nesac | tee log\n(z)",
                 Some(&["case <$1> in", "case <$2> in", "esac", "esac", "z"]),
             ),
-            // A reserved word opens no command of its own only when it is written bare.
             (
                 "reserved word, quoted or escaped",
                 "'if' pip install a\n\\if pip install b\n\"then\" pip install c",
@@ -646,7 +573,6 @@ mod tests {
                 "if (pip install a); then pip install b; fi",
                 Some(&["pip install a", "pip install b", "fi"]),
             ),
-            // A parenthesis that opens no command is passed over to the one that closes it.
             (
                 "array over lines",
                 "CMD=(\npip install a\n)\npip install b",
@@ -665,7 +591,6 @@ mod tests {
             ("arithmetic left open", "(( pip install a", None),
             ("subshell left open", "( pip install a", None),
             ("array left open", "CMD=(\npip install a", None),
-            // Between parentheses a comment runs to the end of its line, whatever it holds.
             (
                 "quote in a comment of an array",
                 "ARGS=(\n  --pre   # don't pin\n)\npip install a",
@@ -701,13 +626,11 @@ mod tests {
                 "CMD=(#c )\npip install a\n)\npip install b",
                 Some(&["CMD=", "pip install b"]),
             ),
-            // The comment holds the parenthesis that would close the array.
             (
                 "array closed in a comment",
                 "CMD=( # x )\npip install a",
                 None,
             ),
-            // Word: a literal, a quoted literal.
             (
                 "quoted",
                 "pip install 'a>=1' \"b<2\" c\\>3",
@@ -733,7 +656,6 @@ mod tests {
             ("input", "pip install a < answers", Some(&["pip install a"])),
             ("quote left open", "pip install a\necho don't", None),
             ("string left open", "pip install \"a", None),
-            // An expression or a variable a literal `env` gives.
             (
                 "expression",
                 "pip install ${{ env.PKG }} ${{env.PKG}}",
@@ -765,7 +687,6 @@ mod tests {
                 "p $PKG $PKG",
                 Some(&["p acme-lib acme-lib"]),
             ),
-            // Unresolved, each form.
             (
                 "secrets",
                 "pip install ${{ secrets.X }}",
@@ -838,7 +759,6 @@ mod tests {
             ),
             ("expression left open", "pip install ${{ env.PKG", None),
             ("substitution left open", "pip install $(cat name", None),
-            // No shell is evaluated: a name the script rebinds keeps no literal.
             (
                 "assignment",
                 "PKG=b\npip install $PKG",
@@ -878,16 +798,11 @@ mod tests {
 
     #[test]
     fn a_script_of_operators_alone_is_read_in_one_pass() {
-        // One pass over the bytes: no rule looks back further than the word it is in, and a
-        // parenthesis left open ends the reading at once.
-        // The first line's word stands before a `()`, as a function's name: no command.
         let script = "$(".repeat(400) + &")".repeat(400) + &"();|&\n".repeat(200);
         assert_eq!(read(&script).map(|c| c.len()), Some(0));
         assert_eq!(read(&"\\".repeat(1001)), Some(vec!["\\".repeat(500)]));
         assert_eq!(read(&("(".repeat(1000) + " pip install a")), None);
         assert_eq!(read(&"x(".repeat(1000)), None);
-        // The literals a script reads add at most its own length and one value's: the rest
-        // stays open.
         let read = read(&"$PKG ".repeat(400)).unwrap();
         assert!(read[0].starts_with("acme-lib acme-lib") && read[0].ends_with("<$PKG> <$PKG>"));
         assert!(read[0].len() <= 2 * 2000 + VALUE_MAX, "{}", read[0].len());
@@ -906,8 +821,6 @@ mod tests {
                 "echo \"SHA=${GITHUB_SHA::7}\" >> ${{ GitHub['env'] }}",
                 Some(true),
             ),
-            // A file, a name an expansion gives, another command, a second write on the line,
-            // an escape `sh` prints as a new line.
             ("cat ci/vars.env >> \"$GITHUB_ENV\"", Some(false)),
             ("echo \"$NAME=b\" >> $GITHUB_ENV", Some(false)),
             ("echo \"=b\" >> $GITHUB_ENV", Some(false)),

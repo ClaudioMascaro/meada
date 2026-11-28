@@ -117,8 +117,6 @@ with tempfile.TemporaryDirectory(prefix="meada-container-") as name:
         subprocess.run(["docker", "logs", container], check=False)
         run("docker", "rm", "--force", container)
 
-    # The Docker MCP line of README*.md ("Conectar um agente") and docs/site/*/mcp.md, run as a
-    # client would: from the repository, which answers the roots request with its host path.
     line = ('exec docker run -i --rm --network none --user "$(id -u):$(id -g)" '
             f'-v "${{PWD%/*}}:${{PWD%/*}}" -w "$PWD" {image} mcp')
     server = subprocess.Popen(["sh", "-c", line], cwd=mirror, text=True,

@@ -1,26 +1,15 @@
-//! Conditional compilation (spec #30): whether a `#[cfg(..)]` predicate holds for the one
-//! target Meada indexes, `x86_64` Linux, with the default features of the crate. Nothing
-//! depends on the machine that runs Meada, and a predicate this module does not know is false.
-//! `test` is a parameter of `holds`: the caller asks with it false, as in a build of the crate
-//! itself, and with it true, to keep the modules a test build compiles and nothing else.
-
 use std::collections::BTreeSet;
 
 use super::crates::entries;
 
-/// How deep `all`, `any` and `not` may nest in one predicate; a deeper one is false.
 // ponytail: real predicates nest two or three levels; the reader recurses once per level, so a
 // crafted `not(not(not(..` must not reach the stack's end.
 pub const PREDICATE_DEPTH: usize = 64;
 
-/// How many features one crate's default set may reach through features that enable others; the
-/// rest is not followed. A cycle (`a = ["b"]`, `b = ["a"]`) is cut by the visited set as well.
 // ponytail: real crates define dozens of features; a crafted manifest of a million chained ones
 // must not be walked whole on every refresh.
 pub const FEATURES: usize = 4096;
 
-/// Whether the text after `cfg`, `(unix, not(feature = "x"))` with its parentheses, holds with
-/// `features` enabled and `test` set as given. A malformed or too deep predicate is false.
 pub fn holds(predicate: &str, features: &BTreeSet<String>, test: bool) -> bool {
     let mut at = Reader {
         tokens: tokens(predicate),
@@ -31,8 +20,6 @@ pub fn holds(predicate: &str, features: &BTreeSet<String>, test: bool) -> bool {
     at.open() && at.predicate(0) == Some(true) && at.close() && at.next == at.tokens.len()
 }
 
-/// The default features of a manifest: `default`, the names it lists, and the ones those enable
-/// in turn. Entries `dep:x` and `x/feat` enable no feature of this crate and are ignored.
 pub fn defaults(manifest: &toml::Table) -> BTreeSet<String> {
     let optional: BTreeSet<&str> = (entries(manifest).into_iter())
         .filter(|(kind, _, spec)| {
@@ -56,8 +43,6 @@ pub fn defaults(manifest: &toml::Table) -> BTreeSet<String> {
             .collect();
         for entry in &listed {
             match entry.split_once('/') {
-                // `x/feat` also enables the feature `x` of an optional dependency that no
-                // `dep:x` entry names; `x?/feat` does not.
                 Some((dep, _)) if optional.contains(dep) => {
                     let named = listed_anywhere(table, dep);
                     if !named {
@@ -73,7 +58,6 @@ pub fn defaults(manifest: &toml::Table) -> BTreeSet<String> {
     out
 }
 
-/// Whether some feature lists `dep:<dep>`.
 fn listed_anywhere(table: Option<&toml::Table>, dep: &str) -> bool {
     let want = format!("dep:{dep}");
     (table.into_iter().flat_map(|t| t.values()))
@@ -91,7 +75,6 @@ enum Token<'s> {
     Text(&'s str),
 }
 
-/// The tokens of a predicate, none at all when it holds a character it has no use for.
 fn tokens(text: &str) -> Vec<Token<'_>> {
     let mut out = Vec::new();
     let mut rest = text;
@@ -101,7 +84,6 @@ fn tokens(text: &str) -> Vec<Token<'_>> {
             ')' => out.push(Token::Close),
             ',' => out.push(Token::Comma),
             '=' => out.push(Token::Equals),
-            // No escapes: a name with one is none that is known.
             '"' => {
                 let Some(end) = rest[1..].find('"') else {
                     return Vec::new();
@@ -148,8 +130,6 @@ impl Reader<'_, '_> {
         self.eat(Token::Close)
     }
 
-    /// One predicate, or `None` when it is malformed or nests past the limit. Every operand is
-    /// read, so the cursor ends after the whole predicate.
     fn predicate(&mut self, depth: usize) -> Option<bool> {
         let Some(&Token::Name(name)) = self.tokens.get(self.next) else {
             return None;

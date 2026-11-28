@@ -30,10 +30,7 @@ from pathlib import Path
 import prove
 from prove import corpus, fetch, infra
 
-# Strongest first, as meada-core's `Level` orders them (ADR 0005); a name it does not know is weakest.
 LEVELS = ("exact", "declared", "inferred", "decided", "ambiguous")
-# `meada status` in English (`LANG`, ADR 0008): `orphan <contract>: no <counterpart>[ in <scope>]; <place>[ [level]]`.
-# A tag before #849 names no scope; both sides read one workspace, so the scope is not compared.
 ORPHAN = re.compile(r"^\s+orphan (.+?): (no [a-z]+)(?: in [^;]+)?; (.*?)(?: \[(" + "|".join(LEVELS) + r")\])?$")
 LINK_TYPES = ("new", "vanished", "raised", "dropped")
 ORPHAN_TYPES = ("appeared", "vanished", "level moved")
@@ -248,7 +245,7 @@ def selftest():
     def side(folder, links, status):
         (folder / "w").mkdir(parents=True)
         (folder / "w" / "a.export.json").write_text(json.dumps({"links": links[:2]}))
-        (folder / "w" / "b.export.json").write_text(json.dumps({"links": links}))  # a shared link shows twice
+        (folder / "w" / "b.export.json").write_text(json.dumps({"links": links}))
         (folder / "w" / "status.txt").write_text(status)
         return load(folder)
 
@@ -271,7 +268,6 @@ def selftest():
             "github.com/acme/b | channel::sns::alerts | main.tf:3 module.t[0].aws_sns_topic.this (root live)"], base
         assert compare(base, side(tmp / "same", [dict(row) for row in reversed(links)], status)) == [], "equal sides differ"
         # One of each type: POST raised, CI dropped, package vanished, a new HTTP link, the SNS line of `a`
-        # vanished, an image line appeared, and the S3 use moved its level.
         planted = [links[0], {**links[1], "level": "exact"}, {**links[2], "level": "ambiguous"},
                    link("a::put", "http::PUT::/z", "inferred")]
         moved = (status.replace("  orphan channel::sns::alerts: no use; main.tf:3 module.t[0].aws_sns_topic.this (root live)\n", "", 1)
@@ -289,7 +285,6 @@ def selftest():
         assert "| http links | inferred -> exact | 0 | 0 | 1 | 0 |" in text, text
         assert "| image orphan lines | - | 1 | 0 | 0 |" in text, text
         assert "No change" in summary([], "v0", "v1")
-    # The default selection: every URL-pinned entry and this checkout, in three workspaces, no probe.
     chosen = groups(public())
     assert set(chosen) == {"code", "infra", "ci"} and "meada" in chosen["code"], chosen
     assert all(not table()[n][1].startswith("probe:") for names in chosen.values() for n in names), chosen

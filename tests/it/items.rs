@@ -1,6 +1,3 @@
-//! Open items (spec #18): the ambiguous links and unresolved consumers of a workspace, their
-//! sorted candidates, and how `search` lists them.
-
 use crate::common;
 
 use std::fs;
@@ -45,7 +42,6 @@ fn search_matches_the_enclosing_symbol_and_the_call_expression() {
     let (web, _, _) = chain("items_query");
     let engine = Engine::open(&web).unwrap();
 
-    // The enclosing symbol is `track`; the call expression holds `event.url`.
     for query in ["track", "event.url"] {
         let answer = engine.search(query, Some("unresolved"), None).unwrap();
         assert!(answer.contains("src/status.ts:8"), "{query}: {answer}");
@@ -66,7 +62,6 @@ fn a_dynamic_url_lists_the_routes_its_method_and_fragments_leave() {
     let routes: Vec<String> = (items[0].candidates.iter())
         .map(|c| format!("{} {}", c.repository, c.label()))
         .collect();
-    // The DELETE and POST routes, `/api/users` and `/api/health` are filtered out.
     assert_eq!(
         routes,
         [
@@ -99,7 +94,6 @@ fn ambiguous_candidates_are_the_listed_providers_sorted_by_repository() {
     let (web, _, _) = chain("items_order");
     let items = Engine::open(&web).unwrap().open_items().unwrap();
 
-    // Item ids are call-site identities, handled in id order.
     let ids: Vec<&str> = items.iter().map(|i| i.id.as_str()).collect();
     assert_eq!(
         ids,
@@ -122,8 +116,6 @@ fn ambiguous_candidates_are_the_listed_providers_sorted_by_repository() {
 
 #[test]
 fn a_refreshed_index_lists_the_open_items_a_cold_index_does() {
-    // The method and fragments of an unresolved consumer are not in the export, so this is
-    // where a refresh that loses them shows.
     let render = |engine: &Engine| {
         let mut out = engine.search("", Some("unresolved"), None).unwrap();
         for item in engine.open_items().unwrap() {
@@ -155,9 +147,6 @@ fn a_refreshed_index_lists_the_open_items_a_cold_index_does() {
     assert_eq!(refreshed, render(&Engine::open(&cold).unwrap()));
 }
 
-/// The issue's repositories (#801): `api` serves `GET /api/orders`, `/orders`, `/v2/orders`,
-/// `/items`, `/api/orders/items`, `/api/items/export` and `/api/lineitems`; `go` calls it with
-/// bases read in place and with one a method returns. `client` is the client's fixture.
 fn unread_base(case: &str, client: &str) -> std::path::PathBuf {
     fixture_repo(
         case,
@@ -171,7 +160,6 @@ fn unread_base(case: &str, client: &str) -> std::path::PathBuf {
     fixture_repo(case, client, Some(&origin))
 }
 
-/// Every link of `engine`'s export as `consumer -> contract [reason]`.
 fn links_of(engine: &Engine) -> Vec<String> {
     let export: serde_json::Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
     (export["links"].as_array().unwrap().iter())
@@ -187,7 +175,6 @@ fn links_of(engine: &Engine) -> Vec<String> {
         .collect()
 }
 
-/// Each open item as its call, its limit and its candidates' labels.
 fn items_of(engine: &Engine) -> Vec<String> {
     (engine.open_items().unwrap().iter())
         .map(|i| {
@@ -200,10 +187,6 @@ fn items_of(engine: &Engine) -> Vec<String> {
         .collect()
 }
 
-/// A URL whose base is the return value of a call Meada does not evaluate (`c.baseV2()`, which
-/// adds `/v2`) links to no route: it is an open item whose candidates are the routes that end
-/// with its known part, and it names the limit and the callee. A base read in place still links
-/// by its variable, whether a peer names it or not.
 #[test]
 fn a_base_a_call_returns_makes_an_open_item_that_names_the_callee() {
     let go = unread_base("items_unread_base_call", "unread-base-go");
@@ -244,10 +227,6 @@ fn a_base_a_call_returns_makes_an_open_item_that_names_the_callee() {
     );
 }
 
-/// A base that is a parameter no call site binds, or the return value of a method, makes an open
-/// item whose candidates end with the known part at a `/`: `/items` takes `GET /items` and `GET
-/// /api/orders/items`, not `GET /api/items/export` nor `GET /api/lineitems`. A URL written with
-/// no base, and an absolute path resolved over an unknown base, keep the hostless link.
 #[test]
 fn a_base_a_parameter_holds_makes_an_open_item_and_a_certain_path_still_links() {
     let web = unread_base("items_unread_base_param", "unread-base-web");
@@ -277,7 +256,6 @@ fn a_base_a_parameter_holds_makes_an_open_item_and_a_certain_path_still_links() 
     );
 }
 
-/// A `dynamic-url` decision that names one of the item's candidates applies on the next index.
 #[test]
 fn a_decision_for_a_candidate_of_an_unread_base_applies() {
     let go = unread_base("items_unread_base_decided", "unread-base-go");
@@ -295,7 +273,6 @@ fn a_decision_for_a_candidate_of_an_unread_base_applies() {
     );
 }
 
-/// An `ambiguous-link` decision written for such a call goes stale, and the item stays open.
 #[test]
 fn an_ambiguous_link_decision_for_an_unread_base_goes_stale() {
     let go = unread_base("items_unread_base_stale", "unread-base-go");
@@ -322,7 +299,6 @@ fn an_ambiguous_link_decision_for_an_unread_base_goes_stale() {
     );
 }
 
-/// Each open item as its call and the limit it names.
 fn limits_of(engine: &Engine) -> Vec<String> {
     (engine.open_items().unwrap().iter())
         .map(|i| {
@@ -335,11 +311,6 @@ fn limits_of(engine: &Engine) -> Vec<String> {
         .collect()
 }
 
-/// A Python `httpx` client built with a `base_url` Meada does not read (it comes from another
-/// module), and a URL that starts with a call's return value, are open items that name the
-/// client's base and the callee; neither links to a guessed route. An aiohttp session joins as
-/// RFC 3986 does: over such a base, a relative path is an open item and a path from the root
-/// keeps the hostless link.
 #[test]
 fn a_python_base_meada_did_not_read_makes_open_items_that_name_it() {
     let python = unread_base("items_unread_base_python", "unread-base-python");
@@ -370,9 +341,6 @@ fn a_python_base_meada_did_not_read_makes_open_items_that_name_it() {
     );
 }
 
-/// Swift: a URL that starts with a call's return value, and a path component appended to a URL
-/// Meada did not read, are open items that name the callee and the client's base; a path from
-/// the root resolved over such a URL (`URL(string:relativeTo:)`) keeps the hostless link.
 #[test]
 fn a_swift_base_meada_did_not_read_makes_open_items_that_name_it() {
     let swift = unread_base("items_unread_base_swift", "unread-base-swift");
@@ -410,9 +378,6 @@ fn a_swift_base_meada_did_not_read_makes_open_items_that_name_it() {
     );
 }
 
-/// The key of a Go struct literal named like an import (`&Client{http: ..}`, `&Client{os: ..}`)
-/// is a field: the file still reads the package, so each call keeps its method and its base,
-/// as with another key (`good`) or none (`nolit`), and links with no open item.
 #[test]
 fn a_go_literal_key_named_like_an_import_leaves_its_call_linked() {
     fixture_repo(
@@ -593,7 +558,6 @@ fn unknown_returns_and_path_changes_remain_unresolved() {
 
 #[test]
 fn a_go_deferred_write_of_the_named_result_leaves_the_base_open() {
-    // #948: the deferred function writes `base` after `return` set it; the empty one does not.
     let export = http_value_flow("http_value_flow_deferred");
     let consumers = export["consumers"].as_array().unwrap();
     let links = export["links"].as_array().unwrap();
@@ -619,7 +583,6 @@ fn a_go_deferred_write_of_the_named_result_leaves_the_base_open() {
 
 #[test]
 fn a_python_decorator_of_the_function_or_its_class_leaves_the_base_open() {
-    // #949: a decorator call rebinds the function; #962: a class decorator may replace the method.
     let export = http_value_flow("http_value_flow_decorated");
     let consumers = export["consumers"].as_array().unwrap();
     let links = export["links"].as_array().unwrap();
@@ -644,7 +607,6 @@ fn a_python_decorator_of_the_function_or_its_class_leaves_the_base_open() {
             "{name}: {open:?}"
         );
     }
-    // No decorator, or one that keeps the body a call runs (`dataclass`, `lru_cache`).
     let kept = [
         "Ordinary.ViaOrdinaryClass",
         "Settings.ViaDataclass",
@@ -665,8 +627,6 @@ fn a_python_decorator_of_the_function_or_its_class_leaves_the_base_open() {
 
 #[test]
 fn a_private_jvm_method_runs_alone_whatever_other_classes_spell() {
-    // #810: a private method of the same name in a Java and a Kotlin class still folds; a method
-    // a subclass overrides does not.
     let export = http_value_flow("http_value_flow_private");
     let consumers = export["consumers"].as_array().unwrap();
     let rows = |at: &str| -> Vec<&serde_json::Value> {

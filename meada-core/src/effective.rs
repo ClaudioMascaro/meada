@@ -114,7 +114,6 @@ pub fn labels(blocks: &Json) -> Vec<String> {
     serve.into_iter().chain(resources).chain(peers).collect()
 }
 
-/// The blocks of `entry` (a version document's entry): everything but `repo`.
 fn blocks_of(entry: &Json) -> Json {
     let mut blocks = entry.clone();
     if let Some(map) = blocks.as_object_mut() {

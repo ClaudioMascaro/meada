@@ -157,8 +157,6 @@ def main():
         audit.score(argparse.Namespace(auditor=str(checker.parent / 'auditor'), checks=str(observed),
                                        judgment=str(judgment), output=str(scored)))
         assert json.loads(scored.read_text())['script_caught']
-        # Only the judge's word that the script named the symptom makes a detection; exit 3
-        # (`prove.py`'s answer key rejecting) counts as exit 1 does. The last case restores the state.
         for exit_code, names in ((1, False), (3, True), (1, True)):
             judged['script_names_symptom'] = names
             audit.save(judgment, judged)
@@ -180,7 +178,6 @@ def main():
         assert result == 1 and json.loads((observed / 'report.json').read_text())['audit_result'] == 'INCOMPLETE'
         checks.append({'check': 'script catches without fresh blind evidence cannot complete the audit', 'passed': True})
         audit.save(run / 'dummy-report.json', json.loads((observed / 'report.json').read_text()))
-        # The explicit fallback may complete scripted rounds, without turning them blind.
         inline = dict(judged, checker_mode='inline', receipt='dummy inline symptom fixture')
         audit.save(judgment, inline)
         audit.score(argparse.Namespace(auditor=str(checker.parent / 'auditor'), checks=str(observed),
@@ -205,8 +202,6 @@ def main():
         checks.append({'check': 'explicit inline completion preserves zero blind counts, rejects missing rounds and contradictory PROVED', 'passed': True})
         audit.save(run / 'dummy-inline-report.json', fallback)
         final_judgment.write_text(receipt)
-        # The independent review found that a script detection overrode PROVED. Keep the
-        # actual contradictory verdict in both the score and aggregate regression.
         judged.update(verdict='PROVED', fresh_blind_checker=True, receipt='dummy contradictory verdict fixture only')
         audit.save(judgment, judged)
         audit.score(argparse.Namespace(auditor=str(checker.parent / 'auditor'), checks=str(observed),
@@ -224,7 +219,6 @@ def main():
         checks.append({'check': 'fresh PROVED remains missed despite a script detection, including aggregate', 'passed': True})
         audit.save(run / 'dummy-contradictory-score.json', item)
         audit.save(run / 'dummy-contradictory-report.json', report)
-        # Old or inconsistent derived fields must not bypass the nested actual verdict.
         inconsistent = dict(item, result='caught', checker_caught=True, blind_caught=True)
         audit.save(observed / 'inconsistent-score.json', inconsistent)
         refused('aggregate rejects catch flags contradicting actual PROVED verdict', lambda: audit.report(
@@ -253,8 +247,6 @@ def main():
             assert result == 1 and unfinished['incomplete_rounds'] == ['dummy'] and unfinished['caught'] == 0
             assert unfinished['incomplete_count'] == 1 and unfinished['script_only_count'] == 1
         checks.append({'check': 'fresh BLOCKED and UNPROVEN judgments leave detected rounds incomplete', 'passed': True})
-        # Native checks alone must never authorize missing clean UI/source proof. These
-        # are disposable receipts, not actual product or independent-checker evidence.
         original_manifest = (baseline / 'baseline.json').read_bytes()
         manifest = json.loads(original_manifest)
         manifest['requires_ui_receipt'] = True
@@ -318,7 +310,7 @@ def main():
         refused('a fresh source judgment cannot waive failed API or incomplete transport scope',
                 lambda: audit.attestation(baseline, json.dumps(judged), ui_path, scope_path))
         captured['checks'].pop()
-        captured['checks'].pop()  # a missing real entry cleanup result cannot masquerade as complete
+        captured['checks'].pop()
         audit.save(scope_path, captured)
         judged['scope_receipt_sha256'] = audit.digest(scope_path)
         refused('missing actual corpus/API/viewer phase cannot count as complete',

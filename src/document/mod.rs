@@ -1,9 +1,3 @@
-//! Provider documents (spec #21): OpenAPI and AsyncAPI files a repository with a `[serve]`
-//! table keeps. `refresh` reads each one into a `Summary`, derived from its bytes alone and
-//! stored in the index; `Http::declare` turns the routes into provider contracts at query time,
-//! `Channel::declare` the channel sides, and `report` gives the status lines. Readers see the JSON value model whatever the syntax (`events.rs`);
-//! `schema.rs` reads a response schema into a shape.
-
 mod asyncapi;
 pub(crate) mod events;
 mod openapi;
@@ -20,22 +14,14 @@ use crate::shape::Shape;
 use crate::workspace::Repository;
 use crate::{channel, http};
 
-/// The largest document read; a larger one is unreadable. The largest public single-file
-/// descriptions are 10 to 15 MB (GitHub's REST API, Stripe's SDK spec), far past the manifests'
-/// `lang::MAX_BYTES`.
 // ponytail: a flat 16 MiB, parsed whole in memory; a streaming reader that keeps only the
 // paths, servers and channels lifts it.
 pub(crate) const DOCUMENT_BYTES_MAX: usize = 16 << 20;
 
-/// Whether `path` (repository-relative) is a document by its file name: `openapi.yaml`,
-/// `openapi.yml`, `openapi.json`, or a name ending in `.openapi.` and one of those extensions;
-/// the same with `asyncapi`.
 pub fn is_document(path: &str) -> bool {
     named(path, "openapi") || named(path, "asyncapi")
 }
 
-/// Whether the file name of `path` is `<format>.<ext>` or `<name>.<format>.<ext>`, with `ext`
-/// `yaml`, `yml` or `json`.
 fn named(path: &str, format: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
     let Some((stem, ext)) = name.rsplit_once('.') else {
@@ -47,25 +33,18 @@ fn named(path: &str, format: &str) -> bool {
 
 pub use meada_core::export::Format;
 
-/// What Meada read from one document. Nothing else of the file is kept.
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
 pub struct Summary {
-    /// For a document read; `None` when it was ignored (see `problems`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format: Option<Format>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
-    /// `info.title`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// Sorted by path, then method, each once.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub routes: Vec<Route>,
-    /// The root `servers` URLs that name a host or a server path, sorted, each once.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub servers: Vec<Server>,
-    /// The channel sides an AsyncAPI document lists, sorted by broker kind, name and role, each
-    /// once.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub channels: Vec<Side>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -73,8 +52,6 @@ pub struct Summary {
 }
 
 impl Summary {
-    /// What `search` shows of a document read: `openapi 3.1.0, routes: 3`, or `asyncapi 3.0.0,
-    /// channels: 2`. Nothing for one ignored.
     pub fn shown(&self) -> Option<String> {
         let (format, version) = (self.format?, self.version.as_ref()?);
         let counted = match format {
@@ -85,7 +62,6 @@ impl Summary {
         Some(format!("{} {version}, {counted}: {count}", format.name()))
     }
 
-    /// How many routes an OpenAPI document lists, or channels an AsyncAPI one.
     pub fn count(&self, format: Format) -> usize {
         match format {
             Format::Openapi => self.routes.len(),
@@ -93,7 +69,6 @@ impl Summary {
         }
     }
 
-    /// How many channels the sides are of: a channel both sent to and received from counts once.
     pub fn channel_count(&self) -> usize {
         let channels: BTreeSet<String> = self.channels.iter().map(Side::contract).collect();
         channels.len()
@@ -107,9 +82,6 @@ impl Summary {
     }
 }
 
-/// What a root `servers` URL gives: the host it is served on (lower case, as a consumer's URL
-/// names it) and its server path (normalized, no trailing `/`, empty for none). A relative URL
-/// has no host.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Server {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -118,19 +90,15 @@ pub struct Server {
     pub path: String,
 }
 
-/// One side of a channel an AsyncAPI document lists: a producer or a consumer of the channel
-/// `name` of the broker kind `broker`.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Side {
     pub broker: String,
     pub name: String,
     pub role: Role,
-    /// What its messages carry (`asyncapi.rs`), when the document says.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape: Option<Shape>,
 }
 
-/// Which way the messages of a channel side go.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "kebab-case")]
 pub enum Role {
@@ -143,8 +111,6 @@ impl Side {
         channel::contract(&self.broker, Some(&self.name))
     }
 
-    /// `kafka send orders.created`: the broker kind, the verb of the document's operation and
-    /// the channel. It ends the site of a side only a document lists.
     pub fn label(&self) -> String {
         let verb = match self.role {
             Role::Producer => "send",
@@ -154,13 +120,10 @@ impl Side {
     }
 }
 
-/// One path and method of a document; `path` is normalized like a code path.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Route {
     pub path: String,
-    /// Upper case: `GET`.
     pub method: String,
-    /// What its 2xx JSON response carries (`openapi.rs`), when the document says.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape: Option<Shape>,
 }
@@ -170,53 +133,26 @@ impl Route {
         http::contract(&self.method, &self.path)
     }
 
-    /// `GET /users/{}`.
     pub fn label(&self) -> String {
         format!("{} {}", self.method, self.path)
     }
 }
 
-/// Why a document, or part of one, was not read; rendered by `report`.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(tag = "problem", rename_all = "kebab-case")]
 pub enum Problem {
-    /// The file does not parse as YAML or JSON (or is not UTF-8).
     Unreadable { line: usize, error: String },
-    /// It parses, but is not AsyncAPI 2.x or 3.0; `found` is what it says it is, such as
-    /// `asyncapi 1.2.0`.
     AsyncFormat { found: Option<String> },
-    /// A channel on a server whose protocol Meada has no broker kind for: that channel is
-    /// ignored. Each protocol once, sorted.
     Protocol { protocol: String },
-    /// A channel name with parameters, ignored. Each once, sorted.
     Parameters { channel: String },
-    /// An AsyncAPI document with channels and no root `servers`: no channel has a broker kind,
-    /// so every one is ignored.
     NoServers,
-    /// A server a channel uses has no `protocol`: the channel is ignored on it. Each once,
-    /// sorted.
     NoProtocol { server: String },
-    /// A channel lists a server the document does not have: ignored on it. Each pair once,
-    /// sorted.
     UnknownServer { channel: String, server: String },
-    /// It parses, but is not OpenAPI 3.0 or 3.1; `found` is what it says it is, such as
-    /// `swagger 2.0`.
     Format { found: Option<String> },
-    /// A `$ref` to another file or a URL in a response schema: not followed, so the part of
-    /// the shape behind it is open. Each reference once, sorted.
     ExternalRef { reference: String },
-    /// A path item that is a `$ref` to another file or a URL: not followed, so the routes
-    /// behind it are not read. Each reference once, sorted.
     ExternalPathItem { reference: String },
 }
 
-/// The summary of the document at `path` (repository-relative) holding `src`. JSON by the
-/// extension, YAML otherwise. It never fails: what cannot be read is a problem, and a document
-/// larger than `DOCUMENT_BYTES_MAX` is unreadable at its first line whatever the rest holds.
-///
-/// The content decides the format, since a listed document can have any name: a top-level
-/// `openapi` field is OpenAPI, an `asyncapi` one AsyncAPI. With neither, the name only picks
-/// which format the document is reported as not being.
 pub fn read(path: &str, src: &[u8]) -> Summary {
     if src.len() > DOCUMENT_BYTES_MAX {
         let error = format!("larger than {} MiB", DOCUMENT_BYTES_MAX >> 20);
@@ -232,8 +168,6 @@ pub fn read(path: &str, src: &[u8]) -> Summary {
     }
 }
 
-/// The document's value, or the line and the reason it cannot be read. An error at the end of
-/// the file is on its last line.
 fn parse(path: &str, src: &[u8]) -> Result<Value, (usize, String)> {
     let breaks = src.iter().filter(|&&b| b == b'\n').count();
     let last = breaks + usize::from(!src.ends_with(b"\n"));
@@ -241,9 +175,6 @@ fn parse(path: &str, src: &[u8]) -> Result<Value, (usize, String)> {
         .map_err(|(line, error)| (line.min(last.max(1)), error))
 }
 
-/// The status lines of `repo` (its index content `export`) about its documents, in path
-/// order: each one read, each one ignored with why, and each route a later document lists
-/// again; then each path `[serve] documents` lists that has no document.
 pub fn report(repo: &Repository, export: &Export) -> Vec<String> {
     let mut lines = Vec::new();
     let mut first: BTreeMap<String, &str> = BTreeMap::new();
@@ -383,7 +314,6 @@ mod tests {
             ("openapi.yaml", "openapi: 3.1.0\n", ok("3.1.0")),
             ("openapi.yaml", "openapi: 3.0.3\n", ok("3.0.3")),
             ("openapi.yaml", "openapi: '3.0'\n", ok("3.0")),
-            // A number in YAML still names the version.
             ("openapi.yaml", "openapi: 3.1\n", ok("3.1")),
             ("openapi.json", r#"{"openapi": "3.1.0"}"#, ok("3.1.0")),
             ("openapi.yaml", "swagger: '2.0'\n", not(Some("swagger 2.0"))),
@@ -432,7 +362,6 @@ mod tests {
             read("api.asyncapi.yaml", openapi.as_bytes()).routes.len(),
             1
         );
-        // Neither field: the name picks the message, OpenAPI's for any other name.
         let swagger = "swagger: '2.0'\n";
         let found = Some("swagger 2.0".to_string());
         for (path, problem) in [

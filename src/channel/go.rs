@@ -1,16 +1,3 @@
-//! The channel kind's Go forms: the message libraries of the Go pack (spec #25),
-//! segmentio/kafka-go, confluent-kafka-go, sarama, amqp091-go, aws-sdk-go-v2's SQS, nats.go and
-//! go-redis. A form is a method called on a value that the source says the library made
-//! (`Code::origins` with `Follow::Declarations`: written as its type, or made by its constructor,
-//! through the methods that hand the object on, such as `Connection.Channel`; the constructor is
-//! spelled from the origin's outside name and steps), so a `Publish` or a `Send` on anything else
-//! is no producer. A function of the library is a callee that `Code::outside` names with the
-//! package itself as its head. The names are folded like URLs (`Code::expand`), struct fields of
-//! composite literals included.
-//!
-//! A client that calls back (`Subscribe(subject, handler)`) has the callback as its handler; a
-//! polling one, the function that holds the call naming the topic or the queue.
-
 use crate::channel::message::{
     Handler, Message, bind, channel_name as name, consume, consume_env, env_of, produce,
     produce_env, publish, topic, topics,
@@ -34,9 +21,6 @@ enum Client {
     Redis,
 }
 
-/// A library by the packages it is imported from (without a major version), what makes its
-/// client (the type it is written as, or the function that constructs it) and the methods that
-/// hand the client on (`Connection.Channel`).
 struct Library {
     client: Client,
     packages: &'static [&'static str],
@@ -45,7 +29,6 @@ struct Library {
 }
 
 impl Library {
-    /// Whether `origin`, what a value is made by outside the repository, is the library's client.
     fn made(&self, origin: &str) -> bool {
         self.packages.iter().any(|package| {
             let rest = origin.strip_prefix(package);
@@ -143,7 +126,6 @@ const LIBRARIES: &[Library] = &[
     },
 ];
 
-/// The methods a form is made of.
 const METHODS: &[&str] = &[
     "WriteMessages",
     "Produce",
@@ -178,7 +160,6 @@ pub(super) fn messages(code: &Code, clients: &[ChannelClient]) -> Vec<Message> {
             if !METHODS.contains(&method) {
                 continue;
             }
-            // The values of the call: `files` holds none, only the facts the index keeps.
             let Some(call) = code.call(path, n) else {
                 continue;
             };
@@ -207,9 +188,6 @@ pub(super) fn messages(code: &Code, clients: &[ChannelClient]) -> Vec<Message> {
     out
 }
 
-/// The Client declaration the call at `n` of `path` (named `method`) resolves to: an external
-/// function by its import path and name, or a definition of the repository the call reaches,
-/// by its file and qualified name. A name alone never matches.
 fn declared<'a, 'c>(
     code: &Code<'a>,
     path: &'a str,
@@ -238,9 +216,6 @@ fn declared<'a, 'c>(
     })
 }
 
-/// The sides a declared call makes, read as a built-in client of its role: the value at its
-/// topic position names each, lifted through exact callers when it is a parameter, its
-/// environment variable kept. A position the call or its literal lacks leaves it unresolved.
 fn client_sides<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -272,11 +247,6 @@ fn client_sides<'a>(
     sides
 }
 
-/// What the source says the value `name`, written in `scope` of `path`, is made by outside the
-/// repository, spelled as the imports name it: a type it is written as
-/// (`github.com/segmentio/kafka-go.Writer`), or the function that made it with the methods
-/// called on the way (`github.com/rabbitmq/amqp091-go.Dial.Channel`). The `Declarations`
-/// origin, its outside name and its steps.
 fn made_by<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> Option<String> {
     let found = code.origins(path, scope, Of::Name(name), Follow::Declarations);
     let origin = found.into_iter().next()?;
@@ -287,7 +257,6 @@ fn made_by<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) ->
     Some(made)
 }
 
-/// What the call at `n` of `path`, `method` of a `client`, produces or consumes.
 fn form<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -349,7 +318,6 @@ fn form<'a>(
         }
         (Client::Amqp, "Consume") => consume(code, path, n, "amqp", &one, None),
         (Client::Amqp, "QueueBind") => {
-            // `QueueBind(queue, key, exchange, ..)`.
             let read = |a: &[Value], _: &Keywords| {
                 Some((name(arg(a, 0))?, name(arg(a, 2))?, name(arg(a, 1))?))
             };
@@ -371,12 +339,10 @@ fn form<'a>(
     }
 }
 
-/// Whether the call `NewReader` of `call` is kafka-go's: a function of the package.
 fn is_kafka_reader<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> bool {
     is_library(code, path, &call.scope, &call.callee, "NewReader")
 }
 
-/// Whether `callee`, written in `scope` of `path`, is the function `function` of kafka-go.
 fn is_library<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -392,8 +358,6 @@ fn is_library<'a>(
         .is_some_and(|n| unversioned(&n) == format!("{KAFKA_GO}.{function}"))
 }
 
-/// The topics of `kafka.NewReader(kafka.ReaderConfig{Topic:, GroupTopics:})`, with the
-/// variable `Topic` is read from.
 fn reader(args: &[Value], _: &Keywords) -> Option<(Vec<Option<String>>, Option<String>)> {
     let config = arg(args, 0);
     let (single, group) = (field(config, "Topic")?, field(config, "GroupTopics")?);
@@ -411,10 +375,6 @@ fn reader(args: &[Value], _: &Keywords) -> Option<(Vec<Option<String>>, Option<S
     Some((names, single.and_then(env_of)))
 }
 
-/// The topic the Writer `receiver` is configured with when it is a constant the source builds:
-/// `Writer{Topic:}` or `NewWriter(WriterConfig{Topic:})`, with the variable it is read from.
-/// `None` when it sets none (the messages name it), the name `None` when it cannot be
-/// evaluated.
 fn configured<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -424,30 +384,24 @@ fn configured<'a>(
     let ((file, constant), value) = code.constant(path, &call.scope, receiver)?;
     let scope = crate::parent(constant);
     let config = match value {
-        // Only the library's constructor: a function of the repository of the same name says
-        // nothing about the topic its writer has.
         Value::Call(made) if is_library(code, file, scope, &made.callee, "NewWriter") => {
             made.args.first()?
         }
         Value::Call(_) => return None,
         value => value,
     };
-    // A `Topic` written after the literal (`w.Topic = ..`) may be any other.
     if code.field_written("Topic") {
         return Some((None, None));
     }
     let topic = field(config, "Topic")??;
     let folded = code.value(file, scope, topic);
     let named = name(&folded).unwrap_or(None);
-    // An empty topic leaves the messages to name it.
     named
         .as_deref()
         .is_none_or(|t| !t.is_empty())
         .then(|| (named, env_of(&folded)))
 }
 
-/// The topics of the messages a `WriteMessages` is given: a message, or a slice of them. A
-/// parameter makes the call a wrapper; anything else is unresolved.
 fn messages_topics(value: &Value) -> Option<Vec<Option<String>>> {
     match value {
         Value::List(items) => {
@@ -458,7 +412,6 @@ fn messages_topics(value: &Value) -> Option<Vec<Option<String>>> {
     }
 }
 
-/// The topic `TopicPartition.Topic` of a confluent `Message`, the field a pointer to a string.
 fn confluent_topic(message: &Value) -> Option<Vec<Option<String>>> {
     match field(message, "TopicPartition")? {
         Some(partition) => one_field(partition, "Topic", topic),
@@ -466,8 +419,6 @@ fn confluent_topic(message: &Value) -> Option<Vec<Option<String>>> {
     }
 }
 
-/// The one name the field `key` of the struct literal `value` gives, read by `read`: unresolved
-/// when the literal leaves it out. `None` when it depends on a parameter.
 fn one_field(
     value: &Value,
     key: &str,
@@ -479,8 +430,6 @@ fn one_field(
     }])
 }
 
-/// The streams of the `Streams` field of an `XReadGroupArgs`: the stream names are the first
-/// half of the list, the ids the second.
 fn streams(args: &Value) -> Option<Vec<Option<String>>> {
     match field(args, "Streams")? {
         Some(Value::List(items)) if items.len() % 2 == 0 => {
@@ -491,9 +440,6 @@ fn streams(args: &Value) -> Option<Vec<Option<String>>> {
     }
 }
 
-/// The value of the field `key` in the struct literal `value`: `Some(Some(v))`, `Some(None)` when
-/// the literal leaves it out or is not one (the field cannot be evaluated), and `None` when the
-/// value is a parameter.
 fn field<'v>(value: &'v Value, key: &str) -> Option<Option<&'v Value>> {
     let fields = match value {
         Value::Ref(_) => return None,
@@ -507,8 +453,6 @@ fn field<'v>(value: &'v Value, key: &str) -> Option<Option<&'v Value>> {
     property(fields, key).ok()
 }
 
-/// The handler a callback argument is: a function written in place or a definition of the
-/// repository.
 fn callback<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, at: usize) -> Option<Handler> {
     match call.args.get(at)? {
         Value::Function(def) => Some(Handler::Inline {
@@ -525,8 +469,6 @@ fn callback<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, at: usize) -> Op
     }
 }
 
-/// The `ConsumeClaim` method of the handler type a sarama `ConsumerGroup.Consume` is given: the
-/// literal written in place, or the name that holds one.
 fn claim_handler<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Option<Handler> {
     let held = match call.args.get(2)? {
         Value::New(ty, _) | Value::Ref(ty) => ty,
@@ -539,12 +481,10 @@ fn claim_handler<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Option<H
     })
 }
 
-/// The argument at position `at`, `Undefined` when the call leaves it out.
 fn arg(args: &[Value], at: usize) -> &Value {
     args.get(at).unwrap_or(&Value::Undefined)
 }
 
-/// The one channel name the first argument gives.
 fn one(args: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
     Some(vec![name(arg(args, 0))?])
 }
@@ -557,7 +497,6 @@ mod tests {
     use crate::resolve::Resolver;
     use std::collections::BTreeMap;
 
-    /// The messages of the Go file `src` as lines.
     fn lines(src: &str) -> Vec<String> {
         let facts = Go.parse("x.go", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("x.go", &facts)]);
@@ -586,7 +525,6 @@ func run() {
 	nc.Subscribe("orders.created", func(m *nats.Msg) {})
 }
 "#;
-        // The handler is the function literal, named by its byte offset.
         let at = src.find("func(m *nats.Msg)").unwrap();
         assert_eq!(
             lines(src),
@@ -598,8 +536,6 @@ func run() {
         );
     }
 
-    /// A client declared `*sqs.Client` is the SDK's, injected as a parameter; one a factory found
-    /// by name returns is not.
     #[test]
     fn an_sqs_client_declared_with_the_sdk_type_sends_and_receives() {
         let src = r#"package x

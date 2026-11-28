@@ -1,6 +1,4 @@
 #!/bin/sh
-# Local half of the gate in AGENTS.md: formatting of staged Rust files, and no em dash added to
-# staged Markdown. CI runs the full gate.
 set -eu
 
 staged=$(git diff --cached --name-only --diff-filter=ACMR)
@@ -15,7 +13,6 @@ fi
 
 md=$(printf '%s\n' "$staged" | grep '\.md$' || true)
 if [ -n "$md" ]; then
-  # Word splitting on $md is intended: one path per word.
   # shellcheck disable=SC2086
   if git diff --cached -U0 -- $md | grep '^+' | grep -v '^+++' | grep -q '—'; then
     echo "pre-commit: staged Markdown adds an em dash; use a comma, colon or parentheses" >&2

@@ -1,5 +1,3 @@
-//! Curated custom resources: the table owns types, this reader owns Kubernetes key paths.
-
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -129,7 +127,6 @@ pub(super) fn read(
         _ => return None,
     };
     let shape = types::named(&entry)?;
-    // A malformed spec is not an absent optional name and cannot invoke a default.
     let malformed = value
         .get("spec")
         .is_some_and(|spec| !spec.is_object() && !spec.is_null());
@@ -182,8 +179,6 @@ pub(super) fn read(
     })
 }
 
-/// Root-local references use the same original Kubernetes names as the ordinary reader.
-/// A duplicate or absent referent stays unresolved; no metadata-name fallback guesses its API name.
 pub(super) struct Targets<'a> {
     objects: &'a [Obj],
     named: HashMap<(&'a str, &'a str, Option<&'a str>, &'a str), Vec<usize>>,
@@ -355,12 +350,10 @@ impl Name {
         })
     }
 
-    /// Crossplane field-path patches that can change any retained identity or route are unread.
     pub(super) fn affected(&self, path: &str) -> bool {
         self.fields_affected(path) || self.namespace_affected(path)
     }
 
-    /// A default namespace matters only when a retained endpoint reference uses it.
     fn namespace_affected(&self, path: &str) -> bool {
         let implicit = self.qualifier.iter().chain(&self.source).any(|(_, input)| {
             matches!(

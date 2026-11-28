@@ -1,9 +1,3 @@
-//! A node with `[accounts]` and no `[oidc]` (#560, ADR 0024): `meada mcp --listen` admits the
-//! agent tokens for the nodes the console signs, checked with the signing key's public half
-//! alone against the console's `[ui] public_url`, and answers under the grant their groups map
-//! to, as an identity provider's token is answered. Tokens are signed here with a key pair the
-//! test generates; no service is needed.
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -14,13 +8,9 @@ use super::{Answer, SERVED, WEB, answers, ask, golden, raw, trace, traced, web_o
 use crate::manifest::{MANIFEST, chain_manifest, run, run_args};
 use crate::server::Server;
 
-/// The console's `public_url`: the issuer of every agent token.
 const CONSOLE: &str = "https://console.example";
 const NODES: &str = "meada:nodes";
 
-/// The chain, indexed, its manifest with `[postgres]`, the console's `[ui]` and `[accounts]` over
-/// `ops/public.pem` (written now, the private half never), and `tail`; the dir and the private
-/// half's signing key.
 fn node_manifest(case: &str, tail: &str) -> (PathBuf, EncodingKey) {
     let dir = chain_manifest(case);
     assert!(run(&dir, "index").2);
@@ -28,18 +18,12 @@ fn node_manifest(case: &str, tail: &str) -> (PathBuf, EncodingKey) {
     (dir, signing)
 }
 
-/// `[postgres]`, `[ui]` and `[accounts]` (a key pair generated now, its public half written beside
-/// `manifest`, the private file named but never written) and `tail`, appended to `manifest` of
-/// `dir`; the private half's signing key.
 pub(crate) fn with_accounts(dir: &Path, manifest: &str, tail: &str) -> EncodingKey {
     let (private, public) = crate::ui::accounts::pair();
     node_section(dir, manifest, &public, CONSOLE, tail);
     EncodingKey::from_ed_pem(private.as_bytes()).unwrap()
 }
 
-/// `[postgres]`, `[ui]` with the console's `issuer` and `[accounts]` over `public` (a PEM written
-/// beside `manifest`, the private file named but never written) and `tail`, appended to
-/// `manifest` of `dir`.
 pub(crate) fn node_section(dir: &Path, manifest: &str, public: &str, issuer: &str, tail: &str) {
     let file = dir.join(manifest);
     let base = file.parent().unwrap();
@@ -52,7 +36,6 @@ pub(crate) fn node_section(dir: &Path, manifest: &str, public: &str, issuer: &st
     fs::write(&file, fs::read_to_string(&file).unwrap() + &section).unwrap();
 }
 
-/// `[accounts.groups]` granting the group `web` the repository `WEB`.
 const GROUPS: &str = "\n[accounts.groups]\nweb = [\"example.com/chain/web\"]\n\
                       everything = [\"*\"]\n";
 
@@ -61,7 +44,6 @@ fn start(dir: &Path) -> Server {
     Server::start_args(dir, &args, &[])
 }
 
-/// The claims of an agent token for the nodes of `CONSOLE`, of `groups`, valid five minutes.
 fn claims(groups: &[&str]) -> Value {
     let now = jsonwebtoken::get_current_timestamp();
     json!({
@@ -74,7 +56,6 @@ fn sign(key: &EncodingKey, claims: &Value) -> String {
     jsonwebtoken::encode(&Header::new(Algorithm::EdDSA), claims, key).unwrap()
 }
 
-/// The tokens a node refuses with 401 `invalid_token`, each with its case.
 fn refused_tokens(signing: &EncodingKey) -> Vec<(&'static str, String)> {
     let good = claims(&["web"]);
     let edit = |change: &dyn Fn(&mut Value)| {
@@ -92,7 +73,6 @@ fn refused_tokens(signing: &EncodingKey) -> Vec<(&'static str, String)> {
     vec![
         ("malformed", "not-a-jwt".to_string()),
         ("wrong key", sign(&stranger, &good)),
-        // A session token: the console's audience.
         (
             "session token",
             edit(&|c| c["aud"] = "meada:console".into()),
@@ -130,7 +110,6 @@ fn refused_tokens(signing: &EncodingKey) -> Vec<(&'static str, String)> {
             )
             .unwrap(),
         ),
-        // {"alg":"none","typ":"JWT"}
         (
             "alg none",
             format!("eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.{payload}."),
@@ -146,13 +125,6 @@ fn challenge(answer: &Answer) -> (u16, Option<&str>) {
     (answer.status, answer.challenge.as_deref())
 }
 
-/// The demo's node side: no token is a 401 `Bearer` at the endpoint, the root and an unknown
-/// path, with no listing; every refused token (another key, a session token, another surface's,
-/// expired, `nbf` ahead, another issuer, a non-EdDSA algorithm, `crit`) a 401 `invalid_token`
-/// before routing, as are two `Authorization` headers; a token of the group `web` reads `WEB`
-/// alone, no answer naming a peer, and gets a 403 on another repository; a token of a group
-/// mapping to `*` reads the chain as the golden has it; the 404s list only what the token reads; a
-/// browser's request is refused first, whatever its token; and no part of a token reaches stderr.
 #[test]
 fn an_agent_token_reads_what_its_groups_map_to_and_nothing_else_passes() {
     let (dir, signing) = node_manifest("accounts_node_grant", GROUPS);
@@ -200,7 +172,6 @@ fn an_agent_token_reads_what_its_groups_map_to_and_nothing_else_passes() {
     }
     assert_eq!(ask(&at(WEB), Some(&none), &[], trace()).status, 403);
 
-    // The `Origin` 403 comes first, with or without a token.
     for token in [None, Some(all.as_str())] {
         let origin = [("Origin", &b"https://evil.example"[..])];
         let answer = ask(&at(WEB), token, &origin, trace());
@@ -215,8 +186,6 @@ fn an_agent_token_reads_what_its_groups_map_to_and_nothing_else_passes() {
     }
 }
 
-/// Without `[accounts.groups]`, an agent token reads every repository (ADR 0024, the single-team
-/// proof of concept), the trace as the golden has it; a token is still needed.
 #[test]
 fn without_a_groups_table_an_agent_token_reads_everything() {
     let (dir, signing) = node_manifest("accounts_node_all", "");
@@ -229,10 +198,6 @@ fn without_a_groups_table_an_agent_token_reads_everything() {
     assert_eq!(challenge(&ask(&at, None, &[], trace())), (401, MISSING));
 }
 
-/// A node with `[accounts]` and no `[oidc]` refuses to start, nothing listening, when its public
-/// key is missing, unreadable or no Ed25519 key, naming the key and never a value, and when its
-/// manifest has no `[ui]`, whose `public_url` is every token's issuer. It never reads the private
-/// half, which is never written here.
 #[test]
 fn a_node_refuses_to_start_without_a_readable_public_key_or_the_issuer() {
     let (dir, _) = node_manifest("accounts_node_refused", "");
@@ -272,12 +237,6 @@ fn a_node_refuses_to_start_without_a_readable_public_key_or_the_issuer() {
     refused("names no public key of the signing key pair");
 }
 
-/// On a node serving generations with pins (a generation made by hand, the pins' `[valkey]` never
-/// reached), a pin and a named workspace's route are admitted as their identity is: a 401 without
-/// a token, a 403 for a pin outside the grant, the pin served to a token reading `WEB`, the 404 of
-/// a generation not held only to a token reading the identity, a workspace id unknown the 404
-/// listing nothing to it. A generation that stops being servable is the fixed 503 to an admitted
-/// token, and the 401 without one.
 #[cfg(feature = "generation-pointer")]
 #[test]
 fn pins_named_workspaces_and_the_503_are_admitted_as_their_identity_is() {
@@ -326,7 +285,6 @@ fn pins_named_workspaces_and_the_503_are_admitted_as_their_identity_is() {
     let unknown = ask(&at(&workspace), Some(&web), &[], trace());
     assert_eq!((unknown.status, unknown.body.as_str()), (404, ""));
 
-    // No servable generation: the 503 to an admitted token, the 401 before it without one.
     fs::write(local.join("current"), "00000000000000bb 0\n").unwrap();
     let answer = ask(&at(WEB), Some(&web), &[], None);
     assert_eq!(

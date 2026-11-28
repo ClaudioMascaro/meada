@@ -1,4 +1,3 @@
-# Keep tool pins aligned with ui/.nvmrc and ui/scripts/wasm.mjs.
 FROM --platform=$BUILDPLATFORM node:22.23.1-bookworm@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37 AS node
 FROM --platform=$BUILDPLATFORM rust:1.98.1-bookworm@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e AS frontend
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
@@ -62,5 +61,4 @@ ENTRYPOINT ["meada"]
 FROM base AS cloud
 COPY --from=frontend /build/ui/dist/ /usr/share/meada/ui/
 
-# The default target does not depend on Node or the frontend stage.
 FROM base AS runtime

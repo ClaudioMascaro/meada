@@ -32,10 +32,9 @@ SEPARATE_SCOPE = ('corpus-api-viewer', 'public-infra', 'native-hcl', 'serverless
 SOURCE_CAPTURES = ('pinned-monitoring', 'adjacent-monitoring', 'native-hcl-values', 'generic-boutique',
                    'generic-kube-prometheus', 'generic-crossplane-aws', 'generic-kube-controls',
                    'generic-compose-controls', 'serverless-nodes')
-# Historical keys required by the existing drivers, not the final clean binary.
-PRE_CONFIG = '6a5eca5853193d205bcf756983b41e9cb16ffa9d'  # before #661, after cloud prerequisites
-PRE_IMAGE = 'eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62'  # before #662
-PRE_EXTENSIONS = 'e6d27d0d7c046eceb8771f17111f00511a8d6c3d'  # compatible A7 before #666/#668/#670/#671
+PRE_CONFIG = '6a5eca5853193d205bcf756983b41e9cb16ffa9d'
+PRE_IMAGE = 'eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62'
+PRE_EXTENSIONS = 'e6d27d0d7c046eceb8771f17111f00511a8d6c3d'
 
 
 def digest(path):
@@ -55,7 +54,6 @@ def git(*args):
 
 
 def keys():
-    # This skill and its feature skills (`prove-meada-*`), which hold the answer-key rows of their flows.
     folders = [SKILL, *sorted(SKILL.parent.glob(SKILL.name + '-*'))]
     return {str(p.relative_to(ROOT)): digest(p) for folder in folders for p in sorted(folder.rglob('*'))
             if (p.is_file() or p.is_symlink()) and '__pycache__' not in p.parts and p.suffix != '.pyc'}
@@ -100,8 +98,6 @@ def record_command(command, folder, name, cwd=ROOT, env=None, timeout=1200):
 
 @contextmanager
 def compiler_lock(run):
-    # The managed host has one common compiler lock; an isolated public runner needs only
-    # its own. Waiting is bounded in CI by the job timeout, with no active compiler outside it.
     path = Path(os.environ.get('PROVE_COMPILER_LOCK') or run / 'compiler.lock')
     with path.open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -114,13 +110,10 @@ def build(source, output, logs):
     source, output, logs = Path(source), Path(output), Path(logs)
     output.parent.mkdir(parents=True, exist_ok=True)
     logs.mkdir(parents=True, exist_ok=True)
-    # The optimization level of build.sh, so every binary of a run is built alike.
     env = dict(os.environ, CARGO_INCREMENTAL='0', CARGO_PROFILE_DEV_DEBUG='0', CARGO_PROFILE_DEV_OPT_LEVEL='1')
     env.setdefault('CARGO_BUILD_JOBS', '2')
     target = Path(env.get('CARGO_TARGET_DIR', str(ROOT / 'target'))).resolve()
     with compiler_lock(logs):
-        # Same-version worktrees share package fingerprints. A frozen binary is copied
-        # before releasing the lock, and each package root is touched inside that lock.
         for path in ('src/lib.rs', 'src/main.rs', 'meada-core/src/lib.rs'):
             (source / path).touch()
         code = record_command(['cargo', 'build', '--locked', '--bin', 'meada', '--target-dir', str(target)],
@@ -212,7 +205,6 @@ def baseline(args):
                   'meada-pre-image': PRE_IMAGE, 'meada-pre-extensions': PRE_EXTENSIONS}
     for label, revision in historical.items():
         worktree = run / ('source-' + label)
-        # A base no branch holds any more (e6d27d0) is fetched by its SHA, as build.sh does.
         if subprocess.run(['git', '-C', str(ROOT), 'cat-file', '-e', revision + '^{commit}']).returncode:
             subprocess.run(['git', '-C', str(ROOT), 'fetch', '--no-tags', 'origin', revision], check=True)
         subprocess.run(['git', '-C', str(ROOT), 'worktree', 'add', '--detach', str(worktree), revision], check=True)
@@ -220,7 +212,6 @@ def baseline(args):
             build(worktree, run / 'bin' / label, run / (label + '-build'))
         finally:
             subprocess.run(['git', '-C', str(ROOT), 'worktree', 'remove', '--force', str(worktree)], check=True)
-    # #648: the base binary is the answer key of the existing flows; the head is never its own.
     checks = check_flows(baseline_bin, base_bin, base_bin, run / 'checks', ALL, run / 'bin/meada-pre-extensions')
     manifest = {'source_commit': head, 'source_tree': git('rev-parse', 'HEAD^{tree}'), 'base_commit': base,
                 'verifier_keys': keys(), 'binaries': {
@@ -270,9 +261,6 @@ def attestation(packet, raw, ui_receipt=None, scope_receipt=None):
         entries = list(corpus())
         expected = ['corpus', 'viewer-start', 'viewer-pages', 'viewer-stop', 'source-and-ui-binary-unchanged']
         expected += [name + '-' + phase for name in entries for phase in ('ui-stdio', 'start', 'api', 'stop')]
-        # Source-confirmed changes from main are adjudicated, never silently reblessed.
-        # Only that comparison may have exit 1; the fresh checker must judge every
-        # delta and budget. API, feature parity, viewer and cleanup must pass directly.
         failures = [item for item in captured.get('checks', []) if item['exit']]
         if captured.get('source_commit') != manifest['source_commit'] or captured.get('source_tree') != manifest['source_tree'] \
                 or captured.get('baseline_manifest_sha256') != digest(packet / 'baseline.json') \
@@ -333,8 +321,6 @@ def candidate(args):
             raise RuntimeError('STOP: exact restore failed; retained byte backup is authoritative')
     if failure:
         raise failure
-    # This packet contains no mutation name, source file, patch or expected symptom. A
-    # fresh checker must still avoid auditor artifacts, workflow inputs and this plan.
     save(run / 'checker/candidate.json', {'source_commit': manifest['source_commit'],
          'baseline_manifest_sha256': digest(packet / 'baseline.json'),
          'binary_sha256': digest(run / 'checker/meada-candidate'), 'restored_before_publication': True})
@@ -437,7 +423,7 @@ def scope_check(args):
         run / 'logs', 'corpus', timeout=2700)
     receipt['checks'].append({'flow': 'corpus', 'exit': code})
     save(run / 'receipt.json', receipt)
-    for name in corpus():  # exact loader membership, seven pinned repositories/eight packs
+    for name in corpus():
         record_path = target / 'head' / name / 'record.json'
         if not record_path.is_file():
             receipt['checks'].append({'flow': name + '-api', 'exit': 2, 'reason': 'native corpus record unavailable'})
@@ -524,8 +510,6 @@ def scope_check(args):
     capture_failed = any(item['exit'] and (item['flow'] != 'corpus' or item['exit'] != 1) for item in all_checks)
     receipt['capture_result'] = 'INCOMPLETE' if capture_failed else 'CAPTURED'
     save(run / 'receipt.json', receipt)
-    # A completed capture is not a semantic pass over corpus differences. Their raw
-    # exit 1 and BROKEN script result stay visible until the fresh source judgment.
     return 2 if blocked else 1 if capture_failed else 0
 
 
@@ -557,7 +541,6 @@ def score(args):
     evidence_text = evidence.read_text(errors='replace')
     symptom = judged.get('symptom', '')
     names_symptom = bool(symptom and symptom in evidence_text and re.search(case['evidence'], evidence_text, re.I))
-    # Exit 3 is `prove.py values`/`iac`'s answer key rejecting an answer: a detection, as exit 1 is.
     script_caught = failed['exit'] in (1, 3) and names_symptom and judged.get('script_names_symptom') is True
     checker_caught = bool(judged.get('verdict') == 'BROKEN' and names_symptom and judged.get('checker') and judged.get('receipt'))
     script_detection = 'caught' if script_caught else \
@@ -615,8 +598,6 @@ def report(args):
     script_only = [item['mutation'] for item in current if item['script_caught'] and not item['blind_caught']]
     complete = not not_blind and not (missing or missed or luck or incomplete) and caught == len(planned) \
         and blind == len(planned) and final_clean and independent_final
-    # audit-prove-it permits scripted checks when fresh agents are unavailable or forbidden.
-    # Keep their blind judgments incomplete and give the explicit fallback its own result.
     script_complete = bool(not_blind and inline_final and final_clean and final_judgment_valid
         and not missing and len(current) == len(planned) and all(
             item['script_caught'] and item['script_detection'] == 'caught' and item['checker_caught']

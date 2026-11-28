@@ -43,7 +43,6 @@ use tokio_postgres::tls::{ChannelBinding, NoTls, TlsConnect};
 use crate::modules::{Problem, Secret, at_least};
 use crate::msg::Msg;
 
-/// The variable `url_env` names by default.
 const URL_ENV: &str = "MEADA_POSTGRES_URL";
 // ponytail: the most `url_file` may hold; past it the connection fails, naming the file.
 const URL_MAX: u64 = 4096;
@@ -54,14 +53,9 @@ const SCHEMA_MAX: usize = 63;
 // ponytail: the longest `statement_timeout` Postgres takes, in seconds (`INT_MAX` milliseconds).
 const STATEMENT_MAX: u64 = i32::MAX as u64 / 1000;
 
-/// The migrations in order: migration `n` is `MIGRATIONS[n - 1]`, `{schema}` standing for the
-/// quoted schema. `migrate` creates the schema itself, in migration 1's transaction, when it is
-/// absent. A later ticket appends the next one when it merges, never editing one before it.
 const MIGRATIONS: &[&str] = &[
-    // 1: the version the schema holds, one row that `migrate` alone writes.
     "CREATE TABLE {schema}.schema_version (version integer NOT NULL);
      INSERT INTO {schema}.schema_version VALUES (0);",
-    // 2: the audit (`crate::audit`), one row per write, never deleted by Meada.
     "CREATE TABLE {schema}.audit (
        id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
        \"time\" timestamptz NOT NULL DEFAULT now(),
@@ -75,9 +69,6 @@ const MIGRATIONS: &[&str] = &[
        outcome text NOT NULL,
        message text
      );",
-    // 3: the directory (`crate::directory`, #334): users and groups as the identity provider
-    // sent them, Meada's ids 32 lowercase hex characters, the memberships, and the revocation
-    // markers a deleted user leaves until it is provisioned again, active.
     "CREATE TABLE {schema}.directory_users (
        id text PRIMARY KEY DEFAULT replace(gen_random_uuid()::text, '-', ''),
        user_name text NOT NULL,
@@ -110,10 +101,6 @@ const MIGRATIONS: &[&str] = &[
        external_id text,
        revoked timestamptz NOT NULL DEFAULT now()
      );",
-    // 4: the directory's state (#335), one row the SCIM endpoint updates in each write's
-    // transaction: whether a group was ever provisioned (a directory whose final group was
-    // deleted differs from one never fed, for `owner_missing`) and the time of the last write.
-    // An existing directory starts from what it holds.
     "CREATE TABLE {schema}.directory_state (
        singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
        groups_provisioned boolean NOT NULL,
@@ -127,11 +114,6 @@ const MIGRATIONS: &[&str] = &[
          (SELECT max(revoked) FROM {schema}.directory_revoked)
        )
      );",
-    // 5: the permissions set (#331), one kept: `meada github-app roles` replaces it in one
-    // transaction, its repositories what GitHub showed of each identity on the host (`listed`,
-    // `not_found`, `forbidden`, `uncovered`, `not_a_repository`), its rows every collaborator
-    // GitHub listed, and its exclusions the additions left out (`no_role`, `role_not_accepted`);
-    // times from Postgres's clock.
     "CREATE TABLE {schema}.permission_sets (
        id text PRIMARY KEY DEFAULT replace(gen_random_uuid()::text, '-', ''),
        fence bigint NOT NULL,
@@ -161,18 +143,8 @@ const MIGRATIONS: &[&str] = &[
        reason text NOT NULL,
        PRIMARY KEY (set_id, identity)
      );",
-    // 6: where a repository of the permissions set came from (#341, ADR 0021): the workspace
-    // selects it (`selected`, every row so far), only `[catalog]` allows it (`catalog`), or both.
-    // The catalog is the `catalog` and `both` rows whose coverage is `listed`.
     "ALTER TABLE {schema}.permission_repositories
        ADD COLUMN source text NOT NULL DEFAULT 'selected';",
-    // 7: named workspaces (#342, ADR 0021). A workspace is a stable id with a name, a current
-    // version and a `seq`, the base every write must still find; `entries` is the identities of
-    // the current version in manifest order, a copy that moves with `current` so that a list
-    // reads no store document. Operators are (workspace, subject) pairs; a version row says who
-    // stored a document of the shared store and when; the history is append only. An exclusion
-    // belongs to the deployment workspace (`context` empty) or to one named workspace, and a
-    // named entry has no `added_by`.
     "CREATE TABLE {schema}.workspaces (
        id text PRIMARY KEY,
        name text NOT NULL,
@@ -216,21 +188,10 @@ const MIGRATIONS: &[&str] = &[
      ALTER TABLE {schema}.permission_exclusions ADD COLUMN context text NOT NULL DEFAULT '';
      ALTER TABLE {schema}.permission_exclusions ALTER COLUMN added_by DROP NOT NULL;
      ALTER TABLE {schema}.permission_exclusions ADD PRIMARY KEY (set_id, context, identity);",
-    // 8: the version lifecycle of named workspaces (#343, ADR 0021 contract 4). A version row
-    // keeps the identities of its document, in manifest order, so that a list of versions
-    // filters by the reader's grant without reading a store document per row, as `workspaces
-    // .entries` does for the current one. Every row so far is a creation's version, which is
-    // still the workspace's current one. The column is NOT NULL once filled: a row the backfill
-    // missed fails the migration instead of reading as an empty set, which every grant contains.
     "ALTER TABLE {schema}.workspace_versions ADD COLUMN entries text[];
      UPDATE {schema}.workspace_versions v SET entries = w.entries
        FROM {schema}.workspaces w WHERE w.id = v.workspace_id AND w.current = v.version;
      ALTER TABLE {schema}.workspace_versions ALTER COLUMN entries SET NOT NULL;",
-    // 9: local accounts (#554, ADR 0024): one row per account, never deleted or renamed by Meada.
-    // A username is 1 to 64 lowercase ASCII letters, digits, `.`, `-` and `_`; the hash an
-    // argon2id PHC string; the role `operator` or `viewer`; the groups owner names. The lockout
-    // (`failures`, `locked_until`) and the verified GitHub login, unique when present, are the
-    // later tickets' columns, created here so the table moves once.
     "CREATE TABLE {schema}.accounts (
        username text PRIMARY KEY,
        password_hash text NOT NULL,
@@ -245,10 +206,6 @@ const MIGRATIONS: &[&str] = &[
        created timestamptz NOT NULL DEFAULT now(),
        created_by text
      );",
-    // 10: when the GitHub grant provider's first permissions set started (#454), one row the
-    // role check writes once and never moves: an `added_by` written by then is `unattributed`.
-    // A schema that holds a set already starts from that set's start: the latest run's, since a
-    // run deletes the sets before it, so later than the true first and stricter, never looser.
     "CREATE TABLE {schema}.permission_state (
        singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
        first_started timestamptz NOT NULL
@@ -276,13 +233,9 @@ pub struct Config {
     url: Secret,
     ca_file: Option<PathBuf>,
     schema: String,
-    /// The most connections a process holds: the callers that pool them (S4 tickets 2, 5, 6
-    /// and 8) read it; `migrate` and `status` open one.
     pool_size: u64,
     connect_timeout: Duration,
     statement_timeout: Duration,
-    /// Every transaction read-only (`default_transaction_read_only`): the proposal server's
-    /// connections (ADR 0022), where a write is refused by Postgres itself.
     read_only: bool,
 }
 
@@ -330,9 +283,6 @@ impl File {
     }
 }
 
-/// Whether `schema` is a name Meada accepts: lowercase letters, digits and `_`, starting with a
-/// letter, not `pg_` (reserved by Postgres), at most `SCHEMA_MAX` characters. Such a name needs no
-/// escaping inside double quotes.
 fn schema_ok(schema: &str) -> bool {
     schema.len() <= SCHEMA_MAX
         && schema.starts_with(|c: char| c.is_ascii_lowercase())
@@ -340,21 +290,15 @@ fn schema_ok(schema: &str) -> bool {
         && (schema.bytes()).all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 
-/// The connection URL's parts, decoded.
 #[derive(Debug, PartialEq)]
 struct Url {
     user: Option<String>,
     password: Option<Vec<u8>>,
-    /// A DNS name or an IP address, an IPv6 one without its brackets.
     host: String,
     port: u16,
     dbname: Option<String>,
 }
 
-/// `text` as a connection URL: `postgres://` or `postgresql://`, optionally a user and a
-/// password, a TCP host (a name or an IP address, IPv6 in brackets), optionally a port and a
-/// database, and nothing after: no query (so no `sslmode`, TLS being Meada's decision) and no
-/// fragment. A Unix socket path or a list of hosts is no TCP host.
 fn parse(text: &str) -> Result<Url, Msg<'static>> {
     let invalid = || Msg::PostgresUrlInvalid;
     let rest = (text.strip_prefix("postgres://"))
@@ -388,7 +332,6 @@ fn parse(text: &str) -> Result<Url, Msg<'static>> {
             None => (hostport, None),
         },
     };
-    // A TCP host is a name or an address rustls can verify: no `/`, `%`, `,` or space.
     if ServerName::try_from(host).is_err() {
         return Err(invalid());
     }
@@ -413,15 +356,11 @@ fn parse(text: &str) -> Result<Url, Msg<'static>> {
     })
 }
 
-/// Whether a connection to `host` goes over TLS: always outside loopback (`localhost`,
-/// `127.0.0.0/8`, `::1`), and on loopback when the section names a `ca_file`, so a local TLS
-/// proxy keeps working and a configured CA is never silently ignored.
 fn over_tls(host: &str, ca_file: bool) -> bool {
     ca_file || !crate::modules::loopback(host)
 }
 
 impl Config {
-    /// The key that names where the URL comes from.
     fn url_key(&self) -> &'static str {
         match self.url {
             Secret::Env(_) => "postgres.url_env",
@@ -429,8 +368,6 @@ impl Config {
         }
     }
 
-    /// The URL, read now from the variable or the file (on a blocking thread, so a slow mount
-    /// stalls no timeout) and checked. An error names the key and never the URL.
     async fn url(&self) -> Result<Url, String> {
         let named = |what: String| format!("`{}`: {what}", self.url_key());
         let source = self.url.clone();
@@ -444,20 +381,16 @@ impl Config {
         parse(&text).map_err(|reason| named(reason.text()))
     }
 
-    /// The schema, as written.
     #[cfg(feature = "accounts")]
     pub(crate) fn schema(&self) -> &str {
         &self.schema
     }
 
-    /// The schema, quoted for a statement (`schema_ok` leaves nothing to escape).
     pub(crate) fn quoted(&self) -> String {
         format!("\"{}\"", self.schema)
     }
 }
 
-/// The TLS of a connection to Postgres: rustls with ring (no process default is read or
-/// installed), verifying against `ca_file` alone when set, else the system's roots.
 fn tls(ca_file: Option<&Path>) -> Result<rustls::ClientConfig, String> {
     use rustls::pki_types::{CertificateDer, pem::PemObject};
     use rustls_platform_verifier::BuilderVerifierExt;
@@ -494,7 +427,6 @@ fn tls(ca_file: Option<&Path>) -> Result<rustls::ClientConfig, String> {
     Ok(builder.with_no_client_auth())
 }
 
-/// tokio-postgres's TLS hook over tokio-rustls, for the one host the URL names.
 struct Tls(tokio_rustls::TlsConnector, ServerName<'static>);
 
 impl TlsConnect<TcpStream> for Tls {
@@ -507,12 +439,9 @@ impl TlsConnect<TcpStream> for Tls {
     }
 }
 
-/// A TLS stream to Postgres.
 struct Stream(tokio_rustls::client::TlsStream<TcpStream>);
 
 impl tokio_postgres::tls::TlsStream for Stream {
-    /// `tls-server-end-point` of the server's certificate, so SCRAM runs as `-PLUS` whenever the
-    /// server offers it; none when the certificate's hash is unknown (`end_point`).
     fn channel_binding(&self) -> ChannelBinding {
         let leaf = self
             .0
@@ -527,14 +456,10 @@ impl tokio_postgres::tls::TlsStream for Stream {
     }
 }
 
-/// The `tls-server-end-point` channel binding of a DER certificate (RFC 5929, 4.1): its hash with
-/// the digest its signature algorithm names, SHA-256 for MD5 and SHA-1. `None` for a signature
-/// with no digest of its own (Ed25519) or one not listed here, which Postgres cannot bind either.
 // ponytail: no SHA-224 (ring has none), DSA or Ed448 signature gets a binding; add one when a
 // deployment's certificate needs it.
 fn end_point(cert: &[u8]) -> Option<Vec<u8>> {
     use ring::digest::{SHA256, SHA384, SHA512, digest};
-    // The contents and the rest of the DER element at the start of `der`, if its tag is `tag`.
     fn element(tag: u8, der: &[u8]) -> Option<(&[u8], &[u8])> {
         let (&first, der) = der.strip_prefix(&[tag])?.split_first()?;
         let (len, der) = match first {
@@ -565,7 +490,6 @@ fn end_point(cert: &[u8]) -> Option<Vec<u8>> {
         [p @ .., 0x03, 0x02] if p == ECDSA => &SHA256,
         [p @ .., 0x03, 0x03] if p == ECDSA => &SHA384,
         [p @ .., 0x03, 0x04] if p == ECDSA => &SHA512,
-        // RSASSA-PSS: the hash is its parameters' `[0] hashAlgorithm`, SHA-1 when absent.
         [p @ .., 0x0a] if p == PKCS1 => {
             let (pss, _) = element(SEQUENCE, parameters)?;
             match element(EXPLICIT_0, pss) {
@@ -615,10 +539,6 @@ impl AsyncWrite for Stream {
     }
 }
 
-/// A connection to the configured Postgres, its version not checked (`migrate` alone uses it as
-/// is): the URL read, TCP to its host, TLS by `over_tls`, all within `connect_timeout_seconds`,
-/// and every statement bounded by `statement_timeout_seconds`. An error never carries the
-/// password.
 async fn open(config: &Config) -> Result<Opened, String> {
     let bound = config.connect_timeout;
     match tokio::time::timeout(bound, handshake(config)).await {
@@ -627,7 +547,6 @@ async fn open(config: &Config) -> Result<Opened, String> {
     }
 }
 
-/// `open` without its bound.
 async fn handshake(config: &Config) -> Result<Opened, String> {
     let url = config.url().await?;
     let secret = (url.password.as_deref()).map(|p| String::from_utf8_lossy(p).into_owned());
@@ -677,7 +596,6 @@ async fn handshake(config: &Config) -> Result<Opened, String> {
     Ok(Opened { client, secret })
 }
 
-/// An open connection and the password it was opened with, which no error may carry.
 pub(crate) struct Opened {
     pub(crate) client: tokio_postgres::Client,
     secret: Option<String>,
@@ -688,8 +606,6 @@ impl Opened {
         scrub(&reason(&e), self.secret.as_deref())
     }
 
-    /// `scrub` holding its own copy of the password, for the errors of a transaction, which
-    /// borrows the client.
     #[cfg(feature = "oidc")]
     pub(crate) fn scrubber(&self) -> impl Fn(tokio_postgres::Error) -> String + use<> {
         let secret = self.secret.clone();
@@ -697,8 +613,6 @@ impl Opened {
     }
 }
 
-/// `e` with its causes (`db error: FATAL: password authentication failed for user "meada"`):
-/// tokio-postgres's own text stops at `db error`.
 fn reason(e: &tokio_postgres::Error) -> String {
     let mut text = e.to_string();
     let mut cause = std::error::Error::source(e);
@@ -709,7 +623,6 @@ fn reason(e: &tokio_postgres::Error) -> String {
     text
 }
 
-/// `text` without the secret, if the text carries it.
 fn scrub(text: &str, secret: Option<&str>) -> String {
     match secret {
         Some(secret) if !secret.is_empty() => text.replace(secret, "***"),
@@ -717,9 +630,6 @@ fn scrub(text: &str, secret: Option<&str>) -> String {
     }
 }
 
-/// The schema version this binary knows: its number of migrations. In debug builds
-/// `MEADA_POSTGRES_VERSION_MAX` caps it (a knob for tests and not documented, as
-/// `MEADA_DRAIN_MS` is; a release binary ignores it).
 fn known() -> i32 {
     let all = MIGRATIONS.len() as i32;
     #[cfg(debug_assertions)]
@@ -732,7 +642,6 @@ fn known() -> i32 {
     all
 }
 
-/// The version the schema holds: 0 when the schema or its version table is absent.
 async fn stored(opened: &Opened, config: &Config) -> Result<i32, String> {
     let client = &opened.client;
     let table = format!("{}.schema_version", config.quoted());
@@ -748,12 +657,8 @@ async fn stored(opened: &Opened, config: &Config) -> Result<i32, String> {
     Ok(row.map_err(|e| opened.scrub(e))?.get(0))
 }
 
-/// The statements of `stored` (the table's lookup, then the version), which every `connected`
-/// runs before the caller's own.
 const VERSION_STATEMENTS: u32 = 2;
 
-/// The version check every connection but `migrate`'s makes: `stored` must be `known`. Lower
-/// (an absent schema included) names `meada postgres migrate`; higher names both versions.
 fn check(schema: &str, stored: i32, known: i32) -> Result<(), String> {
     match stored.cmp(&known) {
         Ordering::Equal => Ok(()),
@@ -782,25 +687,15 @@ pub async fn connect(config: &Config) -> Result<(tokio_postgres::Client, i32), S
 }
 
 impl Config {
-    /// How long a connection through `connected` and `statements` statements of the caller's own
-    /// on it may take, all told: the connect timeout, one statement timeout per statement and
-    /// `VERSION_STATEMENTS` more for the version check `connected` makes first. What a caller
-    /// with no one waiting on it bounds itself by, since a peer that stops answering without
-    /// closing the connection would hold it forever (the server's `statement_timeout` does not
-    /// fire then). A call site counts its own statements, a transaction's begin and commit
-    /// included, and says so beside the call.
     pub(crate) fn bound(&self, statements: u32) -> Duration {
         self.connect_timeout + self.statement_timeout * (statements + VERSION_STATEMENTS)
     }
 }
 
-/// `connect`, keeping the password so a later statement's error can be scrubbed of it.
 pub(crate) async fn connected(config: &Config) -> Result<Opened, String> {
     versioned(config).await.map_err(|(why, _)| why)
 }
 
-/// `connected` telling the version refusal apart: its error is why, and whether it is a schema
-/// version this binary does not know (a node writes that one once, #332).
 pub(crate) async fn versioned(config: &Config) -> Result<Opened, (String, bool)> {
     let opened = open(config).await.map_err(|why| (why, false))?;
     let version = stored(&opened, config).await.map_err(|why| (why, false))?;
@@ -825,8 +720,6 @@ pub fn probe(config: &Config) -> Result<(), String> {
     crate::modules::within(config.bound(0), run, Msg::PostgresTimeout).unwrap_or(Ok(()))
 }
 
-/// Whether `text` is a time as Meada's statements answer one (`to_char` of a `timestamptz` at
-/// UTC): `YYYY-MM-DDTHH:MM:SS.ffffffZ`.
 #[cfg_attr(
     not(any(feature = "ui", feature = "oidc", feature = "generation-pointer")),
     expect(dead_code)
@@ -843,8 +736,6 @@ pub(crate) fn is_time(text: &str) -> bool {
         })
 }
 
-/// The advisory lock key of `schema`'s migrations: the first eight bytes of a BLAKE3 hash, so
-/// every binary computes the same key for the same schema and two schemas rarely share one.
 fn lock_key(schema: &str) -> i64 {
     let hash = blake3::hash(format!("meada postgres migrate {schema}").as_bytes());
     i64::from_le_bytes(hash.as_bytes()[..8].try_into().expect("eight bytes"))
@@ -861,7 +752,6 @@ pub fn migrate(manifest: &Path) -> crate::Result<i32> {
     let run = async {
         let mut opened = open(&config).await?;
         let key = lock_key(&config.schema);
-        // The wait is a statement: `statement_timeout_seconds` would cancel it.
         let unbounded = (opened.client)
             .batch_execute("SET statement_timeout = 0")
             .await;
@@ -875,7 +765,6 @@ pub fn migrate(manifest: &Path) -> crate::Result<i32> {
             .await;
         bounded.map_err(|e| opened.scrub(e))?;
         let reached = steps(&mut opened, &config).await;
-        // Closing the connection releases the lock too.
         let _ = (opened.client)
             .execute("SELECT pg_advisory_unlock($1)", &[&key])
             .await;
@@ -884,7 +773,6 @@ pub fn migrate(manifest: &Path) -> crate::Result<i32> {
     Ok(crate::modules::block_on(run)??)
 }
 
-/// The migrations from the stored version to the binary's, under the lock.
 async fn steps(opened: &mut Opened, config: &Config) -> Result<i32, String> {
     let (stored, known) = (stored(opened, config).await?, known());
     let schema = config.schema.as_str();
@@ -946,7 +834,6 @@ mod tests {
     #[test]
     fn a_bound_counts_the_connection_the_version_check_and_the_callers_statements() {
         let config = section("").unwrap();
-        // 5 s to connect, then 10 s for each of the version check's two and the caller's own.
         assert_eq!(config.bound(0), Duration::from_secs(25));
         assert_eq!(config.bound(1), Duration::from_secs(35));
     }
@@ -1064,7 +951,6 @@ mod tests {
     fn only_a_loopback_host_without_a_ca_file_connects_in_plain_tcp() {
         for host in ["localhost", "127.0.0.1", "127.4.5.6", "::1"] {
             assert!(!over_tls(host, false), "{host}");
-            // A configured CA is never ignored: a local TLS proxy keeps working.
             assert!(over_tls(host, true), "{host}");
         }
         for host in [
@@ -1091,13 +977,11 @@ mod tests {
 
     #[test]
     fn migrations_name_only_their_schema_and_the_lock_key_is_stable() {
-        // Every name after a keyword that takes a table is the schema's.
         for migration in MIGRATIONS {
             let sql = migration.replace("{schema}", "\"s\"");
             let words: Vec<&str> = sql.split_whitespace().collect();
             for pair in words.windows(2) {
                 let keyword = ["TABLE", "INTO", "UPDATE", "FROM", "ON", "REFERENCES"];
-                // `ON DELETE` is a foreign key's action, not a table.
                 if keyword.contains(&pair[0]) && pair[1] != "DELETE" {
                     assert!(pair[1].starts_with("\"s\"."), "{sql}");
                 }
@@ -1121,8 +1005,6 @@ mod tests {
             out.extend(contents);
             out
         }
-        // A certificate whose signature algorithm is `oid` with `parameters`, its body large
-        // enough for long-form lengths.
         let cert = |oid: &[u8], parameters: &[u8]| {
             let algorithm = der(0x30, &[der(0x06, oid), parameters.to_vec()].concat());
             let tbs = der(0x30, &[0u8; 300]);
@@ -1138,15 +1020,15 @@ mod tests {
         let null = der(0x05, &[]);
         let sha1 = [0x2b, 0x0e, 0x03, 0x02, 0x1a];
         for (signed, hash) in [
-            (cert(&pkcs1(0x04), &null), &SHA256), // MD5
-            (cert(&pkcs1(0x05), &null), &SHA256), // SHA-1
+            (cert(&pkcs1(0x04), &null), &SHA256),
+            (cert(&pkcs1(0x05), &null), &SHA256),
             (cert(&pkcs1(0x0b), &null), &SHA256),
             (cert(&pkcs1(0x0c), &null), &SHA384),
             (cert(&pkcs1(0x0d), &null), &SHA512),
             (
                 cert(&[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x01], &[]),
                 &SHA256,
-            ), // SHA-1
+            ),
             (cert(&ecdsa(0x02), &[]), &SHA256),
             (cert(&ecdsa(0x03), &[]), &SHA384),
             (cert(&ecdsa(0x04), &[]), &SHA512),
@@ -1159,17 +1041,12 @@ mod tests {
             let bound = end_point(&signed);
             assert_eq!(bound.as_deref(), Some(digest(hash, &signed).as_ref()));
         }
-        // Ed25519, SHA-224 and a truncated certificate bind nothing.
         assert_eq!(end_point(&cert(&[0x2b, 0x65, 0x70], &[])), None);
         assert_eq!(end_point(&cert(&pkcs1(0x0e), &null)), None);
         let whole = cert(&pkcs1(0x0b), &null);
         assert_eq!(end_point(&whole[..whole.len() - 1]), None);
     }
 
-    /// Over TLS, SCRAM negotiates `SCRAM-SHA-256-PLUS` with the server's certificate: a client
-    /// that requires channel binding connects to the Postgres of `MEADA_TEST_POSTGRES_TLS_URL`,
-    /// verified against `MEADA_TEST_POSTGRES_TLS_CA`. Without them it prints why and skips
-    /// (fails with `MEADA_TEST_SERVICES_REQUIRED=1`).
     #[test]
     fn over_tls_a_client_requiring_channel_binding_connects() {
         use tokio_postgres::config::{ChannelBinding, Host};
@@ -1217,13 +1094,11 @@ mod tests {
         );
         let err = runtime.block_on(missing.url()).unwrap_err();
         assert!(err.starts_with("`postgres.url_file`: "), "{err}");
-        // Past `URL_MAX`, the file is refused, naming it.
         let big = std::env::temp_dir().join(format!("meada-postgres-url-{pid}"));
         std::fs::write(&big, vec![b'x'; URL_MAX as usize + 1]).unwrap();
         let config = section(&format!("url_file = \"{}\"", big.display())).unwrap();
         let err = runtime.block_on(config.url()).unwrap_err();
         assert!(err.ends_with("larger than 4096 bytes"), "{err}");
-        // Past `POSTGRES_CA_MAX`, so is the CA.
         let ca = std::env::temp_dir().join(format!("meada-postgres-ca-{pid}"));
         std::fs::write(&ca, vec![b'x'; POSTGRES_CA_MAX as usize + 1]).unwrap();
         let err = tls(Some(&ca)).err().unwrap();

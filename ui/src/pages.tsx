@@ -23,12 +23,10 @@ export const routes = [
   { path: '/accounts', label: 'accounts' },
 ] as const;
 
-/** The pages `session` is offered (the profile, with local accounts, and the accounts page, to the global operator alone with them): the audit, when the console has one, is the global operator's alone, and the catalog (#341) and the named workspaces (#342) are every admitted subject's when the console has them. */
 export function offered(session?: Session, audit = false, catalog = false, workspaces = false, profile = false, accounts = false) {
   return routes.filter(route => (route.path !== '/profile' || profile) && (route.path !== '/accounts' || (accounts && session?.role === 'operator')) && (route.path !== '/audit' || (audit && session?.role === 'operator')) && (route.path !== '/catalog' || catalog) && (route.path !== '/workspaces' || workspaces));
 }
 
-/** `locked`: the page offers nothing to navigate to (the sign-in and the forced password change), so no link and no menu. */
 export function Shell({ path, locale, onLanguage, session, t, children, onNavigate, audit, catalog, workspaces, profile, accounts, locked }: {
   path: string; locale: Language; onLanguage: (language: Language) => void;
   session?: Session; t: Copy; children: ReactNode; onNavigate?: (path: string) => void; audit?: boolean; catalog?: boolean; workspaces?: boolean;

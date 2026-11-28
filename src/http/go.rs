@@ -1,23 +1,3 @@
-//! Go providers (spec #25): `net/http`, gin, echo, chi and gorilla/mux. A router is the call
-//! that makes it (`gin.Default()`, `echo.New()`, `chi.NewRouter()`, `http.NewServeMux()`) or a
-//! group a method of it makes (`r.Group("/v1")`, `r.Route("/v1", fn)`,
-//! `r.PathPrefix("/v1").Subrouter()`), followed through assignments, arguments and return values
-//! (`Code::origins` with `Follow::Values`); a route is a call of one of the router's methods on
-//! it. A call is a function of a router package when `Code::outside` names it with the package
-//! itself as its head (`direct`), so a method of a typed local is not one. Where a route is
-//! served follows the mounts: a group is mounted on the router it is made on under its prefix
-//! (the router the function of a `Route` or `Group` receives is that group), a chi router on
-//! the one it is given to (`Mount(prefix, router)`), a `ServeMux` on the mux it is given to
-//! (`Handle(pattern, mux)`, where it keeps its own paths, served for the pattern's subtree and
-//! method alone), and `Follow::Values` reads every router that reaches the receiver, so a
-//! function registering on the router it receives serves it under every prefix its callers give
-//! it. A mount Meada does not read serves nothing: a router inside any other call
-//! (`http.StripPrefix`, `echo.WrapHandler`, a middleware) is one.
-//!
-//! The routers are the rows of `ROUTERS`: a package, what makes its routers, the methods that
-//! make a group or mount a router, and the methods that register a route. Another router package
-//! is another row.
-
 mod clients;
 
 pub(super) use clients::consumers;
@@ -34,72 +14,44 @@ use crate::lang::go::{modfile::unversioned, package_call};
 use crate::lang::{Call, Value, literal};
 use crate::resolve::{Code, Follow, Of, Target, method as member};
 
-/// How a route method says which methods the route serves.
 #[derive(Clone, Copy)]
 enum Serves {
-    /// The one method it is named for (`GET`).
     Method(&'static str),
-    /// Every method (`Any`).
     Any,
-    /// The method is the first argument, the path the second (`Handle(method, path, ..)`).
     Given,
-    /// A Go 1.22 pattern, `[METHOD ][HOST]/[PATH]`: its method, every method without one.
     Pattern,
-    /// Every method, or the ones a `.Methods(..)` chained on the call names (gorilla/mux).
     Chained,
 }
 
-/// How a method makes a group of routes under a prefix.
 #[derive(Clone, Copy)]
 enum Form {
-    /// `Group(prefix, middleware..)`: gin and echo.
     Prefix,
-    /// `Group(fn)`: chi, no prefix; `fn` receives the group.
     Callback,
-    /// `Route(prefix, fn)`: chi; `fn` receives the group.
     Route,
-    /// `PathPrefix(prefix).Subrouter()`: gorilla/mux; the method is the `Subrouter` call.
     Subrouter,
 }
 
-/// The spellings of a path parameter a router reads.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Params {
-    /// `{name}`, `{name:regex}`, `{name...}` and `{$}` only: `net/http` and gorilla/mux, where
-    /// `:name` and `*` are literal.
     Braces,
-    /// Braces, and `*` for the rest of the path: chi.
     Star,
-    /// Braces, `:name` and `*rest`: gin and echo.
     Colon,
 }
 
-/// Where a route method takes its handler.
 #[derive(Clone, Copy)]
 enum Handler {
-    /// The last argument: gin's `GET(path, middleware.., handler)`.
     Last,
-    /// The argument after the path: echo's `GET(path, handler, middleware..)`.
     Next,
 }
 
-/// A package whose routers serve routes.
 struct Router {
-    /// The import path of the package, without a major version.
     package: &'static str,
-    /// The functions of the package that make a router.
     made: &'static [&'static str],
-    /// The methods of a router that make a group under a prefix.
     groups: &'static [(&'static str, Form)],
-    /// The method that mounts the router given as its second argument under its first (chi's
-    /// `Mount`).
     mount: Option<&'static str>,
-    /// The methods that register a route, with the methods each serves.
     routes: &'static [(&'static str, Serves)],
     handler: Handler,
     params: Params,
-    /// Whether the package has a router of its own that its functions register on
-    /// (`http.HandleFunc`), and the mux it is served under no prefix.
     default: bool,
 }
 
@@ -115,7 +67,6 @@ const GIN_ROUTES: &[(&str, Serves)] = &[
     ("Handle", Serves::Given),
 ];
 
-// STDLIB and the router lookups must refer to the same table allocation.
 static ROUTERS: &[Router] = &[
     Router {
         package: "net/http",
@@ -142,7 +93,6 @@ static ROUTERS: &[Router] = &[
         made: &["New"],
         groups: &[("Group", Form::Prefix)],
         mount: None,
-        // echo has no `Handle`: `Add(method, path, handler)` is not read.
         routes: &[
             ("GET", Serves::Method("GET")),
             ("POST", Serves::Method("POST")),
@@ -193,21 +143,15 @@ static ROUTERS: &[Router] = &[
     },
 ];
 
-/// gorilla/mux restricts the methods of a route with `.Methods(..)` chained on the call that
-/// registers it, after the calls that keep the route (`Name`, `Schemes`, a second `Methods`).
 const RESTRICT: &str = "Methods";
 const KEEPS_ROUTE: &[&str] = &["Name", "Schemes", "Headers", "Queries", "Host", RESTRICT];
 
-/// Where routes are registered or served, a node of the mounts.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Place<'a> {
-    /// The call that makes a router or a group.
     Made(CallAt<'a>),
-    /// The router of `net/http` that its package functions register on.
     Default,
 }
 
-/// A call registering a route, on the place it is registered on.
 struct Registration<'a> {
     path: &'a str,
     n: usize,
@@ -215,18 +159,12 @@ struct Registration<'a> {
     member: &'a str,
 }
 
-/// The package, without its module's major version (`modfile::unversioned`), and the name an
-/// outside function is called by (`net/http`, `HandleFunc`).
 fn split(external: &str) -> Option<(String, &str)> {
     external
         .rsplit_once('.')
         .map(|(package, name)| (unversioned(package), name))
 }
 
-/// `path` as the segments of a path: each `{name}`, `{name:regex}` and `{rest...}` a parameter,
-/// the `{$}` that ends a pattern gone, and, as the router's `params` say, each `*rest` segment a
-/// parameter (chi, gin, echo) and each `:name` one (gin, echo); `None` when a brace is not
-/// closed, `{$}` is not the end, or a `:name` segment is a literal that no contract can spell.
 fn go_path(path: &str, params: Params) -> Option<String> {
     let (colon, star) = (params == Params::Colon, params != Params::Braces);
     let path = path
@@ -248,20 +186,14 @@ fn go_path(path: &str, params: Params) -> Option<String> {
     Some(segments.collect::<Vec<_>>().join("/"))
 }
 
-/// A `net/http` pattern, `[METHOD ][HOST]/[PATH]`: the host is dropped.
 #[derive(Clone)]
 struct Pattern {
-    /// `None` for a pattern without a method: every method.
     method: Option<String>,
-    /// The path, normalized.
     path: String,
-    /// Whether the path ends in `/` or `{name...}`: it holds everything below it.
     subtree: bool,
 }
 
 impl Pattern {
-    /// Whether a route of a mux the pattern mounts, at `route` (normalized), is reached: a mux
-    /// sees the whole path, so the route must fall under the pattern.
     fn holds(&self, route: &str) -> bool {
         let segments = |p: &str| -> Vec<String> {
             p.split('/')
@@ -277,8 +209,6 @@ impl Pattern {
         }
     }
 
-    /// The method a route of `method` is served for through the pattern: the pattern's own, when
-    /// the route has none or the same.
     fn serves(&self, method: Option<&str>) -> Option<Option<String>> {
         match (&self.method, method) {
             (Some(m), Some(r)) if m != r => None,
@@ -288,7 +218,6 @@ impl Pattern {
     }
 }
 
-/// The pattern `pattern` of `net/http`, `None` when its method or its path cannot be read.
 fn pattern(pattern: &str) -> Option<Pattern> {
     let (method, rest) = match pattern.split_once([' ', '\t']) {
         Some((method, rest)) => (Some(method), rest.trim_start_matches([' ', '\t'])),
@@ -305,37 +234,23 @@ fn pattern(pattern: &str) -> Option<Pattern> {
     })
 }
 
-/// `net/http`, the router whose mux a mount is read for.
 const STDLIB: &Router = &ROUTERS[0];
 
 struct Go<'c, 'a> {
     code: &'c Code<'a>,
-    /// The groups and the mounted routers of gin, echo, chi and gorilla/mux under their
-    /// prefixes. A router with an empty list is mounted where Meada does not read.
     mounts: Mounts<'a, Place<'a>>,
-    /// The `ServeMux`es given as a handler, with the router and the pattern each is given
-    /// under. A mux with an empty list, or only unreadable patterns, is served nowhere.
     patterns: BTreeMap<Place<'a>, Vec<(Place<'a>, Option<Pattern>)>>,
-    /// The groups whose function receives the group as its first parameter: chi's `Route(prefix,
-    /// fn)` and `Group(fn)`, by the function (a literal or a named one).
     callbacks: BTreeMap<Target<'a>, Vec<Place<'a>>>,
-    /// The methods `.Methods(..)` restricts the route registered by a call to; `None` when they
-    /// cannot be read or a second `Methods` ANDs the first: the route serves nothing.
     restricted: BTreeMap<CallAt<'a>, Option<Vec<String>>>,
 }
 
-/// A call making a group of routes under a prefix.
 struct Group<'a> {
-    /// The value the group is made on.
     parent: &'a Value,
-    /// The segment it adds, `None` when it cannot be read.
     prefix: Option<String>,
-    /// The function that receives the group.
     callback: Option<Target<'a>>,
 }
 
 impl<'c, 'a> Go<'c, 'a> {
-    /// Whether the call `at` is a function of `router` that makes a router.
     fn makes(&self, router: &Router, (path, n): CallAt<'a>) -> bool {
         let Some(call) = self.code.call(path, n) else {
             return false;
@@ -347,10 +262,6 @@ impl<'c, 'a> Go<'c, 'a> {
         }
     }
 
-    /// The places the routers that `value`, written in `scope` of `path`, may be are served at:
-    /// the ones it flows from, and the groups whose function receives it as its first parameter,
-    /// reached through the exact callers that pass the parameter on (`users(r)`) and the names
-    /// that hold it (`sub := r`).
     fn places(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Vec<Place<'a>> {
         let origins = self.code.origins(
             path,
@@ -374,8 +285,6 @@ impl<'c, 'a> Go<'c, 'a> {
         places
     }
 
-    /// Adds to `out` the groups the parameter `value` names stands for. Whether it read them all:
-    /// past `PREFIX_DEPTH` hops or `PREFIX_WORK` parameters it reads none.
     // ponytail: a group passed on through more than `PREFIX_DEPTH` exact calls and names, or
     // reached through more than `PREFIX_WORK` parameters, is served nowhere rather than under a
     // part of its callers.
@@ -394,7 +303,6 @@ impl<'c, 'a> Go<'c, 'a> {
         if depth >= PREFIX_DEPTH || seen.len() >= PREFIX_WORK {
             return false;
         }
-        // A name bound once to another (`sub := r`) is that name.
         if let Some(((at, constant), held)) = self.code.constant(path, scope, name) {
             return match held {
                 Value::Ref(_) => {
@@ -423,7 +331,6 @@ impl<'c, 'a> Go<'c, 'a> {
         read
     }
 
-    /// The routers of `router` that `value`, written in `scope` of `path`, may be.
     fn routers(
         &self,
         path: &'a str,
@@ -436,12 +343,10 @@ impl<'c, 'a> Go<'c, 'a> {
         made.collect()
     }
 
-    /// The `ServeMux`es `value`, written in `scope` of `path`, may be.
     fn muxes(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Vec<Place<'a>> {
         self.routers(path, scope, value, STDLIB)
     }
 
-    /// The group the call `call` of `path` makes, when it is one.
     fn group(&self, path: &'a str, call: &'a Call) -> Option<Group<'a>> {
         let scope = call.scope.as_str();
         let member = member(&call.callee);
@@ -490,10 +395,6 @@ impl<'c, 'a> Go<'c, 'a> {
         None
     }
 
-    /// Mounts the `ServeMux`es that `value`, the handler of a call written in `scope` of `path`,
-    /// holds on `parents` under `outer`. A mux inside a call (`http.StripPrefix`,
-    /// `echo.WrapHandler`, a middleware) is mounted where Meada does not read (`unread`). Whether
-    /// it found a mux.
     fn mount(
         &mut self,
         at: (&'a str, &'a str),
@@ -509,11 +410,6 @@ impl<'c, 'a> Go<'c, 'a> {
         !muxes.is_empty() || self.unread(at, value)
     }
 
-    /// Mounts the routers of `router` that `value`, the handler of a call written in `scope` of
-    /// `path`, may be on `parents` under `prefix` (`None`: it cannot be read), and the others it
-    /// holds nowhere Meada reads (`unread`). A `ServeMux` mounted this way sees the full path
-    /// (chi only advances its own routing path), which would combine the mux's chains with the
-    /// router's prefixes: it is not modelled.
     fn mount_router(
         &mut self,
         at: (&'a str, &'a str),
@@ -529,8 +425,6 @@ impl<'c, 'a> Go<'c, 'a> {
         self.unread(at, value);
     }
 
-    /// Marks the routers `value` holds as mounted where Meada cannot read: they are served
-    /// nowhere. Whether it found one.
     fn unread(&mut self, (path, scope): (&'a str, &'a str), value: &'a Value) -> bool {
         let mut found = false;
         for place in self.places(path, scope, value) {
@@ -553,8 +447,6 @@ impl<'c, 'a> Go<'c, 'a> {
         found
     }
 
-    /// The patterns a route registered on the mux `at` is reached through, one list for each way
-    /// the mux is served: none when it is mounted nowhere Meada reads, or too deep.
     fn chains(
         &self,
         at: Place<'a>,
@@ -570,7 +462,6 @@ impl<'c, 'a> Go<'c, 'a> {
         let Some(parents) = self.patterns.get(&at) else {
             return Some(vec![Vec::new()]);
         };
-        // A mux mounted inside itself, through any depth, adds nothing.
         if seen.contains(&at) {
             return Some(Vec::new());
         }
@@ -591,8 +482,6 @@ impl<'c, 'a> Go<'c, 'a> {
         Some(out)
     }
 
-    /// The method `arg`, an argument written in `scope` of `path`, names: a string, or a
-    /// constant of `net/http` (`http.MethodGet`), in upper case.
     fn method(&self, path: &'a str, scope: &'a str, arg: &'a Value) -> Option<String> {
         let method = match arg {
             Value::Ref(name) => {
@@ -611,8 +500,6 @@ impl<'c, 'a> Go<'c, 'a> {
         upper(&method).then_some(method)
     }
 
-    /// Reads the `.Methods(..)` call `n` of `path`: the route it restricts is the call it is
-    /// chained on, through the calls that keep the route.
     fn restrict(&mut self, path: &'a str, n: usize) {
         let Some(call) = self.code.call(path, n) else {
             return;
@@ -629,7 +516,6 @@ impl<'c, 'a> Go<'c, 'a> {
             };
             let name = member(&inner.callee);
             if chained(name) {
-                // A second `Methods` on the route ANDs the first.
                 let first = !self.restricted.contains_key(&(path, at));
                 let methods = methods.filter(|_| first);
                 self.restricted.insert((path, at), methods);
@@ -642,8 +528,6 @@ impl<'c, 'a> Go<'c, 'a> {
         }
     }
 
-    /// The handler `value` stands for: the function a `http.HandlerFunc(f)` conversion holds,
-    /// else the value itself.
     fn unwrapped(&self, path: &'a str, scope: &'a str, value: &'a Value) -> &'a Value {
         if let Value::Call(call) = value
             && let [inner] = &call.args[..]
@@ -657,7 +541,6 @@ impl<'c, 'a> Go<'c, 'a> {
         value
     }
 
-    /// The providers of one call registering a route on the router `at`.
     fn provide(
         &self,
         Registration {
@@ -685,7 +568,6 @@ impl<'c, 'a> Go<'c, 'a> {
                 Place::Default => router.default.then(String::new),
                 Place::Made(at) => self.makes(router, at).then(String::new),
             };
-            // A mux sees the whole path of the muxes it is given to; the others add prefixes.
             let (mut work, stdlib) = (PREFIX_WORK, std::ptr::eq(router, STDLIB));
             let chains = match stdlib {
                 true => self
@@ -700,7 +582,6 @@ impl<'c, 'a> Go<'c, 'a> {
             if prefixes.is_empty() && chains.is_empty() {
                 continue;
             }
-            // The methods (`None`: every method), the path, and the position of the path.
             let (methods, route, at) = match serves {
                 Serves::Method(m) => (
                     vec![Some(m.to_string())],
@@ -735,7 +616,6 @@ impl<'c, 'a> Go<'c, 'a> {
                     (methods, read(0).and_then(|p| go_path(&p, router.params)), 0)
                 }
             };
-            // A route whose path Meada cannot read serves nothing.
             let Some(route) = route else { continue };
             let handler = match router.handler {
                 Handler::Last => call.args.last().filter(|_| call.args.len() > at + 1),
@@ -743,7 +623,6 @@ impl<'c, 'a> Go<'c, 'a> {
             };
             let Some(handler) = handler else { continue };
             let handler = self.unwrapped(path, scope, handler);
-            // The method (`None`: every method) and the path of each way the route is served.
             let route = normalize_path(&route);
             let mut served = BTreeSet::new();
             for method in &methods {
@@ -769,7 +648,6 @@ impl<'c, 'a> Go<'c, 'a> {
     }
 }
 
-/// Go providers: see the module.
 pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     if !code.pack().extensions().contains(&"go") {
         return Vec::new();
@@ -781,8 +659,6 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
         callbacks: BTreeMap::new(),
         restricted: BTreeMap::new(),
     };
-    // The functions that receive a group and the routes a `.Methods(..)` restricts are read
-    // first: a call registering a route may come before them, or in another file.
     for (&path, facts) in code.files() {
         for (n, stored) in facts.calls.iter().enumerate() {
             let member = member(&stored.callee);
@@ -814,7 +690,6 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             if !(groups || routes || mounting.is_some()) {
                 continue;
             }
-            // The values of the call: `files` holds none, only the facts the index keeps.
             let Some(call) = code.call(path, n) else {
                 continue;
             };
@@ -826,16 +701,12 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             if !(routes || mounting.is_some()) {
                 continue;
             }
-            // `http.HandleFunc(..)` registers on the router of the package itself; any other
-            // call is a method of a router, whatever its head's type reads as.
             let external = package_call(go.code, path, &call.scope, &call.callee);
             if external
                 .as_deref()
                 .and_then(split)
                 .is_some_and(|(package, name)| clients::is_package_send(&package, name))
             {
-                // A URL argument of net/http.Get cannot mount a router. Tracing it as one
-                // follows every caller through rotated parameters before the client reader runs.
                 continue;
             }
             let package_call =
@@ -863,9 +734,6 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             if !routes {
                 continue;
             }
-            // A mux given as the handler is mounted under the pattern, whatever router it is
-            // given to; a router held by any other argument is an unread mount. What holds none
-            // is a route.
             let mut mounts = false;
             for (i, arg) in call.args.iter().enumerate() {
                 if member == "Handle" && call.args.len() == 2 && i == 1 {
@@ -893,13 +761,11 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     found
 }
 
-/// Whether a route method of a router is restricted by a chained `.Methods(..)`.
 fn chained(name: &str) -> bool {
     let mut routes = ROUTERS.iter().flat_map(|r| r.routes);
     routes.any(|(m, serves)| *m == name && matches!(serves, Serves::Chained))
 }
 
-/// Whether `method` is an HTTP method's spelling: upper-case letters.
 fn upper(method: &str) -> bool {
     !method.is_empty() && method.bytes().all(|b| b.is_ascii_uppercase())
 }
@@ -910,7 +776,6 @@ mod tests {
 
     #[test]
     fn a_path_has_each_parameter_spelling_as_one_segment() {
-        // gin and echo: `{..}` as the pattern of `net/http`, `:name` and `*rest` too.
         let cases = [
             ("/users/{id}", "/users/{}"),
             ("/users/{id:[0-9]+}", "/users/{}"),
@@ -938,7 +803,6 @@ mod tests {
         let read = |written: &str| go_path(written, Params::Braces).map(|p| normalize_path(&p));
         assert_eq!(read("/users/{id}").as_deref(), Some("/users/{}"));
         assert_eq!(read("/files/{path...}").as_deref(), Some("/files/{}"));
-        // `*` is a literal there, and a `:name` segment one a contract cannot spell.
         assert_eq!(read("/static/*").as_deref(), Some("/static/*"));
         assert_eq!(read("/users/:id"), None);
     }

@@ -1,4 +1,3 @@
-//! The documented .NET GCP factories and sync/async string or typed-name operations.
 use super::{Argument, Code, Frame, Handle, Role, Stage, argument};
 
 pub(super) fn constructed<'a>(

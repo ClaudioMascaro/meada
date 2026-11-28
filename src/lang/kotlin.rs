@@ -1,7 +1,3 @@
-//! The Kotlin language pack: one source file's syntax, with no compiler, JDK or build tool.
-//! Its files resolve with the Java pack's (`LanguagePack::resolves_with`), so the two share one
-//! layout of packages and types and call each other by fully qualified name.
-
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 use std::rc::Rc;
@@ -16,22 +12,15 @@ use super::{
 };
 use crate::{Result, qualify};
 
-/// How many named declarations may enclose a definition. Deeper bodies keep their enclosing
-/// symbol.
 // ponytail: real source nests a few declarations; this prevents quadratic qualified names.
 const DEFINITION_DEPTH: usize = 128;
-/// How deep arguments and concatenations are read before their value becomes unknown.
 // ponytail: real expressions nest a few levels; this bounds hostile source recursion.
 const VALUE_DEPTH: usize = 64;
-/// How many segments of a callee are kept before it becomes an unknown expression.
 // ponytail: real member paths are short; this keeps crafted chains cheap.
 const PATH_DEPTH: usize = 256;
-/// Enclosing-name bytes across syntax visits, before a file yields no facts.
 // ponytail: a long package prefix must not multiply across a broad file without a budget.
 const QUALIFICATION_BYTES: usize = 4 * 1024 * 1024;
 
-/// The hard keywords that open a declaration. The grammar reads one as a name only when it
-/// misparses a declaration as an infix call (`misparsed`).
 const DECLARATION_KEYWORDS: &[&str] = &[
     "class",
     "fun",
@@ -42,7 +31,6 @@ const DECLARATION_KEYWORDS: &[&str] = &[
     "var",
 ];
 
-/// The packages every Kotlin file on the JVM imports on demand without writing it.
 const DEFAULT_IMPORTS: &[&str] = &[
     "java.lang",
     "kotlin",
@@ -56,7 +44,6 @@ const DEFAULT_IMPORTS: &[&str] = &[
     "kotlin.text",
 ];
 
-/// The names `Comparable` declares, with the standard library's extensions on it.
 const COMPARABLE: &[&str] = &[
     "compareTo",
     "coerceAtLeast",
@@ -66,15 +53,12 @@ const COMPARABLE: &[&str] = &[
     "rangeUntil",
 ];
 
-/// The names `AutoCloseable` and `Closeable` declare, with the standard library's `use`.
 const CLOSEABLE: &[&str] = &["close", "use"];
 
 unsafe extern "C" {
-    /// The vendored grammar's constructor, which `build.rs` compiles (ADR 0017).
     fn tree_sitter_kotlin() -> *const ();
 }
 
-/// The Kotlin grammar, the way the grammar crates expose theirs.
 // SAFETY: the function is the tree-sitter CLI's generated constructor of a static language.
 const LANGUAGE: LanguageFn = unsafe { LanguageFn::from_raw(tree_sitter_kotlin) };
 
@@ -85,15 +69,11 @@ impl LanguagePack for Kotlin {
         &["kt", "kts"]
     }
 
-    /// Gradle's Kotlin DSL files are build manifests, not code.
     fn is_code(&self, path: &str) -> bool {
         let name = path.rsplit('/').next().unwrap_or(path);
         !matches!(name, "build.gradle.kts" | "settings.gradle.kts")
     }
 
-    /// Calls between Kotlin and Java files resolve by fully qualified name, through the Java
-    /// pack's layout of packages and types and its flags (`this`, `super`, class members in
-    /// scope, on-demand imports).
     fn resolves_with(&self) -> Option<&'static dyn LanguagePack> {
         Some(&super::java::Java)
     }
@@ -106,9 +86,6 @@ impl LanguagePack for Kotlin {
         true
     }
 
-    /// Kotlin's own outside types the Java pack's table (the JDK's, which Kotlin files resolve
-    /// with) lacks, and the standard library's extension functions on the JDK's: a call no own
-    /// overload fits by type takes them, so they count as names the type declares.
     fn known_outside(&self) -> super::KnownOutside {
         &[
             ("kotlin.Comparable", COMPARABLE),
@@ -119,8 +96,6 @@ impl LanguagePack for Kotlin {
         ]
     }
 
-    /// Spring's base configuration, as the Java pack lists it: a Kotlin-only repository gives
-    /// `@Value` its keys too.
     fn config_files(&self) -> &'static [&'static str] {
         crate::jvm::spring::CONFIG_FILES
     }
@@ -134,8 +109,6 @@ impl LanguagePack for Kotlin {
     }
 }
 
-/// Who sees a declaration: Kotlin's default is public; `internal` is the repository's module
-/// only, `private` its file or class only.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Access {
     Public,
@@ -143,9 +116,6 @@ enum Access {
     Private,
 }
 
-/// Where a node sits: at a file's top level, directly in a class body, in code (a function
-/// body, a getter), or in code whose scope is a class or the file (an `init` block, a secondary
-/// constructor, a property's initializer), where a declaration is no definition.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Place {
     Top,
@@ -159,48 +129,28 @@ struct Visit<'t> {
     scope: Rc<String>,
     place: Place,
     access: Access,
-    /// Inside a lambda, an object literal or an enum entry's body: declarations there are no
-    /// definitions.
     opaque: bool,
-    /// Whom a bare or `this` call reaches there.
     implicit: Implicit,
-    /// The type parameters in scope, which name no class.
     generics: Rc<Vec<String>>,
-    /// Inside the lambda of a `let` or `also` whose parameter is `it`, which a lambda that
-    /// declares no parameter hides in its own scope.
     typed_it: bool,
     depth: usize,
-    /// How long the scope's qualified name is up to its last named definition: the lambdas and
-    /// local functions after it (`.@<offset>`) are charged to the budget where they are stored.
     named_len: usize,
 }
 
-/// Whom a bare call or a call on `this` reaches in a piece of code.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Implicit {
-    /// The class around it, or the file: the call is read as written.
     Enclosing,
-    /// The receiver of an `apply`, `run` or `with` block (the scope is a block of its type,
-    /// `Facts::impls`), whose members a bare call reaches before the names around it. `super` is
-    /// still the enclosing class's.
     Receiver,
-    /// A lambda, an object literal or an enum entry's body may have a receiver no syntax names,
-    /// whose members come first: the call is read as a name match.
     Unknown,
 }
 
-/// What a scope function's receiver is, as far as the syntax says.
 #[derive(Clone)]
 enum Held {
     Class(Class),
-    /// A name, whose declared type is read once the whole file is.
     Name(String),
     Unknown,
 }
 
-/// A lambda passed to `apply`, `run` or `with` (`receiver`: its `this` is the receiver), or to
-/// `let`, `also` or `use` (its parameter is); `run { }` alone is a block with neither. `on` is
-/// the receiver as a value.
 struct Tracked {
     receiver: bool,
     parameter: bool,
@@ -208,8 +158,6 @@ struct Tracked {
     on: Value,
 }
 
-/// What a tracked lambda's scope `at` takes from a name declared elsewhere in the file: the
-/// type of its `this` (`name` none) or of its parameter.
 struct Later {
     at: String,
     within: String,
@@ -217,7 +165,6 @@ struct Later {
     held: Held,
 }
 
-/// One file's facts; a `script`'s declarations are its own, exported to no other file.
 fn parse(src: &[u8], script: bool) -> Result<Facts> {
     let mut parser = Parser::new();
     parser.set_language(&LANGUAGE.into())?;
@@ -235,10 +182,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         package,
         ..Facts::default()
     };
-    // Globs are read the latest first: the file's own package comes first and stops the
-    // reading, then the star imports, which see `internal` declarations and combine (two that
-    // give a name leave it ambiguous), then the default imports. Explicit imports come before
-    // any glob.
     for package in DEFAULT_IMPORTS {
         wildcard(package, false, &mut facts);
     }
@@ -260,28 +203,17 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         named_len: facts.package.len(),
     }];
     let mut budget = QUALIFICATION_BYTES;
-    // Type names written in the file, which nothing binds when they are not the repository's.
     let mut outside = BTreeSet::new();
-    // Names a class or the file declares as properties, and the typed locals, which a field of
-    // the same name hides where the source does not say which one a use reads.
     let mut fields: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    // The assignments to a name that can be a property (`f = v`, `this.f = v`, `o.f = v`, `f++`)
-    // with where each is and whether it may be a property of the class around it (`this.f`, or
-    // a bare `f` no local or parameter declares), and the properties by the class `Marked`
-    // names, which `Code::field_written_in` is asked about.
     let mut writes: Vec<(String, String, bool)> = Vec::new();
     let mut seen = Declared::new(root);
-    // The classes that declare a property, by its name.
     let mut members: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut classes: BTreeSet<String> = BTreeSet::new();
     let mut query_locals = Vec::new();
     let mut query_writes = HashMap::new();
     let mut locals: Vec<Receiver> = Vec::new();
-    // The `val`s of unknown class a `Bound` was recorded for, by qualified name.
     let mut vals: Vec<String> = Vec::new();
-    // Each call made on a call, with the range of the call it is made on.
     let mut chains: Vec<(usize, Range<usize>)> = Vec::new();
-    // The receivers of tracked lambdas, by the lambda's node.
     let mut tracked: HashMap<usize, Tracked> = HashMap::new();
     let mut later: Vec<Later> = Vec::new();
     let mut extensions: BTreeSet<(String, String)> = BTreeSet::new();
@@ -304,7 +236,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
             named_len
         };
         let Some(left) = budget.checked_sub(charge) else {
-            // A partial overload family could turn an ambiguous call into a false exact one.
             return Ok(Facts {
                 budget: Some(QUALIFICATION_BYTES),
                 ..Facts::default()
@@ -312,8 +243,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         };
         budget = left;
         if misparsed(node, src) {
-            // The declaration is lost with no ERROR node: the file is left out as a whole, like
-            // one over budget, rather than indexed without it, and `meada status` names it.
             return Ok(Facts {
                 misparsed: true,
                 ..Facts::default()
@@ -324,7 +253,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         let (mut inner_implicit, mut inner_generics) = (implicit, generics.clone());
         let mut inner_typed_it = typed_it;
         let mut skip_parameters = false;
-        // A lambda or a local function: a scope that keeps the named length of its own.
         let mut inline = false;
         let defining = !opaque && depth < DEFINITION_DEPTH && place != Place::Init;
         match node.kind() {
@@ -341,8 +269,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 inner_generics = with_parameters(&generics, node, src);
                 nested += 1;
                 let mut bases = bases(node, src);
-                // A companion's members are called on the class's name (`Point.origin()`) and
-                // by bare name inside it: the companion reads as the class's last base.
                 if let Some(companion) = body(node)
                     .flat_map(named)
                     .find(|n| n.kind() == "companion_object")
@@ -351,9 +277,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     let own = own.map_or("Companion", |n| text(n, src));
                     bases.push(format!("{name}.{own}"));
                 }
-                // A class's name called constructs it: the class joins the callables of its
-                // name (`Facts::overloads`, with a factory function of that name and its
-                // secondary constructors) with its primary constructor's parameters.
                 let params = constructor(node, src);
                 if params.is_some() {
                     let family = facts.overloads.entry(inner.as_ref().clone()).or_default();
@@ -382,7 +305,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 if children(node).any(|c| c.kind() == "interface") {
                     facts.interfaces.push(inner.as_ref().clone());
                 }
-                // Java reaches an object through its `INSTANCE` field.
                 if node.kind() == "object_declaration" {
                     facts.receivers.push(Receiver {
                         scope: inner.as_ref().clone(),
@@ -453,7 +375,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     .entry(family.clone())
                     .or_default()
                     .push(inner.as_ref().clone());
-                // A top-level `fun main` (not a script's, not an extension) starts a program.
                 if place == Place::Top && !script && base == "main" {
                     facts.programs.push(inner.as_ref().clone());
                 }
@@ -464,9 +385,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 }
                 annotate(&mut facts, node, src, &scope, &inner);
             }
-            // A function declared where it is no definition (in a lambda, an object literal, an
-            // initializer) is a scope of its own, as a lambda is: its body is not the code
-            // around it.
             "function_declaration" if depth < DEFINITION_DEPTH => {
                 inner = Rc::new(qualify(&scope, &format!("@{}", node.start_byte())));
                 let range = node.byte_range();
@@ -486,7 +404,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 if named(node).any(|n| n.kind() == "getter")
                     && let [name] = names[..]
                 {
-                    // A property with a getter is a definition, its calls the getter's.
                     let on = receiver(node, src);
                     let base = match &on {
                         Some(on) => format!("{on}.{}", text(name, src)),
@@ -555,17 +472,13 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                             publish(&mut facts, own, name, &qualify(&scope, name));
                         }
                     }
-                    // The initializer's calls belong to the declaration around it.
                     inner_place = Place::Init;
                 }
             }
-            // A constructor's `val` and `var` parameters are properties of the class; the others
-            // are seen by its initializers.
             "class_parameter" if defining => {
                 if let Some(name) = named(node).find(|n| n.kind() == "identifier") {
                     let written = children(node).any(|c| matches!(c.kind(), "val" | "var"));
                     let name = text(name, src);
-                    // The constructor's parameter, and the property it declares.
                     let at = (node.parent().into_iter().flat_map(named))
                         .take_while(|n| n.id() != node.id())
                         .filter(|n| n.kind() == "class_parameter")
@@ -582,7 +495,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                             name: name.to_string(),
                             is_static: false,
                         };
-                        // The parameter's value reaches the property, whatever the target.
                         let targets = [FIELD_TARGETS, &["param"]].concat();
                         mark(&mut facts, on, node, src, &scope, &targets);
                     }
@@ -591,8 +503,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                         class_of(ty, src, &generics, &mut outside)
                     });
                     if written {
-                        // An annotated one is injected, as a `lateinit var` is: no constant
-                        // stands in for what the annotation gives it (`Code::expand_with`).
                         let constant = children(node).any(|c| c.kind() == "val")
                             && annotations(node, src, &scope).is_empty();
                         fields
@@ -614,8 +524,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 }
                 inner_place = Place::Init;
             }
-            // A secondary constructor is a callable of its class's name, with its own
-            // parameter list (`Facts::overloads`); its body is read in the class's scope.
             "secondary_constructor" if defining => {
                 let (params, types, _) = parameters(node, src, &generics, &mut outside);
                 let class = scope.rsplit('.').next().unwrap_or_default();
@@ -643,7 +551,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     });
                 }
             }
-            // An enum entry's arguments are read in the enum's scope, its body as an object's.
             "class_body" if node.parent().is_some_and(|p| p.kind() == "enum_entry") => {
                 inner_opaque = true;
                 inner_implicit = Implicit::Unknown;
@@ -661,8 +568,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     on,
                 }) = given
                 {
-                    // The lambda is a scope of its own, a definition that folds into the
-                    // one around it: its `this` and its parameter are bound there.
                     inner = Rc::new(qualify(&scope, &format!("@{}", node.start_byte())));
                     let range = node.byte_range();
                     facts
@@ -717,10 +622,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     }
                 } else {
                     inner_implicit = Implicit::Unknown;
-                    // A lambda written as an argument is a scope of its own (`Value::Function`
-                    // names it there), as is one in a `let` around it that binds a typed `it`:
-                    // `it`, a lambda's one parameter when it declares none, hides that one only
-                    // inside it.
                     let lambda = node.kind() == "lambda_literal";
                     let it = lambda && named(node).all(|n| n.kind() != "lambda_parameters");
                     if (argument(node) || it && typed_it) && depth < DEFINITION_DEPTH {
@@ -769,8 +670,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                     }
                 }
                 if let Some((name, own)) = target.and_then(|t| write_target(t, src, &mut seen)) {
-                    // The `this` and the members of a lambda or an object literal are not the
-                    // class's.
                     let own = own && !opaque && implicit == Implicit::Enclosing;
                     writes.push((scope.as_ref().clone(), text(name, src).to_string(), own));
                 }
@@ -792,15 +691,12 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
             }
             _ => {}
         }
-        // Names code binds: locals, loop and lambda variables, `catch` parameters and the
-        // parameters of functions that are no definitions.
         let binds = match node.kind() {
             "variable_declaration" if matches!(place, Place::Code | Place::Init) => {
                 named(node).next()
             }
             "catch_block" => named(node).find(|n| n.kind() == "identifier"),
             "parameter" if !defining => named(node).next(),
-            // A function or class declared where it is no definition binds its name.
             "function_declaration" | "class_declaration" | "object_declaration" if !defining => {
                 node.child_by_field_name("name")
             }
@@ -817,12 +713,9 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 }
                 _ => Class::Unknown,
             };
-            // A `val`: a `var` may hold another value by the time it is used.
             let property = node
                 .parent()
                 .filter(|p| children(*p).any(|c| c.kind() == "val"));
-            // The value a client reader follows to its base: a constructor call, a factory call
-            // (`WebClient.create(..)`, `.build()`), written type or none.
             if let Some(initial) = property.and_then(initial) {
                 facts.bound.push(Bound {
                     scope: scope.to_string(),
@@ -855,7 +748,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
             false => inner.len(),
         };
         let mut pushed: Vec<Node> = named(node).collect();
-        // A property's own names are no locals of the code its initializer or getter is.
         if node.kind() == "property_declaration" && matches!(place, Place::Top | Place::Class) {
             pushed.retain(|n| {
                 !matches!(
@@ -864,7 +756,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
                 )
             });
         }
-        // `f(a) { }` is one call whose callee and arguments the inner node holds.
         if node.kind() == "call_expression"
             && let Some(first) = pushed.first().copied()
             && trailing(node, first)
@@ -893,17 +784,12 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
         facts.exports.clear();
         facts.private.clear();
     }
-    // A local is typed only where it is the one binding of its name in its scope; one named
-    // like a property may be read as the property, so its class is unknown.
     for local in &mut locals {
         let hidden = fields.get(&local.name);
         if hidden.is_some_and(|at| at.iter().any(|at| encloses(at, &local.scope))) {
             local.class = Class::Unknown;
         }
     }
-    // A write of a property of the class around it, the innermost one, names that class; any
-    // other, a property it inherits, one of an outer class its own class may inherit, an
-    // extension receiver's or one of another object, names none.
     let writes: BTreeSet<(String, Option<String>)> = (writes.into_iter())
         .map(|(scope, name, own)| {
             let around = innermost(&classes, &scope);
@@ -940,8 +826,6 @@ fn parse(src: &[u8], script: bool) -> Result<Facts> {
             })
             .collect(),
     );
-    // A name another binding of the scope also declares (a loop variable, a `catch` parameter)
-    // holds no one value: the bound of such a `val` is dropped. Two `val`s keep both bounds.
     let taken = |name: &String| {
         let (held, declared) = (vals.iter().filter(|v| *v == name).count(), &facts.locals);
         declared.iter().filter(|l| *l == name).count() > held
@@ -992,9 +876,6 @@ fn definition(name: &str, kind: Kind, range: Range<usize>, params: Vec<Param>) -
     }
 }
 
-/// Exports `local` under `exported` and under its fully qualified name, unless it is
-/// `private`: an `internal` one only the repository sees. A declaration that is not public is
-/// no export door either.
 fn publish(facts: &mut Facts, access: Access, exported: &str, local: &str) {
     if access != Access::Public {
         facts.hidden.push(local.to_string());
@@ -1018,8 +899,6 @@ fn publish(facts: &mut Facts, access: Access, exported: &str, local: &str) {
     }
 }
 
-/// A property without a getter: a `val` is a constant (its value read when it is the one
-/// declared), and a class's property hides an outer name in the class.
 fn property(
     facts: &mut Facts,
     place: Place,
@@ -1043,7 +922,6 @@ fn property(
     }
 }
 
-/// The declaration's own visibility, from its modifiers.
 fn own_access(node: Node, src: &[u8]) -> Access {
     let visibility = (named(node).filter(|n| n.kind() == "modifiers"))
         .flat_map(named)
@@ -1057,7 +935,6 @@ fn own_access(node: Node, src: &[u8]) -> Access {
     }
 }
 
-/// The declaration's `expect` or `actual` modifier, if it writes one.
 fn platform<'s>(node: Node, src: &'s [u8]) -> Option<&'s str> {
     (named(node).filter(|n| n.kind() == "modifiers"))
         .flat_map(named)
@@ -1065,7 +942,6 @@ fn platform<'s>(node: Node, src: &'s [u8]) -> Option<&'s str> {
         .map(|n| text(n, src))
 }
 
-/// `expect` when a declaration the node is nested in is `expect`: Kotlin makes its members so.
 fn enclosing_expect<'s>(node: Node, src: &'s [u8]) -> Option<&'s str> {
     let mut up = node.parent();
     while let Some(p) = up {
@@ -1079,9 +955,6 @@ fn enclosing_expect<'s>(node: Node, src: &'s [u8]) -> Option<&'s str> {
     None
 }
 
-/// The primary constructor's parameters of a class; `None` for an interface, an object, a
-/// companion or a class whose constructors are all secondary, which join the callables of its
-/// name one by one.
 fn constructor(node: Node, src: &[u8]) -> Option<Vec<Param>> {
     let class = node.kind() == "class_declaration"
         && children(node).all(|c| c.kind() != "interface")
@@ -1115,13 +988,10 @@ fn constructor(node: Node, src: &[u8]) -> Option<Vec<Param>> {
     Some(params.collect())
 }
 
-/// The body of a class or object declaration.
 fn body(node: Node) -> impl Iterator<Item = Node> {
     named(node).filter(|n| matches!(n.kind(), "class_body" | "enum_class_body"))
 }
 
-/// The supertypes a declaration writes after `:`, in order; one whose name cannot be read
-/// stays as an unread base (`(type)`), whose members are not known.
 fn bases(node: Node, src: &[u8]) -> Vec<String> {
     (named(node).filter(|n| n.kind() == "delegation_specifiers"))
         .flat_map(named)
@@ -1138,9 +1008,6 @@ fn bases(node: Node, src: &[u8]) -> Vec<String> {
         .collect()
 }
 
-/// The receiver type an extension function or property writes before its name (`Route` of
-/// `fun Route.orders()`), by name without type arguments: a type before the `name` field (or
-/// the variable) of the declaration, not its result type after it.
 fn receiver(node: Node, src: &[u8]) -> Option<String> {
     let mut found = None;
     for child in children(node) {
@@ -1157,7 +1024,6 @@ fn receiver(node: Node, src: &[u8]) -> Option<String> {
     type_name(ty, src)
 }
 
-/// A `user_type`'s dotted name, without type arguments (`Map.Entry` of `Map.Entry<K, V>`).
 fn type_name(ty: Node, src: &[u8]) -> Option<String> {
     let parts: Vec<&str> = (named(ty).filter(|n| n.kind() == "identifier"))
         .map(|n| text(n, src))
@@ -1165,8 +1031,6 @@ fn type_name(ty: Node, src: &[u8]) -> Option<String> {
     (!parts.is_empty()).then(|| parts.join("."))
 }
 
-/// A function's parameters and their types as written: a `vararg` one takes any number of
-/// arguments (`Binds::Rest`, spelled `vararg T`), one with a default value may be left out.
 fn parameters(
     node: Node,
     src: &[u8],
@@ -1214,17 +1078,12 @@ fn parameters(
     (params, types, classes)
 }
 
-/// Whether `node` is a declaration the grammar read as an infix call: a hard keyword as one of
-/// its operands (grammar 1.1.0 read `@A @B("x") class C { .. }` with `class` as an operand
-/// and `C` as the infix function).
-/// Valid code never names anything `class` or `fun`, and a backticked name keeps its backticks.
 fn misparsed(node: Node, src: &[u8]) -> bool {
     node.kind() == "infix_expression"
         && named(node)
             .any(|n| n.kind() == "identifier" && DECLARATION_KEYWORDS.contains(&text(n, src)))
 }
 
-/// A type's tokens as written, without annotations or comments, a space only between words.
 fn spelling(node: Node, src: &[u8]) -> String {
     let mut spelled = String::new();
     let mut pending = vec![node];
@@ -1251,7 +1110,6 @@ fn spelling(node: Node, src: &[u8]) -> String {
     spelled
 }
 
-/// The type parameters in scope inside the declaration `node`, with those it declares.
 fn with_parameters(outer: &Rc<Vec<String>>, node: Node, src: &[u8]) -> Rc<Vec<String>> {
     let Some(list) = named(node).find(|n| n.kind() == "type_parameters") else {
         return outer.clone();
@@ -1265,10 +1123,6 @@ fn with_parameters(outer: &Rc<Vec<String>>, node: Node, src: &[u8]) -> Rc<Vec<St
     Rc::new(all)
 }
 
-/// The class a written type names, as a path read among types: unknown for a function type, a
-/// type parameter, or a path with type arguments inside it (`Outer<T>.Inner`). A nullable type
-/// names the class of its type. The head of the path is noted in `outside`: a type nothing in
-/// the repository binds comes from outside it.
 fn class_of(ty: Node, src: &[u8], generics: &[String], outside: &mut BTreeSet<String>) -> Class {
     let mut ty = ty;
     while matches!(ty.kind(), "nullable_type" | "parenthesized_type") {
@@ -1304,7 +1158,6 @@ fn class_of(ty: Node, src: &[u8], generics: &[String], outside: &mut BTreeSet<St
     }
 }
 
-/// The type a function writes after its parameters (`Box?` of `fun find(): Box?`).
 fn returned(node: Node) -> Option<Node> {
     children(node)
         .skip_while(|c| c.kind() != "function_value_parameters")
@@ -1316,8 +1169,6 @@ fn returned(node: Node) -> Option<Node> {
         })
 }
 
-/// The call a call is made on the result of: `make()` in `make().save()`, `make()?.save()`,
-/// `make()!!.save()` and `make().x.save()`.
 fn chained(node: Node) -> Option<Node> {
     let mut at = parts(node).0?;
     while let Some(next) = match at.kind() {
@@ -1332,19 +1183,15 @@ fn chained(node: Node) -> Option<Node> {
     (at.kind() == "call_expression").then_some(at)
 }
 
-/// The class a variable declaration writes as its type.
 fn written(var: Node, generics: &[String], outside: &mut BTreeSet<String>, src: &[u8]) -> Class {
     (named(var).nth(1)).map_or(Class::Unknown, |ty| class_of(ty, src, generics, outside))
 }
 
-/// Whether the parameter `node` takes any number of arguments.
 fn vararg(node: Node, src: &[u8]) -> bool {
     (node.prev_named_sibling())
         .is_some_and(|p| p.kind() == "parameter_modifiers" && text(p, src).contains("vararg"))
 }
 
-/// The class the one variable a property declares has: its written type, else the class a
-/// constructor call initializes it with.
 fn declared(
     property: Node,
     generics: &[String],
@@ -1364,14 +1211,11 @@ fn declared(
     }
 }
 
-/// The expression the property declaration `node` is initialized with.
 fn initial(node: Node) -> Option<Node> {
     let mut children = children(node).skip_while(|c| c.kind() != "=");
     children.find(|c| c.is_named())
 }
 
-/// What an expression holds, as far as the syntax says: the class a constructor call `T(..)`
-/// gives, which `apply` and `also` pass on, or a name to read the declared type of.
 fn held(node: Node, src: &[u8], depth: usize) -> Held {
     let mut node = node;
     while node.kind() == "parenthesized_expression" {
@@ -1400,9 +1244,6 @@ fn held(node: Node, src: &[u8], depth: usize) -> Held {
                     {
                         return held(on, src, depth + 1);
                     }
-                    // `X.f(..)` calls a function of `X` (`Json.encodeToString(x)`): only a
-                    // capitalized name, as Kotlin writes a class's, is read as a constructor
-                    // (`a.b.Box()`, `Outer.Inner()`).
                     let path = callee(function, src);
                     let class = last.is_some_and(|l| l.starts_with(char::is_uppercase));
                     if path.contains('(') || !class {
@@ -1418,9 +1259,6 @@ fn held(node: Node, src: &[u8], depth: usize) -> Held {
     }
 }
 
-/// The lambda a call of `apply`, `run`, `with`, `let` or `also` passes, and what it takes from
-/// the receiver. Any other function that takes a lambda is not tracked, nor is one whose
-/// receiver is not known: its lambda keeps a receiver the syntax does not name.
 fn tracked_call<'t>(node: Node<'t>, src: &[u8]) -> Option<(Node<'t>, Tracked)> {
     let (function, args) = parts(node);
     let function = function?;
@@ -1466,8 +1304,6 @@ fn tracked_call<'t>(node: Node<'t>, src: &[u8]) -> Option<(Node<'t>, Tracked)> {
     ))
 }
 
-/// The name and written type of the one parameter a lambda declares, `it` when it declares
-/// none; `None` for several or a destructured one.
 fn lambda_parameter<'t>(lambda: Node<'t>, src: &[u8]) -> Option<(String, Option<Node<'t>>)> {
     let params: Vec<Node> = (named(lambda).filter(|n| n.kind() == "lambda_parameters"))
         .flat_map(named)
@@ -1483,9 +1319,6 @@ fn lambda_parameter<'t>(lambda: Node<'t>, src: &[u8]) -> Option<(String, Option<
 }
 
 /// An extension function or property extends its receiver's type: a block of that type
-/// (`Facts::extensions`), whose definitions are named under the receiver's name where the
-/// extension is written. A type parameter's (`fun <T> T.logged()`) is spelled in parentheses,
-/// which name no type.
 fn extension(
     facts: &mut Facts,
     seen: &mut BTreeSet<(String, String)>,
@@ -1511,8 +1344,6 @@ fn extension(
     }
 }
 
-/// The receivers with one entry per name and scope: a name bound twice with different classes
-/// holds an unknown one.
 fn merge(all: Vec<Receiver>) -> Vec<Receiver> {
     let mut at = HashMap::new();
     let mut receivers: Vec<Receiver> = Vec::new();
@@ -1534,8 +1365,6 @@ fn merge(all: Vec<Receiver>) -> Vec<Receiver> {
     receivers
 }
 
-/// Binds what tracked lambdas take from a name declared in the file: the nearest declaration
-/// of the name around the lambda, unless a binding of an unknown class is nearer.
 fn scoped(facts: &mut Facts, later: Vec<Later>) {
     let mut bound: HashMap<(&str, &str), Class> = HashMap::new();
     for r in &facts.receivers {
@@ -1620,15 +1449,12 @@ fn import(node: Node, src: &[u8], facts: &mut Facts) {
     });
 }
 
-/// Whether the call `node` passes a trailing lambda to the call `first` it is written after:
-/// `f(a) { }` is one call of `f`, not a call of what `f(a)` returns.
 fn trailing(node: Node, first: Node) -> bool {
     first.kind() == "call_expression"
         && named(node).skip(1).all(|n| n.kind() == "annotated_lambda")
         && named(first).all(|n| n.kind() != "annotated_lambda")
 }
 
-/// The arguments and trailing lambdas of a call, and the expression called.
 fn parts<'t>(node: Node<'t>) -> (Option<Node<'t>>, Vec<Node<'t>>) {
     let mut first = named(node).next();
     let mut args = Vec::new();
@@ -1650,15 +1476,11 @@ fn parts<'t>(node: Node<'t>) -> (Option<Node<'t>>, Vec<Node<'t>>) {
     (first, own)
 }
 
-/// The call `node` is, written in `scope`; with `lambdas`, a lambda argument is the
-/// `Kind::Inline` definition the walk gives it.
 fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit, lambdas: bool) -> Option<Call> {
     let (function, args) = parts(node);
     let function = function?;
     let mut callee = callee(function, src);
     match implicit {
-        // A lambda may have a receiver no syntax names, whose members a bare or `this` call
-        // reaches first: such a call is read as a name match.
         Implicit::Unknown => {
             if let Some(rest) = callee.strip_prefix("this.") {
                 callee = format!("(anonymous).{rest}");
@@ -1666,7 +1488,6 @@ fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit, lambdas: bool) 
                 callee = format!("(anonymous).{callee}");
             }
         }
-        // `super` in a block is the class around it, not the block's receiver's.
         Implicit::Receiver => {
             if let Some(rest) = callee.strip_prefix("super.") {
                 callee = format!("(anonymous).{rest}");
@@ -1711,20 +1532,13 @@ fn call(node: Node, src: &[u8], scope: &str, implicit: Implicit, lambdas: bool) 
     Some(at)
 }
 
-/// How `arguments` reads what is written between the parentheses.
 #[derive(Clone, Copy)]
 enum Args {
-    /// Values as written.
     Plain,
-    /// The entries of a `mapOf(..)`: an entry `k to v` is its key `k`, since every entry of a
-    /// `mapOf` is a pair and only its key is read (a pair as a call would cost the evaluation
-    /// of the node and the key of every entry).
     Pairs,
-    /// An annotation's arguments, `Elements(nested)` as `element` reads them.
     Elements(bool),
 }
 
-/// How the arguments of the call to `function` are read: `Pairs` for `mapOf`.
 fn pairs(function: Node, src: &[u8]) -> Args {
     match function.kind() == "identifier" && text(function, src) == "mapOf" {
         true => Args::Pairs,
@@ -1732,8 +1546,6 @@ fn pairs(function: Node, src: &[u8]) -> Args {
     }
 }
 
-/// The arguments as written: positional ones, then named ones (`key = value`). A lambda is the
-/// `Kind::Inline` definition it is under `scope`, when given, and `Unknown` otherwise.
 fn arguments(
     nodes: &[Node],
     src: &[u8],
@@ -1775,8 +1587,6 @@ fn arguments(
     (args, kwargs)
 }
 
-/// Whether a node of `kind` stores its scope's qualified name in the facts: a call, a definition
-/// or a binding. The rest of the nodes are charged the named part of the name alone.
 fn stores(kind: &str) -> bool {
     matches!(
         kind,
@@ -1798,7 +1608,6 @@ fn stores(kind: &str) -> bool {
     )
 }
 
-/// Appends `found` to `parts`, joining the text at the seam.
 fn append(parts: &mut Vec<Part>, found: Vec<Part>) {
     for part in found {
         match (parts.last_mut(), part) {
@@ -1809,7 +1618,6 @@ fn append(parts: &mut Vec<Part>, found: Vec<Part>) {
     }
 }
 
-/// The parts of the text `text` of a string literal: a `$` followed by a name is that name.
 fn template(parts: &mut Vec<Part>, text: &str) {
     let mut rest = text;
     while let Some(at) = rest.find('$') {
@@ -1822,7 +1630,6 @@ fn template(parts: &mut Vec<Part>, text: &str) {
             .next()
             .is_some_and(|c| c.is_alphabetic() || c == '_');
         if !starts {
-            // A `$` that starts no name is text.
             append(parts, vec![Part::Text(rest[..=at].into())]);
             rest = name;
             continue;
@@ -1834,10 +1641,6 @@ fn template(parts: &mut Vec<Part>, text: &str) {
     append(parts, vec![Part::Text(rest.into())]);
 }
 
-/// The name `target`, the left side of an assignment or the operand of `++`, writes if it is
-/// one that can be a property, and whether it may be a property of the class around it: a bare
-/// name no local or parameter declared before it, or `this.name`; the last of any other path
-/// (`o.base`) is one of another object.
 fn write_target<'t>(
     target: Node<'t>,
     src: &[u8],
@@ -1855,9 +1658,6 @@ fn write_target<'t>(
     }
 }
 
-/// What the children of each node declare (the node's id to each name with the offset of the
-/// first child that declares it), and the parent of each node, both read once per file:
-/// `Node::parent()` is found from the root, so a walk up by it costs the depth squared.
 struct Declared<'t> {
     root: Node<'t>,
     names: BTreeMap<usize, BTreeMap<String, usize>>,
@@ -1873,7 +1673,6 @@ impl<'t> Declared<'t> {
         }
     }
 
-    /// The parent of `node`, from an index of every node's parent built on first use.
     fn parent(&mut self, node: Node<'t>) -> Option<Node<'t>> {
         let root = self.root;
         let parents = self.parents.get_or_insert_with(|| {
@@ -1891,9 +1690,6 @@ impl<'t> Declared<'t> {
     }
 }
 
-/// Whether the identifier `name` is a local or a parameter declared before it, in a block
-/// around it, a loop, a `catch`, a lambda or the function. `seen` holds what each block
-/// declares, read once, so a block of thousands of statements costs its width.
 // ponytail: a local of the script around it is not read, so an assignment to one counts as a
 // write of a property of that name.
 fn declared_before<'t>(name: Node<'t>, src: &[u8], seen: &mut Declared<'t>) -> bool {
@@ -1901,7 +1697,6 @@ fn declared_before<'t>(name: Node<'t>, src: &[u8], seen: &mut Declared<'t>) -> b
     let mut child = name;
     while let Some(parent) = seen.parent(child) {
         let outer = |n: Node| matches!(n.kind(), "class_body" | "enum_class_body" | "source_file");
-        // A property's own name is no local of its initializer.
         let member =
             parent.kind() == "property_declaration" && seen.parent(parent).is_some_and(outer);
         if outer(parent) {
@@ -1921,7 +1716,6 @@ fn declared_before<'t>(name: Node<'t>, src: &[u8], seen: &mut Declared<'t>) -> b
     false
 }
 
-/// The names the children of `parent` declare.
 fn declared_in(parent: Node, src: &[u8]) -> BTreeMap<String, usize> {
     let mut names = BTreeMap::new();
     for s in named(parent) {
@@ -1932,7 +1726,6 @@ fn declared_in(parent: Node, src: &[u8]) -> BTreeMap<String, usize> {
     names
 }
 
-/// Tells `out` each name `sibling`, a child of `parent`, declares.
 fn declares(parent: Node, sibling: Node, src: &[u8], out: &mut dyn FnMut(&str)) {
     match sibling.kind() {
         "variable_declaration" | "parameter" => {
@@ -1953,13 +1746,6 @@ fn declares(parent: Node, sibling: Node, src: &[u8], out: &mut dyn FnMut(&str)) 
     }
 }
 
-/// Records `name = value` and `this.name = value`, written in a lambda that is a call's
-/// argument, as the keyword `name=` of that call (a key no Kotlin name spells, so it matches no
-/// parameter): the setting of a property of the lambda's receiver, which no call or constant
-/// records, read by the kind that knows the receiver (Ktor's request `method`). The value is
-/// kept where the statement is the lambda's own; where it may not run (an `if`, a `try`, a loop)
-/// or sets the outer receiver from a lambda inside, the call it reaches is told `Unknown`, as it
-/// is when a second statement sets it again.
 fn assigned<'t>(calls: &mut [Call], node: Node<'t>, src: &[u8], seen: &mut Declared<'t>) {
     let (Some(left), Some(right), Some(operator)) = (
         node.child_by_field_name("left"),
@@ -2014,14 +1800,12 @@ fn assigned<'t>(calls: &mut [Call], node: Node<'t>, src: &[u8], seen: &mut Decla
     }
 }
 
-/// Whether `node` is a lambda written as an argument of a call, trailing or in parentheses.
 fn argument(node: Node) -> bool {
     node.kind() == "lambda_literal"
         && (node.parent())
             .is_some_and(|p| matches!(p.kind(), "annotated_lambda" | "value_argument"))
 }
 
-/// The annotations written on the declaration `node`, each a call decorating `inner`.
 fn annotate(facts: &mut Facts, node: Node, src: &[u8], scope: &str, inner: &str) {
     for mut annotation in annotations(node, src, scope) {
         annotation.decorates = Some(inner.to_string());
@@ -2029,8 +1813,6 @@ fn annotate(facts: &mut Facts, node: Node, src: &[u8], scope: &str, inner: &str)
     }
 }
 
-/// The annotations written on the field or the parameter `node`, whose use-site target is one
-/// of `targets` (`""` for none), mark it, as `Facts::annotated` holds them.
 fn mark(facts: &mut Facts, on: Marked, node: Node, src: &[u8], scope: &str, targets: &[&str]) {
     let modifiers = named(node).filter(|n| n.kind() == "modifiers");
     for (annotation, target) in modifiers.flat_map(|m| annotations_of(m, src, scope)) {
@@ -2041,14 +1823,9 @@ fn mark(facts: &mut Facts, on: Marked, node: Node, src: &[u8], scope: &str, targ
     }
 }
 
-/// What Spring injects through each use-site target: a property gets it as a field, or through
-/// a setter (`set`, `setparam`); a constructor parameter as the parameter. A getter and a
-/// Kotlin property (`get`, `property`, `file`, `receiver`, `delegate`) inject nothing.
 const FIELD_TARGETS: &[&str] = &["", "field", "set", "setparam"];
 const PARAM_TARGETS: &[&str] = &["", "param"];
 
-/// The annotations of the parameters of the function `node` (`inner`), at the position of the
-/// parameter they are written before.
 fn annotate_parameters(facts: &mut Facts, node: Node, src: &[u8], scope: &str, inner: &str) {
     let Some(list) = named(node).find(|n| n.kind() == "function_value_parameters") else {
         return;
@@ -2071,14 +1848,11 @@ fn annotate_parameters(facts: &mut Facts, node: Node, src: &[u8], scope: &str, i
     }
 }
 
-/// Whether a declaration is a member of an object or a companion, which Spring injects nothing
-/// into (a static member on the JVM).
 fn in_object(node: Node) -> bool {
     let owner = node.parent().and_then(|body| body.parent());
     owner.is_some_and(|o| matches!(o.kind(), "object_declaration" | "companion_object"))
 }
 
-/// The annotations among the modifiers of the declaration `node`, as calls.
 fn annotations<'t>(node: Node<'t>, src: &[u8], scope: &str) -> Vec<Call> {
     (named(node).filter(|n| n.kind() == "modifiers"))
         .flat_map(|modifiers| annotations_of(modifiers, src, scope))
@@ -2086,8 +1860,6 @@ fn annotations<'t>(node: Node<'t>, src: &[u8], scope: &str) -> Vec<Call> {
         .collect()
 }
 
-/// The annotations that are children of `modifiers`, as calls, each with its use-site target
-/// (`field` of `@field:Value`, empty for none).
 fn annotations_of<'s>(modifiers: Node, src: &'s [u8], scope: &str) -> Vec<(Call, &'s str)> {
     let mut found = Vec::new();
     for annotation in named(modifiers).filter(|n| n.kind() == "annotation") {
@@ -2138,12 +1910,6 @@ fn annotations_of<'s>(modifiers: Node, src: &'s [u8], scope: &str) -> Vec<(Call,
     found
 }
 
-/// A value in an annotation's arguments. Kotlin writes an annotation as an element value without
-/// its `@` (`Queue("q")`, `Exchange(value = "x", type = T)`): the call is `Value::New(name,
-/// [Object(elements)])`, its unnamed element as `value`, as Java's pack reads `@Queue("q")`.
-/// An annotation's argument is a constant, so `arrayOf(..)` there is the compiler's: nested in an
-/// annotation it is the list of its elements, and at the top level `Value::Call` still, which the
-/// Spring MVC reader checks against the standard library's name (`nested`).
 fn element(node: Node, src: &[u8], depth: usize, nested: bool) -> Value {
     if depth >= VALUE_DEPTH {
         return Value::Unknown;
@@ -2189,8 +1955,6 @@ fn element(node: Node, src: &[u8], depth: usize, nested: bool) -> Value {
     }
 }
 
-/// The normalized callee of an expression: `a.b.c` for names and navigation, `this` and `super`
-/// for the plain keywords, `(<node kind>)` for anything else.
 fn callee(node: Node, src: &[u8]) -> String {
     let mut parts = Vec::new();
     let mut pending = vec![node];
@@ -2206,14 +1970,12 @@ fn callee(node: Node, src: &[u8]) -> String {
                 let ids: Vec<Node> = named(n).filter(|n| n.kind() == "identifier").collect();
                 pending.extend(ids.into_iter().rev());
             }
-            // `a!!` is `a`, of the type `a` is declared with.
             "unary_expression" if children(n).any(|c| c.kind() == "!!") => {
                 match n.child_by_field_name("argument") {
                     Some(operand) => pending.push(operand),
                     None => parts.push("(expression)"),
                 }
             }
-            // `a.b`, `a?.b`; a callable reference (`a::b`) is no member.
             "navigation_expression" if children(n).all(|c| c.kind() != "::") => {
                 let nodes: Vec<Node> = named(n)
                     .filter(|n| !matches!(n.kind(), "line_comment" | "block_comment"))
@@ -2229,13 +1991,9 @@ fn callee(node: Node, src: &[u8]) -> String {
     parts.join(".")
 }
 
-/// The key of the type argument a call is given (`create<Api>()`) among its keyword arguments:
-/// the class as the `Member(X, "class")` of the literal `X::class.java`. No name matches it.
 pub const TYPE_ARGUMENT: &str = "<type>=";
 
-/// The class `X` of the one type argument `f<X>(..)` is written with (a path, `a.X`, too).
 fn type_argument(node: Node, src: &[u8]) -> Option<String> {
-    // With a trailing lambda the call wraps the one the arguments belong to.
     let inner = named(node).next().filter(|f| f.kind() == "call_expression");
     let arguments = named(inner.unwrap_or(node)).find(|n| n.kind() == "type_arguments")?;
     let mut projections = named(arguments);
@@ -2249,7 +2007,6 @@ fn type_argument(node: Node, src: &[u8]) -> Option<String> {
     (!path.is_empty()).then(|| path.join("."))
 }
 
-/// The class `X` of the class literal `X::class.java` (a path, `a.X`, too).
 fn java_class(node: Node, src: &[u8]) -> Option<String> {
     let mut outer = named(node);
     let (literal, java) = (outer.next()?, outer.next()?);
@@ -2266,8 +2023,6 @@ fn java_class(node: Node, src: &[u8]) -> Option<String> {
     (inner.next().is_none() && literal_of_class).then(|| callee(on, src))
 }
 
-/// The string methods an environment read passes through, still the variable's value as far as
-/// the host goes.
 const STRING_METHODS: &[&str] = &[
     "trim",
     "trimEnd",
@@ -2280,16 +2035,11 @@ const STRING_METHODS: &[&str] = &[
 ];
 
 thread_local! {
-    /// The properties of the file `parse` reads whose declaration reads `System.getenv`
-    /// (`env_names`), for `reads_environment`.
     static ENV_NAMES: std::cell::RefCell<HashSet<String>> = std::cell::RefCell::new(HashSet::new());
-    /// Whether the file `parse` reads binds `System` to a type other than `java.lang.System`
-    /// (`binds_system`), for `env`.
     static SYSTEM_BOUND: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// Whether the file binds `System` to another type: an import of one (also under that alias),
-/// or a type it may declare by that name.
 fn binds_system(root: Node, src: &[u8]) -> bool {
     let imported = named(root).filter(|n| n.kind() == "import").any(|n| {
         let import = text(n, src).trim_start_matches("import").trim();
@@ -2307,19 +2057,15 @@ fn binds_system(root: Node, src: &[u8]) -> bool {
     imported || declared
 }
 
-/// Whether `callee` is `System.getenv`, unless the file binds `System` to another type.
 // ponytail: a `System` type another file of the package declares is not seen (`binds_system`).
 fn getenv(callee: &str) -> bool {
     callee == "java.lang.System.getenv" || callee == "System.getenv" && !SYSTEM_BOUND.get()
 }
 
-/// The variable a value is when it is exactly one environment read.
 fn read_variable(value: &Value) -> bool {
     matches!(value, Value::Str(parts) if matches!(parts[..], [Part::Env(_) | Part::EnvKey { .. }]))
 }
 
-/// Whether a fallback reads the environment too: an environment read, or a name of a property
-/// of the file that holds one (`ENV_NAMES`).
 fn reads_environment(value: &Value) -> bool {
     let holds = |name: &str| {
         let name = name.rsplit('.').next().unwrap_or(name);
@@ -2336,14 +2082,11 @@ fn reads_environment(value: &Value) -> bool {
     }
 }
 
-/// The properties of the file whose declaration reads `System.getenv`, by name.
 fn env_names(root: Node, src: &[u8]) -> HashSet<String> {
     let mut names = HashSet::new();
     if !src.windows(6).any(|w| w == b"getenv") {
         return names;
     }
-    // Each node with the property declaration around it, if the nearest declaration is one.
-    // (A node's parent is found from the root: this walk does not ask for it.)
     let mut pending = vec![(root, None)];
     while let Some((node, owner)) = pending.pop() {
         let owner = match node.kind() {
@@ -2367,8 +2110,6 @@ fn env_names(root: Node, src: &[u8]) -> HashSet<String> {
     names
 }
 
-/// The expression body or the explicit returns of a Kotlin function. A nested function's
-/// return cannot supply the outer value. A lambda may return nonlocally, so leave it unknown.
 fn function_returns(function: Node, src: &[u8]) -> Vec<Value> {
     let Some(body) = named(function).find(|n| n.kind() == "function_body") else {
         return Vec::new();
@@ -2405,15 +2146,11 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
         return Value::Unknown;
     }
     match node.kind() {
-        // A literal: its text, and its templates as the names and holes they read. One with an
-        // escape is unknown (the kinds that need it read it themselves).
         "string_literal" | "multiline_string_literal" => {
             let (mut parts, mut pending) = (Vec::new(), String::new());
             for part in named(node) {
                 match part.kind() {
-                    // The grammar reads `$name` as text: a `$` token, then the name's content.
                     "string_content" => pending.push_str(text(part, src)),
-                    // `\$` is a `$` that starts no template (`@Value("\${key}")`).
                     "escape_sequence" if text(part, src) == "\\$" => {
                         template(&mut parts, &std::mem::take(&mut pending));
                         append(&mut parts, vec![Part::Text("$".into())]);
@@ -2435,7 +2172,6 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             }
             Value::Str(parts)
         }
-        // `Api::class.java`, the `Api.class` of Java.
         "navigation_expression" => match java_class(node, src) {
             Some(class) => Value::Member(class, "class".into()),
             None => Value::Ref(callee(node, src)),
@@ -2450,7 +2186,6 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             let callee = callee(function, src);
             let (args, keywords) = arguments(&args, src, depth + 1, None, pairs(function, src));
             let navigation = function.kind() == "navigation_expression";
-            // `System.getenv("X")`.
             if navigation
                 && getenv(&callee)
                 && keywords.is_empty()
@@ -2463,7 +2198,6 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 .then(|| named(function).next())
                 .flatten()
                 .map(|n| value(n, src, depth + 1));
-            // A string method on an environment read is still the read.
             let method = named(function).last().map(|n| text(n, src));
             if let Some(receiver) = receiver.as_ref().filter(|r| read_variable(r))
                 && navigation
@@ -2479,7 +2213,6 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 range: node.byte_range(),
             })
         }
-        // `System.getenv()["X"]`.
         "index_expression" => {
             let mut parts = named(node);
             let (Some(map), Some(key)) = (parts.next(), parts.next()) else {
@@ -2501,7 +2234,6 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 _ => Value::Unknown,
             }
         }
-        // `x!!` is `x` for an environment read.
         "unary_expression" if children(node).any(|c| c.kind() == "!!") => {
             let inner = node.child_by_field_name("argument");
             match inner.map(|n| value(n, src, depth + 1)) {
@@ -2509,7 +2241,6 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
                 _ => Value::Unknown,
             }
         }
-        // A fallback keeps the environment read on its left, unless it reads another.
         "binary_expression"
             if node
                 .child_by_field_name("operator")
@@ -2548,7 +2279,6 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             }
         }
         "number_literal" => Value::Scalar(text(node, src).parse().ok()),
-        // `["/a", "/b"]`, an annotation's array.
         "collection_literal" => {
             Value::List(named(node).map(|n| value(n, src, depth + 1)).collect())
         }
@@ -2577,8 +2307,6 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
     }
 }
 
-/// The scope whose locals a property of `node` in `scope` hides: a companion's members belong
-/// to its class.
 fn owner(node: Node, scope: &str) -> String {
     let companion = node.parent().and_then(|b| b.parent());
     match scope.rsplit_once('.') {
@@ -2589,8 +2317,6 @@ fn owner(node: Node, scope: &str) -> String {
     }
 }
 
-/// The innermost class of `classes` that is `scope` or encloses it (the package, possibly
-/// empty, does), found by the prefixes of `scope` rather than a scan of the classes.
 fn innermost<'a>(classes: &'a BTreeSet<String>, scope: &str) -> Option<&'a str> {
     let ends = [0]
         .into_iter()
@@ -2601,7 +2327,6 @@ fn innermost<'a>(classes: &'a BTreeSet<String>, scope: &str) -> Option<&'a str> 
         .map(String::as_str)
 }
 
-/// Whether the scope `class` is `scope` or encloses it (the package, possibly empty, does).
 fn encloses(class: &str, scope: &str) -> bool {
     class.is_empty()
         || scope == class
@@ -2614,8 +2339,6 @@ fn encloses(class: &str, scope: &str) -> bool {
 mod tests {
     use super::*;
 
-    /// A long enclosing name repeated by every declaration under it exhausts the budget: the
-    /// file keeps no definitions and carries the budget `meada status` names, not `unbuilt`.
     #[test]
     fn a_file_past_the_qualification_budget_keeps_no_facts() {
         let name = "N".repeat(64 * 1024);
@@ -2631,8 +2354,6 @@ mod tests {
         assert!(!facts.defs.is_empty());
     }
 
-    /// A secondary constructor is a method `C.C(types)` in the overload family of its class's
-    /// name, hidden when `internal` or `private`; an enum's included.
     #[test]
     fn a_secondary_constructor_joins_its_classs_overloads() {
         let facts = parse(
@@ -2648,19 +2369,15 @@ mod tests {
 
     #[test]
     fn a_declaration_read_as_an_infix_call_leaves_the_file_out() {
-        // What the grammar makes of a declaration it misparses: a hard keyword as an operand
-        // of an infix call, with no ERROR node (`val a = b class C` is one such tree).
         let facts = parse(b"package a\nfun f() {}\nval a = b class C\n", false).unwrap();
         assert!(facts.misparsed && facts.defs.is_empty());
         assert!(!facts.unbuilt);
-        // Soft keywords are names, and a backticked keyword is one too.
         let facts = parse(
             b"package a\nval p = value to open\nval q = x `class` y\n",
             false,
         );
         let facts = facts.unwrap();
         assert!(!facts.misparsed);
-        // Only a misparsed file stores the key, so every other file's facts stay as they were.
         assert!(!serde_json::to_string(&facts).unwrap().contains("misparsed"));
         let facts = parse(b"package a\nval a = b class C\n", false).unwrap();
         assert!(
@@ -2670,9 +2387,6 @@ mod tests {
         );
     }
 
-    /// The parts a string literal's value is: `$name` and `${name}` are names, a call the return
-    /// value of its callee (#801), any other expression a hole, a `$` that starts no name text,
-    /// and an escape leaves it unknown.
     #[test]
     fn a_string_template_is_text_names_and_holes() {
         let text = |s: &str| Part::Text(s.into());
@@ -2709,7 +2423,6 @@ mod tests {
         assert_eq!(parts, [text("")]);
     }
 
-    /// The parts of the `val x` a source declares, `None` when it is no string.
     fn parts_of(source: &str) -> Option<Vec<Part>> {
         let facts = parse(source.as_bytes(), false).unwrap();
         match facts.consts.into_iter().next()?.value {
@@ -2718,8 +2431,6 @@ mod tests {
         }
     }
 
-    /// A class literal is the member `class` of the class named, as Java's `Api.class` is: the
-    /// `Api::class.java` that Retrofit's `create` takes.
     #[test]
     fn a_class_literal_is_the_member_class_of_the_type() {
         let of = |literal: &str| {
@@ -2733,12 +2444,9 @@ mod tests {
             };
             assert_eq!((ty.as_str(), class.as_str()), (name, "class"), "{literal}");
         }
-        // A callable reference is no class literal.
         assert!(!matches!(of("Api::create"), Value::Member(..)));
     }
 
-    /// The one type argument of a call is its keyword `TYPE_ARGUMENT`, a class literal as
-    /// `create(Api::class.java)` gives it; two of them, or none, give none.
     #[test]
     fn a_type_argument_is_the_class_of_a_keyword() {
         let of = |call: &str| {
@@ -2757,8 +2465,6 @@ mod tests {
         assert_eq!(of("create(1)"), None);
     }
 
-    /// A `val` of unknown class is bound to its initializer, unless a binding of another kind
-    /// (a loop variable, a `catch` parameter) declares the name in the scope.
     #[test]
     fn a_local_val_is_bound_when_no_other_binding_shares_its_name() {
         let bound = |body: &str| {
@@ -2771,12 +2477,9 @@ mod tests {
             bound("val a = xs.make(); for (a in xs) { use(a) }"),
             [] as [&str; 0]
         );
-        // Two `val`s keep both, which `Code::local` reads as a name declared twice.
         assert_eq!(bound("val a = xs.make(); val a = xs.other()"), ["a", "a"]);
     }
 
-    /// `x!!.f()` and `x?.f()` are calls on `x`, of the type `x` is declared with; `(x).f()` and
-    /// `x++` are no name.
     #[test]
     fn a_not_null_assertion_calls_on_its_operand() {
         let src = "package a\nfun f(x: Foo?) { x!!.ext(); x?.ext(); x!!!!.ext(); (x).ext() }\n";
@@ -2785,8 +2488,6 @@ mod tests {
         assert_eq!(callees, ["x.ext", "x.ext", "x.ext", "(expression).ext"]);
     }
 
-    /// A property assigned in a lambda passed to a call is the call's `name=` keyword, whatever
-    /// the name; one that may not run is unknown.
     #[test]
     fn a_property_assigned_in_a_lambda_is_a_keyword_of_its_call() {
         let src =
@@ -2806,7 +2507,6 @@ mod tests {
         );
     }
 
-    /// A value as a line, for the tests that compare shapes.
     fn show(v: &Value) -> String {
         let all = |vs: &[Value]| vs.iter().map(show).collect::<Vec<_>>().join(", ");
         match v {
@@ -2836,9 +2536,6 @@ mod tests {
         }
     }
 
-    /// An annotation written as an element value is the `New` of its name with its elements, the
-    /// unnamed one as `value`; `arrayOf(..)` nested in one is a list, and at the top level the
-    /// call the Spring MVC reader checks.
     #[test]
     fn an_annotation_element_value_is_a_new_with_its_elements() {
         let src = "package a\nclass C {\n\
@@ -2857,7 +2554,6 @@ mod tests {
         assert_eq!(of("list"), ".arrayOf(new Inner({value: \"z\"}))");
     }
 
-    /// An entry `k to v` of a `mapOf` is its key; elsewhere an infix call is not read.
     #[test]
     fn a_mapof_entry_is_its_key() {
         let facts = parse(
@@ -2874,7 +2570,6 @@ mod tests {
         );
     }
 
-    /// `\$` is a `$` that starts no template: Spring's `@Value("\${key}")` is the text `${key}`.
     #[test]
     fn an_escaped_dollar_is_text() {
         let of = |literal: &str| parts_of(&format!("package a\nval x = {literal}\n"));
@@ -2887,7 +2582,6 @@ mod tests {
         assert_eq!(of(r#""\$name""#), text("$name"));
     }
 
-    /// The forms of an environment read that stay the leading term of a URL.
     #[test]
     fn an_environment_read_is_one_variable_through_fallbacks_and_string_methods() {
         let of = |expression: &str, header: &str| {
@@ -2909,11 +2603,8 @@ mod tests {
         let after = Some(vec![Part::Env("X".into()), Part::Text("/api".into())]);
         assert_eq!(of(r#"System.getenv("X") + "/api""#, ""), after);
         assert_eq!(of(r#""${System.getenv("X")}/api""#, ""), after);
-        // A second variable in the fallback is a hole.
         let two = r#"System.getenv("X") ?: System.getenv("Y")"#;
         assert_eq!(of(two, ""), Some(vec![Part::Hole]));
-        // A name that is no literal, another call, another type named `System` and a string
-        // method on anything else read no variable.
         for (read, header) in [
             (r#"System.getenv(name)"#, ""),
             (r#"System.getenv("X", "Y")"#, ""),
@@ -2933,8 +2624,6 @@ mod tests {
         }
     }
 
-    /// A read nested deeper than the value limit is no environment read, and costs no more than
-    /// the limit.
     #[test]
     fn a_deeply_nested_environment_read_is_bounded() {
         let chain = format!("System.getenv(\"X\"){}", ".trim()".repeat(VALUE_DEPTH + 8));
@@ -2949,32 +2638,24 @@ mod tests {
         }
     }
 
-    /// A chain of string methods on an environment read costs its length: each link is read
-    /// once, not once per link below it.
     #[test]
     fn a_long_chain_of_string_methods_is_read_in_linear_time() {
-        // Each link read once costs about a second here; once per link below it, minutes.
         for head in [r#"System.getenv("X")"#, "base", r#"foo("X")"#] {
             let source = format!("package a\nval x = {head}{}\n", ".trim()".repeat(2048));
             let start = std::time::Instant::now();
             let found = parts_of(&source);
             let took = start.elapsed();
-            // Past the value limit the chain is no read, whatever it starts with.
             assert!(found.is_none(), "{head}");
-            // 1.6 s measured in a local debug build; the bound is over twenty times that.
             assert!(took.as_secs() < 40, "{head}: {took:?}");
         }
     }
 
-    /// Adjacent literal parts join, so a placeholder split by `+` is still one.
     #[test]
     fn literals_joined_by_plus_make_one_text() {
         let found = parts_of(r#"val x = "\$" + "{key}" + "/a""#);
         assert_eq!(found, Some(vec![Part::Text("${key}/a".into())]));
     }
 
-    /// A fallback that reads another variable, through a property of the file, is a hole: the
-    /// term comes from exactly one read.
     #[test]
     fn a_fallback_that_reads_the_environment_through_a_property_is_a_hole() {
         let source = |fallback: &str| {
@@ -2989,8 +2670,6 @@ mod tests {
         assert_eq!(parts_of(&source("plain")), env);
     }
 
-    /// A field some code assigns holds no one value, so Spring's injection is not its value
-    /// (`Code::field_written_in`, which reads the `.name` constants).
     #[test]
     fn every_assignment_to_a_name_that_can_be_a_property_is_recorded_as_a_write() {
         let source = br#"package a
@@ -3008,9 +2687,6 @@ class C {
         assert_eq!(written, ["base@a.C", "other", "third"]);
     }
 
-    /// Spring injects a property annotated with no target or with `field`, `param`, `set` or
-    /// `setparam`, never through its getter or as a Kotlin property; a constructor parameter
-    /// only with no target or `param`, a `val` of it also into the field.
     #[test]
     fn a_use_site_target_decides_what_the_annotation_marks() {
         let source = br#"package a
@@ -3056,8 +2732,6 @@ class C(
         assert_eq!(marks, expected);
     }
 
-    /// Spring's `@Value` on a property, a constructor parameter or property, and a function's
-    /// parameter, with what each marks; nothing on a static (companion or top-level) property.
     #[test]
     fn annotations_on_fields_and_parameters_are_recorded_with_what_they_mark() {
         let source = br#"package a
@@ -3093,7 +2767,6 @@ class C(@Value("\${a}") private val p: String, q: String, @param:Value("b") r: I
                 "field a.top true",
             ]
         );
-        // They are not calls decorating a definition twice over: the fields' own are.
         assert!(
             facts
                 .annotated
@@ -3104,8 +2777,6 @@ class C(@Value("\${a}") private val p: String, q: String, @param:Value("b") r: I
 
     #[test]
     fn accessors_stay_accessors_beside_the_scanner_patch() {
-        // The forms the local scanner patch (ADR 0017) must keep reading as accessors: a
-        // property with a getter is a definition, and the declarations after it survive.
         let src = b"package a
 class A {
     val a: Int
@@ -3161,8 +2832,6 @@ fun after() {}
 
     #[test]
     fn a_setter_parameter_is_any_name() {
-        // The scanner patch reads `set(` as a setter only before a name: non-ASCII letters,
-        // `_` and backticked names are names, and a space before the parenthesis is allowed.
         let src = "package a
 class A {
     var p: Int = 0
@@ -3194,7 +2863,6 @@ class A {
         );
     }
 
-    /// The markers `Code::field_written_in` reads (`Const`s named `.f` or `.f@class`) of a source.
     fn writes(src: &str) -> Vec<String> {
         let facts = parse(src.as_bytes(), false).unwrap();
         let mut marks: Vec<_> = (facts.consts.iter())
@@ -3205,7 +2873,6 @@ class A {
         marks
     }
 
-    /// A block of thousands of assignments costs its width: what a block declares is read once.
     #[test]
     fn a_block_of_many_assignments_is_read_in_linear_time() {
         let body = "a = 1\n".repeat(50_000);
@@ -3214,12 +2881,9 @@ class A {
         let mut marks = writes(&src);
         marks.dedup();
         assert_eq!(marks, [".a@a.C"]);
-        // 1.8 s measured in a local debug build; the bound is over twenty times that.
         assert!(start.elapsed().as_secs() < 40, "{:?}", start.elapsed());
     }
 
-    /// Thousands of properties and thousands of locals cost their sum: a local finds the
-    /// properties of its name by a lookup, not a scan of every property.
     #[test]
     fn many_properties_and_locals_are_read_in_linear_time() {
         let fields = (0..5_000).fold(String::new(), |s, n| s + &format!("var f{n} = 0\n"));
@@ -3229,19 +2893,14 @@ class A {
         let src = format!("package a\nclass C {{\n{fields} fun f() {{\n{locals} }} }}");
         let start = std::time::Instant::now();
         let facts = parse(src.as_bytes(), false).unwrap();
-        // Every local shares its name with a property, so none keeps its class; the control
-        // local, whose name no property has, is the one that does.
         let typed: Vec<_> = (facts.receivers.iter())
             .filter(|r| r.class != Class::Unknown)
             .map(|r| r.name.as_str())
             .collect();
         assert_eq!(typed, ["control"]);
-        // 0.6 s measured in a local debug build; the bound is over twenty times that.
         assert!(start.elapsed().as_secs() < 15, "{:?}", start.elapsed());
     }
 
-    /// Writes at the bottom of deeply nested blocks cost the depth each: a node's parent is read
-    /// from an index, not found from the root.
     #[test]
     fn deeply_nested_writes_are_read_in_linear_time() {
         let depth = 1_000;
@@ -3253,7 +2912,6 @@ class A {
         );
         let start = std::time::Instant::now();
         assert_eq!(writes(&src), [".a@a.C"]);
-        // 0.6 s measured in a local debug build; the bound is over twenty times that.
         assert!(start.elapsed().as_secs() < 15, "{:?}", start.elapsed());
     }
 

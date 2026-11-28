@@ -1,9 +1,3 @@
-//! SDK-style MSBuild project files (`.csproj`), read as XML with no MSBuild evaluation:
-//! whether one is a project, the usings it adds to every file of it (the SDK's implicit usings
-//! among them), the properties that name its package and the references it declares, with the
-//! `Directory.Build.props` files MSBuild imports into it (#381); `Directory.Build.targets` and
-//! `Directory.Packages.props` are not read.
-
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use roxmltree::{Document, Node, ParsingOptions};
@@ -13,8 +7,6 @@ use crate::lang::MAX_BYTES;
 use crate::repo::relative;
 use crate::xml::{XML_NODES, within_limits};
 
-/// A using directive: a namespace's types on demand, a type's static members and nested
-/// types (`using static`), or an alias (`using X = A.B`).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Using {
     Namespace(String),
@@ -22,38 +14,26 @@ pub enum Using {
     Alias(String, String),
 }
 
-/// What an SDK-style project file says, as written: nothing is evaluated, so a value may hold
-/// `$(Property)` text.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Project {
-    /// The usings it adds to each of its files, in order.
     pub usings: Vec<Using>,
-    /// The package properties (`PACKAGE`), each the last one written, an empty one kept.
     pub properties: Properties,
-    /// The `PackageId` and `AssemblyName` properties, and the `PackageVersion` or else `Version`.
     pub package_id: Option<String>,
     pub assembly_name: Option<String>,
     pub version: Option<String>,
-    /// Its `PackageReference` items, in order.
     pub packages: Vec<Reference>,
-    /// Its `ProjectReference` items, in order.
     pub projects: Vec<Reference>,
 }
 
-/// The package properties a file writes, by name: what names a project's package.
 pub type Properties = BTreeMap<String, String>;
 
-/// A `PackageReference` or `ProjectReference` item, as written.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Reference {
     pub include: String,
     pub version: Option<String>,
-    /// It does not pass on to the projects that reference this one: its `PrivateAssets` names
-    /// `all` or `compile`, or is computed (`$(Property)`), which the reader cannot tell.
     pub private: bool,
 }
 
-/// The namespaces implicit usings add in every SDK project (the SDK's own list).
 const IMPLICIT: &[&str] = &[
     "System",
     "System.Collections.Generic",
@@ -63,7 +43,6 @@ const IMPLICIT: &[&str] = &[
     "System.Threading",
     "System.Threading.Tasks",
 ];
-/// Those `Microsoft.NET.Sdk.Web` adds beside them.
 const WEB: &[&str] = &[
     "System.Net.Http.Json",
     "Microsoft.AspNetCore.Builder",
@@ -75,7 +54,6 @@ const WEB: &[&str] = &[
     "Microsoft.Extensions.Hosting",
     "Microsoft.Extensions.Logging",
 ];
-/// Those `Microsoft.NET.Sdk.Worker` adds beside them.
 const WORKER: &[&str] = &[
     "Microsoft.Extensions.Configuration",
     "Microsoft.Extensions.DependencyInjection",
@@ -83,30 +61,20 @@ const WORKER: &[&str] = &[
     "Microsoft.Extensions.Logging",
 ];
 
-/// The name of the file MSBuild imports into every project below it.
 pub const PROPS: &str = "Directory.Build.props";
 
-/// The longest chain of props files `chain` follows; a file further up is not read.
 // ponytail: real repositories nest a props file or two; this bounds the walk over a hostile one.
 pub const PROPS_DEPTH: usize = 8;
 
-/// The most usings and references a props file adds to each project below it; a props file with
-/// more reads as one that cannot be read, so that what it gives a project, copied into each of
-/// them, stays bounded.
 // ponytail: real props files add a few analyzers and usings; this bounds a crafted one.
 pub const PROPS_ITEMS: usize = 256;
 
-/// The props file a props file imports, as a path of the repository (`""` is the root).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Import {
-    /// The first props file at or above this directory (`GetPathOfFileAbove`).
     Above(String),
-    /// This props file (a relative path).
     File(String),
 }
 
-/// A props file as it is read: what it adds to the projects below it, and the props file it
-/// imports. Read once, it is evaluated under each project below it (`read`).
 #[derive(Debug, PartialEq, Eq)]
 pub struct Props {
     pub project: Project,
@@ -114,7 +82,6 @@ pub struct Props {
     layer: Layer,
 }
 
-/// One file of an evaluation, as written: a project file or a props file.
 #[derive(Debug, Default, PartialEq, Eq)]
 struct Layer {
     sdk: Option<String>,
@@ -126,9 +93,7 @@ struct Layer {
     import: Option<Import>,
 }
 
-/// The properties that name a project's package.
 const PACKAGE: [&str; 4] = ["PackageId", "AssemblyName", "PackageVersion", "Version"];
-/// The properties a layer is asked for.
 const PROPERTIES: [&str; 5] = [
     "ImplicitUsings",
     "PackageId",
@@ -137,12 +102,6 @@ const PROPERTIES: [&str; 5] = [
     "Version",
 ];
 
-/// What an SDK-style project file says, with the props files `props` (the `Directory.Build.props`
-/// files MSBuild imports into it, outer first, from `chain`, each read once by `props`)
-/// evaluated before it: the usings it adds to each of its files, in order (the implicit usings
-/// it enables, then the `<Using>` items, less those removed), its package properties and its
-/// references. `None` when the file is no SDK-style project (no `Sdk` on `Project`, in an `Sdk`
-/// element or on an `Import`), or cannot be read.
 // ponytail: properties are read as written, with no `Condition` and only a props file's parent
 // imported; the last one written decides. A `ProjectReference` in a props file is relative to
 // the project, as MSBuild evaluates it; one built on `$(MSBuildThisFileDirectory)` is computed.
@@ -154,8 +113,6 @@ pub fn read(src: &[u8], props: &[&Props]) -> Option<Project> {
     Some(merge(&layers))
 }
 
-/// What the props file at `path` says, as a project file does; `None` when it cannot be read or
-/// adds more than `PROPS_ITEMS` usings and references.
 pub fn props(path: &str, src: &[u8]) -> Option<Props> {
     let dir = path.rsplit_once('/').map_or("", |(dir, _)| dir);
     let layer = layer(src, dir)?;
@@ -169,14 +126,10 @@ pub fn props(path: &str, src: &[u8]) -> Option<Props> {
     })
 }
 
-/// Whether `path` is a `Directory.Build.props` file.
 pub fn is_props(path: &str) -> bool {
     path.rsplit('/').next() == Some(PROPS)
 }
 
-/// The `PackageId`, else the `AssemblyName`, and the `PackageVersion`, else the `Version`, that
-/// the package properties of `layers` (outer first) give: the last one written of each, an empty
-/// one giving none.
 pub fn package<'a>(
     layers: impl IntoIterator<Item = &'a Properties>,
 ) -> (Option<String>, Option<String>) {
@@ -194,10 +147,6 @@ pub fn package<'a>(
     )
 }
 
-/// The props files MSBuild imports into a project in the directory `dir` (`a/b`, empty at the
-/// root), outer first: the first one at or above it, then each it imports, up to `PROPS_DEPTH`
-/// files and not one twice. `props` gives the props file at a path as the file it imports, or
-/// `None` when there is no such file; a file that cannot be read imports nothing.
 pub fn chain(dir: &str, props: impl Fn(&str) -> Option<Option<Import>>) -> Vec<String> {
     let above = |mut dir: &str| loop {
         let path = join(dir, PROPS);
@@ -233,14 +182,11 @@ fn join(dir: &str, name: &str) -> String {
     }
 }
 
-/// The props file the `Import` of `project` (its `Project` attribute) names, written in the file
-/// in `dir`: `GetPathOfFileAbove` of the file's name, or a relative path to one.
 fn import_of(dir: &str, project: &str) -> Option<Import> {
     const HERE: &str = "$(MSBuildThisFileDirectory)";
     let value = project.trim().replace('\\', "/");
     let inside = |path: String| (!path.starts_with("..")).then_some(path);
     if let Some((_, args)) = value.split_once("GetPathOfFileAbove(") {
-        // `('Directory.Build.props', '$(MSBuildThisFileDirectory)../')`
         let mut quoted = args.split('\'').skip(1).step_by(2);
         let (name, start) = (quoted.next(), quoted.next());
         let start = start.map_or(Some(""), |start| start.strip_prefix(HERE))?;
@@ -253,7 +199,6 @@ fn import_of(dir: &str, project: &str) -> Option<Import> {
     path.and_then(inside).map(Import::File)
 }
 
-/// One file as written. `dir` is its directory, to resolve the props file it imports.
 fn layer(src: &[u8], dir: &str) -> Option<Layer> {
     if src.len() > MAX_BYTES {
         return None;
@@ -277,7 +222,6 @@ fn layer(src: &[u8], dir: &str) -> Option<Layer> {
         .or_else(|| elements(project, "Import").find_map(|n| n.attribute("Sdk")));
     let sdk = sdk.map(|sdk| {
         let name = sdk.split(';').next().unwrap_or("");
-        // MSBuild reads SDK names in any case.
         name.split('/')
             .next()
             .unwrap_or("")
@@ -324,7 +268,6 @@ fn layer(src: &[u8], dir: &str) -> Option<Layer> {
             .filter_map(|n| Some((n, n.attribute("Include")?.trim())))
             .filter(|(_, include)| !include.is_empty())
     };
-    // An attribute, else a child element of the item.
     let metadata = |item: Node<'_, '_>, name: &'static str| {
         let child = elements(item, name).next().and_then(|v| v.text());
         (item.attribute(name).or(child))
@@ -349,9 +292,6 @@ fn layer(src: &[u8], dir: &str) -> Option<Layer> {
     Some(layer)
 }
 
-/// The layers, outer first, evaluated in order: a property written by a later one wins, items
-/// add up, and a `Using` removed drops those the layers before it and its own file add (and the
-/// implicit ones).
 fn merge(layers: &[&Layer]) -> Project {
     let mut properties: HashMap<&str, &str> = HashMap::new();
     for layer in layers {
@@ -398,7 +338,6 @@ fn merge(layers: &[&Layer]) -> Project {
     project
 }
 
-/// The child elements of `node` named `name`, in order.
 fn elements<'a, 'i>(node: Node<'a, 'i>, name: &'static str) -> impl Iterator<Item = Node<'a, 'i>> {
     node.children()
         .filter(move |n| n.is_element() && n.tag_name().name() == name)
@@ -550,8 +489,6 @@ mod tests {
                 _ => "?",
             })
             .collect();
-        // The SDK's implicit usings come first, less `System.IO`; `B` and `C` are removed by
-        // the file after the one that adds them, `D` is the project's own.
         assert_eq!(names[..2], ["System", "System.Collections.Generic"]);
         assert!(!names.contains(&"System.IO"));
         assert_eq!(names[names.len() - 2..], ["A", "D"]);
@@ -561,7 +498,6 @@ mod tests {
             |refs: &[Reference]| refs.iter().map(|r| r.include.clone()).collect::<Vec<_>>();
         assert_eq!(includes(&project.packages), ["P", "Q"]);
         assert_eq!(includes(&project.projects), ["..\\X\\X.csproj"]);
-        // An unreadable props file adds nothing; a project is still needed to have an SDK.
         let big = format!("<Project><!--{}--></Project>", "x".repeat(MAX_BYTES));
         assert_eq!(
             project_under(&[&big, "not xml"], own),
@@ -571,8 +507,6 @@ mod tests {
         assert!(read(outer.as_bytes(), &[&read_once]).is_none());
     }
 
-    /// A props file adds at most `PROPS_ITEMS` usings and references to each project below it:
-    /// past them it adds nothing, as one that cannot be read.
     #[test]
     fn a_props_file_past_its_items_reads_as_none() {
         let items = |n: usize| {
@@ -628,14 +562,12 @@ mod tests {
                 "a/b/Directory.Build.props"
             ]
         );
-        // A relative path to the file above, with either slash and the property in front.
         let by_path = importing("$(MSBuildThisFileDirectory)..\\Directory.Build.props");
         let files = [
             (PROPS, plain),
             ("a/Directory.Build.props", by_path.as_str()),
         ];
         assert_eq!(found(&files, "a"), [PROPS, "a/Directory.Build.props"]);
-        // The file imported is the one that is read, not the first above the importing one.
         let skip = importing("../../Directory.Build.props");
         let files = [
             (PROPS, plain),
@@ -658,7 +590,6 @@ mod tests {
             ("a/Directory.Build.props", up.as_str()),
         ];
         assert_eq!(found(&files, "a"), [PROPS, "a/Directory.Build.props"]);
-        // An import past the root, or of another file, goes nowhere.
         let outside = importing("../Directory.Build.props");
         assert_eq!(found(&[(PROPS, outside.as_str())], ""), [PROPS]);
         let other = importing("common.props");

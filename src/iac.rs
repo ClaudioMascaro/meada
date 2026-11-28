@@ -1,38 +1,3 @@
-//! IaC nodes (#649, ADR 0025): every Terraform and OpenTofu resource, data block and module call
-//! of the `.tf`, `.tf.json`, `.tofu` and `.tofu.json` files a repository holds, with an address,
-//! a type, a file, a span and the root module that roots its evaluation, and the static references
-//! between them, stored like calls. A Compose project (#652, `compose`) and a CloudFormation or
-//! SAM template (#653, `cloudformation`) give nodes of the same shape. `search` finds a node with
-//! the kind `iac`, `context` explains it and `trace` walks its references both ways. Nodes holding
-//! a contract side enter the export.
-//!
-//! A directory of Terraform files is a module. A module block whose `source` is a local path
-//! (`./` or `../`, staying inside the repository) calls the module of that directory; a directory
-//! no other one calls is a root module, labelled by its path (`.` for the repository root). Each
-//! root is evaluated alone: its blocks are nodes at their own address (`<type>.<name>`,
-//! `data.<type>.<name>`, `module.<name>`), and each call of a local module instantiates that
-//! module's blocks once, prefixed by the call's address (`module.orders.aws_sqs_queue.this`). A
-//! `count` or `for_each` over values that resolve to literals gives one node per instance,
-//! suffixed `[key]`. Override files (`override.tf`, `*_override.tf` and their other extensions)
-//! merge into the blocks of their directory after its other files, in name order, as Terraform
-//! applies them: what an override block sets replaces the base block's, and one with nothing to
-//! merge into is left out.
-//!
-//! A reference is a traversal in a block's expressions that names a resource, a data block or a
-//! module; one through `var.<name>`, `local.<name>` or a module's output (`module.<name>.<out>`) is
-//! followed to what the caller's argument, the local or the output refers to, and keeps the name
-//! it went through as its `via`.
-//!
-//! Static evaluation (#650) resolves each node's physical name, its `name` argument, and the
-//! `count` and `for_each` of its block with `hcl-rs`'s evaluator and the pure functions of
-//! `functions`, from the repository's own values: variable defaults, the values a
-//! `terraform.tfvars` or `*.auto.tfvars` file of the root gives, locals, a local module's inputs
-//! and outputs per call, `each` and `count`. Nothing else is evaluated (data sources, resource
-//! attributes, registry modules, `terraform.workspace`, `-var`, `TF_VAR_`, a sensitive
-//! variable): a part of a name built from it is a wildcard `*`, and the name a pattern. A name
-//! that went through a root module's variable records it as `Overridable`, by its default or by
-//! the var file that gives it.
-
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -80,77 +45,51 @@ pub(crate) mod subscription;
 pub(crate) mod types;
 pub(crate) mod workload;
 
-/// The instances one `count` or `for_each` gives; past it the block is one node with no key.
 // ponytail: a fleet of a few hundred instances is real; past a thousand the keys come from data.
 const EXPANSION_MAX: usize = 1000;
 
-/// How deep local module calls nest; a call deeper keeps its node and instantiates nothing.
 // ponytail: real module trees nest three or four levels; 16 stops a chain built to run on.
 const MODULE_DEPTH_MAX: usize = 16;
 
-/// How many names (`var`, `local`, outputs) a reference or a value may go through before it is
-/// dropped (a value then unresolved).
 // ponytail: a name passed down a few modules goes through a handful; 32 stops a chain of locals.
 const EVAL_DEPTH_MAX: usize = 32;
 
-/// The values a deployer can override (`Overridable`) one name may go through; past it the name
-/// is unresolved.
 // ponytail: a name goes through a handful of variables or parameters; 32 stops one joined from
 // thousands of them, whose list every name built on it would copy.
 const OVERRIDABLE_MAX: usize = 32;
 
-/// The bytes one evaluated value may hold (`size`); past it the value is unresolved.
 // ponytail: a name, a `for_each` map or a list of regions holds far less; 64 KiB stops a local
 // doubled at every step.
 const EVAL_VALUE_MAX: usize = 64 << 10;
 
-/// The cost one expression may have at most (`cost`, an upper bound of its evaluation steps: a
-/// byte made or `TEMPLATE_PART_COST` of a template's part evaluated in a `for`) for `hcl-rs` to
-/// evaluate it; past it the expression is unresolved, but for its template parts, and spends
-/// only the bytes it went through to decide.
 // ponytail: a `for` over a map of a few hundred entries costs a few hundred KiB; 1 MiB stops a
 // `for` inside a `for` over wide lists, and a template in a `for` before it takes a second.
 const EVAL_COST_MAX: usize = 1 << 20;
 
-/// The cost of one part of a template (a literal, an interpolation or a directive) at each
-/// evaluation in a `for`, whatever bytes it makes: `Exact` makes a template a call of its parts
-/// (`template_call`), which `hcl-rs` evaluates one by one, so a template in a `for` evaluates
-/// each part once per element (#763).
 // ponytail: measured on 2026-11-14 in a debug build (CPU time of 20 resources near the ceiling,
 // against one part per element), a part takes about 1 µs (a literal, an `if` directive) to 1.7 µs
 // (an interpolation, a call of `meada_exact`), where the other steps take about 0.3 µs a unit of
 // cost; 8 covers the slowest form.
 const TEMPLATE_PART_COST: usize = 8;
 
-/// The cost (`cost`) the evaluations of one root module may spend together; past it every value
-/// left is unresolved.
 // ponytail: 64 MiB is thousands of times what a real root spends; it bounds a module instanced
 // thousands of times with costly locals.
 const EVAL_WORK_MAX: usize = 64 * MAX_BYTES;
 
-/// The nodes one root module's evaluation gives; past it the rest of the root is left out.
 // ponytail: a large root holds a few thousand blocks with its modules; 10,000 is past real ones.
 const NODES_MAX: usize = 10_000;
 
-/// The references one node keeps, in address order; past it the rest are left out.
 // ponytail: a block names a handful of others; 64 is past a wide `depends_on`.
 const REFERENCES_MAX: usize = 64;
 
-/// The bytes of addresses one root's nodes and references may store; past it the rest of the
-/// root is left out. Instancing multiplies a module by its calls, so a small file can ask for
-/// much more than its size.
 // ponytail: four times the per-file ceiling holds a root of a few thousand nodes; past it the
 // evaluation is built to explode.
 const ROOT_STORED_MAX: usize = 4 * MAX_BYTES;
 
-/// The bytes of addresses the nodes and references of the whole repository may store, across
-/// its roots; past it the rest is left out.
 // ponytail: sixteen times the per-file ceiling holds a monorepo of environments; many roots
 // calling one exploding module would pass it.
 const STORED_MAX: usize = 16 * MAX_BYTES;
 
-/// Whether `path` holds IaC nodes: Terraform/OpenTofu in native or JSON syntax, or a Compose
-/// file or its override by name (#652).
 pub(crate) fn is_source(path: &str) -> bool {
     path.ends_with(".tf")
         || path.ends_with(".tofu")
@@ -158,18 +97,12 @@ pub(crate) fn is_source(path: &str) -> bool {
         || compose::is_file(path)
 }
 
-/// A text a node records (a Compose service's image or build context, a Serverless function's
-/// handler or event) after its variables were expanded: a default (Compose's `${VAR:-default}`,
-/// Serverless's `${opt:x, 'default'}`) is in the text, with `overridable` set, and a variable
-/// nothing resolves stays in the text as `${VAR}`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Resolved {
     pub text: String,
     pub overridable: bool,
 }
 
-/// The Dockerfile a Compose `build` names (#744): its path relative to the build context, or, with
-/// `inline`, its text (`dockerfile_inline`), after the variables were expanded as for `Resolved`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Dockerfile {
     pub text: String,
@@ -177,7 +110,6 @@ pub(crate) struct Dockerfile {
     pub inline: bool,
 }
 
-/// An evaluated container image and the values a deployer can override that it used.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct WorkloadImage {
     pub container: String,
@@ -197,16 +129,13 @@ impl WorkloadImage {
     }
 }
 
-/// A composite provisioned name. An explicit absent name forbids a physical-name fallback.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub(crate) struct Projection {
     pub name: Option<String>,
     pub pattern: bool,
     pub through: Vec<Overridable>,
-    /// A curated entry selected by a module source or Kubernetes group and kind.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entry: Option<String>,
-    /// Defining input key paths, excluded from directionless uses of their own resource.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub defining: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -215,7 +144,6 @@ pub(crate) struct Projection {
     pub binding: Option<mapping::Binding>,
 }
 
-/// Literal routing evidence after a Kubernetes overlay has renamed its Service.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Ingress {
     pub host: String,
@@ -223,7 +151,6 @@ pub(crate) struct Ingress {
     pub service: String,
 }
 
-/// A complete evaluated HTTP event, retained on the function that serves it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Route {
     pub method: Resolved,
@@ -252,15 +179,10 @@ impl Projection {
     }
 }
 
-/// Whether the file at `path` is a var file Terraform loads by itself into its directory's root
-/// module: `terraform.tfvars`, `terraform.tfvars.json`, `*.auto.tfvars` or `*.auto.tfvars.json`.
 fn is_var_file(path: &str) -> bool {
     var_file_rank(path).is_some()
 }
 
-/// Where Terraform loads the var file at `path` among its directory's: `terraform.tfvars`, then
-/// `terraform.tfvars.json`, then each `*.auto.tfvars` and `*.auto.tfvars.json` in name order, a
-/// later value winning; `None` for a file it does not load by itself.
 fn var_file_rank(path: &str) -> Option<(u8, &str)> {
     let file = path.rsplit('/').next().unwrap_or(path);
     match file {
@@ -273,52 +195,34 @@ fn var_file_rank(path: &str) -> Option<(u8, &str)> {
     }
 }
 
-/// Whether the file at `path` is read by the evaluation: a source or a var file.
 pub(crate) fn is_input(path: &str) -> bool {
     is_source(path) || is_var_file(path)
 }
 
-/// A resource block's stored key path, in native syntax or JSON label/body array form.
 pub(super) fn is_resource_block(block: &str) -> bool {
     block
         .strip_prefix("resource")
         .is_some_and(|rest| rest.starts_with('.') || rest.starts_with('['))
 }
 
-/// One IaC node as stored.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub(crate) struct Node {
     pub address: String,
-    /// The label of the root module its evaluation starts from: its directory, `.` for the root.
     pub root: String,
-    /// The resource or data type, or `module` for a module call.
     pub ty: String,
-    /// Its physical name: its `name` argument as static evaluation resolves it, each unresolved
-    /// part a `*` when it is a pattern.
     pub name: Option<String>,
-    /// Whether `name` is a pattern: some part of it is unresolved.
     pub pattern: bool,
-    /// The values a deployer can override that `name` went through, in path and line order.
     pub overridable: Vec<Overridable>,
     pub path: String,
     pub line: usize,
     pub end_line: usize,
-    /// The key path of its block, which its config values start with.
     pub block: String,
-    /// The image a Compose service runs.
     pub image: Option<Resolved>,
-    /// The build context of a Compose service: a path inside the repository from its root.
     pub build: Option<Resolved>,
-    /// Whether Compose configures a build, including remote contexts.
     pub build_image: bool,
-    /// The Dockerfile a Compose build names (#744); `None` is `Dockerfile` in the context.
     pub dockerfile: Option<Dockerfile>,
-    /// What a Kubernetes object is to Crossplane (#655): `crossplane claim`, `crossplane
-    /// composition` and the like; `None` for any other node.
     pub role: Option<String>,
-    /// The handler of a Serverless function (#654).
     pub handler: Option<Resolved>,
-    /// The events of a Serverless function, in file order.
     pub events: Vec<Resolved>,
     pub routes: Vec<Route>,
     pub subscription: Option<subscription::Subscription>,
@@ -326,8 +230,6 @@ pub(crate) struct Node {
     pub images: Vec<WorkloadImage>,
     pub provisioned: Option<Projection>,
     pub ingress: Vec<Ingress>,
-    /// What the GitHub Actions reader keeps of a pipeline, a CI job or a CI step: its selectors
-    /// (#823) and what the CI contract reads of it (#824).
     pub actions: Option<actions::Facts>,
 }
 
@@ -354,14 +256,10 @@ impl Node {
         format!("{repository}::{}::{}", self.path, self.address)
     }
 
-    /// Whether `context` lists the node's sides above its values: a CI node, since who calls a
-    /// pipeline is what its reader asks and the values of a long file would spend the budget
-    /// first.
     pub(crate) fn sides_first(&self) -> bool {
         actions::owns(self)
     }
 
-    /// The node's stored line range as the code-span shape used by open items.
     pub(crate) fn span(&self, source: Option<&[u8]>) -> crate::index::Span {
         let mut span = crate::index::Span::default();
         span.path = self.path.clone();
@@ -380,19 +278,14 @@ impl Node {
     }
 }
 
-/// A root module's variable a name went through: by its default, or by the value a var file
-/// gives it (ADR 0025), either of which a deployer can override.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub(crate) struct Overridable {
     pub path: String,
     pub line: usize,
-    /// `var.<name>`.
     pub variable: String,
-    /// Whether a var file gives the value, rather than the variable's default.
     pub tfvars: bool,
 }
 
-/// A reference from the node `source` to the node `target` of the root `root`, through `via`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Reference {
     pub root: String,
@@ -408,7 +301,6 @@ enum Kind {
     Module,
 }
 
-/// An instance key: `[0]` of a `count`, `["eu"]` of a `for_each`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Key {
     Int(u64),
@@ -424,8 +316,6 @@ impl Key {
     }
 }
 
-/// What a traversal names: a block (with the instance key written after it and, for a module,
-/// the output read), or a variable or local whose value is followed.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Ref {
     Block {
@@ -440,7 +330,6 @@ enum Ref {
 }
 
 impl Ref {
-    /// The name a reference went through, when it is not the block itself.
     fn via(&self) -> Option<String> {
         match self {
             Ref::Block {
@@ -459,7 +348,6 @@ impl Ref {
     }
 }
 
-/// A resource, data or module block as read.
 struct Block {
     kind: Kind,
     ty: String,
@@ -467,25 +355,16 @@ struct Block {
     path: String,
     line: usize,
     end_line: usize,
-    /// JSON's actual block path, including array steps; native blocks derive it from labels.
     json_path: Option<String>,
-    /// Its `name` argument, which static evaluation resolves into its physical name; `None` for a
-    /// module call, whose `name` is one of its inputs.
     named: Option<Expression>,
     count: Option<Expression>,
     for_each: Option<Expression>,
-    /// The references of its expressions, by the argument or nested block type that makes them,
-    /// as an override block replaces them.
     refs: BTreeMap<String, Vec<Ref>>,
-    /// A module call's `source`, and each of its arguments.
     source: Option<String>,
     args: BTreeMap<String, Named>,
-    /// Nested syntax of workload types, evaluated only by the format's workload reader.
     nested: Vec<hcl_edit::structure::Block>,
 }
 
-/// An expression a name holds (a local, an output, a module call's argument), with the
-/// references it makes.
 struct Named {
     refs: Vec<Ref>,
     expr: Expression,
@@ -500,25 +379,15 @@ impl Named {
     }
 }
 
-/// What a variable's declared `type` does to the value it receives (Terraform converts a value
-/// to the type).
 #[derive(Clone, Copy, PartialEq)]
 enum Declared {
-    /// `set(T)`: the elements converted to `T`, then sorted and deduplicated.
     Set(Elem),
-    /// `list(T)`: the elements converted to `T`, in their order, where `T` is a primitive type
-    /// (`string`, `number`, `bool`) or a set came before it (an override retyping a declared
-    /// set); a list of another type that no set touched stays as it is.
     List(Elem),
-    /// `any`: the value keeps its own type.
     Any,
-    /// Any other type (`tuple(...)`, `map(...)`, `object(...)`, a primitive): no conversion is
-    /// made, and no set converts to these.
     Other,
 }
 
 impl Declared {
-    /// The declared type written as the constraint `text` (the form a Terraform JSON file gives).
     fn text(text: &str) -> Declared {
         let text = text.trim();
         let inner = |prefix: &str| {
@@ -533,7 +402,6 @@ impl Declared {
         }
     }
 
-    /// The declared type written as the expression `expr`.
     fn expr(expr: &Expression) -> Declared {
         let elem = |f: &hcl_edit::expr::FuncCall| match f.args.iter().next() {
             Some(Expression::Variable(v)) => Elem::named(v.as_str()),
@@ -547,8 +415,6 @@ impl Declared {
         }
     }
 
-    /// Whether this type converts a value no set has touched: a set, or a list of a primitive
-    /// type.
     fn converts(self) -> bool {
         match self {
             Declared::Set(_) => true,
@@ -558,10 +424,6 @@ impl Declared {
     }
 }
 
-/// `value` converted through the declared types `steps` in turn, as Terraform converts a default
-/// (to the type of the block that declares it, then to each type an override gives). `None`
-/// where Meada cannot make a conversion with certainty, and where a set meets a type no set
-/// converts to (a tuple, a map): Terraform rejects the configuration.
 fn converted_through(mut value: Value, steps: &[Declared]) -> Option<Value> {
     let mut set = false;
     for step in steps {
@@ -570,8 +432,6 @@ fn converted_through(mut value: Value, steps: &[Declared]) -> Option<Value> {
                 value = functions::to_set(&value, elem).ok()?;
                 set = true;
             }
-            // A list of a primitive type converts any value; a list of another type converts only
-            // a set that came before it (an override retyping a declared set).
             Declared::List(elem) if set || elem.primitive() => {
                 value = functions::to_list(&value, elem).ok()?;
                 set = false;
@@ -585,15 +445,11 @@ fn converted_through(mut value: Value, steps: &[Declared]) -> Option<Value> {
     Some(value)
 }
 
-/// Whether a default converted through `steps` is a set: the last type that is not `any`, which
-/// keeps the value, is one.
 fn ends_in_set(steps: &[Declared]) -> bool {
     let last = steps.iter().rev().find(|t| **t != Declared::Any);
     matches!(last, Some(Declared::Set(_)))
 }
 
-/// `found`, a variable's value, converted through the declared types `steps`: unresolved where
-/// Meada cannot make the conversion with certainty.
 fn declared(found: Evaluated, steps: &[Declared]) -> Evaluated {
     match found.val {
         Val::Known(v) => Evaluated {
@@ -604,9 +460,6 @@ fn declared(found: Evaluated, steps: &[Declared]) -> Evaluated {
     }
 }
 
-/// `value` converted once to the type `ty`, as OpenTofu 1.13 and later convert a default: a set
-/// or list converts its elements, any other type keeps the value. `None` where Meada cannot
-/// convert with certainty.
 fn converted_once(value: Value, ty: Option<Declared>) -> Option<Value> {
     match ty {
         Some(Declared::Set(elem)) => functions::to_set(&value, elem).ok(),
@@ -615,21 +468,7 @@ fn converted_once(value: Value, ty: Option<Declared>) -> Option<Value> {
     }
 }
 
-/// `found`, the default of `variable`, converted as `declared` does: Terraform converts it to the
-/// type of its declaring block and again to each override's. A variable with a block in a file
-/// only OpenTofu reads (`.tofu`, `.tofu.json`) is one Terraform does not read whole, and OpenTofu
-/// 1.13 and later convert the default once, to the final type, where 1.12 and earlier convert it
-/// as Terraform does: the default is unresolved where the two hold other elements, or another
-/// kind of collection, so that no tool's answer is taken for certain, and is the value OpenTofu
-/// 1.13 gives where they agree. A set's elements are compared as they are (#754), a list's as a
-/// name spells them (`spelled`): where a list's two values differ only in an element's type
-/// (`[10, 9]` against `["10", "9"]` under an override typed `any`), OpenTofu 1.13's is the value
-/// Meada gave before lists converted (#770). An override in such a file is merged as OpenTofu
-/// merges it, also over a declaration Terraform reads, whose value `Eval::var` then compares with
-/// Terraform's reading (#767).
 fn declared_default(found: Evaluated, variable: &Variable) -> Evaluated {
-    // Only a set or a list of a primitive type converts a value here: a default no such type
-    // touches is one value.
     let converts = (variable.through.iter()).any(|t| t.converts());
     let (true, true, Val::Known(v)) = (variable.opentofu, converts, &found.val) else {
         return declared(found, &variable.through);
@@ -649,9 +488,6 @@ fn declared_default(found: Evaluated, variable: &Variable) -> Evaluated {
     }
 }
 
-/// `value` with each scalar as the text a template shows of it (`functions::shown`), so that two
-/// values whose elements a name spells alike compare equal: `[10, 9]` and `["10", "9"]` do,
-/// `["010"]` and `[10]` do not.
 fn spelled(value: &Value) -> Value {
     match value {
         Value::Array(items) => Value::Array(items.iter().map(spelled).collect()),
@@ -662,50 +498,29 @@ fn spelled(value: &Value) -> Value {
     }
 }
 
-/// A `variable` block: its default, whether it is sensitive, and where it is declared.
 #[derive(Clone)]
 struct Variable {
     default: Option<Expression>,
-    /// What its declared `type` does to the value it receives; `None` without a `type`.
     ty: Option<Declared>,
-    /// Its final `type` as written (`None` without one), which tells two readings of one class
-    /// apart (`string` and `number`, `map(string)` and `map(number)`: `Eval::var`, #767).
     type_text: Option<String>,
-    /// The types its default is converted through, in order (`converted_through`): the type of
-    /// the block that gave the default, then the final type at each override that gives a type or
-    /// a default.
     through: Vec<Declared>,
-    /// Whether any of its blocks, declaring or overriding, is in a file only OpenTofu reads
-    /// (`.tofu`, `.tofu.json`).
     opentofu: bool,
     sensitive: bool,
     path: String,
     line: usize,
-    /// Terraform's reading of the variable where it is declared in a file Terraform reads and a
-    /// later block is in a file only OpenTofu reads: its blocks without those files' (#767).
     terraform: Option<Box<Variable>>,
-    /// Whether it is declared both in a file Terraform reads and in one only OpenTofu reads, which
-    /// OpenTofu refuses ("Duplicate variable declaration"): it is then the block Terraform reads,
-    /// with nothing of a block in a file only OpenTofu reads but its `sensitive` (#768).
     terraform_only: bool,
 }
 
 impl Variable {
-    /// Merges `variable`, a later block of this variable, into it. An override file's
-    /// (`overriding`) default replaces the one it holds; a declaring block replaces it whole.
     fn merge(&mut self, mut variable: Variable, overriding: bool) {
         variable.sensitive |= self.sensitive;
-        // Any block in a file only OpenTofu reads, whatever the order the blocks come in.
         variable.opentofu = self.opentofu | config_values::only_opentofu(&variable.path);
         self.opentofu = variable.opentofu;
-        // An override block's `type` replaces the declared one; without one the declared stays.
         let (own, merged) = (variable.ty, variable.ty.or(self.ty));
         let type_text = (variable.type_text.clone()).or_else(|| self.type_text.clone());
-        // An override block without a default keeps the declared one, and where it is.
         if overriding && variable.default.is_none() {
             self.sensitive = variable.sensitive;
-            // Terraform converts the kept default again to the type the override gives (OpenTofu
-            // 1.13 and later convert once, to the final type, and name other instances: #740).
             self.through.extend(own);
             self.ty = merged;
             self.type_text = type_text;
@@ -721,10 +536,6 @@ impl Variable {
         }
     }
 
-    /// Whether OpenTofu refuses the directory for this variable's default, as far as Meada can
-    /// tell: a list or set of numbers whose default holds a string no number spells (`["z"]`),
-    /// which every OpenTofu converts to a number once or through the declared types. Meada tells
-    /// no other refusal from a default it cannot convert.
     fn opentofu_refuses(&self) -> bool {
         let number = matches!(
             self.ty,
@@ -738,36 +549,23 @@ impl Variable {
     }
 }
 
-/// The value a var file gives a variable, and where: `None` when it is past the evaluation
-/// ceilings, which leaves the variable unresolved.
 struct Given {
     value: Option<Value>,
     path: String,
     line: usize,
-    /// Where its file loads among the directory's var files (`var_file_rank`).
     rank: (u8, String),
 }
 
 impl Module {
-    /// Records the `variable` block `variable` of `name`. An override file's (`overriding`) merges
-    /// into the declaration, its default replacing the declared one, or with none is left out, as
-    /// Terraform refuses it. A variable any of its blocks marks sensitive stays sensitive. Where
-    /// a block in a file only OpenTofu reads follows a declaration Terraform reads, Terraform's
-    /// reading is kept apart, made of the blocks it reads (`Variable::terraform`). A variable
-    /// declared both in a file Terraform reads and in one only OpenTofu reads is Terraform's
-    /// reading alone (`Variable::terraform_only`).
     fn declare(&mut self, name: &str, mut variable: Variable, overriding: bool) {
         let tofu = config_values::only_opentofu(&variable.path);
         if let Some(declared) = self.variables.get_mut(name) {
             let across_tools = !overriding && tofu != config_values::only_opentofu(&declared.path);
             match (across_tools, tofu) {
-                // A declaration Terraform reads replaces one only OpenTofu reads.
                 (true, false) => {
                     variable.terraform_only = true;
                     variable.sensitive |= declared.sensitive;
                 }
-                // Terraform does not read a block only OpenTofu reads of a variable declared for
-                // each tool; only its `sensitive` is kept, as any block's is.
                 (_, true) if across_tools || declared.terraform_only => {
                     declared.terraform_only = true;
                     declared.sensitive |= variable.sensitive;
@@ -786,14 +584,11 @@ impl Module {
         } else if overriding {
             return;
         }
-        // A default is converted to the type its block declares when it is decoded.
         variable.through = variable.default.iter().flat_map(|_| variable.ty).collect();
         variable.opentofu = tofu;
         self.variables.insert(name.to_string(), variable);
     }
 
-    /// Each variable OpenTofu refuses (`Variable::opentofu_refuses`) as Terraform reads it, the
-    /// only tool that runs its directory (#767).
     fn settle(&mut self) {
         for variable in self.variables.values_mut() {
             if variable.opentofu_refuses()
@@ -804,9 +599,6 @@ impl Module {
         }
     }
 
-    /// Adds the resource, data or module block `block`. An override file's (`overriding`) merges
-    /// into the block of its address, which the other files of its directory, all read before
-    /// it, give, or with none is left out.
     fn add(&mut self, block: Block, overriding: bool) {
         if !overriding {
             self.blocks.push(block);
@@ -823,16 +615,12 @@ impl Module {
     }
 }
 
-/// Records the local or output `value` of `name` in `map`. An override file's (`overriding`)
-/// replaces the one the other files of its directory give, or with none is left out.
 fn assign(map: &mut BTreeMap<String, Named>, name: &str, value: Named, overriding: bool) {
     if !overriding || map.contains_key(name) {
         map.insert(name.to_string(), value);
     }
 }
 
-/// The type of the nested block `b`, all of which an override block's nested blocks of that
-/// type replace: a `dynamic` block's label, the type of the blocks it generates.
 fn nested_type(b: &hcl_edit::structure::Block) -> &str {
     match (b.ident.as_str(), b.labels.first()) {
         ("dynamic", Some(label)) => label.as_str(),
@@ -840,8 +628,6 @@ fn nested_type(b: &hcl_edit::structure::Block) -> &str {
     }
 }
 
-/// The references of the block body `body`, by the argument or nested block type that makes
-/// them.
 fn keyed_refs(body: &Body) -> BTreeMap<String, Vec<Ref>> {
     let mut keyed: BTreeMap<String, Vec<Ref>> = BTreeMap::new();
     for structure in body.iter() {
@@ -862,8 +648,6 @@ fn keyed_refs(body: &Body) -> BTreeMap<String, Vec<Ref>> {
 }
 
 impl Block {
-    /// Merges the override block `o` into this one: each argument it sets replaces this one's,
-    /// references included, and its nested blocks of each type replace all of that type.
     fn merge(&mut self, o: Block) {
         self.named = o.named.or(self.named.take());
         self.count = o.count.or(self.count.take());
@@ -886,7 +670,6 @@ impl Block {
         }
     }
 
-    /// The key path of the block (ADR 0025), which its config values start with.
     fn key_path(&self) -> String {
         if let Some(path) = &self.json_path {
             return path.clone();
@@ -901,8 +684,6 @@ impl Block {
     }
 }
 
-/// The blocks, outputs, locals and variables of one directory, and the values its var files
-/// give (read only when it is a root).
 #[derive(Default)]
 struct Module {
     blocks: Vec<Block>,
@@ -910,19 +691,12 @@ struct Module {
     locals: BTreeMap<String, Named>,
     variables: BTreeMap<String, Variable>,
     given: BTreeMap<String, Given>,
-    /// Each block's index by its local address, built when the first override block arrives.
     addresses: HashMap<String, usize>,
-    /// Whether the directory holds an override file, and whether one of its Terraform files does
-    /// not read or is shadowed: merged into the others, that file may mark any variable sensitive.
     overridden: bool,
     unreadable: bool,
-    /// Where the last-loaded of its var files that do not read loads (`var_file_rank`): it may
-    /// give any variable a value.
     unread: Option<(u8, String)>,
 }
 
-/// The directory a local module `source` names from `dir`: `./` or `../` joined and normalized,
-/// `None` for any other source or one that climbs out of the repository.
 fn local_source(dir: &str, source: &str) -> Option<String> {
     if !(source.starts_with("./") || source.starts_with("../")) {
         return None;
@@ -930,9 +704,6 @@ fn local_source(dir: &str, source: &str) -> Option<String> {
     joined(dir, source)
 }
 
-/// `rel` joined to the directory `dir` and normalized (`.` and empty steps dropped, `..` popped);
-/// `None` for a path that climbs out of the repository or is absolute. The result has no
-/// leading or trailing `/`, and is empty for the root.
 pub(crate) fn joined(dir: &str, rel: &str) -> Option<String> {
     if rel.starts_with('/') {
         return None;
@@ -950,7 +721,6 @@ pub(crate) fn joined(dir: &str, rel: &str) -> Option<String> {
     Some(parts.join("/"))
 }
 
-/// Collects the references of the expressions it visits.
 #[derive(Default)]
 struct Refs(Vec<Ref>);
 
@@ -972,19 +742,16 @@ fn refs_of(expr: &Expression) -> Vec<Ref> {
     refs.0
 }
 
-/// The reference a traversal from the variable `root` through `ops` makes, if any.
 fn reference(root: &str, ops: &[&TraversalOperator]) -> Option<Ref> {
     let attr = |at: usize| match ops.get(at) {
         Some(TraversalOperator::GetAttr(i)) => Some(i.as_str().to_string()),
         _ => None,
     };
-    // An index or a splat right after the block's name: `Some(key)` for a literal index.
     let keyed = |at: usize| -> (Option<Key>, usize) {
         match ops.get(at) {
             Some(TraversalOperator::Index(Expression::Number(n))) => {
                 (n.value().as_u64().map(Key::Int), at + 1)
             }
-            // The key in NFC, as the instance keys are (#749).
             Some(TraversalOperator::Index(Expression::String(s))) => {
                 (Some(Key::Str(functions::nfc(s.value().clone()))), at + 1)
             }
@@ -1018,7 +785,6 @@ fn reference(root: &str, ops: &[&TraversalOperator]) -> Option<Ref> {
     }
 }
 
-/// The line of each byte offset of `text`, 1-based.
 fn lines(text: &str) -> impl Fn(usize) -> usize {
     let newlines: Vec<usize> = (text.bytes().enumerate())
         .filter(|&(_, b)| b == b'\n')
@@ -1027,16 +793,10 @@ fn lines(text: &str) -> impl Fn(usize) -> usize {
     move |offset| newlines.partition_point(|&n| n < offset) + 1
 }
 
-/// `expr` as `hcl-rs` evaluates it in `ctx`, `None` when it fails or panics: the library's number
-/// type panics on a remainder by zero or an integer overflow, which a hostile file must not turn
-/// into a crash of indexing or of the server.
 fn evaluated(expr: &Expression, ctx: &Context, sets: &BTreeSet<String>) -> Option<Value> {
     evaluation(expr, ctx, sets).0
 }
 
-/// `evaluated`, and whether arithmetic left it unresolved (`Exact`): a value Terraform has
-/// that Meada cannot write exactly, rather than none. `sets` are the references (`local.x`,
-/// `var.x`) in `expr` that hold a set.
 fn evaluation(expr: &Expression, ctx: &Context, sets: &BTreeSet<String>) -> (Option<Value>, bool) {
     let mut exact = Exact {
         ctx,
@@ -1054,39 +814,18 @@ fn evaluation(expr: &Expression, ctx: &Context, sets: &BTreeSet<String>) -> (Opt
     (value, exact.inexact)
 }
 
-/// Puts each integer `+ - * / %` and negation's exact value in place before `hcl-rs` evaluates:
-/// its number type casts a large unsigned operand to signed, wraps on overflow and divides by
-/// zero into a float, each of which would print as a wrong exact name. A result past
-/// `i64::MIN..=u64::MAX`, a division with a remainder and arithmetic on a fraction or a non-number
-/// become an undefined name (`undefined`), so the value stays unresolved. An operand that does
-/// not evaluate in `ctx` (a `for` variable) turns its operation, and every operation around it,
-/// into a call of `meada_exact`, which does the same arithmetic as `hcl-rs` evaluates, so no
-/// operand is evaluated twice. A number literal `hcl-rs` would print otherwise than Terraform
-/// (`printed_as_written`) becomes the undefined name too.
-///
-/// It also puts each object literal's keys in lexical order, the order Terraform walks an object
-/// in, where `hcl-rs` keeps the written one. A `for` over a collection holding an object whose
-/// keys are known only once evaluated (a computed key, a comprehension) becomes the undefined
-/// name too.
 struct Exact<'a, 'c> {
     ctx: &'a Context<'c>,
-    /// The references in the expression that hold a set (`holds_set`).
     sets: &'a BTreeSet<String>,
     left: usize,
-    /// Whether an operation became the undefined name, or a call that may fail as one.
     inexact: bool,
-    /// The objects seen so far whose keys are not written as plain names or strings.
     unordered: usize,
 }
 
-/// Whether `expr` is a set: a `toset(...)` call, in parentheses or in a conditional's branch, or
-/// a reference `named` says holds one (`local.x` or `var.x` alone, not an attribute or an index
-/// of it).
 fn is_set(expr: &Expression, named: &mut dyn FnMut(&Ref) -> bool) -> bool {
     match expr {
         Expression::FuncCall(f) => f.name.name.as_str() == "toset",
         Expression::Parenthesis(p) => is_set(p.inner(), named),
-        // A lone interpolation (`"${toset(...)}"`) keeps its value's type.
         Expression::StringTemplate(t) if t.len() == 1 => match t.iter().next() {
             Some(Element::Interpolation(i)) => is_set(&i.expr, named),
             _ => false,
@@ -1097,8 +836,6 @@ fn is_set(expr: &Expression, named: &mut dyn FnMut(&Ref) -> bool) -> bool {
     }
 }
 
-/// The variable or local `expr` reads whole (`var.x`, `local.x`), not an attribute or an index of
-/// it.
 fn lone_ref(expr: &Expression) -> Option<Ref> {
     let Expression::Traversal(t) = expr else {
         return None;
@@ -1110,9 +847,6 @@ fn lone_ref(expr: &Expression) -> Option<Ref> {
 }
 
 impl Exact<'_, '_> {
-    /// A `for` binding a key over a set: Terraform's key is the element, Meada's set a list keyed
-    /// by index. `toset(...)` and the references in `sets` are sets; a set that arrives any other
-    /// way (an attribute, an index, another call) is a ceiling until #717.
     fn keyed_set(&self, key: bool, collection: &Expression) -> bool {
         key && is_set(collection, &mut |r| {
             r.via().is_some_and(|v| self.sets.contains(&v))
@@ -1121,8 +855,6 @@ impl Exact<'_, '_> {
 }
 
 impl VisitMut for Exact<'_, '_> {
-    /// A template that is one interpolation keeps its value's type, as in HCL; any other
-    /// interpolation shows its value as text (`meada_exact("text", ...)`).
     fn visit_string_template_mut(&mut self, node: &mut hcl_edit::template::StringTemplate) {
         if node.len() == 1
             && let Some(Element::Interpolation(sole)) = node.iter_mut().next()
@@ -1140,7 +872,6 @@ impl VisitMut for Exact<'_, '_> {
         node.expr = Expression::from(hcl_edit::expr::FuncCall::new(name, args.into()));
     }
 
-    /// `hcl-edit` never visits a `%{ for }` directive's collection: read it as a `for` reads its own.
     fn visit_for_template_expr_mut(&mut self, node: &mut hcl_edit::template::ForTemplateExpr) {
         let unordered = self.unordered;
         let keyed = self.keyed_set(node.key_var.is_some(), &node.collection_expr);
@@ -1167,14 +898,10 @@ impl VisitMut for Exact<'_, '_> {
         let left = self.left;
         visit_mut::visit_expr_mut(self, expr);
         let (operator, operands) = match expr {
-            // The visitor never visits a call it writes, so this one is the file's: no Terraform
-            // function.
             Expression::FuncCall(f) if f.name.name.as_str() == "meada_exact" => {
                 *expr = undefined();
                 return;
             }
-            // Its parts visited, a template becomes the call that makes its text, so `hcl-rs`
-            // never parses it again at an evaluation (#763).
             Expression::StringTemplate(t) => {
                 *expr = template_expr(Template::from(std::mem::take(t)));
                 return;
@@ -1198,8 +925,6 @@ impl VisitMut for Exact<'_, '_> {
             }
             Expression::Object(object) => {
                 let mut entries: Vec<_> = std::mem::take(object).into_iter().collect();
-                // `hcl-edit` visits no key: a computed one is evaluated as any other expression,
-                // and a name is the string Terraform makes of it, in NFC.
                 for (key, _) in &mut entries {
                     match key {
                         ObjectKey::Expression(key) => self.visit_expr_mut(key),
@@ -1279,14 +1004,10 @@ impl VisitMut for Exact<'_, '_> {
     }
 }
 
-/// A name no file can bind (it holds a space), so evaluating it always fails: what `Exact` puts
-/// in place of a value Meada cannot write exactly.
 fn undefined() -> Expression {
     Expression::from(hcl_edit::Ident::new_unchecked("meada inexact"))
 }
 
-/// The exact result of an integer `+ - * / %` (`None` for negation), `None` past
-/// `i64::MIN..=u64::MAX`, for a division with a remainder or for Terraform's negative zero.
 fn arithmetic(
     operator: Option<hcl_edit::expr::BinaryOperator>,
     values: &[i128],
@@ -1301,7 +1022,6 @@ fn arithmetic(
         (Some(B::Mod), &[a, b]) => a.checked_rem(b),
         _ => None,
     }?;
-    // Terraform's zero keeps a sign: `-(0)`, `0 * -1` and `0 / -1` print `-0`.
     let negative_zero = match operator {
         None => true,
         Some(B::Mul | B::Div) => values.iter().any(|&v| v < 0),
@@ -1315,9 +1035,6 @@ fn arithmetic(
         .ok()
 }
 
-/// The expression `hcl-rs` evaluates for the template `t`, its parts visited by `Exact`: one
-/// that is a single interpolation is that interpolation's expression, whose value keeps its
-/// type as `hcl-rs` unwraps it; any other is `template_call` (#763).
 fn template_expr(t: Template) -> Expression {
     let mut elements: Vec<Element> = t.into_iter().collect();
     if let [Element::Interpolation(_)] = elements.as_slice()
@@ -1328,10 +1045,6 @@ fn template_expr(t: Template) -> Expression {
     template_call(elements, Strip::None, Strip::None)
 }
 
-/// The call `meada_exact("template", ...)` that makes the text of a template of `elements`, as
-/// `hcl-rs` makes it when it parses the template's text again: each literal stripped as the `~`
-/// of the elements around it ask (`prev` and `next` stand for those around the template), an
-/// `if` directive a conditional and a `for` directive a `for` whose texts the call joins.
 fn template_call(elements: Vec<Element>, prev: Strip, next: Strip) -> Expression {
     use hcl_edit::expr::{Conditional, ForExpr, ForIntro, FuncCall, FuncName};
     let strips: Vec<Strip> = elements.iter().map(element_strip).collect();
@@ -1371,7 +1084,6 @@ fn template_call(elements: Vec<Element>, prev: Strip, next: Strip) -> Expression
     Expression::from(FuncCall::new(name, args.into()))
 }
 
-/// The `~` the template element `e` asks of the literals around it, as `hcl-rs` reads it.
 fn element_strip(e: &Element) -> Strip {
     match e {
         Element::Literal(_) => Strip::None,
@@ -1386,8 +1098,6 @@ fn element_strip(e: &Element) -> Strip {
     }
 }
 
-/// `literal` as `hcl-rs` strips it: its leading spaces and first line break cut when the
-/// element before it ends in `~`, and its trailing ones when the element after it starts so.
 fn stripped(literal: &str, before: Strip, after: Strip) -> String {
     let space = |c: char| c.is_whitespace() && c != '\r' && c != '\n';
     let mut s = literal;
@@ -1402,12 +1112,6 @@ fn stripped(literal: &str, before: Strip, after: Strip) -> String {
     s.to_string()
 }
 
-/// `meada_exact(operator, operands...)`: the operation `Exact` could not do before evaluating
-/// (`"neg"` for negation), done as exactly, an error where `Exact` writes the undefined name.
-/// `meada_exact("text", value)` is an interpolated value, an error for a null or a collection,
-/// which Terraform cannot show as text where `hcl-rs` prints them. `meada_exact("template",
-/// parts...)` is a template's text (`template_call`): its parts shown and joined, a list the
-/// texts a `for` directive made.
 fn exact_call(args: hcl::eval::FuncArgs) -> std::result::Result<Value, String> {
     let operator = match args[0].as_str() {
         Some("text") => {
@@ -1449,7 +1153,6 @@ fn exact_call(args: hcl::eval::FuncArgs) -> std::result::Result<Value, String> {
 }
 
 impl Exact<'_, '_> {
-    /// `None` when `expr` does not evaluate in `ctx`; `Some(None)` for a value that is no integer.
     fn integer(&self, expr: &Expression) -> Option<Option<i128>> {
         match hcl::Expression::from(expr.clone())
             .evaluate(self.ctx)
@@ -1464,12 +1167,9 @@ impl Exact<'_, '_> {
 }
 
 thread_local! {
-    /// Whether this thread runs `quiet`, whose panics are expected and caught.
     static QUIET: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-/// `f()`, `None` when it panics, without the panic message the default hook prints: the hook is
-/// wrapped once so that panics on threads outside `quiet` print as before.
 fn quiet<T>(f: impl FnOnce() -> T) -> Option<T> {
     static HOOK: std::sync::Once = std::sync::Once::new();
     HOOK.call_once(|| {
@@ -1486,21 +1186,15 @@ fn quiet<T>(f: impl FnOnce() -> T) -> Option<T> {
     out.ok()
 }
 
-/// The text of `src`, `None` when it is not UTF-8 or nests past the HCL reader's ceiling.
 fn shallow(src: &[u8]) -> Option<&str> {
     let text = std::str::from_utf8(src).ok()?;
     config_values::nested_past(text).is_none().then_some(text)
 }
 
-/// The text of `src` as HCL, `None` when it is not `shallow` or holds objects wider than its
-/// budget (config values count it unreadable).
 fn text(src: &[u8]) -> Option<&str> {
     shallow(src).filter(|text| config_values::wide_past(text).is_none())
 }
 
-/// Reads the values the var file at `path` gives into `module`, a value of a file Terraform loads
-/// later (`var_file_rank`) winning, whatever order the files come in. A file that does not read
-/// may give any variable: `module` keeps where it loads as `unread`.
 fn read_var_file(path: &str, src: &[u8], module: &mut Module) {
     let Some(rank) = var_file_rank(path) else {
         return;
@@ -1527,19 +1221,11 @@ fn read_var_file(path: &str, src: &[u8], module: &mut Module) {
     }
 }
 
-/// The values the var file at `path` gives, each with its line; `None` for a file past
-/// `MAX_BYTES`, not `shallow`, with HCL objects past their width or that does not parse. A value
-/// that is no constant (Terraform refuses it) is left out; one past `EVAL_COST_MAX`, the file's
-/// own `EVAL_WORK_MAX` or `EVAL_VALUE_MAX`, whose arithmetic is inexact (`Exact`) or a JSON
-/// number read as a float (`float`), is given but unresolved. A JSON var file's strings are
-/// literals, as Terraform reads them, each at the line of its key (the last one, as its value,
-/// when a key repeats).
 fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>, usize)>> {
     if src.len() > MAX_BYTES {
         return None;
     }
     let json = path.ends_with(".json");
-    // `serde_json` reads objects in linear time: only HCL needs its objects' widths checked.
     let text = if json { shallow(src) } else { text(src) }?;
     let mut values = Vec::new();
     if json {
@@ -1575,13 +1261,10 @@ fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>,
                 work -= spend;
                 match evaluation(&a.value, &ctx, &BTreeSet::new()) {
                     (Some(v), _) => (size(&v) <= EVAL_VALUE_MAX).then_some(v),
-                    // Terraform has a value Meada cannot write exactly (`7 / 2`): the default
-                    // must not stand in for it.
                     (None, true) => None,
                     (None, false) => continue,
                 }
             } else {
-                // Refused, it evaluates nothing and copied nothing (a var file binds no name).
                 None
             };
             let at = line(a.span().map_or(0, |s| s.start));
@@ -1591,9 +1274,6 @@ fn var_file_values(path: &str, src: &[u8]) -> Option<Vec<(String, Option<Value>,
     Some(values)
 }
 
-/// Reads the blocks, outputs, locals and variables of the Terraform file at `path` into `module`;
-/// a file past `MAX_BYTES`, not UTF-8, nesting past the HCL reader's ceiling or that does not
-/// parse adds nothing but marks `module` unreadable, as config values count it.
 fn read(path: &str, src: &[u8], module: &mut Module) {
     if is_var_file(path) {
         read_var_file(path, src, module);
@@ -1680,8 +1360,6 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
             line: line(span.start),
             end_line: line(span.end.saturating_sub(1).max(span.start)),
             json_path: None,
-            // A module call's `name` is one of its inputs, not the name of something it creates.
-            // A resource the type table lists (#656) is named by the argument the table names.
             named: (kind != Kind::Module)
                 .then(|| attr(name_argument(kind, ty)).cloned())
                 .flatten(),
@@ -1700,8 +1378,6 @@ fn read(path: &str, src: &[u8], module: &mut Module) {
     }
 }
 
-/// The argument that holds the physical name of a block of `kind` and `ty`: the one the type
-/// table names for a resource it lists (`bucket` for `aws_s3_bucket`), else `name`.
 fn name_argument(kind: Kind, ty: &str) -> &'static str {
     match kind {
         Kind::Resource => types::entry("terraform", ty)
@@ -1712,11 +1388,8 @@ fn name_argument(kind: Kind, ty: &str) -> &'static str {
     }
 }
 
-/// A block by its kind, type and name, as a reference names it.
 type BlockName<'m> = (Kind, &'m str, &'m str);
 
-/// A value as static evaluation finds it: known, a string with unresolved parts (each `*`), or
-/// unresolved, with the values a deployer can override that it went through.
 #[derive(Debug, Clone, PartialEq)]
 struct Evaluated {
     val: Val,
@@ -1738,8 +1411,6 @@ impl Evaluated {
         }
     }
 
-    /// The text a template shows for it, and whether some of it is unresolved: a scalar as
-    /// written, a pattern's text, `*` for anything else.
     fn text(&self) -> (String, bool) {
         match &self.val {
             Val::Known(Value::String(s)) => (s.clone(), false),
@@ -1751,7 +1422,6 @@ impl Evaluated {
     }
 }
 
-/// `v` with every object's keys in lexical order, the order Terraform walks them in.
 fn lexical(v: Value) -> Value {
     match v {
         Value::Object(map) => {
@@ -1766,20 +1436,13 @@ fn lexical(v: Value) -> Value {
     }
 }
 
-/// Whether `n`, written `written`, prints as Terraform prints it: Terraform reads a number with
-/// 512 bits and prints its decimal, `hcl-rs` reads a 64-bit float past `i64::MIN..=u64::MAX` or
-/// with a fraction and prints its shortest form, with an exponent past 1e16 or below 1e-5.
 fn printed_as_written(n: &hcl::Number, written: &str) -> bool {
     let shown = n.to_string();
     !shown.contains('e') && decimal(&shown).is_some_and(|d| decimal(written) == Some(d))
 }
 
-/// A decimal `[-+]digits[.digits][e[-+]digits]` as its sign, its digits with no leading or
-/// trailing zero and the power of ten they are multiplied by.
 fn decimal(text: &str) -> Option<(bool, String, i64)> {
     let (negative, text) = match text.strip_prefix('-') {
-        // `hcl-edit` reads `- 1` and `-/* c */1` as one literal: the digits follow the last space
-        // or `/`.
         Some(t) => (
             true,
             t.rsplit(|c: char| c.is_whitespace() || c == '/').next()?,
@@ -1797,16 +1460,12 @@ fn decimal(text: &str) -> Option<(bool, String, i64)> {
     let power = (power.parse::<i64>().ok())
         .and_then(|p| p.checked_sub(i64::try_from(fraction.len()).ok()?))
         .and_then(|p| p.checked_add(i64::try_from(significant.len() - kept.len()).ok()?))?;
-    // Terraform keeps a zero's sign: `-0` prints `-0`.
     Some(match kept {
         "" => (negative, String::new(), 0),
         _ => (negative, kept.to_string(), power),
     })
 }
 
-/// Whether a JSON value holds a number `serde_json` read as a float (written with a fraction or
-/// an exponent, or past `i64::MIN..=u64::MAX`): its digits are gone, so it may not be the number
-/// Terraform reads. (`hcl-rs` would make a whole one an integer, `i64::MIN` for one just below.)
 fn float(v: &serde_json::Value) -> bool {
     match v {
         serde_json::Value::Number(n) => n.is_f64(),
@@ -1816,7 +1475,6 @@ fn float(v: &serde_json::Value) -> bool {
     }
 }
 
-/// The bytes `v` holds as JSON, about: what the value ceilings count.
 fn size(v: &Value) -> usize {
     match v {
         Value::Null | Value::Bool(_) | Value::Number(_) => 8,
@@ -1828,10 +1486,6 @@ fn size(v: &Value) -> usize {
     }
 }
 
-/// The values bound to the root names (`var`, `local`, ...) and the bytes each holds (`size`),
-/// worked out once per expression: `cost` reads a root's size at every traversal in a `for`.
-/// A value read inside them is sized once too, by its address, however many times the
-/// expression reads it (#765).
 struct Roots<'v> {
     values: &'v Map<String, Value>,
     sizes: BTreeMap<&'v str, usize>,
@@ -1844,15 +1498,12 @@ impl Roots<'_> {
         self.sizes.get(name).copied()
     }
 
-    /// `size(v)` of a value read inside the roots.
     fn read_size(&self, v: &Value) -> usize {
         *(self.read_sizes.borrow_mut())
             .entry(std::ptr::from_ref(v))
             .or_insert_with(|| size(v))
     }
 
-    /// How many elements the value `v` read inside the roots gives a `for`, and the bytes one
-    /// of them (or its key, with its quotes) holds at most.
     fn read_elements(&self, v: &Value) -> (usize, usize) {
         let key = std::ptr::from_ref(v);
         if let Some(&found) = self.read_elements.borrow().get(&key) {
@@ -1872,8 +1523,6 @@ impl Roots<'_> {
     }
 }
 
-/// The value a traversal reaches inside the bound values `roots` through attributes and literal
-/// indices only, when it reaches one.
 fn bound<'v>(t: &Traversal, roots: &'v Map<String, Value>) -> Option<&'v Value> {
     let Expression::Variable(root) = &t.expr else {
         return None;
@@ -1895,12 +1544,10 @@ fn bound<'v>(t: &Traversal, roots: &'v Map<String, Value>) -> Option<&'v Value> 
     Some(v)
 }
 
-/// Whether `name` is the variable of a `for` around (`iters`), which hides a root of that name.
 fn shadowed(name: &str, iters: &[(String, usize)]) -> bool {
     iters.iter().any(|(n, _)| n == name)
 }
 
-/// The value `t` reads from `roots` (`bound`), unless a `for` variable hides its root.
 fn unshadowed<'v>(
     t: &Traversal,
     roots: &Roots<'v>,
@@ -1912,8 +1559,6 @@ fn unshadowed<'v>(
     }
 }
 
-/// What evaluating the traversal `t` copies before it reads: `hcl-rs` clones its root object
-/// whole, once per evaluation, so in a `for` (`iters`) that copy counts once per element.
 fn copied(t: &Traversal, roots: &Roots<'_>, iters: &[(String, usize)]) -> usize {
     match &t.expr {
         Expression::Variable(v) if !iters.is_empty() => roots.size(v.as_str()).unwrap_or(0),
@@ -1921,8 +1566,6 @@ fn copied(t: &Traversal, roots: &Roots<'_>, iters: &[(String, usize)]) -> usize 
     }
 }
 
-/// The steps evaluating `expr` takes at most (`cost`), its variables bound to `roots`: the bytes
-/// it makes and the steps that make none (template parts evaluated, root objects copied).
 fn steps(expr: &Expression, roots: &Map<String, Value>) -> usize {
     let sizes = roots.iter().map(|(k, v)| (k.as_str(), size(v))).collect();
     let roots = Roots {
@@ -1936,15 +1579,6 @@ fn steps(expr: &Expression, roots: &Map<String, Value>) -> usize {
     made.saturating_add(overhead).max(1)
 }
 
-/// An upper bound of the bytes evaluating `expr` makes, its variables bound to `roots` and the
-/// iterator variables of the `for` around it to `iters` (a name and the most one element holds);
-/// `overhead` grows by the steps that make no bytes each time they run in a `for`: evaluating
-/// a template's parts (`TEMPLATE_PART_COST` each) and copying the root object a traversal reads
-/// (`hcl-rs` clones `var`, `local`, ... whole to evaluate `var.x[0]`), kept apart so an element
-/// count estimated from the bytes does not multiply it. A product (a `for`,
-/// `formatlist`, `join`, `replace`) multiplies, a function that may grow its input (a `format`
-/// width, `jsonencode`'s escapes, `split`'s quotes, a case change) grows it, and anything else
-/// adds up.
 fn cost(
     expr: &Expression,
     roots: &Roots<'_>,
@@ -1955,8 +1589,6 @@ fn cost(
     match expr {
         Expression::Null(_) | Expression::Bool(_) | Expression::Number(_) => 8,
         Expression::String(s) => s.len() + 2,
-        // An element costs a byte at least (a template of no text costs nothing), so a list's
-        // cost bounds how many elements it holds, as `join` and `formatlist` read it (#764).
         Expression::Array(items) => (items.iter())
             .map(|e| cost(e, roots, iters, overhead).max(1))
             .fold(2, add),
@@ -2002,20 +1634,14 @@ fn cost(
                 .map(|e| cost(e, roots, iters, overhead))
                 .collect();
             let sum = args.iter().copied().fold(8, add);
-            // The three products below are charged their output's bound (#764), never more
-            // than the square of their arguments they were charged before.
             let square = sum.saturating_mul(sum);
             match (f.name.name.as_str(), args.as_slice()) {
-                // An expanded last argument (`join(x...)`) may hold any of the others.
                 ("formatlist" | "join" | "replace", _) if f.args.expand_final() => square,
-                // At most an element per byte of the lists, each shown in up to three times
-                // its cost, and a separator after each.
                 ("join", [sep, lists @ ..]) => {
                     let sep = shown_len(f.args.iter().next(), *sep);
                     let lists = lists.iter().copied().fold(0, add);
                     add(sum, lists.saturating_mul(add(sep, 3))).min(square)
                 }
-                // A literal, non-empty substring matches at most once per byte.
                 ("replace", [s, _, to]) => {
                     let s = shown_len(f.args.iter().next(), *s);
                     let to = shown_len(f.args.iter().nth(2), *to);
@@ -2060,11 +1686,6 @@ fn cost(
     }
 }
 
-/// The bytes `formatlist` makes from its arguments (`costs`, the format's first): a row per
-/// element of its lists, which share one length or it makes none (without one, as many rows as
-/// its costliest argument of no known kind), each row what the format shows, a width up to
-/// `WIDTH_MAX` per argument and what it formats escaped (`%q`, up to six bytes a byte): a list's
-/// elements once in all, any other argument whole in each row (#764).
 fn formatlist_cost(
     f: &hcl_edit::expr::FuncCall,
     costs: &[usize],
@@ -2113,8 +1734,6 @@ fn formatlist_cost(
         .saturating_add(lists.saturating_mul(6))
 }
 
-/// The most bytes the string argument `e`, costed `cost`, shows: a literal its length, anything
-/// else three times its cost (a number shown takes up to 24 bytes, where 8 are counted).
 fn shown_len(e: Option<&Expression>, cost: usize) -> usize {
     match e {
         Some(Expression::String(s)) => s.len(),
@@ -2122,9 +1741,6 @@ fn shown_len(e: Option<&Expression>, cost: usize) -> usize {
     }
 }
 
-/// The bytes the template `t` makes, as `cost`; each of its parts evaluated in a `for` (`iters`)
-/// adds `TEMPLATE_PART_COST` to `overhead`. Outside every `for` a part runs once per evaluation,
-/// in time the template's text bounds.
 fn template_cost(
     t: &Template,
     roots: &Roots<'_>,
@@ -2171,9 +1787,6 @@ fn template_cost(
     total
 }
 
-/// How many elements the collection `expr` gives at most, and the bytes one of them (or its key)
-/// holds at most: exact for a bound value, a literal list or object's count and its costliest
-/// element, else its cost for both.
 fn elements(
     expr: &Expression,
     roots: &Roots<'_>,
@@ -2186,23 +1799,17 @@ fn elements(
         && !f.args.expand_final()
         && let Some(arg) = f.args.iter().next()
     {
-        // A conversion keeps its argument's elements (a number made a string adds its quotes).
-        // Another argument or an expanded one (`x...`), which `hcl-rs` evaluates before it
-        // refuses the call, is costed as any call.
         return elements(arg, roots, iters, overhead);
     }
     match expr {
         Expression::Parenthesis(p) => return elements(p.inner(), roots, iters, overhead),
         Expression::Conditional(c) => {
-            // As many as the larger branch gives; the condition makes no element.
             let cond = cost(&c.cond_expr, roots, iters, overhead);
             *overhead = overhead.saturating_add(cond);
             let (a, x) = elements(&c.true_expr, roots, iters, overhead);
             let (b, y) = elements(&c.false_expr, roots, iters, overhead);
             return (a.max(b), x.max(y));
         }
-        // A literal holds as many elements as it lists, each costed alone (its whole cost for
-        // each element squared it), and is made once, whatever its `for` reads of it (#716).
         Expression::Array(items) => {
             let costs = (items.iter()).map(|e| cost(e, roots, iters, overhead));
             let costs: Vec<usize> = costs.collect();
@@ -2212,7 +1819,6 @@ fn elements(
         Expression::Object(object) => {
             let mut each = 0;
             for (k, v) in object.iter() {
-                // The key is bound as a string, its quotes counted as a bound object's are.
                 let key = match k {
                     ObjectKey::Ident(i) => i.as_str().len() + 2,
                     ObjectKey::Expression(e) => cost(e, roots, iters, overhead),
@@ -2248,9 +1854,6 @@ fn elements(
     }
 }
 
-/// How many times an expression reads each variable it names: `each` and `count` say whether
-/// it reads the instance it is evaluated in, a root object's (`var`, `local`, ...) what a
-/// refusal spends on that root.
 #[derive(Default)]
 struct Variables(BTreeMap<String, usize>);
 
@@ -2265,7 +1868,6 @@ impl Variables {
         self.0.get(name).copied().unwrap_or(0)
     }
 
-    /// Whether the expression reads the instance it is evaluated in.
     fn reads_instance(&self) -> bool {
         self.0.contains_key("each") || self.0.contains_key("count")
     }
@@ -2280,8 +1882,6 @@ impl Visit for Variables {
     }
 }
 
-/// The key comparisons converting the object literals of `expr` for `hcl-rs` takes, the square
-/// of each one's keys: converting checks each key of an object against those before it.
 fn widths(expr: &Expression) -> usize {
     struct Widths(usize);
     impl Visit for Widths {
@@ -2295,8 +1895,6 @@ fn widths(expr: &Expression) -> usize {
     widths.0
 }
 
-/// What `each` and `count` hold in one instance of a block or a module call: its key and
-/// `each.value`, with what the `count` or `for_each` went through.
 #[derive(Debug, Clone)]
 struct Each {
     key: Key,
@@ -2304,7 +1902,6 @@ struct Each {
     through: BTreeSet<Overridable>,
 }
 
-/// A name a value is memoized under, in one instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Name {
     Var(String),
@@ -2312,44 +1909,26 @@ enum Name {
     Output(String),
 }
 
-/// One instance of a module during a root's evaluation.
 struct Instance<'m> {
     dir: &'m str,
-    /// The instance that calls it, with the call's block.
     parent: Option<(usize, &'m Block)>,
-    /// The key and `each.value` of the call's instance that made it, when the call has keys.
     call: Option<Each>,
-    /// Each block's nodes, by its kind, type and name: the instance key and the address.
     nodes: HashMap<BlockName<'m>, Vec<(Option<Key>, String)>>,
-    /// The instances of each local module it calls, by the call's name, with their keys.
     children: HashMap<&'m str, Vec<(Option<Key>, usize)>>,
 }
 
-/// The evaluation of a repository's Terraform files, root by root.
 struct Eval<'m> {
     modules: &'m BTreeMap<String, Module>,
     mappings: &'m mapping::Config,
     instances: Vec<Instance<'m>>,
-    /// The targets each reference resolves to in an instance, once computed.
     memo: HashMap<(usize, &'m Ref), Vec<String>>,
-    /// The references being resolved: one met again closes a cycle and resolves to nothing.
     open: HashSet<(usize, &'m Ref)>,
-    /// `hcl-rs`'s evaluation context, its functions declared once and its variables (`var`,
-    /// `local`, `module`, `each`, `count`) declared again for each expression.
     ctx: Context<'static>,
-    /// The value of each name of an instance, once evaluated.
     values: HashMap<(usize, Name), Evaluated>,
-    /// Whether each name of an instance holds a set, once known (`holds_set`).
     sets: HashMap<(usize, Name), bool>,
-    /// The names being evaluated: one met again closes a cycle and is unresolved.
     evaluating: HashSet<(usize, Name)>,
-    /// Whether module outputs may be read: not while the instances are made, since a module
-    /// called later has none yet.
     outputs: bool,
-    /// The cost the root's evaluations may still spend.
     work: usize,
-    /// The nodes whose physical name waits for every instance: the node, its instance, its block
-    /// and its instance's `each`.
     pending: Vec<(usize, usize, &'m Block, Option<Each>)>,
     subscription_inputs: subscription::Inputs,
     node_inputs: HashMap<String, (usize, BTreeSet<Overridable>)>,
@@ -2393,7 +1972,6 @@ impl<'m> Eval<'m> {
         }
     }
 
-    /// Whether `bytes` more fit both budgets, taking them when they do.
     fn charge(&mut self, bytes: usize) -> bool {
         match (
             self.root_left.checked_sub(bytes),
@@ -2410,14 +1988,12 @@ impl<'m> Eval<'m> {
         }
     }
 
-    /// The nodes and references of the root module at `dir`.
     fn root(&mut self, dir: &'m str) {
         self.node_inputs.clear();
         self.instances.clear();
         self.memo.clear();
         self.open.clear();
         self.values.clear();
-        // An instance's number is its place in its root: a root's sets are no other root's (#783).
         self.sets.clear();
         self.evaluating.clear();
         self.pending.clear();
@@ -2428,13 +2004,10 @@ impl<'m> Eval<'m> {
         self.root_nodes = 0;
         self.root_left = ROOT_STORED_MAX;
         self.instantiate(dir, "", None, None, &mut vec![dir]);
-        // Every instance made, module outputs are known: values are evaluated again with them.
         self.values.clear();
         self.evaluating.clear();
         self.outputs = true;
         let pending = std::mem::take(&mut self.pending);
-        // An unknown composite must never fall back to its physical short name, even if
-        // the root exhausts its evaluation/storage budget before projection runs.
         for &(node, _, block, _) in &pending {
             if block.kind == Kind::Resource
                 && (block.ty.starts_with("azurerm_") || block.ty.starts_with("google_"))
@@ -2443,9 +2016,6 @@ impl<'m> Eval<'m> {
                 self.nodes[node].provisioned = Some(Projection::default());
             }
         }
-        // A known name that reads neither `each` nor `count` is the same in every instance of
-        // its block: it is evaluated once (#765). One that is not known (a pattern or
-        // unresolved) is evaluated again, and spends again, in each instance.
         let mut shared: HashMap<(usize, *const Block), Evaluated> = HashMap::new();
         for &(node, instance, block, ref each) in &pending {
             let Some(named) = &block.named else { continue };
@@ -2463,27 +2033,22 @@ impl<'m> Eval<'m> {
                     found
                 }
             };
-            // A null or a collection is no name; anything else is its text, `*` when unresolved.
             let (name, pattern) = match &found.val {
                 Val::Known(Value::Null | Value::Array(_) | Value::Object(_)) => (None, false),
                 _ => {
                     let (text, pattern) = found.text();
-                    // An ARN or a URL in a type the table lists holds the name (#656).
                     let entry = (block.kind == Kind::Resource)
                         .then(|| types::entry("terraform", &block.ty))
                         .flatten();
                     let name = match entry {
-                        Some(e) if !pattern && e.ty.starts_with("google_") => {
-                            // Context keeps the physical name. A separate projection below
-                            // carries the canonical target and explicit unresolved state.
-                            e.project(&text)
-                                .map(|name| {
-                                    name.strip_prefix("subscriptions/")
-                                        .unwrap_or(&name)
-                                        .to_string()
-                                })
-                                .or(Some(text))
-                        }
+                        Some(e) if !pattern && e.ty.starts_with("google_") => e
+                            .project(&text)
+                            .map(|name| {
+                                name.strip_prefix("subscriptions/")
+                                    .unwrap_or(&name)
+                                    .to_string()
+                            })
+                            .or(Some(text)),
                         Some(e) if !pattern => e.project(&text),
                         _ => Some(text),
                     };
@@ -2571,9 +2136,6 @@ impl<'m> Eval<'m> {
         }
     }
 
-    /// Adds an instance of the module at `dir` under `prefix` (the call's address and a dot),
-    /// made by the call's instance `call`, its nodes and those of the local modules it calls,
-    /// `stack` holding the directories of the calls above it; its position.
     fn instantiate(
         &mut self,
         dir: &'m str,
@@ -2660,10 +2222,6 @@ impl<'m> Eval<'m> {
         id
     }
 
-    /// The instances the `count` or `for_each` of `block` gives in the instance `at`, sorted
-    /// by key as Terraform sorts them; `None` for a block with neither, or with one that does
-    /// not resolve to a number, an object or a list of strings, for a list known to be a tuple
-    /// (`is_tuple`: Terraform and OpenTofu refuse it), or past `EXPANSION_MAX`.
     fn keys(&mut self, at: usize, block: &'m Block) -> Option<Vec<Each>> {
         if let Some(count) = &block.count {
             let found = self.value(at, None, count, 0);
@@ -2702,8 +2260,6 @@ impl<'m> Eval<'m> {
         Some(entries.into_iter().map(each).collect())
     }
 
-    /// The value of the name `name` in the instance `at`, memoized; `depth` names already gone
-    /// through. A name met again inside its own evaluation (a cycle) is unresolved.
     fn name(&mut self, at: usize, name: Name, depth: usize) -> Evaluated {
         let key = (at, name);
         if let Some(found) = self.values.get(&key) {
@@ -2729,8 +2285,6 @@ impl<'m> Eval<'m> {
         found
     }
 
-    /// Whether the local or variable `name` of the instance `at` holds a set (`is_set`), following
-    /// a name that is another name, or a variable declared `type = set(...)`. A cycle holds none.
     fn holds_set(&mut self, at: usize, name: Name, depth: usize) -> bool {
         let key = (at, name);
         if let Some(&found) = self.sets.get(&key) {
@@ -2742,11 +2296,9 @@ impl<'m> Eval<'m> {
         self.sets.insert(key.clone(), false);
         let modules = self.modules;
         let module = &modules[self.instances[at].dir];
-        // `kept`: the default is a set because its conversions made one and `any` kept it.
         let (scope, expr, kept) = match &key.1 {
             Name::Local(n) => (at, module.locals.get(n).map(|l| &l.expr), false),
             Name::Var(n) => match (module.variables.get(n), self.instances[at].parent) {
-                // A declared type converts the value: only `any`, or none, keeps the set.
                 (Some(v), _)
                     if matches!(
                         v.ty,
@@ -2761,8 +2313,6 @@ impl<'m> Eval<'m> {
                     Some(arg) => (caller, Some(&arg.expr), false),
                     None => (at, v.default.as_ref(), ends_in_set(&v.through)),
                 },
-                // A var file's value is a literal converted once, to the final type, so it holds no
-                // set here (a final set is handled above); only a default is converted twice.
                 (Some(_), None) if module.given.contains_key(n) => (at, None, false),
                 (Some(v), None) => (at, v.default.as_ref(), ends_in_set(&v.through)),
                 (None, _) => (at, None, false),
@@ -2781,9 +2331,6 @@ impl<'m> Eval<'m> {
         found
     }
 
-    /// Whether `expr`, in the instance `at`, is known to be a tuple, which `for_each` refuses: a
-    /// tuple written out (`[...]`, `[for ...]`), or a variable read whole that holds one. A tuple
-    /// that arrives any other way (a local, a function's result) is a ceiling (#717).
     fn is_tuple(&self, at: usize, expr: &Expression) -> bool {
         match expr {
             Expression::Array(_) => true,
@@ -2793,10 +2340,6 @@ impl<'m> Eval<'m> {
         }
     }
 
-    /// Whether `var.<n>` in the instance `at` holds a tuple: a value of a declared tuple type (or
-    /// of a type a list does not convert to, which the tools refuse), or under `any` or no type a
-    /// value no set or list converted: a var file's, a default's, or a module argument that is a
-    /// tuple in its caller.
     fn holds_tuple(&self, at: usize, n: &str) -> bool {
         let module = &self.modules[self.instances[at].dir];
         let Some(v) = module.variables.get(n) else {
@@ -2815,10 +2358,6 @@ impl<'m> Eval<'m> {
         }
     }
 
-    /// The value of `var.<n>` in the instance `at` (`reading`). A sensitive or undeclared variable
-    /// is unresolved, and so is one Terraform reads without some of its blocks
-    /// (`Variable::terraform`) where the two readings give it another value or another type, since
-    /// either tool may run the directory (#767).
     fn var(&mut self, at: usize, n: &str, depth: usize) -> Evaluated {
         let module = &self.modules[self.instances[at].dir];
         let Some(variable) = module.variables.get(n).filter(|v| !v.sensitive) else {
@@ -2828,7 +2367,6 @@ impl<'m> Eval<'m> {
         let Some(terraform) = variable.terraform.as_deref() else {
             return found;
         };
-        // A type as written, whitespace aside; no `type` is `any`: either keeps the value as it is.
         let ty = |v: &Variable| -> String {
             (v.type_text.as_deref().unwrap_or("any").split_whitespace()).collect()
         };
@@ -2844,10 +2382,6 @@ impl<'m> Eval<'m> {
         }
     }
 
-    /// The value `variable`, a reading of `var.<n>`, has in the instance `at`: in a module called
-    /// locally, the call's argument evaluated in the caller (else the variable's default, which the
-    /// repository fixes); in a root, the value its var files give or else its default, either of
-    /// which a deployer can override.
     fn reading(&mut self, at: usize, n: &str, variable: &'m Variable, depth: usize) -> Evaluated {
         let module = &self.modules[self.instances[at].dir];
         if let Some((caller, block)) = self.instances[at].parent {
@@ -2865,7 +2399,6 @@ impl<'m> Eval<'m> {
             };
         }
         let given = module.given.get(n);
-        // A var file that does not read, loaded after the value found, may give another.
         let unread =
             (module.unread.as_ref()).is_some_and(|unread| given.is_none_or(|g| g.rank < *unread));
         let (mut found, path, line, tfvars) = match (given, &variable.default) {
@@ -2902,11 +2435,6 @@ impl<'m> Eval<'m> {
         found
     }
 
-    /// `found`, the value a module argument or a var file gives `variable` in the instance `at`,
-    /// converted to its final type. Unresolved where the variable's default does not convert to
-    /// its types (`converted_through`): Terraform and OpenTofu refuse the configuration whatever
-    /// gives the value. A variable with a block in a file only OpenTofu reads is not checked: with
-    /// a declaration Terraform reads, `Eval::var` compares it with Terraform's reading (#767).
     fn received(
         &mut self,
         at: usize,
@@ -2927,10 +2455,6 @@ impl<'m> Eval<'m> {
         declared(found, variable.ty.as_slice())
     }
 
-    /// The value of `module.<name>` in the instance `at`, holding the outputs `outs` of each of
-    /// its instances that resolve: an object for a call with no keys, a list for a `count`, an
-    /// object by key for a `for_each`. Only the instances `picked` (by a literal key) add what
-    /// they went through.
     fn module(
         &mut self,
         at: usize,
@@ -2972,11 +2496,6 @@ impl<'m> Eval<'m> {
         Some((value, through))
     }
 
-    /// The value of `expr` in the instance `at`, inside the block instance `each` when it has one;
-    /// `depth` names already gone through. `hcl-rs` evaluates it with every name it reads bound
-    /// to its value; when that fails (a part is unresolved), a template keeps its literal text
-    /// and the parts that resolve, each other part a `*`, and `var.<x>`, `local.<x>` or a module
-    /// output alone is that name's value.
     fn value(
         &mut self,
         at: usize,
@@ -2990,8 +2509,6 @@ impl<'m> Eval<'m> {
         if let Expression::String(s) = expr
             && s.len() + 2 <= EVAL_VALUE_MAX
         {
-            // Nothing to evaluate: a literal that fits stays known once the work is spent, in NFC
-            // as `Exact` writes the literals it evaluates (#749).
             return Evaluated {
                 val: Val::Known(Value::String(functions::nfc(s.value().clone()))),
                 through: BTreeSet::new(),
@@ -3012,14 +2529,12 @@ impl<'m> Eval<'m> {
                 Ref::Local(n) => Some(Name::Local(n.clone())),
                 _ => None,
             };
-            // Every read is checked for a set (#731), even one copied once below.
             if let (Some(held), Some(via)) = (held, r.via())
                 && self.holds_set(at, held, depth)
             {
                 sets.insert(via);
             }
             if matches!(r, Ref::Var(_) | Ref::Local(_)) && !seen.insert(r.clone()) {
-                // Read twice, a name is copied once.
                 continue;
             }
             let (map, name, found) = match r {
@@ -3095,13 +2610,6 @@ impl<'m> Eval<'m> {
                 _ => {}
             }
         } else {
-            // Refused, it spends the bytes it went through to decide, not what it would have
-            // made: its own text, and an upper bound for each root, once copied, once ordered
-            // (`lexical`) and twice at each read of that root (`cost` reads the value read; a
-            // resource it names is no root; `count.index` reads only `count`, #765). Never
-            // more than the `EVAL_COST_MAX` every refusal spent before. The parts `partial`
-            // evaluates pass this gate themselves.
-            // An expression built rather than read has no span: its text is written out.
             let text = (expr.span()).map_or_else(|| expr.to_string().len(), |s| s.len());
             let spent = (roots.iter())
                 .map(|(name, v)| {
@@ -3114,7 +2622,6 @@ impl<'m> Eval<'m> {
         self.partial(at, each, expr, depth)
     }
 
-    /// The value of `expr` when it does not evaluate whole, by its form (`value`).
     fn partial(
         &mut self,
         at: usize,
@@ -3194,8 +2701,6 @@ impl<'m> Eval<'m> {
         Evaluated { val, through }
     }
 
-    /// The addresses the reference `r` in the instance `at` resolves to, sorted, at most
-    /// `REFERENCES_MAX`; `depth` names already gone through.
     fn resolve(&mut self, at: usize, r: &'m Ref, depth: usize) -> Vec<String> {
         if depth > EVAL_DEPTH_MAX || !self.open.insert((at, r)) {
             return Vec::new();
@@ -3206,7 +2711,6 @@ impl<'m> Eval<'m> {
         }
         let modules = self.modules;
         let mut found: BTreeSet<String> = BTreeSet::new();
-        // The instances of `list` the key names, or all of them when it names none of them.
         fn pick<T: Clone>(list: &[(Option<Key>, T)], key: &Option<Key>) -> Vec<T> {
             let named: Vec<T> = (list.iter())
                 .filter(|(k, _)| key.is_some() && k == key)
@@ -3267,30 +2771,23 @@ impl<'m> Eval<'m> {
     }
 }
 
-/// The label of the root module at `dir`: its path, `.` for the repository's root.
 fn label(dir: &str) -> &str {
     if dir.is_empty() { "." } else { dir }
 }
 
-/// The Terraform files of one repository read into modules, one per directory.
 pub(crate) struct Repository {
     modules: BTreeMap<String, Module>,
     mappings: mapping::Config,
-    /// The Compose files (#652), by path.
     compose: Vec<(String, Vec<u8>)>,
 }
 
 impl Repository {
-    /// Reads the Terraform files `files` (path and bytes, `is_input`) of one repository, those a
-    /// `.tofu` file shadows left out as the index leaves them.
     #[cfg(test)]
     pub(crate) fn read(files: &[(String, Vec<u8>)]) -> Repository {
         let (files, shadowed) = config_values::unshadowed(files.to_vec());
         Self::read_with(&files, &shadowed, &mapping::Config::default())
     }
 
-    /// `read` for the files `files` a `.tofu` file does not shadow, and the paths of the others,
-    /// `shadowed`: Terraform, which ignores `.tofu` files, reads them, so their blocks are unknown.
     pub(crate) fn read_with(
         files: &[(String, Vec<u8>)],
         shadowed: &[String],
@@ -3298,7 +2795,6 @@ impl Repository {
     ) -> Repository {
         let mut modules: BTreeMap<String, Module> = BTreeMap::new();
         let mut sorted: Vec<&(String, Vec<u8>)> = files.iter().collect();
-        // Terraform merges override files into a directory once its other files are read.
         sorted.sort_by_key(|(path, _)| (config_values::is_override(path), path));
         let mut compose = Vec::new();
         for (path, src) in sorted {
@@ -3328,16 +2824,11 @@ impl Repository {
         }
     }
 
-    /// The directories each local module call of the module at `dir` names.
     fn calls<'a>(&'a self, dir: &'a str) -> impl Iterator<Item = String> + 'a {
         (self.modules.get(dir).into_iter().flat_map(|m| &m.blocks))
             .filter_map(move |b| b.source.as_deref().and_then(|s| local_source(dir, s)))
     }
 
-    /// The Terraform root modules by directory, each with its evaluation unit: its directory and
-    /// those of the local modules it calls, however deep (up to `MODULE_DEPTH_MAX`), whether they
-    /// hold files or not. A directory another one calls as a local module is evaluated only
-    /// through its calls, so it is no root.
     fn terraform_units(&self) -> BTreeMap<&str, BTreeSet<String>> {
         let called: HashSet<String> = (self.modules.keys())
             .flat_map(|dir| self.calls(dir).filter(move |t| t != dir))
@@ -3359,9 +2850,6 @@ impl Repository {
             .collect()
     }
 
-    /// Each root, by its label, with its evaluation unit: a Terraform root module with its
-    /// called modules, or the directory of a Compose project (#652), which joins the Terraform
-    /// root of the same directory.
     pub(crate) fn units(&self) -> Vec<(String, BTreeSet<String>)> {
         let mut units: BTreeMap<String, BTreeSet<String>> = (self.terraform_units().into_iter())
             .map(|(dir, unit)| (dir.to_string(), unit))
@@ -3376,8 +2864,6 @@ impl Repository {
             .collect()
     }
 
-    /// The IaC nodes and references of the roots whose label `pick` keeps, each evaluated alone,
-    /// in root and file order, with `left` bytes to store them all.
     pub(crate) fn evaluate(
         &self,
         pick: impl Fn(&str) -> bool,
@@ -3411,8 +2897,6 @@ impl Repository {
     }
 }
 
-/// The IaC nodes and references of the Terraform files `files` (path and bytes) of one
-/// repository, each root module evaluated alone, in root and file order.
 #[cfg(test)]
 pub(crate) fn evaluate(files: &[(String, Vec<u8>)]) -> (Vec<Node>, Vec<Reference>) {
     let (mut nodes, mut references) = Repository::read(files).evaluate(|_| true, STORED_MAX);
@@ -3424,9 +2908,6 @@ pub(crate) fn evaluate(files: &[(String, Vec<u8>)]) -> (Vec<Node>, Vec<Reference
     (nodes, references)
 }
 
-/// Evaluates again the root modules of `repository` whose unit holds a directory of `dirs`
-/// (where a Terraform file changed, appeared or left) and those not stored yet, drops the rows
-/// of the roots that are no more, and keeps the rows of every other root as they are.
 pub(crate) fn refresh(
     tx: &Transaction,
     repository: &Repository,
@@ -3470,10 +2951,6 @@ pub(crate) fn refresh(
     insert(tx, &nodes, &references)
 }
 
-/// The condition that the file in `column` is one this module reads: a Terraform file or, since
-/// #652, a Compose file. The Terraform and Compose nodes and the Kubernetes nodes (#651) share
-/// the tables, and a Terraform root and a Kubernetes unit may share a label, so each side touches
-/// the rows of its own files only.
 fn terraform_path(column: &str) -> String {
     let mut any = vec![
         format!("{column} LIKE '%.tf'"),
@@ -3487,23 +2964,15 @@ fn terraform_path(column: &str) -> String {
     format!("({})", any.join(" OR "))
 }
 
-/// Who writes a stored node. The Terraform and Compose nodes (#649, #652), the Kubernetes nodes
-/// (#651), the CloudFormation nodes (#653) and the GitHub Actions nodes (#823) share the tables,
-/// and each is rewritten by its own refresh, so each touches the rows it owns only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Owner {
-    /// A node without `::` in its type, in a Terraform, OpenTofu or Compose file.
     Terraform,
-    /// A node whose type has no `::`, in any other file: a Kubernetes kind.
     Kubernetes,
-    /// A node whose type has a `::`, regardless of filename: `AWS::SQS::Queue`, `Custom::Name`.
     CloudFormation,
-    /// A pipeline, an action, a CI job or a CI step (`actions::ROWS`), whatever its file's name.
     Actions,
 }
 
 impl Owner {
-    /// The condition that a row of `iac_nodes` is owned by `self`.
     pub(crate) fn sql(self) -> String {
         let own = terraform_path("path");
         let typed = "type LIKE '%::%'";
@@ -3517,7 +2986,6 @@ impl Owner {
     }
 }
 
-/// Deletes the stored nodes and references `owner` writes, of the root `root` or of every root.
 pub(crate) fn forget(tx: &Transaction, root: Option<&str>, owner: Owner) -> Result<()> {
     let own = owner.sql();
     let mut args: Vec<&dyn rusqlite::ToSql> = Vec::new();
@@ -3526,7 +2994,6 @@ pub(crate) fn forget(tx: &Transaction, root: Option<&str>, owner: Owner) -> Resu
         scope = " AND root = ?1".into();
         args.push(root);
     }
-    // The references go first: they are found through the nodes that source them.
     tx.execute(
         &format!(
             "DELETE FROM iac_references WHERE (root, source) IN \
@@ -3541,14 +3008,10 @@ pub(crate) fn forget(tx: &Transaction, root: Option<&str>, owner: Owner) -> Resu
     Ok(())
 }
 
-/// Whether the file `path` with bytes `src` holds a template unit: a CloudFormation or SAM
-/// template, or a Serverless service (#654), whose `resources` section is one.
 pub(crate) fn template_wanted(path: &str, src: &[u8]) -> bool {
     cloudformation::wanted(path, src) || serverless::wanted(path, src)
 }
 
-/// The nodes and references of a template unit: a Serverless service by its file name, else a
-/// template. A service file that is none yields nothing.
 pub(crate) fn template_evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
     match serverless::is_file(path) {
         true => serverless::evaluate(path, src),
@@ -3556,8 +3019,6 @@ pub(crate) fn template_evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Refer
     }
 }
 
-/// Whether a refresh that read the file `path` again (`src`) or lost it (`None`) changes the
-/// CloudFormation nodes: it says it is a template, or it held nodes.
 pub(crate) fn template_changed(tx: &Transaction, path: &str, src: Option<&[u8]>) -> Result<bool> {
     if !cloudformation::is_source(path) {
         return Ok(false);
@@ -3572,8 +3033,6 @@ pub(crate) fn template_changed(tx: &Transaction, path: &str, src: Option<&[u8]>)
     Ok(tx.prepare_cached(&held)?.exists(params![path])?)
 }
 
-/// Replaces the nodes and references of the template at `path` with those of `src` (`None` for a
-/// file that left): a template is its own evaluation unit, so no other root is touched.
 pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>) -> Result<()> {
     forget(tx, Some(path), Owner::CloudFormation)?;
     // ponytail: a file past `MAX_BYTES` is no template, as config values count it unreadable.
@@ -3585,7 +3044,6 @@ pub(crate) fn refresh_template(tx: &Transaction, path: &str, src: Option<&[u8]>)
     Ok(())
 }
 
-/// Stores `nodes` and `references`.
 pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference]) -> Result<()> {
     let mut insert = tx
         .prepare_cached("INSERT INTO iac_nodes VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)")?;
@@ -3640,12 +3098,10 @@ pub(crate) fn insert(tx: &Transaction, nodes: &[Node], references: &[Reference])
     Ok(())
 }
 
-/// The columns of a node, in `row`'s order.
 const COLUMNS: &str = "address, root, type, name, pattern, overridable, path, line, end_line, \
                        block, image, image_overridable, build, build_overridable, role, \
                        handler, handler_overridable, events, build_image, subscription, environment, images, provisioned, ingress, routes, dockerfile, actions";
 
-/// The text at column `at` and its overridable flag at the next one, when there is a text.
 fn resolved(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<Resolved>> {
     let text: Option<String> = r.get(at)?;
     let overridable: Option<bool> = r.get(at + 1)?;
@@ -3693,7 +3149,6 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Node> {
     })
 }
 
-/// The stored IaC nodes, shared by contract kinds that read workloads.
 pub(crate) fn nodes(db: &Connection) -> Result<Vec<Node>> {
     Ok(db
         .prepare(&format!(
@@ -3703,23 +3158,16 @@ pub(crate) fn nodes(db: &Connection) -> Result<Vec<Node>> {
         .collect::<rusqlite::Result<_>>()?)
 }
 
-/// Stored reference facts used by contract kinds, without reopening infrastructure source.
 pub(crate) fn all_references(db: &Connection) -> Result<Vec<Reference>> {
     Ok(db.prepare("SELECT root, source, target, via FROM iac_references ORDER BY root, source, target, via")?
         .query_map([], |row| Ok(Reference { root: row.get(0)?, source: row.get(1)?, target: row.get(2)?, via: row.get(3)? }))?
         .collect::<rusqlite::Result<_>>()?)
 }
 
-/// `<identity> <path>:<line> <address>`.
 pub(crate) fn at(identity: &str, n: &Node) -> String {
     format!("{identity} {}:{} {}", n.path, n.line, n.address)
 }
 
-/// The IaC nodes of `db` (repository `identity`) whose address, type or physical name matches
-/// `needle`, lowercased, as `search` hits: `<identity> <path>:<line> <address> (<type>[, name
-/// "<name>"], root <root>)`, `pattern` in place of `name` for a pattern, ordered by rank, then
-/// repository, path, line, address and root. The nodes of a pipeline or an action answer to the
-/// kind `ci` (`actions::hits`), never here.
 pub(crate) fn hits(
     identity: &str,
     db: &Connection,
@@ -3762,10 +3210,6 @@ pub(crate) fn hits(
     Ok(hits)
 }
 
-/// The nodes `text` names in `db` (repository `identity`): `<address>`, `<path>::<address>` or
-/// `<identity>::<path>::<address>`, any of them followed by ` (root <root>)` to pick a root. A
-/// pipeline or an action is also named by its file path, and a CI step by a selector
-/// (`actions::names`).
 pub(crate) fn named(identity: &str, nodes: &[Node], text: &str) -> Vec<Node> {
     let (text, root) = match text
         .strip_suffix(')')
@@ -3793,8 +3237,6 @@ pub(crate) fn named(identity: &str, nodes: &[Node], text: &str) -> Vec<Node> {
     found
 }
 
-/// Nodes resolved from the visible exports include stored nodes and configuration-derived
-/// workloads. Neither lookup nor a server-mode query reads a build configuration from disk.
 pub(crate) fn found(exports: &[crate::index::Export], text: &str) -> Vec<(usize, Node)> {
     exports
         .iter()
@@ -3807,7 +3249,6 @@ pub(crate) fn found(exports: &[crate::index::Export], text: &str) -> Vec<(usize,
         .collect()
 }
 
-/// The answer when `text` fits several nodes: one line each, with what to pass for it.
 fn several(repos: &[(&str, &Connection)], text: &str, found: &[(usize, Node)]) -> Vec<String> {
     let short = |n: &Node| format!("{} (root {})", n.address, n.root);
     let mut lines = vec![format!(
@@ -3825,8 +3266,6 @@ fn several(repos: &[(&str, &Connection)], text: &str, found: &[(usize, Node)]) -
     lines
 }
 
-/// The nodes `node` references (`Down`) or that reference it (`Up`), each with the name the
-/// reference went through, in path, line and address order.
 fn references(
     db: &Connection,
     node: &Node,
@@ -3858,8 +3297,6 @@ fn references(
     Ok(found)
 }
 
-/// A recorded text as JSON, then ` (overridable)` when a default gave it and ` (unresolved)` when
-/// a variable with no default is still in it.
 fn resolved_shown(f: &Resolved) -> String {
     let marks = [
         (f.overridable, " (overridable)"),
@@ -3872,17 +3309,11 @@ fn resolved_shown(f: &Resolved) -> String {
     )
 }
 
-/// `<identity> <path>:<line> <address>`, then ` via <name>` when the reference went through one.
 fn reached(identity: &str, n: &Node, via: &Option<String>) -> String {
     let via = via.as_ref().map_or(String::new(), |v| format!(" via {v}"));
     format!("{}{via}", at(identity, n))
 }
 
-/// `context` on the IaC node `text` names, or `None` when it names none: its first line
-/// `<identity> <path>:<line>-<end> <address>`, then its type, its physical name (marked
-/// `(pattern)` when a part is unresolved), its root, its Crossplane role when it has one (#655),
-/// the overridable values its name went through, the nodes it references, those that reference
-/// it and its config values. A text that fits several nodes lists them.
 pub(crate) fn context(
     repos: &[(&str, &Connection)],
     exports: &[crate::index::Export],
@@ -3941,14 +3372,6 @@ pub(crate) fn context(
     Ok(Some(lines))
 }
 
-/// `trace` from the IaC node `text` names, or `None` when it names none: the node, then the nodes
-/// it references (`Down`) or that reference it (`Up`), depth first, each indented under the one
-/// it hangs from, a node met again on its own branch marked ` (cycle)` and one already followed
-/// ` (see above)`; then the chain footer. A text that fits several nodes lists them.
-///
-/// `calls` gives the nodes a link joins to a node in the walk's direction, in any repository
-/// (`trace::Graph::node_calls`, a CI call): the walk follows them with the references, before
-/// them, so a chain of calls crosses repositories and goes on through each one's references.
 pub(crate) fn trace<'l>(
     repos: &[(&str, &Connection)],
     exports: &[crate::index::Export],
@@ -3964,11 +3387,8 @@ pub(crate) fn trace<'l>(
             .then(|| crate::render::budgeted(&several(repos, text, &found), budget)));
     };
     let mut rows = Vec::new();
-    // A node is itself only within its repository and root: a link leaves both.
     let mut expanded: HashSet<(usize, String, String)> = HashSet::new();
     let mut path: Vec<(usize, String, String)> = Vec::new();
-    // (depth, repository, node, the reference's name, the link that reached it), popped in
-    // walk order.
     let mut stack = vec![(0, *r, start.clone(), None::<String>, None::<&Link>)];
     while let Some((depth, r, n, via, link)) = stack.pop() {
         path.truncate(depth);
@@ -4125,7 +3545,6 @@ mod tests {
             ("main.tf", "module \"out\" { source = \"../outside\" }\n"),
             ("outside/main.tf", "resource \"a\" \"b\" {}\n"),
         ]));
-        // `outside` is a root of its own: nothing calls it from inside the repository.
         assert_eq!(addresses(&nodes), ["module.out @.", "a.b @outside"]);
     }
 
@@ -4236,8 +3655,6 @@ mod tests {
         );
     }
 
-    /// A literal index is the key Terraform reads, in NFC as the instance keys are (#749): either
-    /// spelling picks the one instance.
     #[test]
     fn a_literal_index_in_either_spelling_picks_its_instance() {
         let (_, references) = evaluate(&files(&[(
@@ -4254,11 +3671,8 @@ mod tests {
         );
     }
 
-    /// Locals that name each other twice over resolve in linear time, a cycle of locals resolves
-    /// to nothing, and a chain longer than `EVAL_DEPTH_MAX` stops.
     #[test]
     fn a_chain_of_names_past_the_evaluation_depth_stops() {
-        // `n` locals, the last named by `b.u`, each naming the one before twice.
         let chain = |n: usize| {
             let mut text = String::from("resource \"a\" \"t\" {}\nlocals {\n  l0 = a.t.id\n");
             for i in 1..n {
@@ -4299,7 +3713,6 @@ mod tests {
         let list: Vec<(String, Vec<u8>)> =
             list.into_iter().map(|(p, t)| (p, t.into_bytes())).collect();
         let (nodes, _) = evaluate(&list);
-        // m0 is the only root; each level adds one `module.n`.
         assert_eq!(nodes.len(), MODULE_DEPTH_MAX + 1);
         assert!(nodes.iter().all(|n| n.root == "m0" && n.ty == "module"));
         let deepest = nodes.last().unwrap();
@@ -4307,7 +3720,6 @@ mod tests {
             deepest.address.matches("module.n").count(),
             MODULE_DEPTH_MAX + 1
         );
-        // A module calling itself is a cycle: its call keeps no instance.
         let (nodes, _) = evaluate(&files(&[(
             "main.tf",
             "module \"me\" { source = \"./\" }\n",
@@ -4345,8 +3757,6 @@ mod tests {
         assert_eq!(references.last().unwrap().target, names[REFERENCES_MAX - 1]);
     }
 
-    /// A module called twice by each level instantiates two to the power of its depth: the root's
-    /// stored budget stops it, whatever the nesting ceiling allows.
     #[test]
     fn a_root_past_its_stored_budget_leaves_the_rest_out() {
         let mut list: Vec<(String, Vec<u8>)> = (0..MODULE_DEPTH_MAX)
@@ -4369,8 +3779,6 @@ mod tests {
         assert!(nodes.len() < NODES_MAX, "{}", nodes.len());
     }
 
-    /// Roots that each call a module exploding under its stored budget still stop at the
-    /// repository's: past `STORED_MAX` the later roots are left out.
     #[test]
     fn a_repository_past_its_stored_budget_leaves_the_rest_out() {
         let label = "k".repeat(2000);
@@ -4402,9 +3810,6 @@ mod tests {
         assert!(of(&last) * 10 < of("r00"), "{} of {}", of(&last), of("r00"));
     }
 
-    /// A chain of locals as deep as `EVAL_DEPTH_MAX`, each naming the one before twice, read by
-    /// many resources: each local resolves once per root, not twice per link. Measured on
-    /// 2026-11-04 in a debug build: about 0.1 s, a fortieth of the bound.
     #[test]
     fn a_chain_of_locals_named_twice_resolves_in_linear_time() {
         let mut text = String::from("resource \"a\" \"t\" {}\nlocals {\n  l0 = a.t.id\n");
@@ -4425,8 +3830,6 @@ mod tests {
         assert!(took < std::time::Duration::from_secs(4), "{took:?}");
     }
 
-    /// Directories that only call each other are no root (Terraform refuses such a cycle), so
-    /// their blocks are no nodes; a root that calls into the cycle instantiates it once.
     #[test]
     fn directories_calling_only_each_other_are_no_root() {
         let a = "module \"b\" { source = \"../b\" }\nresource \"x\" \"a\" {}\n";
@@ -4451,13 +3854,6 @@ mod tests {
         );
     }
 
-    /// Each node's address and physical name (` = "<name>"`, ` ~ "<pattern>"` for a pattern),
-    /// then each overridable value its name went through. Expect these forms: an instance key in
-    /// the address (`a.q["0"]` for a `for_each` key, `a.q[0]` for a `count` index), a `[var.s
-    /// main.tf:1]` suffix per overridable variable the name went through, on an exact name or a
-    /// pattern (`[var.n terraform.tfvars:1 tfvars]` for a var file's value), a `module.m` line for
-    /// the call itself beside the nodes inside it, and the evaluator's order of nodes, not the
-    /// files'.
     fn names(list: &[(&str, &str)]) -> Vec<String> {
         let (nodes, _) = evaluate(&files(list));
         (nodes.iter())
@@ -4478,8 +3874,6 @@ mod tests {
             .collect()
     }
 
-    /// JSON expression mapping keeps sole interpolations typed, defaults literal, and module
-    /// inputs/outputs on the same evaluator as native HCL (OpenTofu JSON syntax specification).
     #[test]
     fn terraform_json_evaluates_typed_templates_literals_and_local_modules() {
         let main = serde_json::json!({
@@ -4514,8 +3908,6 @@ mod tests {
         assert_eq!(
             names(&[("main.tf.json", &main), ("child/main.tofu.json", &child)]),
             [
-                // serde_json writes section keys in lexical order; HCL JSON visits them in
-                // source order, including their complete node and name results.
                 "data.a.lookup",
                 "module.child",
                 "module.child.b.inner = \"DEV\" [var.env main.tf.json:1]",
@@ -4533,8 +3925,6 @@ mod tests {
         );
     }
 
-    /// A JSON object just past JSON_EXPR_WORK_MAX's quadratic construction charge stays
-    /// unknown before HCL's insertion loop, preserving the readable part of a physical name.
     #[test]
     fn terraform_json_expression_construction_work_bounds_wide_objects() {
         let wide: serde_json::Map<String, serde_json::Value> = (0..1025)
@@ -4551,8 +3941,6 @@ mod tests {
         );
     }
 
-    /// A template whose AST would pass ROOT_STORED_MAX stays unknown, even when its evaluated
-    /// text would fit. Plain strings and a long literal prefix still resolve within that room.
     #[test]
     fn terraform_json_ast_room_bounds_templates_without_cutting_literal_strings() {
         let literal = "1".repeat(4096);
@@ -4573,8 +3961,6 @@ mod tests {
         );
     }
 
-    /// Static dependency strings charge traversal AST room before the array is allocated.
-    /// Passing that room leaves only that attribute unknown, preserving ordinary references.
     #[test]
     fn terraform_json_dependency_room_leaves_other_references_resolvable() {
         let source = serde_json::json!({"resource": {
@@ -4594,8 +3980,6 @@ mod tests {
         assert_eq!(actual, [("b.ordinary", "a.target")]);
     }
 
-    /// The shared evaluator applies REFERENCES_MAX in address order, even when JSON lists its
-    /// dependencies in reverse order. Adapter construction must not cut references first.
     #[test]
     fn terraform_json_references_keep_the_first_in_address_order() {
         let names: Vec<_> = (0..REFERENCES_MAX + 5)
@@ -4635,16 +4019,11 @@ mod tests {
             "resource \"a\" \"file\" { name = \"q-${file(\"name.txt\")}\" }\n",
             "resource \"a\" \"verb\" { name = format(\"%x\", 10) }\n",
             "resource \"a\" \"wide\" { name = format(\"%257d\", 1) }\n",
-            // Terraform splits an empty string into one empty element and walks an object's
-            // keys in lexical order.
             "resource \"a\" \"empty\" { name = \"q-${length(split(\",\", \"\"))}\" }\n",
             "resource \"a\" \"forobj\" { name = join(\"-\", [for k, v in local.m : v]) }\n",
             "resource \"a\" \"directive\" { name = \"%{ for k, v in local.m }${v}%{ endfor }-q\" }\n",
             "resource \"a\" \"first\" { name = \"first-${[for k, v in local.m : k][0]}\" }\n",
             "resource \"a\" \"ordered\" { name = jsonencode(local.m) }\n",
-            // An object built inside the expression is walked in lexical order too: a merge, a
-            // literal, a comprehension. A `for` over one whose keys Meada cannot order before
-            // evaluating (a computed key, a comprehension) stays unresolved.
             "resource \"a\" \"merged\" { name = jsonencode(merge(local.m, { beta = \"bb\" })) }\n",
             "resource \"a\" \"literal\" { name = join(\"-\", [for k, v in { zeta = 1, \"alpha\" = 2 } : k]) }\n",
             "resource \"a\" \"mergefor\" { name = \"m-${[for k, v in merge({ zeta = 1 }, { alpha = 2 }) : k][0]}\" }\n",
@@ -4652,12 +4031,9 @@ mod tests {
             "resource \"a\" \"overcomp\" { name = join(\"-\", [for k, v in { for s in [\"b\", \"a\"] : s => s } : k]) }\n",
             "resource \"a\" \"computed\" { name = join(\"-\", [for k, v in { (local.svc) = 1, alpha = 2 } : k]) }\n",
             "resource \"a\" \"inner\" { name = [for s in [\"x\"] : [for k, v in { zeta = s, alpha = 1 } : k][0]][0] }\n",
-            // Meada's own helper is no Terraform function.
             "resource \"a\" \"inject\" { name = \"inj-${meada_exact(\"+\", 1, 2)}\" }\n",
-            // Nor can a file bind the name that stands for what Meada cannot evaluate.
             "resource \"a\" \"shadowcall\" { name = [for meada_inexact in [\"x\"] : meada_exact(\"+\", 1, 2)][0] }\n",
             "resource \"a\" \"shadowfor\" { name = [for meada_inexact in [[\"y\"]] : [for k, v in { (local.svc) = 1 } : v][0]][0] }\n",
-            // An object's computed key is evaluated as any other expression.
             "resource \"a\" \"keyarith\" { name = keys({ (0 - 18446744073709551615) = 1 })[0] }\n",
             "resource \"a\" \"keyinject\" { name = keys({ (meada_exact(\"+\", 1, 2)) = 1 })[0] }\n",
             "resource \"a\" \"keyfor\" { name = [for x in [0] : keys({ (x - 18446744073709551615) = 1 })[0]][0] }\n",
@@ -4706,7 +4082,6 @@ mod tests {
         );
     }
 
-    /// Terraform converts `sensitive = "true"` to the boolean: such a variable never resolves.
     #[test]
     fn a_variable_marked_sensitive_by_a_string_is_never_resolved() {
         let tf = concat!(
@@ -4719,8 +4094,6 @@ mod tests {
         assert_eq!(names(&[("main.tf.json", json)]), ["a.s ~ \"q-*\""]);
     }
 
-    /// Terraform merges an override file's `variable` block into the declaration: a variable
-    /// marked sensitive in either file never resolves, whichever of them is read first.
     #[test]
     fn a_variable_an_override_file_marks_sensitive_is_never_resolved() {
         let main = concat!(
@@ -4754,11 +4127,6 @@ mod tests {
         assert_eq!(names(&json), ["a.s ~ \"q-*\""]);
     }
 
-    /// Terraform applies override files after the other files of their directory, in name order,
-    /// and an override block merges into the block of its address: each argument it sets replaces
-    /// the block's (a default, a local, an output's value, a resource's `count`, a name from JSON),
-    /// what it leaves stays (a default under a new description), and a block with nothing to merge
-    /// into is left out, as Terraform refuses it.
     #[test]
     fn override_files_merge_into_the_blocks_of_their_directory() {
         let main = concat!(
@@ -4810,8 +4178,6 @@ mod tests {
         );
     }
 
-    /// An argument an override block sets takes the references of the base block's along with
-    /// it, and so does a nested block type it sets, all the base block's of that type at once.
     #[test]
     fn an_override_block_replaces_the_references_of_what_it_sets() {
         let (_, references) = evaluate(&files(&[
@@ -4831,9 +4197,6 @@ mod tests {
         assert_eq!(shown(&references), ["a.x -> b.w", "a.x -> b.z"]);
     }
 
-    /// A JSON `dynamic` property generates blocks of each type it names, as a native
-    /// `dynamic "<type>"` block does: those an override block's blocks of that type replace, and
-    /// those its own replace, references included.
     #[test]
     fn a_json_dynamic_block_counts_as_the_type_it_generates() {
         let dynamic = |target: &str| {
@@ -4859,8 +4222,6 @@ mod tests {
         assert_eq!(shown(&evaluate(&files(&list)).1), ["a.x -> b.z"]);
     }
 
-    /// HCL JSON permits an array of bodies wherever a body goes, the root of a file included: its
-    /// blocks are read, an override file's merge, and a variable it marks sensitive never resolves.
     #[test]
     fn a_json_file_whose_root_is_an_array_of_bodies_is_read() {
         let json = r#"[{"variable": {"env": {"default": "dev"}}},
@@ -4879,10 +4240,6 @@ mod tests {
         assert_eq!(names(&list), ["a.s ~ \"q-*\""]);
     }
 
-    /// Beside an override file, a Terraform file that does not read (it does not parse, or it
-    /// passes a ceiling) may mark any variable of its directory sensitive once merged: none of
-    /// them resolves, as config values store none of their defaults. Without an override file,
-    /// such a file changes nothing.
     #[test]
     fn no_variable_resolves_beside_an_override_file_and_a_file_that_does_not_read() {
         let main = concat!(
@@ -4907,10 +4264,6 @@ mod tests {
         assert_eq!(names(&alone), ["a.s = \"q-tok\" [var.s main.tf:1]"]);
     }
 
-    /// A template keeps its literal text and every part that resolves; what is never evaluated
-    /// (a data source, a resource's attribute, a registry module, `terraform.workspace`, an
-    /// undeclared or sensitive variable, a directive over one) is a `*`, and a call over it
-    /// leaves the whole value unresolved.
     #[test]
     fn unresolved_parts_of_a_name_become_wildcards_of_a_pattern() {
         let text = concat!(
@@ -4948,10 +4301,6 @@ mod tests {
         );
     }
 
-    /// A root's variable is overridable by its default or by the value its var files give
-    /// (`terraform.tfvars`, then each `*.auto.tfvars` in name order, the last winning); a local
-    /// module's input carries what its argument went through, and a default its call leaves is
-    /// fixed by the repository.
     #[test]
     fn a_name_records_the_overridable_values_it_went_through() {
         let main = concat!(
@@ -5002,8 +4351,6 @@ mod tests {
         assert_eq!(through, [("var.env", 1, false), ("var.team", 4, false)]);
     }
 
-    /// A name through more overridable values than `OVERRIDABLE_MAX` is unresolved: every name
-    /// built on it would copy their list.
     #[test]
     fn a_name_through_more_overridable_values_than_the_ceiling_is_unresolved() {
         let name = |n: usize| {
@@ -5021,14 +4368,6 @@ mod tests {
         assert_eq!(name(OVERRIDABLE_MAX + 1), (Some("*".into()), true, 0));
     }
 
-    /// Arithmetic `hcl-rs` cannot do (a remainder by zero, which panics in its number type) leaves
-    /// the value unresolved, in a `.tf` file and in a var file alike, and `substr` past
-    /// `i64::MAX` takes the rest of the string as Terraform does: a hostile file never stops
-    /// indexing. Integer arithmetic is exact, as Terraform's: a result past `u64` or below `i64`,
-    /// a division with a remainder or by zero and arithmetic on a fraction stay unresolved rather
-    /// than print `hcl-rs`'s cast, wrapped or float result as an exact name, a `for` variable's
-    /// too. A var file's value is given but unresolved: the variable's
-    /// default does not stand in for it.
     #[test]
     fn arithmetic_the_evaluator_cannot_do_leaves_the_value_unresolved() {
         let list = [
@@ -5093,12 +4432,6 @@ mod tests {
         );
     }
 
-    /// Terraform reads a number with 512 bits and prints its decimal; `hcl-rs` reads a 64-bit
-    /// float and prints its shortest form, with an exponent past 1e16 or below 1e-5. A number the
-    /// two print differently (past `i64::MIN..=u64::MAX`, more digits than a float holds, an
-    /// exponent) stays unresolved rather than print the float as an exact name, as a literal, a
-    /// `tonumber` and a JSON number alike; one they print alike is exact. A JSON reader keeps no
-    /// digits, so a JSON fraction stays unresolved.
     #[test]
     fn a_number_terraform_prints_otherwise_than_a_float_stays_unresolved() {
         let main = [
@@ -5187,9 +4520,6 @@ mod tests {
         );
     }
 
-    /// A var file is evaluated as Terraform does, with no function: a template and arithmetic on a
-    /// `for` variable resolve, and a null interpolation (Terraform refuses it) gives no value, so
-    /// the default stands in, as for a function call.
     #[test]
     fn a_var_file_evaluates_templates_and_for_arithmetic() {
         let main = concat!(
@@ -5215,7 +4545,6 @@ mod tests {
             "resource \"a\" \"h\" { name = var.h }\n",
             "resource \"a\" \"i\" { name = \"q-${var.i}\" }\n",
             "resource \"a\" \"j\" { name = var.j }\n",
-            // A line comment ends an entry of a sorted object: the newline stays its terminator.
             "resource \"a\" \"k\" {\n  name = chomp(<<EOT\nq-${{\n  b = 2 # note\n  a = 1\n}[\"a\"]}\nEOT\n  )\n}\n",
         );
         let tfvars = concat!(
@@ -5224,8 +4553,6 @@ mod tests {
             "b = [for x in [1, 2] : x * 2][1]\n",
             "c = \"pre-${null}\"\n",
             "d = upper(\"x\")\n",
-            // A `%{ for }` directive's collection is read as any other expression: its keys in
-            // lexical order, no call of the file's own, a negative zero unresolved.
             "e = \"%{for k, v in {b = 1, a = 2}}${k}${v}%{endfor}\"\n",
             "f = \"%{for x in [meada_exact(\"+\", 1, 2)]}${x}%{endfor}\"\n",
             "g = \"${{b = 1, a = 2}[\"a\"]}\"\n",
@@ -5252,9 +4579,6 @@ mod tests {
         );
     }
 
-    /// Each case of `tests/terraform-oracle/cases.tsv`, whose last column that directory's oracle
-    /// computes with HashiCorp's HCL and cty libraries: an exact name is the one Terraform gives,
-    /// an expression Terraform rejects has none, and a case marked `=` is exact.
     #[test]
     fn exact_names_agree_with_the_terraform_oracle() {
         let cases: Vec<_> = (include_str!("../tests/terraform-oracle/cases.tsv").lines())
@@ -5285,8 +4609,6 @@ mod tests {
         assert!(wrong.is_empty(), "{wrong:#?}");
     }
 
-    /// A `for` over a conversion (`tolist`) costs as a `for` over its argument: forty objects from
-    /// a var file expand, where their size squared passed `EVAL_COST_MAX`.
     #[test]
     fn a_for_over_a_converted_list_of_objects_expands() {
         let main = concat!(
@@ -5308,11 +4630,6 @@ mod tests {
         assert!(got.iter().all(|n| n.contains(" = \"q-s")), "{got:?}");
     }
 
-    /// A `for` over a literal list or object costs as a `for` over a bound one (#716): its element
-    /// count times its largest element. Forty inline objects expand, in a list and in an object,
-    /// where the literal's whole cost taken as the count and as each element passed
-    /// `EVAL_COST_MAX`; a `for` in a `for` over two literal lists of 400, which would make more
-    /// than `EVAL_COST_MAX` (160,000 strings of 10 bytes), is still refused.
     #[test]
     fn a_for_over_a_literal_collection_costs_as_over_a_bound_one() {
         let list = (0..40)
@@ -5345,10 +4662,6 @@ mod tests {
         );
     }
 
-    /// A literal's elements are made once, whatever its `for` reads of them (#716): a `for` over
-    /// a one-element list or object holding a `for` in a `for` over two literal lists of 400
-    /// (160,000 strings of 10 bytes) is refused, as that `for` alone is, and so is one holding
-    /// three levels of them (64 million values), without being evaluated.
     #[test]
     fn a_literal_collection_is_charged_its_elements_once() {
         let numbers = (0..400).map(|i| i.to_string()).collect::<Vec<_>>();
@@ -5369,9 +4682,6 @@ mod tests {
         assert!(steps(&expr, &Map::new()) > EVAL_COST_MAX);
     }
 
-    /// `join`, `formatlist` and `replace` are costed by the output they can make, not by their
-    /// arguments' cost squared, which a nested call squared again past `EVAL_COST_MAX` (#764).
-    /// Each name is the one Terraform v1.17.1's `console` gives.
     #[test]
     fn join_formatlist_and_replace_are_costed_by_their_output() {
         let s = "a-".repeat(1000);
@@ -5401,11 +4711,6 @@ mod tests {
         assert_eq!(names(&[("main.tf", &main)]), want);
     }
 
-    /// A `join`, a `formatlist` and a `replace` whose output would pass `EVAL_COST_MAX` (one to
-    /// two million bytes: a separator, a scalar or a replacement of 1,000 to 2,000 bytes once per
-    /// element or match) are refused before they are evaluated (#764): as written, expanded
-    /// (`f(x...)`), over a list of no known length, through `%q` escapes, and with a template
-    /// whose number shows 22 bytes where 8 are counted.
     #[test]
     fn a_join_formatlist_or_replace_past_the_cost_ceiling_is_refused() {
         let (wide, a, to) = ("x".repeat(2000), "a".repeat(2000), "y".repeat(1000));
@@ -5427,7 +4732,6 @@ mod tests {
             format!("replace(\"{}\", \"a\", \"x{n}\")", "a".repeat(95_000)),
             format!("join(\"{}\", [{empty}])", n.repeat(10)),
             format!("formatlist(\"x{}\", [{many}])", n.repeat(100)),
-            // A template of no text still makes a string: 2,000 of them joined by 100 KB.
             format!("join(\"{}\", [{empty_for}])", "x".repeat(100_000)),
         ] {
             let expr = parser::parse_expr(&text).unwrap();
@@ -5435,10 +4739,6 @@ mod tests {
         }
     }
 
-    /// What the square of their arguments named before #764 stays named: a `formatlist` over a
-    /// list of no known length, a `replace` of two variables, and one of two templates at the
-    /// edge of the ceiling (a template's cost is what it was). Each name is the one Terraform
-    /// v1.17.1's `console` gives (the #764 verifier's cases p1, p2b, p3 and d1).
     #[test]
     fn a_join_formatlist_or_replace_the_square_accepted_stays_named() {
         let items = |n: usize| (0..n).map(|i| format!("\"i-{i:02}\"")).collect::<Vec<_>>();
@@ -5466,8 +4766,6 @@ mod tests {
         assert_eq!(names(&[("main.tf", &main)]), want);
     }
 
-    /// A key bound over `toset(...)` is the element in Terraform, where Meada's set is a list
-    /// whose key is the index: unresolved, in a `for` and in a `%{ for }` directive.
     #[test]
     fn a_key_over_a_set_is_unresolved() {
         let main = concat!(
@@ -5492,10 +4790,6 @@ mod tests {
         assert_eq!(got, want);
     }
 
-    /// A key bound over a set held in a local or a variable is the element in Terraform too: the
-    /// same `for` is unresolved through a chain of locals, parentheses, a conditional, a variable
-    /// typed `set(...)` (default or var file) and in a `%{ for }` directive, while a list keeps its
-    /// index and a `for` binding only the value is as before.
     #[test]
     fn a_key_over_a_named_set_is_unresolved() {
         let each = "  for_each = {for k, v in local.s : k => v}\n  name = \"q-${each.key}\"\n}\n";
@@ -5525,7 +4819,6 @@ mod tests {
             ),
             ["a.d ~ \"d-*\"", "a.q ~ \"q-*\""]
         );
-        // A list keeps its index, and a `for` binding only the value is as before.
         assert_eq!(case("  s = [\"x\"]\n", ""), ["a.q[\"0\"] = \"q-0\""]);
         let value = "resource \"a\" \"v\" { name = \"v-${[for v in local.s : v][0]}\" }\n";
         assert_eq!(
@@ -5560,9 +4853,6 @@ mod tests {
         );
     }
 
-    /// A name read twice in one expression is copied once and still counts as a set when it
-    /// holds one (#731): a key bound over a set held in a local is unresolved whether the `for`
-    /// reads it first or after another read of it, and a list read twice keeps its index.
     #[test]
     fn a_key_over_a_named_set_read_twice_is_unresolved() {
         let case = |s: &str, for_each: &str| {
@@ -5589,8 +4879,6 @@ mod tests {
         );
     }
 
-    /// A `for` over a conversion of an expanded argument (`var.l...`) costs as before: the list it
-    /// expands is no element count, and a costly body over its 200 strings stays unresolved.
     #[test]
     fn a_for_over_a_conversion_of_an_expanded_argument_keeps_its_cost() {
         let main = concat!(
@@ -5605,11 +4893,6 @@ mod tests {
         assert_eq!(got, ["a.q ~ \"q-*\""]);
     }
 
-    /// A var file's value that would make more than `EVAL_COST_MAX` (a `for` in a `for` over two
-    /// lists of 300), one past `EVAL_VALUE_MAX` (in HCL or JSON) and one past its file's
-    /// `EVAL_WORK_MAX` are given but unresolved, as a costly value of a `.tf` file is: the
-    /// variable's default does not stand in for them. (A function of an unresolved value is `*`
-    /// whole, with no `through`.)
     #[test]
     fn a_var_file_value_past_the_evaluation_ceilings_is_given_and_unresolved() {
         let list = (0..300).map(|i| i.to_string()).collect::<Vec<_>>();
@@ -5630,10 +4913,6 @@ mod tests {
             given(tfvars, format!("x = \"{long}\"\n")),
             given("terraform.tfvars.json", format!("{{\"x\": \"{long}\"}}")),
         ];
-        // A `for` in a `for` over two lists of 270 could make about 876,000 bytes (`cost`), which
-        // each such value spends before its unknown `z` leaves it out: four times as many as the
-        // work holds spend it (those refused spend nothing), and a value after them costing more
-        // than the work left (about 1,022,000, its strings longer) is given but unresolved.
         let many = (0..270)
             .map(|i| i.to_string())
             .collect::<Vec<_>>()
@@ -5670,8 +4949,6 @@ mod tests {
         );
     }
 
-    /// `serde_json` reads a JSON var file's objects in linear time, so one wider than HCL may
-    /// read still gives its values.
     #[test]
     fn a_json_var_file_with_a_wide_object_gives_its_values() {
         let keys: Vec<String> = (0..5000).map(|i| format!("\"k{i}\": 1")).collect();
@@ -5684,9 +4961,6 @@ mod tests {
         );
     }
 
-    /// A JSON var file's keys are found at their lines in one pass over its text, where a search
-    /// of the text per key was quadratic. Measured on 2026-11-08 in a debug build: 0.6 s, where
-    /// the search per key took 33.6 s.
     #[test]
     fn a_json_var_file_finds_the_lines_of_its_keys_in_linear_time() {
         let n = 60_000;
@@ -5707,13 +4981,6 @@ mod tests {
         assert!(took < std::time::Duration::from_secs(20), "{took:?}");
     }
 
-    /// A template of `k` interpolations in a `for` over `m` elements takes time in `m * k`
-    /// however few bytes it makes (each part evaluated per element, #763; its text parsed again
-    /// before): its steps are charged too, so at `m = 8000, k = 40` (9.6 s in a debug build
-    /// before #714) it is unresolved before it runs, alone or 64 times in a root, with no
-    /// resource left out; over 100 elements it still resolves. Measured on 2026-11-09 in a debug
-    /// build, before #763: 0.35 s for the whole test. (The literal `q-` of each stays: a refusal
-    /// spends what it went through, not 1 MiB.)
     #[test]
     fn a_template_in_a_wide_for_is_bounded_by_its_steps() {
         let body = "${a}".repeat(40);
@@ -5740,17 +5007,11 @@ mod tests {
         for (n, secs) in [(1, 1), (64, 4)] {
             let (got, took) = root(8000, n);
             assert_eq!(got.len(), n);
-            // Each past `EVAL_COST_MAX`, refused without spending the root's `EVAL_WORK_MAX`.
             assert!(got.iter().all(|s| s.ends_with(" ~ \"q-*\"")), "{got:?}");
             assert!(took < std::time::Duration::from_secs(secs), "{n}: {took:?}");
         }
     }
 
-    /// The cheapest template a `for` repeats is a `%{ for }` of no part, charged no part: it still
-    /// evaluates its collection once per element of the directive around it, and each evaluation
-    /// is charged the elements it lists, so two directives over 1,000 literal elements, one inside
-    /// the other with nothing between them (a million calls of an empty body), are refused before
-    /// they run; one alone still evaluates (#763).
     #[test]
     fn a_nested_template_for_of_no_part_is_refused() {
         let ones = vec!["1"; 1000].join(", ");
@@ -5764,11 +5025,6 @@ mod tests {
         assert!(steps(&expr, &Map::new()) <= EVAL_COST_MAX);
     }
 
-    /// No template reaches `hcl-rs` as text, so none is parsed again at an evaluation, whatever
-    /// the instances or the elements of a `for` that evaluate it (#763): each is a call of its
-    /// parts, which makes the text `hcl-rs` makes by parsing it, literals stripped as `~` asks,
-    /// escapes, `if` and `for` directives, heredocs indented or not, and a template that is one
-    /// interpolation keeps its value's type.
     #[test]
     fn a_template_is_evaluated_without_its_text() {
         let mut ctx = Context::new();
@@ -5823,9 +5079,6 @@ mod tests {
         }
     }
 
-    /// The three templates the text charge refused, each fast before it (#763): a 17 KB template
-    /// evaluated twice, an `if` template in a `for` over 2,000 elements and 40 interpolations in
-    /// a `for` over 198 elements, each named as Terraform names it.
     #[test]
     fn templates_the_text_charge_refused_resolve() {
         let list = |n: usize| {
@@ -5855,9 +5108,6 @@ mod tests {
         );
     }
 
-    /// The template parts a `for` evaluates count once per element, and neither as an element of
-    /// the collection it makes nor as one element's size: a `for` over a `for` of templates over
-    /// 30 elements still resolves, where counting it in the bytes squared it past `EVAL_COST_MAX`.
     #[test]
     fn a_for_over_a_for_of_templates_still_resolves() {
         let l: Vec<String> = (0..30).map(|i| format!("\"a{i}\"")).collect();
@@ -5876,9 +5126,6 @@ mod tests {
         );
     }
 
-    /// A root variable read in a `for` body is bound there too, unless a `for` variable hides it:
-    /// a `for` over `var.l` inside a `for` counts its elements, not the bytes of all of `var`, so
-    /// the product of two lists (625 evaluations of a template) or of three resolves.
     #[test]
     fn a_for_in_a_for_body_counts_the_elements_it_reads() {
         let list = |n: usize| {
@@ -5896,7 +5143,6 @@ mod tests {
         };
         let two = "q-${length([for a in var.l : [for b in var.l : \"${a}${b}\"]])}";
         let three = "q-${length([for a in var.l : [for b in var.l : [for c in var.l : \"${a}${b}${c}\"]]])}";
-        // A `for` variable named as a root hides it: `var.l` is then the element's, not bound.
         let hidden = "q-${length([for var in [{l = [1]}] : [for b in var.l : \"${b}\"]])}";
         assert_eq!(
             [root(25, two), root(5, three), root(2, hidden)],
@@ -5908,11 +5154,6 @@ mod tests {
         );
     }
 
-    /// `hcl-rs` copies the root object of a traversal (`var`, `local`, `each`, `module`) whole
-    /// at each evaluation, so `var.items[0]` in a `for` over `var.items` takes time in the square
-    /// of its elements: each copy counts once per element, through any root, and such a name
-    /// is refused before it runs. Measured on 2026-11-10 in a debug build, 34.96 s at 21,000
-    /// elements before.
     #[test]
     fn a_traversal_in_a_for_body_counts_the_root_it_copies() {
         let items = |m: usize| vec!["\"a\""; m].join(", ");
@@ -5967,9 +5208,6 @@ mod tests {
         }
     }
 
-    /// That charge reads the size of the root, worked out once per expression and not at each
-    /// traversal: `each.value[0]` 20,000 times in a `for` body is refused in about the time the
-    /// same name takes over eight elements, whatever `each.value` holds.
     #[test]
     fn a_root_read_many_times_in_a_for_body_is_sized_once() {
         let reads = vec!["each.value[0]"; 20_000].join(", ");
@@ -5988,9 +5226,6 @@ mod tests {
         assert!(wide < bound, "{wide:?} against {few:?}");
     }
 
-    /// The collection of a `for` in a `for` body counts its own elements whatever root it is
-    /// read through (a local, a module output, a map key, `each.value`), and a conditional or a
-    /// parenthesis counts the larger branch: each product of two lists of 25 resolves.
     #[test]
     fn a_for_in_a_for_body_reads_its_collection_through_any_root() {
         let l = (0..25)
@@ -6020,12 +5255,9 @@ mod tests {
         );
         let got = names(&[("main.tf", &main), ("c/main.tf", child)]);
         let resolved = (got.iter()).filter(|s| s.contains(" = \"q-25\"")).count();
-        // Five names and the module call's node.
         assert_eq!((got.len(), resolved), (6, 5), "{got:?}");
     }
 
-    /// A template outside every `for` is parsed once, in time its file's size bounds: it is not
-    /// charged per byte of its text, so one of 33 KB resolves.
     #[test]
     fn a_long_template_evaluated_once_resolves() {
         let long = "a".repeat(33_000);
@@ -6038,12 +5270,6 @@ mod tests {
         );
     }
 
-    /// Each refusal spends the bytes it went through (copying and reading `var.items`), so a
-    /// root of 9,999 refused names over 21,000 elements stops evaluating once that work is
-    /// spent, and the constant name after them stays exact. Measured on 2026-11-10 in a debug
-    /// build: 2.7 s, three times the same root named by constants (0.87 s) and about what
-    /// 2214c81 takes (2.27 s), where copying without spending took 82 s; the bound is ten times,
-    /// for a runner whose other tests slow one of the two roots.
     #[test]
     fn refusals_over_a_wide_variable_spend_the_root_work_they_copy() {
         let items = vec!["\"a\""; 21_000].join(", ");
@@ -6073,9 +5299,6 @@ mod tests {
         );
     }
 
-    /// A refused expression spends only the bytes it went through to decide, not the
-    /// `EVAL_COST_MAX` it would have made, which 32 refusals once spent whole: a constant name
-    /// after them still resolves.
     #[test]
     fn a_refused_expression_spends_what_it_went_through() {
         let items = vec!["\"a\""; 8000].join(", ");
@@ -6100,11 +5323,6 @@ mod tests {
         assert!(got.contains(&"a.z = \"constant\"".to_string()), "{got:?}");
     }
 
-    /// A refusal goes through its own text too, and spends it: an expression holding a 60 KB
-    /// string, refused in each of 1,000 instances, spends the root's work, and a name read
-    /// after them is unresolved. Spending only its roots, a refused expression of any length was
-    /// gone through once per instance: measured on 2026-11-10 in a debug build, 2.2 s for 1,000
-    /// instances of a 120 KB one.
     #[test]
     fn refusals_of_a_long_expression_spend_its_text() {
         let long = "a".repeat(60_000);
@@ -6118,10 +5336,6 @@ mod tests {
         assert_eq!(got.last().map(String::as_str), Some("a.z ~ \"*\""));
     }
 
-    /// A refusal spends for its reads of a root (`var`, `local`, `module`, `each`, `count`),
-    /// not for the resources it names, which copy nothing, and never more than the
-    /// `EVAL_COST_MAX` every refusal spent before: the name after 20 instances that read a
-    /// 60 KB variable 40 times, or after 40 that read it once and name 50 resources, resolves.
     #[test]
     fn a_refusal_spends_its_root_reads_up_to_the_cost_ceiling() {
         let big = vec!["\"a\""; 20_000].join(", ");
@@ -6142,10 +5356,6 @@ mod tests {
         assert_eq!(root(40, &named), resolved);
     }
 
-    /// A known name that reads neither `each` nor `count` is the same in every instance of its
-    /// block and is evaluated once (#765): a name reading a wide variable thousands of times in
-    /// a `for` over an empty list charges the root's work as much at `count = 10` as at
-    /// `count = 1`, where every instance paid it again, and each instance's name is exact.
     #[test]
     fn a_known_name_the_instances_share_is_charged_once() {
         let big = vec!["\"a\""; 2_000].join(", ");
@@ -6169,9 +5379,6 @@ mod tests {
         assert!(one > 0 && ten < 2 * one, "{ten} against {one}");
     }
 
-    /// The estimate sizes a bound value once per expression however many times it reads it
-    /// (#765): 40,000 reads of a 200,000-element variable are estimated in linear time, where
-    /// sizing the variable at each read walked it 40,000 times (eight billion elements).
     #[test]
     fn the_estimate_sizes_a_bound_value_once_in_linear_time() {
         let var = Map::from_iter([
@@ -6191,10 +5398,6 @@ mod tests {
         assert!(took < std::time::Duration::from_secs(2), "{took:?}");
     }
 
-    /// A refusal counts each root by its own reads (#765): a refused name that reads a 60 KB
-    /// `var.big` once and `count.index` 50 times spends `var.big` four times and the small
-    /// `count` root at each of its reads, not every root at each read up to `EVAL_COST_MAX`, so
-    /// all 40 instances are `q-*` and the name after them resolves.
     #[test]
     fn a_refusal_counts_each_root_by_its_own_reads() {
         let big = vec!["\"a\""; 20_000].join(", ");
@@ -6212,13 +5415,9 @@ mod tests {
         assert_eq!(got[40], "a.z = \"q-x\" [var.x main.tf:1]");
     }
 
-    /// A literal skips the evaluation, not `EVAL_VALUE_MAX`: one past it is unresolved as any
-    /// value of that size, as a name or read through a local (whose template keeps its literal
-    /// text), and one that fits stays exact.
     #[test]
     fn a_literal_past_the_value_ceiling_is_unresolved() {
         let long = "a".repeat(EVAL_VALUE_MAX);
-        // `size` counts a string's two quotes.
         let fits = &long[..EVAL_VALUE_MAX - 2];
         let main = format!(
             "locals {{\n  l = \"{long}\"\n}}\nresource \"a\" \"long\" {{ name = \"{long}\" }}\nresource \"a\" \"read\" {{ name = \"q-${{local.l}}\" }}\nresource \"a\" \"fits\" {{ name = \"{fits}\" }}\n"
@@ -6233,9 +5432,6 @@ mod tests {
         );
     }
 
-    /// Converting an object literal for `hcl-rs` checks each key against those before it, so
-    /// each evaluation of one spends the square of its keys from the root's `EVAL_WORK_MAX`: a
-    /// module instanced many times over a wide local stops evaluating it once the work is spent.
     #[test]
     fn a_wide_object_spends_its_keys_squared_from_the_root_work() {
         let keys: String = (0..1500).map(|i| format!("    k{i} = \"v\"\n")).collect();
@@ -6252,10 +5448,6 @@ mod tests {
         assert!(resolved > 0 && resolved < 40, "{resolved}");
     }
 
-    /// `trim` looks each character up in a set of the ones it cuts, and `toset` sorts strings and
-    /// keys any other value once (`n log n`), where a scan per character or per element was
-    /// quadratic: sized so the quadratic forms take several seconds in a debug build. The values
-    /// are bound beforehand, so only the calls are timed.
     #[test]
     fn trim_and_toset_evaluate_in_linear_time() {
         let mut ctx = Context::new();
@@ -6285,8 +5477,6 @@ mod tests {
         assert!(took.iter().all(|t| *t < bound), "{took:?}");
     }
 
-    /// Terraform loads `terraform.tfvars`, then `terraform.tfvars.json`, then each `*.auto.tfvars`
-    /// and `*.auto.tfvars.json` in name order, a later value winning; a JSON string is a literal.
     #[test]
     fn var_files_give_values_in_the_order_terraform_loads_them() {
         let main = concat!(
@@ -6315,9 +5505,6 @@ mod tests {
         );
     }
 
-    /// A var file Terraform loads that does not read here (broken, with objects too wide or past
-    /// `MAX_BYTES`) may give any variable: a value it could give stays unresolved, the default
-    /// not standing in, while a value of a file loaded after it still resolves.
     #[test]
     fn a_var_file_that_does_not_read_leaves_the_values_it_may_give_unresolved() {
         let main = concat!(
@@ -6362,9 +5549,6 @@ mod tests {
         assert_eq!(names(&earlier), unresolved);
     }
 
-    /// Names built from a chain of locals as deep as `EVAL_DEPTH_MAX`, each a template naming the
-    /// one before twice, for many resources: each local is evaluated once per root. Measured on
-    /// 2026-11-04 in a debug build: well under a second, a tenth of the bound.
     #[test]
     fn names_through_a_chain_of_locals_evaluate_in_linear_time() {
         let mut text = String::from("locals {\n  l0 = \"a\"\n");
@@ -6388,9 +5572,6 @@ mod tests {
         assert!(took < std::time::Duration::from_secs(8), "{took:?}");
     }
 
-    /// `count` and `for_each` over a collection that resolves to literals give one node per
-    /// instance, `each` and `count.index` naming it, and a module called with `for_each` has one
-    /// instance per key, its arguments evaluated with its `each`.
     #[test]
     fn count_and_for_each_expand_over_values_that_resolve_to_literals() {
         let main = concat!(
@@ -6428,7 +5609,6 @@ mod tests {
         );
     }
 
-    /// A `for_each` over a resolved collection past `EXPANSION_MAX` is one node with no key.
     #[test]
     fn a_for_each_past_the_expansion_ceiling_is_one_node_with_no_key() {
         let text = |n: usize| {
@@ -6444,8 +5624,6 @@ mod tests {
         assert_eq!(addresses(&nodes), ["a.b @."]);
     }
 
-    /// A name through a chain of locals deeper than `EVAL_DEPTH_MAX` is unresolved, as is one
-    /// through a cycle of locals; within it, it resolves.
     #[test]
     fn a_name_past_the_evaluation_depth_or_around_a_cycle_is_unresolved() {
         let chain = |n: usize| {
@@ -6470,9 +5648,6 @@ mod tests {
         assert_eq!(names(&[("main.tf", cycle)]), ["a.b ~ \"q-*-x\""]);
     }
 
-    /// A variable's declared `type` converts what it receives: a `list(...)` given a set (or a
-    /// local holding one) holds a list, whose key is the index, where `any` or no type keeps the
-    /// caller's set.
     #[test]
     fn a_variable_typed_as_a_list_given_a_set_keeps_its_index_key() {
         let module = |ty: &str| {
@@ -6489,16 +5664,12 @@ mod tests {
         let list = ["module.m", "module.m.a.q[\"0\"] = \"queue-0\""];
         assert_eq!(call("toset([\"x\"])", "  type = list(string)\n"), list);
         assert_eq!(call("local.t", "  type = list(any)\n"), list);
-        // Only a list-like declared type converts: `any` and no type keep the set.
         let unresolved = ["module.m", "module.m.a.q ~ \"queue-*\""];
         assert_eq!(call("local.t", "  type = any\n"), unresolved);
         assert_eq!(call("local.t", ""), unresolved);
         assert_eq!(call("local.t", "  type = set(string)\n"), unresolved);
     }
 
-    /// An override file's `type` replaces the declared one, as Terraform merges a variable: a set
-    /// retyped as a list holds its default as a list, and an override without a `type` keeps the
-    /// set (the many-element rows of #740 are in `retype`).
     #[test]
     fn an_override_retyping_a_set_variable_as_a_list_keeps_its_index_key() {
         let main = concat!(
@@ -6520,8 +5691,6 @@ mod tests {
         assert_eq!(over("  description = \"d\"\n"), ["a.q ~ \"queue-*\""]);
     }
 
-    /// Whether a name holds a set stops at `EVAL_DEPTH_MAX` too: a hostile chain of locals naming
-    /// each other, with a keyed `for` at its end, is unresolved and does not overflow the stack.
     #[test]
     fn a_long_chain_of_locals_named_for_a_set_stops_at_the_depth() {
         let n = 20_000;
@@ -6536,8 +5705,6 @@ mod tests {
         assert_eq!(names(&[("main.tf", &text)]), ["a.q ~ \"q-*\""]);
     }
 
-    /// A name passed down local modules resolves at every level up to `MODULE_DEPTH_MAX`; the
-    /// call past it instantiates nothing, so its module's blocks are no nodes and name nothing.
     #[test]
     fn a_name_passed_down_modules_past_the_nesting_ceiling_stops_with_them() {
         let depth = MODULE_DEPTH_MAX + 2;
@@ -6565,9 +5732,6 @@ mod tests {
         );
     }
 
-    /// A value past `EVAL_VALUE_MAX` (a local doubled at every step), an expression whose cost
-    /// passes `EVAL_COST_MAX` (a `for` in a `for` in a `for` over a wide list) and the names past
-    /// a root's `EVAL_WORK_MAX` are unresolved; below each ceiling the same forms resolve.
     #[test]
     fn values_past_their_size_cost_and_work_ceilings_are_unresolved() {
         let mut doubled = String::from("locals {\n  l0 = \"ab\"\n");

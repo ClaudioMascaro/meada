@@ -1,7 +1,3 @@
-//! Non-call uses of names (TS/JS): a name rendered as JSX, written as a type, read as a value or
-//! a member, extended, re-exported or taken off a dynamic `import()` is a `calls` row of its
-//! kind, from the symbol that holds it to the symbol it names, `exact` only.
-
 use crate::common;
 
 use std::fs;
@@ -31,7 +27,6 @@ fn text(v: &serde_json::Value) -> String {
     v.as_str().map(cut).unwrap_or_default()
 }
 
-/// The export's `calls` rows with a kind, as (caller, kind, target, level), sorted.
 fn edges(repo: &Path) -> Vec<(String, String, String, String)> {
     let json = export(repo);
     let mut rows: Vec<_> = (json["calls"].as_array().into_iter().flatten())
@@ -49,7 +44,6 @@ fn edges(repo: &Path) -> Vec<(String, String, String, String)> {
     rows
 }
 
-/// (row id, holder) of every `calls` row with a holder, sorted.
 fn holders(repo: &Path) -> Vec<(String, String)> {
     let json = export(repo);
     let mut rows: Vec<_> = (json["calls"].as_array().into_iter().flatten())
@@ -82,7 +76,6 @@ fn a_use_in_the_same_file_or_package_is_an_exact_edge_of_its_kind() {
         edge("LoginPage.tsx::LoginPage", "type", "kinds.ts::Kind"),
         edge("LoginPage.tsx::LoginPage", "member", "kinds.ts::Kind"),
         edge("dyn.ts::four", "dynamic", "client.ts::client"),
-        // An enum used in its own file: no reading binds it, the file's declarations do.
         edge("LoginPage.tsx::useLocal", "member", "LoginPage.tsx::Local"),
     ] {
         assert!(got.contains(&want), "{want:?} missing from {got:#?}");
@@ -104,7 +97,6 @@ fn a_use_never_links_by_name() {
             !["div", "t", "m", "Promise", "Record", "console"].contains(&name),
             "{caller} {kind} {target}"
         );
-        // A parameter, a local and a global named like another file's functions.
         assert!(!caller.contains("/neg.tsx::"), "{caller} {kind} {target}");
     }
 }
@@ -126,7 +118,6 @@ fn a_row_held_by_a_top_level_declaration_names_its_holder() {
     ] {
         assert!(got.contains(&want), "{want:?} missing from {got:#?}");
     }
-    // A row whose caller is a symbol has no holder.
     assert!(got.iter().all(|(id, _)| !id.contains("::LoginPage::")));
 }
 
@@ -172,7 +163,6 @@ fn a_warm_index_keeps_the_use_rows() {
     fs::write(&app, src).unwrap();
     let warm = (edges(&repo), export(&repo));
     assert_eq!(warm.0, cold.0);
-    // The doors the stored rows keep open, and the package rows (the second hop included).
     for section in ["processes", "imports"] {
         assert_eq!(warm.1[section], cold.1[section], "{section}");
     }
@@ -203,7 +193,6 @@ fn trace_up_walks_uses_and_holders() {
             .trace(Start::From(&app(id)), Direction::Up, None)
             .unwrap()
     };
-    // Header is rendered by LoginPage, which `routes` renders, which App reads.
     let from_header = up("LoginPage.tsx::Header");
     for name in ["LoginPage (jsx)", "routes (jsx)", "App (value)"] {
         assert!(
@@ -211,7 +200,6 @@ fn trace_up_walks_uses_and_holders() {
             "{name} missing from:\n{from_header}"
         );
     }
-    // helper is called inside `plugin`'s initializer, which `wire` reads.
     let from_helper = up("plugin.ts::helper");
     for name in [" plugin", "wire (value)"] {
         assert!(
@@ -258,7 +246,6 @@ fn context_lists_uses_apart_from_calls() {
         "{header}"
     );
     assert!(header.contains("callers: none"), "{header}");
-    // A top-level declaration lists the uses its initializer makes, as `used by:` names it.
     let routes = engine.context(&app("LoginPage.tsx::routes"), None).unwrap();
     assert!(
         section(&routes, "uses")
@@ -304,8 +291,6 @@ fn processes_are_unchanged_by_uses() {
     assert!(stepped > 0);
 }
 
-/// The export's `imports` rows at `file` that name `specifier`, whole and without their `site`,
-/// sorted by their JSON text (front 1's `rows_at`, `tests/it/packages.rs`).
 fn rows_at(repo: &Path, file: &str, specifier: &str) -> Vec<serde_json::Value> {
     let json = export(repo);
     let mut rows: Vec<serde_json::Value> = (json["imports"].as_array().into_iter().flatten())
@@ -321,7 +306,6 @@ fn rows_at(repo: &Path, file: &str, specifier: &str) -> Vec<serde_json::Value> {
     rows
 }
 
-/// (level, name, target) of each row of `rows`, the target cut, sorted and deduplicated.
 fn named(rows: &[serde_json::Value]) -> Vec<(String, String, String)> {
     let mut found: Vec<_> = (rows.iter())
         .map(|r| (text(&r["level"]), text(&r["name"]), text(&r["target"])))
@@ -335,7 +319,6 @@ fn exact(name: &str, target: &str) -> (String, String, String) {
     ("exact".into(), name.into(), format!("packages/{target}"))
 }
 
-/// The export entry points of the export, cut.
 fn doors(json: &serde_json::Value) -> Vec<String> {
     (json["processes"].as_array().unwrap().iter())
         .filter(|p| p["kind"] == "export")
@@ -395,7 +378,6 @@ fn start_test_backend_features_import_their_default() {
         at("run", "@scope/a"),
         [exact("default", "a/src/index.ts::feature")]
     );
-    // `@scope/b` has no default export: what a static `import d from '@scope/b'` gives.
     assert!(
         at("run", "@scope/b")
             .iter()
@@ -408,7 +390,6 @@ fn start_test_backend_features_import_their_default() {
 fn a_default_a_test_backend_adds_is_no_export_door() {
     let repo = uses_repo("uses_test_backend_door");
     assert!(!doors(&export(&repo)).contains(&"packages/a/src/index.ts::feature".to_string()));
-    // Without the test backend nothing imports it: the drop above is what keeps it out.
     let bare = uses_repo("uses_test_backend_no_door");
     fs::remove_file(bare.join("packages/app/src/test-backend.ts")).unwrap();
     assert!(doors(&export(&bare)).contains(&"packages/a/src/index.ts::feature".to_string()));
@@ -418,8 +399,6 @@ fn a_default_a_test_backend_adds_is_no_export_door() {
 fn an_import_row_from_a_use_drops_no_door() {
     let repo = uses_repo("uses_doors_kept");
     let json = export(&repo);
-    // The row exists: the door stays although an imports row targets it. (`Button` is no door,
-    // `both` calls it; `Base` is a class, never one.)
     let card = rows_at(&repo, "packages/app/src/card.tsx", "@scope/ui");
     assert_eq!(named(&card), [exact("Card", "ui/src/index.ts::Card")]);
     let doors = doors(&json);
@@ -477,7 +456,6 @@ fn one_name_taken_off_two_imports_in_one_scope_keeps_two_rows() {
     assert_eq!(sites, [at(0, "@scope/a"), at(1, "@scope/b")]);
 }
 
-/// `tests/fixtures/go-type-uses`, as `example.com/go/types`.
 fn go_types(case: &str) -> PathBuf {
     fixture_repo(
         case,
@@ -486,8 +464,6 @@ fn go_types(case: &str) -> PathBuf {
     )
 }
 
-/// The export's `calls` rows of kind `type`, as (caller, target, level, holder), sorted, with
-/// the identity cut off.
 fn go_type_rows(repo: &Path) -> Vec<(String, String, String, String)> {
     let json = export(repo);
     let cut = |v: &serde_json::Value| {

@@ -1,14 +1,3 @@
-//! The console with `[accounts]` (#554, #555, ADR 0024): its own sign-in, the default account,
-//! session tokens it signs with Ed25519, the forced password change, the lockout, the rehash of a
-//! weaker hash, `meada ui reset-admin` and the audit of each; account administration (#557) in
-//! `administration`, groups of accounts and their grant (#558) in `groups`. The section and key
-//! refusals, and `reset-admin`'s refusals before Postgres, need no service; the rest run against
-//! the local Postgres of `MEADA_TEST_POSTGRES_URL`, each test in a schema of its own, and skip
-//! without it; the save as the global operator also needs the fleet's Valkey and store. Break
-//! glass beside `[oidc]` (#563) is `break_glass`; agent tokens for the nodes (#560) `tokens`; the
-//! verified login of `[accounts.github]` (#561) `github`, and a local team operator's additions
-//! under it `ui::oidc::additions`.
-
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -28,17 +17,11 @@ mod groups;
 mod tokens;
 
 const EN: &str = "en_US.UTF-8";
-/// The variable every test here names for the initial password, so the runner's own
-/// `MEADA_ADMIN_PASSWORD` never reaches a console.
 const ADMIN_ENV: &str = "MEADA_TEST_ADMIN_PASSWORD_554";
 const CHANGED: &str = "correct horse battery staple";
-/// The initial password the lockout and recovery tests set, so `admin` needs no change first.
 const CHOSEN: &str = "deployer chose this one";
-/// The fixed start of the one stderr line of a generated first password.
 const FIRST: &str = "accounts: default account admin created; first password: ";
 
-/// A fresh Ed25519 key pair in PEM, generated with ring: the private half (PKCS #8) and the
-/// public half (SPKI).
 pub(crate) fn pair() -> (String, String) {
     use ring::signature::KeyPair;
     let rng = ring::rand::SystemRandom::new();
@@ -66,7 +49,6 @@ fn pem(label: &str, der: &[u8]) -> String {
     format!("-----BEGIN {label}-----\n{text}\n-----END {label}-----\n")
 }
 
-/// `ops/public.pem` and `ops/private.pem` under `dir`, a matching pair; the PEM texts.
 fn keys(dir: &Path) -> (String, String) {
     let (private, public) = pair();
     fs::write(dir.join("ops/public.pem"), &public).unwrap();
@@ -74,7 +56,6 @@ fn keys(dir: &Path) -> (String, String) {
     (private, public)
 }
 
-/// The `[accounts]` over `keys`' files, the initial password read from `ADMIN_ENV`.
 fn section() -> String {
     format!(
         "\n[accounts]\npublic_key_file = \"public.pem\"\nprivate_key_file = \"private.pem\"\n\
@@ -82,10 +63,6 @@ fn section() -> String {
     )
 }
 
-/// The first password `console` generated, read from its one line right after the listening
-/// line: 24 characters of the generator's alphabet, the shape `accounts::generated` gives only
-/// once the policy takes it. The prefix, length and alphabet are copied, not imported: they pin
-/// what a deployer greps for and reads, and the crate's `accounts` module is private.
 fn first_password(console: &mut Server) -> String {
     let line = console.next_line();
     let password = (line.strip_prefix(FIRST)).unwrap_or_else(|| panic!("{line:?}"));
@@ -97,7 +74,6 @@ fn first_password(console: &mut Server) -> String {
     password.to_string()
 }
 
-/// `meada ui` on `dir`'s manifest, refused: its stderr.
 fn refused(dir: &Path, env: &[(&str, &str)]) -> String {
     let args = ["ui", "--listen", "127.0.0.1:0", "--workspace", MANIFEST];
     let (stdout, stderr, code) = meada(dir, EN, env, &args);
@@ -105,9 +81,6 @@ fn refused(dir: &Path, env: &[(&str, &str)]) -> String {
     stderr
 }
 
-/// Each section rule names its sections or its key: `[accounts]` needs `[postgres]`, never sits
-/// beside `[oidc]`, takes one key of each pair; `[ui] operations = true` needs no `[oidc]` beside
-/// it, and no operator key.
 #[test]
 fn the_section_s_rules_name_their_sections_and_keys() {
     let ui = ui_section() + "operations = true\n";
@@ -134,7 +107,6 @@ fn the_section_s_rules_name_their_sections_and_keys() {
             ui.clone(),
             "`accounts.public_key_file`: is set together with public_key_env",
         ),
-        // `[accounts.github]` (#561): `api` is GitHub's by default on `github.com` alone.
         (
             "accounts_github_no_api",
             format!(
@@ -159,14 +131,10 @@ fn the_section_s_rules_name_their_sections_and_keys() {
         let (_, stderr, code) = run_args(&dir, &["status", "--workspace", MANIFEST]);
         assert_eq!(code, Some(1), "{case}: {stderr}");
         assert!(stderr.contains(expected), "{case}: {stderr}");
-        // `operations = true` passed: no other problem is named.
         assert_eq!(stderr.lines().count(), 1, "{case}: {stderr}");
     }
 }
 
-/// The console refuses to start on a missing, unreadable, non-Ed25519 or mismatched key pair,
-/// naming the key and never what it holds; with a good pair and no Postgres, on the default
-/// account it cannot create, naming Postgres. `operations = true` passes with `[accounts]` alone.
 #[test]
 fn the_console_refuses_a_missing_unreadable_foreign_or_mismatched_key() {
     let head = format!(
@@ -212,11 +180,9 @@ fn the_console_refuses_a_missing_unreadable_foreign_or_mismatched_key() {
             }
         }
     }
-    // Unreadable: the file named, not a value.
     fs::remove_file(dir.join("ops/public.pem")).unwrap();
     let stderr = refused(&dir, &env);
     assert!(stderr.contains("`accounts.public_key_file`: "), "{stderr}");
-    // Missing: no key named at all.
     let missing = "\n[postgres]\nurl_env = \"MEADA_TEST_POSTGRES_URL_554\"\n\n[accounts]\n\
                    public_key_file = \"public.pem\"\n";
     let bare = console_dir("accounts_keys_missing", Some(VERSION), missing, &ui);
@@ -229,7 +195,6 @@ fn the_console_refuses_a_missing_unreadable_foreign_or_mismatched_key() {
         ),
         "{stderr}"
     );
-    // A good pair: the default account needs Postgres at start, named and never its URL.
     write(&public, &private);
     let stderr = refused(&dir, &env);
     assert!(
@@ -242,8 +207,6 @@ fn the_console_refuses_a_missing_unreadable_foreign_or_mismatched_key() {
     );
 }
 
-/// A node parses `[accounts]` and reads its public key alone (#560): one naming a private key file
-/// that does not exist starts and answers, a request without an agent token a 401.
 #[test]
 fn a_node_never_reads_the_private_key() {
     let dir = chain_manifest("accounts_node");
@@ -261,23 +224,18 @@ fn a_node_never_reads_the_private_key() {
     assert!(!stderr.contains("private"), "{stderr}");
 }
 
-/// A console with `[accounts]` over a Postgres schema of `case`'s own, running.
 struct Local {
     dir: PathBuf,
     audit: Audited,
     console: Server,
-    /// The key pair's PEM texts, which no output may carry.
     keys: (String, String),
-    /// The first password the console generated, when `env` set none.
     first: Option<String>,
 }
 
-/// The console of `case` with `operations` and `[accounts]`, started with `env`.
 fn local(case: &'static str, env: &[(&str, &str)]) -> Option<Local> {
     local_with(case, true, env)
 }
 
-/// The console of `case` with `[accounts]` and `operations` as given, started with `env`.
 fn local_with(case: &'static str, operations: bool, env: &[(&str, &str)]) -> Option<Local> {
     let ui = ui_section() + &format!("operations = {operations}\n");
     let dir = console_dir(case, Some(VERSION), "", &ui);
@@ -328,13 +286,11 @@ fn ask(console: &Server, path: &str, token: &str) -> Reply {
     send(console, "GET", path, &[("Authorization", &bearer(token))])
 }
 
-/// The token of a sign-in that passed.
 fn token(reply: &Reply) -> String {
     assert_eq!(reply.status, 200, "{}", reply.body);
     reply.json()["token"].as_str().unwrap().to_string()
 }
 
-/// The fixed error of `reply`: its status and code.
 fn refusal(reply: &Reply) -> (u16, String) {
     let code = reply.json()["error"]["code"]
         .as_str()
@@ -343,7 +299,6 @@ fn refusal(reply: &Reply) -> (u16, String) {
     (reply.status, code)
 }
 
-/// The audit's records as `GET audit` answers them, oldest first, without their `id` and `time`.
 fn records(console: &Server, token: &str) -> Vec<Value> {
     let page = ask(console, "/api/v1/audit", token);
     assert_eq!(page.status, 200, "{}", page.body);
@@ -374,8 +329,6 @@ fn record(
            "action": action, "arguments": arguments, "outcome": outcome, "message": message})
 }
 
-/// Nothing secret in `text`: no password of `passwords`, no part of a token of `tokens`, no
-/// argon2 hash, no key and no Postgres URL.
 fn assert_leaks_nothing(
     audit: &Audited,
     keys: &(String, String),
@@ -400,12 +353,6 @@ fn assert_leaks_nothing(
     audit.assert_no_url(text);
 }
 
-/// The tracer bullet: the console with no password set generates the default account's first
-/// password and shows it on one stderr line, never again; the account signs in with it, its token
-/// opens only the password change; after the change, a fresh token is the global operator's
-/// session, and a viewer seeded beside it reads and cannot write. Every sign-in, refusal and
-/// change leaves a record the audit page lists, and no answer, record or stderr line holds a
-/// password, a hash or a token; no answer sets a cookie or a CORS header.
 #[test]
 fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator() {
     let Some(local) = local("accounts_flow", &[]) else {
@@ -424,14 +371,12 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
     assert_eq!(missing.header("www-authenticate"), Some("Bearer"));
     assert_eq!(get(console, "/").status, 200);
 
-    // The `Origin` checks come first: a sign-in is a write.
     let body = json!({"username": "admin", "password": generated}).to_string();
     let bare = send_body(console, "POST", "/api/v1/login", &[], &body);
     assert_eq!(bare.status, 403);
     let foreign = [("Origin", "https://evil.example")];
     let cross = send_body(console, "POST", "/api/v1/login", &foreign, &body);
     assert_eq!(cross.status, 403);
-    // A body that does not parse, and one past the cap.
     for bad in [
         "",
         "{",
@@ -444,7 +389,6 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
     let huge = json!({"username": "admin", "password": "x".repeat(8 << 10)}).to_string();
     assert_eq!(post(console, "login", None, &huge).status, 413);
 
-    // The default account: its token opens the password change alone.
     let first = login(console, "admin", generated);
     let changing = token(&first);
     let answer = first.json();
@@ -459,7 +403,6 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
         );
         replies.push(reply);
     }
-    // A write needs the token before anything else: none is a 401, one awaiting its change a 403.
     let pointer = json!({"action": "set", "generation": "0".repeat(32)}).to_string();
     let tokenless = post(console, "pointer", None, &pointer);
     assert_eq!(refusal(&tokenless), (401, "unauthorized".into()));
@@ -468,7 +411,6 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
     let huge = json!({"current": generated, "new": "x".repeat(8 << 10)}).to_string();
     let reply = post(console, "account/password", Some(&changing), &huge);
     assert_eq!(reply.status, 413);
-    // Unknown username and wrong password alike; a tampered token is a 401 before routing.
     let unknown = login(console, "nobody", generated);
     let wrong = login(console, "admin", "admin124");
     assert_eq!(refusal(&unknown), (401, "invalid_credentials".into()));
@@ -480,8 +422,6 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
         reply.header("www-authenticate"),
         Some("Bearer error=\"invalid_token\"")
     );
-    // Session claims signed by the test: with the console's key they pass, so another key's and
-    // an expired one's 401s come from the key and the lifetime alone.
     let signed = |private: &str, exp: u64| {
         let claims = json!({"iss": PUBLIC, "aud": "meada:console", "sub": "local:admin",
                             "role": "viewer", "groups": [], "iat": exp - 3600, "exp": exp});
@@ -509,7 +449,6 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
         replies.push(reply);
     }
 
-    // The change: the policy first, then the current password.
     let short = change(console, &changing, generated, "too short");
     assert_eq!(refusal(&short), (422, "password_policy".into()));
     assert_eq!(short.json()["error"]["rule"], "too_short");
@@ -525,7 +464,6 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
         json!({"subject": "local:admin", "role": "operator", "groups": [], "grant": "*",
                "account": true})
     );
-    // The token issued before the change keeps its mark until it expires.
     let reply = ask(console, "/api/v1/session", &changing);
     assert_eq!(refusal(&reply), (403, "password_change_required".into()));
     assert_eq!(refusal(&login(console, "admin", generated)).0, 401);
@@ -533,8 +471,6 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
     assert_eq!(again.json()["change_required"], false);
     let operator_again = token(&again);
 
-    // A viewer, seeded through the same store with the operator's hash: it reads and cannot
-    // write, and the policy refuses its current password as the new one.
     local.audit.admin.run(&format!(
         "INSERT INTO \"{0}\".accounts (username, password_hash, role, change_required) SELECT \
          'viewer-1', password_hash, 'viewer', false FROM \"{0}\".accounts WHERE username = 'admin'",
@@ -623,7 +559,6 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
         ]
     );
 
-    // A hostile row admits nothing: one line naming the table, the one 401, no value anywhere.
     local.audit.admin.run(&format!(
         "INSERT INTO \"{0}\".accounts (username, password_hash, role, change_required) SELECT \
          'root-1', password_hash, 'root', false FROM \"{0}\".accounts WHERE username = 'admin'",
@@ -691,10 +626,6 @@ fn the_default_account_signs_in_changes_its_password_and_is_the_global_operator(
     assert_leaks_nothing(&audit, &keys, &stderr, &passwords, &tokens);
 }
 
-/// The default account is created once, by consoles started together, from the deployer's
-/// password when one is set (no change required then) and only when it passes the policy, which
-/// otherwise refuses the start naming the key and never the value. A table that holds an account
-/// is never touched again.
 #[test]
 fn the_default_account_is_created_once_from_the_setting_and_never_again() {
     let Some(local) = local(
@@ -714,7 +645,6 @@ fn the_default_account_is_created_once_from_the_setting_and_never_again() {
     } = local;
     drop(console);
 
-    // A table that holds an account is never touched: a new setting changes nothing.
     let restarted = start(&dir, &[(ADMIN_ENV, "another one entirely")]);
     assert_eq!(
         login(&restarted, "admin", "deployer chose this one").status,
@@ -727,7 +657,6 @@ fn the_default_account_is_created_once_from_the_setting_and_never_again() {
     let stderr = restarted.stderr();
     assert!(!stderr.contains(FIRST), "{stderr}");
 
-    // On an empty table, a setting that fails the policy refuses the start, naming its key.
     audit
         .admin
         .run(&format!("DELETE FROM \"{}\".accounts", audit.schema));
@@ -744,8 +673,6 @@ fn the_default_account_is_created_once_from_the_setting_and_never_again() {
         "{stderr}"
     );
 
-    // Two consoles started together on an empty table: both start, one account, and one of
-    // them shows its generated password, on one line.
     let together: Vec<Server> = std::thread::scope(|scope| {
         let starts: Vec<_> = (0..2).map(|_| scope.spawn(|| start(&dir, &[]))).collect();
         starts.into_iter().map(|s| s.join().unwrap()).collect()
@@ -755,7 +682,6 @@ fn the_default_account_is_created_once_from_the_setting_and_never_again() {
         audit.schema
     ));
     assert_eq!(count, ["1"]);
-    // An answer comes after the line: it is printed before the console accepts a connection.
     for console in &together {
         assert_eq!(get(console, "/api/v1/config").status, 200);
     }
@@ -765,8 +691,6 @@ fn the_default_account_is_created_once_from_the_setting_and_never_again() {
         .collect();
     assert_eq!(shown.len(), 1, "{stderr}");
     assert_eq!(stderr.matches(FIRST).count(), 1, "{stderr}");
-    // The next start of the same workspace shows nothing; the password signs in, and demands
-    // its change.
     let again = start(&dir, &[]);
     let reply = login(&again, "admin", shown[0]);
     assert_eq!(reply.json()["change_required"], true, "{}", reply.body);
@@ -774,8 +698,6 @@ fn the_default_account_is_created_once_from_the_setting_and_never_again() {
     assert!(!stderr.contains(FIRST), "{stderr}");
 }
 
-/// A sign-in whose audit record cannot be written gives no token: a 503 `audit_unavailable`;
-/// with Postgres gone, so does every sign-in, and no hash is computed past `HASHES_MAX` at once.
 #[test]
 fn no_token_without_its_record_and_no_hash_past_the_bound() {
     let Some(local) = local("accounts_audit", &[]) else {
@@ -784,7 +706,6 @@ fn no_token_without_its_record_and_no_hash_past_the_bound() {
     let generated = local.first.clone().unwrap();
     let generated = generated.as_str();
     let console = &local.console;
-    // Past the bound: a burst of sign-ins, each a hash, gets some 503 `busy`, the rest the 401.
     let burst: Vec<Reply> = std::thread::scope(|scope| {
         let sent: Vec<_> = (0..24)
             .map(|_| scope.spawn(|| login(console, "nobody", generated)))
@@ -798,7 +719,6 @@ fn no_token_without_its_record_and_no_hash_past_the_bound() {
             .all(|c| *c == (503, "busy".into()) || *c == (401, "invalid_credentials".into())),
         "{codes:?}"
     );
-    // The records go; the sign-in that passes its password gives no token.
     local.audit.admin.run(&format!(
         "ALTER TABLE \"{}\".audit RENAME TO audit_gone",
         local.audit.schema
@@ -815,7 +735,6 @@ fn no_token_without_its_record_and_no_hash_past_the_bound() {
         local.audit.schema
     ));
     let changing = token(&login(console, "admin", generated));
-    // Postgres gone: no sign-in, no change.
     local.audit.relay.close();
     let reply = login(console, "admin", generated);
     assert_eq!(refusal(&reply), (503, "audit_unavailable".into()));
@@ -831,8 +750,6 @@ fn no_token_without_its_record_and_no_hash_past_the_bound() {
     assert_leaks_nothing(&audit, &keys, &stderr, &[generated, CHANGED], &[&changing]);
 }
 
-/// The demo's end: the default account, its password changed, saves a workspace version as the
-/// global operator, and the save is audited under `local:admin`. Real Valkey, store and Postgres.
 #[cfg(feature = "refresh-lock")]
 #[test]
 fn the_global_operator_saves_a_workspace_version_audited_under_its_local_subject() {
@@ -908,7 +825,6 @@ fn the_global_operator_saves_a_workspace_version_audited_under_its_local_subject
     assert!(authors.contains(&"local:admin"), "{listed}");
 }
 
-/// `meada ui reset-admin` on `dir`'s manifest with `env`: stdout, stderr and the exit code.
 fn reset_admin(dir: &Path, env: &[(&str, &str)]) -> (String, String, i32) {
     meada(
         dir,
@@ -918,8 +834,6 @@ fn reset_admin(dir: &Path, env: &[(&str, &str)]) -> (String, String, i32) {
     )
 }
 
-/// An account `username` of `role` seeded beside `admin`, with `admin`'s hash and no change
-/// required.
 fn seed(local: &Local, username: &str, role: &str) {
     local.audit.admin.run(&format!(
         "INSERT INTO \"{0}\".accounts (username, password_hash, role, change_required) SELECT \
@@ -928,8 +842,6 @@ fn seed(local: &Local, username: &str, role: &str) {
     ));
 }
 
-/// The records of `action` on the account `account` the audit page lists, oldest first: each
-/// one's outcome and reason (`-` for none).
 fn outcomes(console: &Server, token: &str, action: &str, account: &str) -> Vec<(String, String)> {
     let page = ask(console, "/api/v1/audit?limit=100", token);
     assert_eq!(page.status, 200, "{}", page.body);
@@ -943,24 +855,18 @@ fn outcomes(console: &Server, token: &str, action: &str, account: &str) -> Vec<(
     found
 }
 
-/// How many of `outcomes` are `(outcome, reason)`.
 fn count(outcomes: &[(String, String)], outcome: &str, reason: &str) -> usize {
     (outcomes.iter())
         .filter(|(o, r)| o == outcome && r == reason)
         .count()
 }
 
-/// A sign-in and how long it took.
 fn timed(console: &Server, username: &str, password: &str) -> (Reply, Duration) {
     let start = Instant::now();
     let reply = login(console, username, password);
     (reply, start.elapsed())
 }
 
-/// The lockout: a success clears the count, so failures on either side of it never lock; ten
-/// wrong passwords sent at once lock the account at exactly the tenth (the rest are refused
-/// `locked`, unchecked); while locked the right password gets the wrong one's 401, at a hash's
-/// cost, and an attempt never extends the lock, which ends on its own.
 #[test]
 fn ten_failures_lock_the_account_and_a_lock_is_neither_checked_nor_extended() {
     let Some(local) = local("accounts_lockout", &[(ADMIN_ENV, CHOSEN)]) else {
@@ -970,7 +876,6 @@ fn ten_failures_lock_the_account_and_a_lock_is_neither_checked_nor_extended() {
     seed(&local, "ops-1", "operator");
     let operator = token(&login(console, "ops-1", CHOSEN));
 
-    // Nine failures, a success, nine more: the count starts again at the success.
     let mut wrong = Vec::new();
     let mut invalid = None;
     for _ in 0..2 {
@@ -984,8 +889,6 @@ fn ten_failures_lock_the_account_and_a_lock_is_neither_checked_nor_extended() {
     }
     let invalid = invalid.unwrap();
 
-    // Fifteen wrong passwords at once: the row's lock counts them one after another. A request
-    // past the hash bound is a 503 `busy` that counts nothing, and is sent again.
     let parallel: Vec<Reply> = std::thread::scope(|scope| {
         let sent: Vec<_> = (0..15)
             .map(|i| {
@@ -1011,7 +914,6 @@ fn ten_failures_lock_the_account_and_a_lock_is_neither_checked_nor_extended() {
     assert_eq!(count(&logins, "refused", "locked_now"), 1, "{logins:?}");
     assert_eq!(count(&logins, "refused", "locked"), 5, "{logins:?}");
 
-    // Locked: the right password gets the wrong one's answer, at about a wrong one's cost.
     let mut locked = Vec::new();
     for _ in 0..6 {
         let (reply, took) = timed(console, "admin", CHOSEN);
@@ -1025,8 +927,6 @@ fn ten_failures_lock_the_account_and_a_lock_is_neither_checked_nor_extended() {
         "a locked refusal took {fastest_locked:?}, a wrong password {fastest_wrong:?}"
     );
 
-    // An attempt while locked never extends the lock: shortened to end in a moment, it ends then
-    // although an attempt came meanwhile, well inside the window.
     local.audit.admin.run(&format!(
         "UPDATE \"{}\".accounts SET locked_until = now() + interval '5 seconds' \
          WHERE username = 'admin'",
@@ -1060,8 +960,6 @@ fn ten_failures_lock_the_account_and_a_lock_is_neither_checked_nor_extended() {
     assert_leaks_nothing(&audit, &keys, &stderr, &[CHOSEN, "a parallel guess"], &[]);
 }
 
-/// A password change's wrong current password counts toward the same lockout as a sign-in's, and
-/// a locked account can neither sign in nor change its password.
 #[test]
 fn a_wrong_current_password_counts_toward_the_lockout() {
     let Some(local) = local("accounts_lockout_change", &[(ADMIN_ENV, CHOSEN)]) else {
@@ -1080,7 +978,6 @@ fn a_wrong_current_password_counts_toward_the_lockout() {
         );
         assert_eq!(refusal(&reply), (401, "invalid_credentials".into()));
     }
-    // The tenth failure, through the sign-in: the count is the account's, whichever route.
     let tenth = login(console, "admin", "not the password");
     assert_eq!(refusal(&tenth), (401, "invalid_credentials".into()));
     let reply = change(console, &admin, CHOSEN, CHANGED);
@@ -1101,9 +998,6 @@ fn a_wrong_current_password_counts_toward_the_lockout() {
     );
 }
 
-/// A stored hash weaker than the console's parameters is redone at the next sign-in that proves
-/// its password, and only then: a wrong password leaves it. No route shows a hash, so this test
-/// reads the column.
 #[test]
 fn a_weaker_hash_is_redone_at_the_next_successful_sign_in() {
     use argon2::password_hash::{PasswordHasher, SaltString, rand_core::OsRng};
@@ -1140,11 +1034,6 @@ fn a_weaker_hash_is_redone_at_the_next_successful_sign_in() {
     assert_eq!(stored(), [redone]);
 }
 
-/// The demo: ten bad sign-ins lock `admin`, the eleventh with the right password is still
-/// refused; `meada ui reset-admin` clears the lock with a generated password, printed once on
-/// stdout and nowhere else, that must be changed; it reactivates a suspended or demoted `admin`
-/// as an operator from the setting's value, creates `admin` when there is none, and refuses, with
-/// nothing changed, a value the policy refuses and a record it cannot write.
 #[test]
 fn reset_admin_recovers_a_locked_default_account_with_a_forced_change() {
     let Some(local) = local("accounts_reset_admin", &[(ADMIN_ENV, CHOSEN)]) else {
@@ -1158,7 +1047,6 @@ fn reset_admin_recovers_a_locked_default_account_with_a_forced_change() {
     }
     assert_eq!(refusal(&login(console, "admin", CHOSEN)).0, 401);
 
-    // A generated password: one line on stdout, never on stderr.
     let (stdout, stderr, code) = reset_admin(&local.dir, &[]);
     assert_eq!(code, 0, "{stderr}");
     let generated = stdout.strip_suffix('\n').unwrap().to_string();
@@ -1196,8 +1084,6 @@ fn reset_admin_recovers_a_locked_default_account_with_a_forced_change() {
                "message": "admin reactivated as an operator, its lock cleared, a password change required"})
     );
 
-    // Suspended and demoted: reactivated as an operator, from the setting's value, which is
-    // never printed.
     local.audit.admin.run(&format!(
         "UPDATE \"{schema}\".accounts SET suspended = true, role = 'viewer' WHERE username = 'admin'"
     ));
@@ -1217,14 +1103,12 @@ fn reset_admin_recovers_a_locked_default_account_with_a_forced_change() {
         "operator"
     );
 
-    // A value the policy refuses: exit 1 naming the key, nothing recorded or changed.
     let (stdout, stderr, code) = reset_admin(&local.dir, &[(ADMIN_ENV, "Password1234")]);
     assert_eq!((stdout.as_str(), code), ("", 1), "{stderr}");
     assert_eq!(
         stderr,
         "meada: `accounts.admin_password_env`: the password is on the list of common passwords\n"
     );
-    // A record that cannot be written: exit 1, nothing changed, no password on stdout.
     local.audit.admin.run(&format!(
         "ALTER TABLE \"{schema}\".audit RENAME TO audit_gone"
     ));
@@ -1241,7 +1125,6 @@ fn reset_admin_recovers_a_locked_default_account_with_a_forced_change() {
     let resets = outcomes(console, &operator, "account.reset_admin", "admin");
     assert_eq!(resets.len(), 2, "{resets:?}");
 
-    // No account at all: `admin` created.
     local
         .audit
         .admin
@@ -1279,9 +1162,6 @@ fn reset_admin_recovers_a_locked_default_account_with_a_forced_change() {
     assert_leaks_nothing(&audit, &keys, &stderr, &passwords, &[]);
 }
 
-/// `meada ui reset-admin`'s refusals before any write, needing no service: a manifest without
-/// `[accounts]`, a setting the policy refuses (named by its key, never its value), and Postgres
-/// unreachable, where the record cannot be written, so nothing is and no password is printed.
 #[test]
 fn reset_admin_refuses_without_its_section_its_policy_or_its_record() {
     let bare = console_dir("accounts_reset_bare", Some(VERSION), "", &ui_section());
@@ -1312,7 +1192,6 @@ fn reset_admin_refuses_without_its_section_its_policy_or_its_record() {
         stderr,
         "meada: `accounts.admin_password_env`: the password has fewer than 12 characters\n"
     );
-    // A setting's file that cannot be read: named by its key, nothing else read or written.
     let filed = "\n[postgres]\nurl_env = \"MEADA_TEST_POSTGRES_URL_555\"\n\n[accounts]\n\
                  admin_password_file = \"no-such-password\"\n";
     let unreadable = console_dir(
@@ -1328,7 +1207,6 @@ fn reset_admin_refuses_without_its_section_its_policy_or_its_record() {
         "{stderr}"
     );
     assert!(!stderr.contains("audit"), "{stderr}");
-    // The help names the subcommand beside the listener.
     let (help, _, code) = meada(&dir, EN, &[], &["ui", "--help"]);
     assert_eq!(code, 0);
     assert!(help.contains("reset-admin"), "{help}");

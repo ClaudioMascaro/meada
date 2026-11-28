@@ -1,5 +1,3 @@
-//! Service and Ingress HTTP routing uses indexed infrastructure and workload code (#665).
-
 use crate::common::{assert_golden, fixture_repo};
 use meada::engine::{Direction, Engine, Start};
 use std::path::PathBuf;
@@ -94,7 +92,6 @@ fn ingress_rewrites_unknown_backends_and_longer_unread_mounts_do_not_guess() {
         assert_eq!(found.len(), 2, "{name}: {found:#?}");
         assert!(found.iter().all(|l| !l["consumer"].as_str().unwrap().contains("::publicOrders::")), "{name}: {found:#?}");
     }
-    // Without a pathType, each controller decides how a path matches: an unread mount too.
     std::fs::write(
         &path,
         original.replace("            pathType: Prefix\n", ""),
@@ -160,7 +157,6 @@ fn service_selection_keeps_every_label_namespace_and_evaluation_root() {
         .split("---\n")
         .find(|s| s.contains("name: orders, namespace: shop") && s.contains("kind: Deployment"))
         .unwrap();
-    // Same labels in a different namespace never satisfy the selector.
     std::fs::write(
         deploy.join("workloads.yaml"),
         source.replace(
@@ -180,7 +176,6 @@ fn service_selection_keeps_every_label_namespace_and_evaluation_root() {
             .unwrap()
             .contains("::directOrders::")
     );
-    // A matching workload in a separate evaluation root cannot complete this Service either.
     std::fs::create_dir(deploy.join("unrelated")).unwrap();
     std::fs::write(
         deploy.join("unrelated/server.yaml"),
@@ -250,7 +245,6 @@ fn a_valid_runner_decision_selects_the_repository_used_by_http() {
     );
     git(&other, &["add", "."]);
     git(&other, &["commit", "-qm", "second literal builder"]);
-    // A raw ambiguity cannot invent which repository runs the Service's workload.
     let before = links(&client);
     assert_eq!(before.len(), 1, "{before:#?}");
     assert!(
@@ -324,7 +318,6 @@ fn an_unread_environment_base_blocks_guessing_and_an_explicit_override_wins() {
             .iter()
             .all(|l| !l["consumer"].as_str().unwrap().contains("::secretOrders::"))
     );
-    // An explicit name in that container overrides the unread envFrom prefix.
     std::fs::write(
         deploy.join("workloads.yaml"),
         changed.replace(
@@ -467,8 +460,6 @@ fn a_declared_host_keeps_its_link_when_no_service_or_ingress_reaches_code() {
         "export function internalOrders() {\n  return fetch('http://orders/orders');\n}\n",
     )
     .unwrap();
-    // The Service selects no workload, and the Ingress of the other declared host has a path
-    // type Meada does not read: neither reaches code, so `[serve] hosts` answers as before.
     let source = std::fs::read_to_string(deploy.join("workloads.yaml")).unwrap();
     std::fs::write(
         deploy.join("workloads.yaml"),
@@ -501,8 +492,6 @@ fn a_declared_host_keeps_its_link_when_no_service_or_ingress_reaches_code() {
     }
 }
 
-/// Overlays of one base repeat its Ingress per environment: one provider behind every copy is
-/// no ambiguity, while a route as long that reaches no code still is.
 #[test]
 fn overlays_repeating_one_route_to_one_provider_leave_it_inferred() {
     let (client, deploy, _) = workspace("http_iac_overlays");

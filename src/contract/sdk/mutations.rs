@@ -1,4 +1,3 @@
-//! Standard mapping mutations, independent of SDK service/operation policy.
 use crate::lang::{Part, Value};
 use crate::resolve::{Code, MemberEffect, method};
 

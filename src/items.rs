@@ -1,7 +1,3 @@
-//! Open items: the ambiguous links and the unresolved consumers of a workspace, each with the
-//! candidates a decision may pick (spec #18). `search` lists them and `meada decide` resolves
-//! them.
-
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 
@@ -46,12 +42,10 @@ pub struct Candidate {
     pub site: String,
 }
 
-/// Query-local candidate names prepared by a kind before linking its sides.
 #[derive(Default)]
 pub(crate) struct NameCandidates {
     pub candidates: Vec<Candidate>,
     pub distinct: usize,
-    /// The chosen literal name and its decision's position in the repository input.
     pub selected: Option<(String, usize)>,
 }
 
@@ -125,7 +119,6 @@ impl OpenItem {
         item
     }
 
-    /// Keep the engine order as the tie-breaker. Only decide calls this before numbering.
     pub(crate) fn rank_candidates(&mut self) {
         if let Some(coverage) = self.literal_coverage {
             self.candidates.sort_by_cached_key(|candidate| {
@@ -147,8 +140,6 @@ impl OpenItem {
     }
 }
 
-/// The sites `list` places, each with the position of its repository: the unresolved
-/// consumers and those an ambiguous link of `links` leaves from (a call, or a definition).
 pub(crate) fn sites(exports: &[Export], links: &[Link]) -> Vec<(usize, String)> {
     let ambiguous: HashSet<String> = (links.iter())
         .filter(|l| contract::consumer_item(l, exports))
@@ -162,26 +153,16 @@ pub(crate) fn sites(exports: &[Export], links: &[Link]) -> Vec<(usize, String)> 
     items.collect()
 }
 
-/// The consumers with no contract that a kind owns, by site, each with why it holds no
-/// candidate (`ContractKind::unresolved_causes`).
 pub(crate) fn causes(exports: &[Export]) -> HashMap<String, &'static str> {
     (contract::KINDS.iter())
         .flat_map(|kind| kind.unresolved_causes(exports))
         .collect()
 }
 
-/// Whether `provider` is a candidate of `consumer`, an unresolved consumer no kind owns: its
-/// kind's `candidate` (HTTP: by method and literal URL fragments, or by a gateway path). The
-/// one rule `meada decide` lists by and the replay of a `dynamic-url` decision checks (#806).
 pub(crate) fn fits(consumer: &Consumer, provider: &Provider) -> bool {
     kind_of(&provider.contract).is_some_and(|k| k.candidate(consumer, provider))
 }
 
-/// The items of every repository as the core sees them, in id order: `links` are the links
-/// before any decision, so a decided call is listed too (the caller drops it to keep the open
-/// ones). The candidates of an ambiguous link are the providers `links` lists for it; those of
-/// an unresolved consumer are the providers of the workspace that its kind's `candidate` leaves
-/// (HTTP: by method and literal URL fragments).
 pub(crate) fn list(
     repos: &[Repository],
     exports: &[Export],
@@ -199,8 +180,6 @@ pub(crate) fn list(
         .iter()
         .flat_map(|e| e.providers.iter().map(|p| (e.repository.as_str(), p)))
         .collect();
-    // A candidate carries the provider's own contract, also when it fits by its gateway path,
-    // so a decision for it names a contract its repository serves.
     fn candidate<'a>(&(repository, p): &(&'a str, &'a Provider)) -> (&'a str, &'a str, &'a str) {
         (repository, p.contract.as_str(), p.site.as_str())
     }
@@ -214,7 +193,6 @@ pub(crate) fn list(
             .map(|s| (s.id.as_str(), s))
             .collect();
         let mut files = Files::new(&repo.root);
-        // The IaC nodes by identity, written out only for an export with an item on one.
         let mut nodes: Option<HashMap<String, &crate::iac::Node>> = None;
         for consumer in &export.consumers {
             let (kind, candidates) = match (
@@ -242,15 +220,12 @@ pub(crate) fn list(
                 }
                 _ => continue,
             };
-            // A consumer at a definition (a method of a declarative client, which has no call
-            // of its own) is the definition: its lines are the excerpt (ADR 0006).
             let infrastructure;
             let (span, caller) = match calls.get(consumer.site.as_str()) {
                 Some(call) => (&call.span, symbols.get(call.caller.as_str())),
                 None => match symbols.get(consumer.site.as_str()) {
                     Some(def) => (&def.span, Some(def)),
                     None => {
-                        // The first node of an identity, as a scan of them finds it.
                         let nodes = nodes.get_or_insert_with(|| {
                             let nodes = export.iac.iter().rev();
                             nodes.map(|n| (n.identity(&export.repository), n)).collect()
@@ -281,11 +256,7 @@ pub(crate) fn list(
                     site: site.into(),
                 })
                 .collect();
-            // The label of a route orders as its method then path: the space sorts before
-            // every method letter and before the slash.
             candidates.sort_by_cached_key(|c| (c.repository.clone(), c.label(), c.site.clone()));
-            // A decision names a repository and a contract (no site): the sites of one
-            // repository that serve one contract are one candidate.
             let mut listed = HashSet::new();
             candidates.retain(|c| listed.insert((c.repository.clone(), c.contract.clone())));
             let (mut cause, mut literal_coverage) = (None, None);

@@ -1,7 +1,3 @@
-//! The command table (#831, ADR 0028): the `run` script of a CI step, read under one gate.
-//! `pip install` and its forms make the CI step a consumer of the package they name, at
-//! `inferred` when one provider fits: the name alone matched (ADR 0029).
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -15,11 +11,8 @@ const LIB: &str = "example.com/pkg/pylib::pyproject.toml";
 const TOOLS: &str = "example.com/pkg/pylib::tools/pyproject.toml";
 const FILE: &str = ".github/workflows/ci.yml";
 const SHARED: &str = "package::pypi::shared-lib";
-/// What the reason of a link from a CI step says first when the name alone matched (ADR 0029).
 const BY_NAME: &str = "the name alone matched";
 
-/// The PyPI fixtures: `pylib` provides `shared-lib` 1.2.0 and `shared-tools` 0.3.0, and `pyweb`
-/// names it as its peer.
 fn pair(case: &str) -> (PathBuf, PathBuf) {
     let repo = |name: &str| {
         let origin = format!("https://example.com/pkg/{name}.git");
@@ -34,8 +27,6 @@ fn write(root: &Path, path: &str, text: &str) {
     fs::write(path, text).unwrap();
 }
 
-/// A pipeline of one CI job, `build`, whose CI steps are `steps` (each line indented under
-/// `steps:`), with `head` between `on` and `jobs`.
 fn pipeline(head: &str, steps: &str) -> String {
     let steps: String = steps.lines().map(|l| format!("      {l}\n")).collect();
     format!(
@@ -43,7 +34,6 @@ fn pipeline(head: &str, steps: &str) -> String {
     )
 }
 
-/// The CI step `index` of the job `build`.
 fn step(index: usize) -> String {
     format!("{WEB}::{FILE}::jobs.build.steps[{index}]")
 }
@@ -53,8 +43,6 @@ fn exported(root: &Path) -> Value {
     serde_json::from_str(&text).unwrap()
 }
 
-/// What the CI nodes of the pipeline hold outside the CI kind: `(address, contract, via)` of
-/// each consumer row, in the export's order.
 fn sides(export: &Value) -> Vec<(String, Option<String>, Option<String>)> {
     let own = format!("{WEB}::{FILE}::");
     let text = |v: &Value| v.as_str().map(str::to_string);
@@ -70,8 +58,6 @@ fn sides(export: &Value) -> Vec<(String, Option<String>, Option<String>)> {
     .collect()
 }
 
-/// The `(consumer address, provider, level, reason)` of every link that leaves a CI node of the
-/// pipeline.
 fn links(export: &Value) -> Vec<(String, String, String, String)> {
     let own = format!("{WEB}::{FILE}::");
     let rows = export["links"].as_array().into_iter().flatten();
@@ -102,8 +88,6 @@ fn an_install_by_name_makes_the_ci_step_a_consumer_of_the_package() {
     );
     let export = exported(&web);
     assert_eq!(sides(&export), [side("jobs.build.steps[0]", SHARED)]);
-    // One provider of the name in the workspace is `inferred`, the range as written: a fork or
-    // a copy of a public package of that name may be what the workspace provides (ADR 0029).
     let reason = format!("{BY_NAME}; package::pypi::shared-lib >=1.0,<2 (local 1.2.0)");
     assert_eq!(
         links(&export),
@@ -118,8 +102,6 @@ fn an_install_by_name_makes_the_ci_step_a_consumer_of_the_package() {
     assert!(nodes.iter().any(|n| n["identity"] == step(0)), "{nodes:#?}");
 }
 
-/// The `(address, contract)` of the consumer rows a name gives, a CI step per entry of
-/// `steps` in the job `build`.
 fn named(case: &str, head: &str, steps: &[&str]) -> (Value, Vec<(String, String)>) {
     let (_, web) = pair(case);
     let text: String = steps.iter().map(|s| format!("- run: {s}\n")).collect();
@@ -149,7 +131,6 @@ fn each_install_command_of_the_table_reads_the_names_it_is_given() {
             "pipx install shared-tools",
             "uv tool install Shared.Tools",
             "pip install --upgrade shared-lib shared-tools 'shared-lib<1'",
-            // A package no repository of the workspace provides, as a manifest's entry.
             "pip install requests",
         ],
     );
@@ -166,8 +147,6 @@ fn each_install_command_of_the_table_reads_the_names_it_is_given() {
             at(6, TOOLS_PACKAGE),
         ]
     );
-    // Every link is `inferred` by the name alone, with the range as written and its flag; the
-    // first install of a name by a CI step gives the range.
     let said = |range: &str, flag: &str| format!("{BY_NAME}; {SHARED} {range} (local 1.2.0){flag}");
     let tools = |n: usize| {
         let reason = format!("{BY_NAME}; {TOOLS_PACKAGE} none (local 0.3.0), range unchecked");
@@ -216,12 +195,10 @@ fn an_argument_that_is_no_name_and_a_command_outside_the_table_give_no_side() {
             "pip install https://example.com/shared-lib.tar.gz",
             "pip install 'shared-lib @ https://example.com/shared-lib.whl'",
             "pip install git+https://example.com/pkg/pylib.git",
-            // 8: the value of an option is never a name, whatever it looks like.
             "pip install --index-url https://example.com/simple --no-binary shared-lib shared-tools",
             "pip install --target shared-lib -c shared-lib -U shared-tools",
             "pip install --find-links=shared-lib -- shared-tools",
             "pip install --no-binary shared-lib",
-            // 12: commands outside the table.
             "pip download shared-lib",
             "pip uninstall shared-lib",
             "pip --quiet install shared-lib",
@@ -231,7 +208,6 @@ fn an_argument_that_is_no_name_and_a_command_outside_the_table_give_no_side() {
             "echo pip install shared-lib",
         ],
     );
-    // In the export's order, by site.
     assert_eq!(
         rows,
         [
@@ -293,7 +269,6 @@ fn the_gate_decides_which_lines_of_a_script_are_commands() {
             at(2, TOOLS_PACKAGE),
             at(4, SHARED),
             at(4, TOOLS_PACKAGE),
-            // A comment inside an array hides its quote, and its `)` closes nothing.
             at(7, SHARED),
         ]
     );
@@ -319,13 +294,11 @@ fn a_script_is_read_under_bash_sh_or_no_declared_shell() {
     let lib = "shared-lib";
     let text = format!(
         "name: ci\non: push\ndefaults:\n  run:\n    shell: pwsh\njobs:\n{}{}{}",
-        // The pipeline's default is `pwsh`: only a CI step that declares its own is read.
         job(
             "inherits",
             "",
             &[("", lib), (&bash, lib), (&sh, lib), (&pwsh, lib)]
         ),
-        // The CI job's default wins over the pipeline's, and the CI step's over both.
         job(
             "declares",
             &defaults("bash"),
@@ -353,8 +326,6 @@ fn a_script_is_read_under_bash_sh_or_no_declared_shell() {
             "jobs.windows.steps[1]",
         ]
     );
-    // None declared anywhere is read too, also in a composite action, where the CI step
-    // declares its shell.
     write(&web, FILE, &pipeline("", "- run: pip install shared-lib"));
     let action = "name: setup\nruns:\n  using: composite\n  steps:\n    - run: pip install shared-lib\n      shell: bash\n    - run: pip install shared-lib\n      shell: pwsh\n";
     write(&web, "tools/setup/action.yml", action);
@@ -412,11 +383,9 @@ fn a_name_is_a_literal_a_pattern_or_left_open() {
     assert_eq!(
         sides(&export),
         [
-            // The nearest `env` that defines a name decides.
             side("jobs.build.steps[0]", SHARED),
             side("jobs.build.steps[0]", TOOLS_PACKAGE),
             side("jobs.build.steps[1]", SHARED),
-            // A name left open whole is one unresolved consumer of its CI step, as written.
             open(2, "${{ vars.PACKAGE }}"),
             open(3, "${{ secrets.PACKAGE }}, $UNKNOWN"),
             open(
@@ -424,11 +393,8 @@ fn a_name_is_a_literal_a_pattern_or_left_open() {
                 "$(cat name), `cat name`, ${{ matrix.package }}, ${{ github.event.inputs.package }}"
             ),
             open(5, "$SPACED, $DYNAMIC, ${PKG:-shared-lib}"),
-            // An open part of a name makes it a pattern.
             pattern(6, "shared-*"),
             pattern(7, "*-lib"),
-            // No side: a pattern that fits no package or leaves too little of a name, a path,
-            // the value of an option, a command left open.
             side("jobs.build.steps[9]", SHARED),
         ]
     );
@@ -477,8 +443,6 @@ fn a_name_is_a_literal_a_pattern_or_left_open() {
 fn a_name_a_script_of_the_file_rebinds_keeps_no_literal() {
     let (_, web) = pair("ci_run_rebound");
     let head = "env:\n  PKG: shared-lib\n  TOOL: shared-tools\n";
-    // A name written to `GITHUB_ENV` reaches the CI steps after it; one a script assigns for
-    // itself stays in that script.
     let steps = "\
 - run: echo \"PKG=shared-tools\" >> \"$GITHUB_ENV\"
 - run: pip install $PKG ${{ env.PKG }} $TOOL
@@ -515,8 +479,6 @@ fn the_environment_file_named_by_an_expression_rebinds_a_name_too() {
     );
 }
 
-/// A line that names the environment file and is no `echo` of `NAME=` may write a name the
-/// script does not show: no literal `env` of the file gives one then.
 #[test]
 fn a_write_to_the_environment_file_that_shows_no_name_opens_every_literal() {
     let (_, web) = pair("ci_run_unseen");
@@ -535,7 +497,6 @@ fn a_write_to_the_environment_file_that_shows_no_name_opens_every_literal() {
         write(&web, FILE, &pipeline(head, &steps));
         assert_eq!(sides(&exported(&web)), open, "{line}");
     }
-    // A line that shows its name leaves the other names their literal.
     let steps = "- run: echo \"OTHER=x\" >> $GITHUB_ENV\n- run: pip install $PKG\n";
     write(&web, FILE, &pipeline(head, steps));
     let named = [(
@@ -546,8 +507,6 @@ fn a_write_to_the_environment_file_that_shows_no_name_opens_every_literal() {
     assert_eq!(sides(&exported(&web)), named);
 }
 
-/// A merge key is not expanded, so an `env` that holds one may define any name: the literal of
-/// an `env` above it is not the value.
 #[test]
 fn an_env_that_merges_another_map_in_gives_no_literal_of_the_ones_above() {
     let (_, web) = pair("ci_run_merge");
@@ -564,7 +523,6 @@ fn an_env_that_merges_another_map_in_gives_no_literal_of_the_ones_above() {
         write(&web, FILE, &pipeline(head, &steps));
         assert_eq!(sides(&exported(&web)), open, "{merge}");
     }
-    // An alias is the map itself, and the nearest `env` that defines the name decides.
     let alias = format!("{anchor}{install}  env: *tools\n");
     write(&web, FILE, &pipeline(head, &alias));
     let tools = side("jobs.build.steps[1]", "package::pypi::shared-tools");
@@ -575,13 +533,10 @@ fn an_env_that_merges_another_map_in_gives_no_literal_of_the_ones_above() {
 fn a_literal_name_is_the_package_whatever_its_range_or_extra_holds() {
     let head = "env:\n  A: shared-lib\n  B: shared-tools\n";
     let steps = [
-        // Two short variables: the literals are longer than the script.
         "pip install $A $B",
         "pip install shared-lib==${{ matrix.v }}",
         "pip install \"shared-lib>=$MIN\" shared-tools[${{ matrix.extra }}]",
-        // No name at all: a path under the home directory, a lone extra or range.
         "pip install ~/wheels/$WHEEL ~/$PKG \"[dev]$X\" ==$V =$X !$X",
-        // An open part right after the extras is the range.
         "pip install shared-lib[fast]$X \"shared-tools[${{ matrix.extra }}]${{ matrix.spec }}\"",
     ];
     let (export, rows) = named("ci_run_ranges", head, &steps);
@@ -597,7 +552,6 @@ fn a_literal_name_is_the_package_whatever_its_range_or_extra_holds() {
             at(4, TOOLS_PACKAGE),
         ]
     );
-    // No pattern and no unresolved consumer among them.
     let rows = sides(&export);
     assert!(
         rows.iter().all(|r| r.1.is_some() && r.2.is_none()),
@@ -667,7 +621,6 @@ fn a_script_past_the_value_length_ceiling_is_not_read() {
         let filler = "    echo 0123456789012345678901234567890123456789\n".repeat(lines);
         format!("- run: |\n{filler}    pip install shared-lib\n")
     };
-    // 20 lines of 46 bytes and the install stay under 1024 bytes; 22 go past it.
     write(&web, FILE, &pipeline("", &(script(20) + &script(22))));
     assert_eq!(
         sides(&exported(&web)),
@@ -680,14 +633,12 @@ fn the_answers_show_a_ci_step_that_installs_a_package() {
     let (lib, web) = pair("ci_run_answers");
     let steps = "- run: pip install 'shared-lib>=1.0'\n- run: pip install ${{ vars.PACKAGE }}\n";
     write(&web, FILE, &pipeline("", steps));
-    // In the package's own repository, the kind's rule for a name with no source holds.
     write(&lib, FILE, &pipeline("", "- run: pip install shared-lib"));
     let engine = Engine::open(&web).unwrap();
     let listed = |answer: &str, start: &str| -> Vec<String> {
         let lines = answer.lines().filter_map(|l| l.strip_prefix(start));
         lines.map(str::to_string).collect()
     };
-    // `context` on the package lists the CI step among its consumers.
     let package = engine.context(SHARED, None).unwrap();
     let steps: Vec<&str> = (package.lines()).filter(|l| l.contains(FILE)).collect();
     assert_eq!(
@@ -698,7 +649,6 @@ fn the_answers_show_a_ci_step_that_installs_a_package() {
         ],
         "{package}"
     );
-    // `context` on the CI step shows the side, its provider, the level and the reason.
     let step = engine.context(&step(0), None).unwrap();
     assert_eq!(listed(&step, "consumes "), [SHARED], "{step}");
     assert_eq!(
@@ -722,11 +672,9 @@ fn the_answers_show_a_ci_step_that_installs_a_package() {
         ],
         "{own}"
     );
-    // A dependent calls on its package: nothing is upstream of the CI step through the link.
     let up = engine.trace(Start::From(&self::step(0)), Direction::Up, None);
     let up = up.unwrap();
     assert!(!up.contains("pyproject.toml"), "{up}");
-    // A name left open is an open item no decision closes: it says why.
     let cause = "the package name is not a literal, and static evaluation does not give it";
     let open = engine.context(&self::step(1), None).unwrap();
     assert_eq!(

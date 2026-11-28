@@ -59,7 +59,6 @@ pub struct HelmEnv {
     pub key: String,
 }
 
-/// A path of keys written `a.b`: no segment empty or holding `*`.
 fn dotted_key<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
     let key = String::deserialize(d)?;
     match key.split('.').any(|s| s.is_empty() || s.contains('*')) {
@@ -95,14 +94,12 @@ impl ChannelClient {
     }
 }
 
-/// `<import path>.<Name>`: the path holds a `/`, the name none and is not empty.
 fn external_call(call: &str) -> Option<(&str, &str)> {
     let (path, name) = call.rsplit_once('.')?;
     (path.contains('/') && !name.is_empty() && !name.contains('/') && !call.contains("::"))
         .then_some((path, name))
 }
 
-/// A `call` in one of its two forms; a bare `Type.method` names no package and is refused.
 fn client_call<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
     let call = String::deserialize(d)?;
     let defined = call
@@ -172,7 +169,6 @@ impl<'de> Deserialize<'de> for TopicAt {
     }
 }
 
-/// One or more variable names.
 fn variables<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
     let names = Vec::<String>::deserialize(d)?;
     match names.is_empty() || names.iter().any(String::is_empty) {
@@ -181,9 +177,6 @@ fn variables<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
     }
 }
 
-/// A directory of the repository written as `a/b`: one trailing `/` is dropped; empty, `.`,
-/// `..` or empty segments, a leading `/` and `\` are refused (`.` alone would be the whole
-/// repository, which `[serve]` covers).
 fn repo_dir<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
     let written = String::deserialize(d)?;
     let dir = written.strip_suffix('/').unwrap_or(&written);
@@ -242,8 +235,6 @@ pub fn gateway_path(
     (!reasons.is_empty() && path != code_path).then(|| (path, reasons.join(", ")))
 }
 
-/// Repository-relative paths: none may be absolute or climb out with `..`. `.` segments and
-/// doubled `/` are dropped.
 fn repo_paths<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
     let mut paths = Vec::new();
     for path in Vec::<String>::deserialize(d)? {
@@ -262,8 +253,6 @@ fn repo_paths<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> 
     Ok(paths)
 }
 
-/// A `[serve]` rewrite: it must start with `/`, and is normalized like a path with its
-/// trailing `/` dropped; `/` alone is no rewrite.
 fn gateway_key<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
     let Some(value) = Option::<String>::deserialize(d)? else {
         return Ok(None);
@@ -314,7 +303,6 @@ impl Role {
     }
 }
 
-/// Lowercase ASCII letters, digits and hyphens, starting with a letter.
 fn kind<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
     let kind = String::deserialize(d)?;
     let mut chars = kind.chars();
@@ -357,7 +345,6 @@ pub fn owner_problem(name: &str) -> Option<Msg<'static>> {
     }
 }
 
-/// One string that `owner_problem` accepts; an array or a number is not an owner.
 fn owner<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
     let toml::Value::String(name) = toml::Value::deserialize(d)? else {
         return Err(D::Error::custom(Msg::OwnerNotString.text()));
@@ -389,7 +376,6 @@ pub fn added_by_problem(login: &str) -> Option<Msg<'static>> {
     }
 }
 
-/// One string that `added_by_problem` accepts; an array or a number is not a login.
 fn added_by<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
     let toml::Value::String(login) = toml::Value::deserialize(d)? else {
         return Err(D::Error::custom(Msg::AddedByNotString.text()));
@@ -413,7 +399,6 @@ pub fn is_time(text: &str) -> bool {
         })
 }
 
-/// One string that `is_time` accepts; a TOML date-time is not one.
 fn added_by_time<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
     match toml::Value::deserialize(d)? {
         toml::Value::String(time) if is_time(&time) => Ok(Some(time)),
@@ -512,8 +497,6 @@ pub fn entry_problems<'a>(repos: impl IntoIterator<Item = &'a str>) -> Vec<Optio
         .collect()
 }
 
-/// A named workspace's `[[repository]]` (ADR 0021): the blocks of an entry and nothing the platform
-/// owns, so no `path`, `owner`, `added_by` or `added_by_time`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct NamedEntry {
@@ -526,7 +509,6 @@ struct NamedEntry {
     peers: Vec<EntryPeer>,
 }
 
-/// The text of a named workspace: its `[[repository]]` entries and nothing else.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct NamedEntries {
@@ -534,7 +516,6 @@ struct NamedEntries {
     repositories: Vec<NamedEntry>,
 }
 
-/// The keys a named workspace's entry may not set (ADR 0021), as dotted keys of the text.
 const NAMED_RESERVED: [&str; 5] = [
     "repository.path",
     "repository.owner",
@@ -620,7 +601,6 @@ pub fn validate_named(
     checked(entries)
 }
 
-/// The text of a workspace: its `[[repository]]` entries and nothing else.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Entries {
@@ -628,8 +608,6 @@ struct Entries {
     repositories: Vec<EntryFile>,
 }
 
-/// The `[[repository]]` entries of a whole manifest's text, every other key left unread: what
-/// `meada workspace import` takes from a file.
 #[derive(Deserialize)]
 struct Imported {
     #[serde(default, rename = "repository")]
@@ -668,7 +646,6 @@ pub fn validate_import(file: &str, src: &str) -> Result<Vec<EntryFile>, Vec<Stri
     })
 }
 
-/// `entries`, or each one's `<repo>: <problem>` that its identity decides.
 fn checked(entries: Vec<EntryFile>) -> Result<Vec<EntryFile>, Vec<String>> {
     let problems = entry_problems(entries.iter().map(|e| e.repo.as_str()));
     let problems: Vec<String> = (entries.iter().zip(problems))
@@ -712,15 +689,12 @@ pub fn error_at(file: &str, src: &str, key: &str, message: &str) -> String {
     format!("{file}:{}: `{key}`: {message}", line_of(src, at))
 }
 
-/// The error message with the dotted key it is about.
 fn describe(src: &str, at: usize, message: &str, file: &str) -> String {
-    // A syntax error leaves no table to find the key in.
     let Ok(table) = DeTable::parse(src) else {
         return message.to_string();
     };
     let mut keys = Vec::new();
     flatten(table.get_ref(), "", &mut keys);
-    // Parents come before their children, so the last key around `at` is the innermost.
     let around = keys
         .iter()
         .rfind(|(_, key, value)| key.contains(&at) || value.contains(&at))
@@ -734,9 +708,6 @@ fn describe(src: &str, at: usize, message: &str, file: &str) -> String {
             Msg::KeyMissing(&qualify(parent.unwrap_or(""), field)).text()
         }
         (Some(_), Some(key)) => Msg::KeyUnknown { key, file }.text(),
-        // Serde quotes the written value in `invalid type`, `invalid value` and `unknown
-        // variant`; a secret pasted under the wrong key must not reach a log. Meada's own rule
-        // errors name the key and the rule only, so what reaches the fallback quotes nothing.
         (_, Some(key)) if message.starts_with("invalid type") => Msg::WrongType {
             key,
             expected: expected_kind(message),
@@ -753,8 +724,6 @@ fn describe(src: &str, at: usize, message: &str, file: &str) -> String {
     }
 }
 
-/// The variants serde's `unknown variant` message lists after `, expected `: the schema's own
-/// names, never the written value (which comes first, and may itself hold a backtick).
 fn accepted_variants(message: &str) -> Vec<&str> {
     let Some((_, expected)) = message.rsplit_once(", expected ") else {
         return Vec::new();
@@ -762,7 +731,6 @@ fn accepted_variants(message: &str) -> Vec<&str> {
     expected.split('`').skip(1).step_by(2).collect()
 }
 
-/// The kind of value serde's `invalid type` message expected, in words that carry no value.
 fn expected_kind(message: &str) -> Kind {
     let expected = message.rsplit_once(", expected ").map_or("", |(_, e)| e);
     let number = |prefix: char| {
@@ -782,8 +750,6 @@ fn expected_kind(message: &str) -> Kind {
     }
 }
 
-/// Every key of `table` with its dotted name, key span and value span; a table's keys follow
-/// the table itself.
 fn flatten(table: &DeTable, prefix: &str, out: &mut Vec<(String, Range<usize>, Range<usize>)>) {
     for (key, value) in table.iter() {
         let name = qualify(prefix, key.get_ref());

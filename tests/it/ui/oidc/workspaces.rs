@@ -1,20 +1,3 @@
-//! Named workspaces from creation to query (#342, ADR 0020 and 0021), as public processes: the
-//! console (`meada ui`) creates and shows workspaces for callers of the shared Y/A/B table
-//! (`tests/fixtures/named-workspaces.json`) over the loopback issuer, the fake GitHub API, the
-//! local Valkey, Postgres and S3-compatible store; the job (`workspace pull`, `github-app roles`,
-//! `index`, `snapshot publish`) makes the selected repositories queryable once; and a node serves
-//! `/-/workspaces/<id>/<identity>` to the same callers. What a caller may do is seen through
-//! statuses and answers, never the module's tables. Without a service the tests print why and
-//! skip; with `MEADA_TEST_SERVICES_REQUIRED=1` they fail.
-//!
-//! The tests named `local_accounts_*` run the same bodies with local accounts (#562, ADR 0024):
-//! no `[oidc]`, `[accounts]` with `[accounts.github]` in place of `[oidc.github]`, and the table's
-//! callers recreated through the console (`Case::local`): the default account creates each as
-//! an account (the platform administrator an operator, the claims caller in a group
-//! `[accounts.groups]` maps to its claims grant), each signs in and verifies its login with a
-//! personal access token the fake GitHub knows, and its node and proposal server tokens are agent
-//! tokens the console issues. Subjects are then `local:<name>` (`Case::subject`).
-
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -40,33 +23,22 @@ use crate::ui::{Reply, send, send_body};
 
 const HOST: &str = "github.com";
 const EN: &str = "en_US.UTF-8";
-/// The audience of the node's tokens.
 const NODE: &str = "https://meada.example";
 const INSTALLATION: u64 = 15;
 const NODE_MANIFEST: &str = "node/meada.workspace.toml";
-/// The SCIM token of the console of a case that has a `[directory]`.
 const SCIM_TOKEN: &str = "scim-334-token-0123456789abcdefghijklmno";
-/// With local accounts: the variable naming the default account's initial password, the
-/// password itself (chosen, so no change is required), and every caller's password.
 const ADMIN_ENV: &str = "MEADA_TEST_ADMIN_PASSWORD_562";
 const ADMIN_PASSWORD: &str = "the deployer chose this one";
 const CALLER_PASSWORD: &str = "a named workspaces passphrase";
-/// With local accounts: the surfaces of a caller's tokens, as `POST account/tokens` names them.
 const CONSOLE_SURFACE: &str = "console";
 const NODES_SURFACE: &str = "nodes";
 
-/// How the case's callers are admitted.
 #[derive(Clone, Copy, PartialEq)]
 enum Mode {
-    /// The loopback issuer's tokens, `[oidc.github]` granting from their login claim.
     Oidc,
-    /// Local accounts (#562): the console's own tokens, `[accounts.github]` granting from each
-    /// account's verified login.
     Local,
 }
 
-/// With local accounts, the personal access token of the table's caller `name` at the fake
-/// GitHub.
 fn pat(name: &str) -> String {
     format!("ghp_{name}_562_0123456789abcdef")
 }
@@ -75,7 +47,6 @@ fn table() -> Value {
     serde_json::from_str(include_str!("../../../fixtures/named-workspaces.json")).unwrap()
 }
 
-/// The fixture each table repository's mirror is a copy of.
 const FIXTURES: [(&str, &str); 3] = [
     ("Y", "chain-web"),
     ("A", "chain-gateway"),
@@ -92,7 +63,6 @@ struct Case {
     table: Value,
     name: String,
     mode: Mode,
-    /// With local accounts, the tokens the console gave each caller, by caller and surface.
     tokens: Mutex<HashMap<(String, &'static str), String>>,
 }
 
@@ -101,15 +71,11 @@ impl Case {
         Self::start(name, false)
     }
 
-    /// The case with local accounts (#562), every caller of the table recreated through the
-    /// console.
     #[cfg_attr(not(feature = "accounts"), expect(dead_code))]
     fn local(name: &str) -> Option<Self> {
         Self::local_with(name, "")
     }
 
-    /// `local`, `tail` appended to the console's manifest before it starts (a `[proposals]` the
-    /// console must read to issue agent tokens for the proposal server).
     #[cfg_attr(not(feature = "accounts"), expect(dead_code))]
     fn local_with(name: &str, tail: &str) -> Option<Self> {
         let case = Self::with(name, Mode::Local, false, 3600, tail)?;
@@ -122,19 +88,14 @@ impl Case {
         Some(case)
     }
 
-    /// The case, with the SCIM `[directory]` in the console's manifest when `directory`.
     fn start(name: &str, directory: bool) -> Option<Self> {
         Self::aged(name, directory, 3600)
     }
 
-    /// `start`, a permissions set granting for `max_age` seconds.
     fn aged(name: &str, directory: bool, max_age: u64) -> Option<Self> {
         Self::with(name, Mode::Oidc, directory, max_age, "")
     }
 
-    /// The case in `mode`: `aged`'s, with local accounts in place of the issuer under
-    /// `Mode::Local` (never with a `[directory]`, an identity provider's), `tail` appended to the
-    /// console's manifest.
     fn with(name: &str, mode: Mode, directory: bool, max_age: u64, tail: &str) -> Option<Self> {
         let github = Github::new(name)?;
         let endpoint = service()?;
@@ -145,8 +106,6 @@ impl Case {
         let table = table();
         let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
         let _ = fs::remove_dir_all(&dir);
-        // The fake GitHub: the table's repositories, their collaborators, and `acme/c` nobody
-        // collaborates on.
         let mut covered = vec!["acme/c".to_string()];
         for (short, identity) in table["identities"].as_object().unwrap() {
             let repo = identity
@@ -171,7 +130,6 @@ impl Case {
         github.list("acme/c", &[]);
         github.api.install(1, INSTALLATION, "acme");
         github.api.with(|s| s.covered.insert(INSTALLATION, covered));
-        // The personal access token of each caller with a login (local accounts).
         for (caller, row) in table["callers"].as_object().unwrap() {
             if let Some(login) = row["login"].as_str() {
                 github
@@ -179,7 +137,6 @@ impl Case {
                     .with(|s| s.users.insert(pat(caller), login.to_string()));
             }
         }
-        // The console's and the job's manifest: one file, as an operator's bootstrap is.
         let roles = "[\"write\", \"maintain\", \"admin\"]";
         let admission = match mode {
             Mode::Oidc => format!(
@@ -219,14 +176,12 @@ impl Case {
         let made = console_dir(name, Some(VERSION), &head, &ui);
         assert_eq!(made, dir);
         fs::write(dir.join("ops/s3-secret"), format!("{SECRET}\n")).unwrap();
-        // The signing key pair of local accounts, beside the console's manifest.
         #[cfg(feature = "accounts")]
         if mode == Mode::Local {
             let (private, public) = crate::ui::accounts::pair();
             fs::write(dir.join("ops/private.pem"), private).unwrap();
             fs::write(dir.join("ops/public.pem"), &public).unwrap();
         }
-        // The mirrors the table's repositories are cloned at, provisioned by the operator.
         for (short, fixture) in FIXTURES {
             let identity = table["identities"][short].as_str().unwrap();
             let origin = format!("https://{identity}.git");
@@ -261,8 +216,6 @@ impl Case {
         })
     }
 
-    /// The subject the console records for the table's caller `name`: its own under the
-    /// issuer, `local:<name>` with local accounts.
     fn subject(&self, name: &str) -> String {
         match self.mode {
             Mode::Oidc => name.to_string(),
@@ -270,8 +223,6 @@ impl Case {
         }
     }
 
-    /// With local accounts, the token of `name` for `surface`, once: a session token for the
-    /// console (`local_session`), else the agent token the console issues to that session.
     fn local_token(&self, name: &str, surface: &'static str) -> String {
         let key = (name.to_string(), surface);
         if let Some(token) = self.tokens.lock().unwrap().get(&key) {
@@ -292,11 +243,6 @@ impl Case {
         token
     }
 
-    /// With local accounts, a session token of the table's caller `name`, recreated through the
-    /// console: the default account creates the account (an operator for the platform
-    /// administrator, a viewer in the group `claims` for a caller with a claims grant, a viewer
-    /// otherwise), the account signs in and, when the caller has a login, verifies it with its
-    /// personal access token; the token that verification answers carries the login.
     fn local_session(&self, name: &str) -> String {
         let sign_in = |username: &str, password: &str| {
             let body = json!({"username": username, "password": password}).to_string();
@@ -341,7 +287,6 @@ impl Case {
         verified.json()["token"].as_str().unwrap().to_string()
     }
 
-    /// `meada <args>` in the case's directory as the job runs it.
     fn job(&self, args: &[&str]) -> (String, String, i32) {
         let env = [
             ("MEADA_PERMISSIONS_POLL_MS", POLL_MS),
@@ -360,7 +305,6 @@ impl Case {
         self.job_ok(&["github-app", "roles", "--workspace", MANIFEST])
     }
 
-    /// The pull that reads the contexts and then the role check, as a refresh runs them.
     fn refresh(&self) -> String {
         self.job_ok(&["workspace", "pull", "--workspace", MANIFEST]);
         self.roles()
@@ -373,7 +317,6 @@ impl Case {
             .to_string()
     }
 
-    /// A console token of the table's caller `name`.
     fn token(&self, name: &str) -> String {
         match self.mode {
             Mode::Oidc => self.token_for(name, PUBLIC),
@@ -381,7 +324,6 @@ impl Case {
         }
     }
 
-    /// A token of the table's caller `name` for `audience`, with the console token's claims.
     fn token_for(&self, name: &str, audience: &str) -> String {
         let caller = &self.table["callers"][name];
         let mut claims = claims(&self.issuer.base, &[]);
@@ -413,7 +355,6 @@ impl Case {
         send_body(&self.console, "POST", path, &headers, &body.to_string())
     }
 
-    /// Waits until the console has read a permissions set (the catalog stops being `no_set`).
     fn ready(&self) {
         let token = self.token("root");
         let start = Instant::now();
@@ -427,13 +368,11 @@ impl Case {
         }
     }
 
-    /// The manifest text selecting the table's `shorts`.
     fn entries(&self, shorts: &[&str]) -> String {
         let one = |s: &&str| format!("[[repository]]\nrepo = \"{}\"\n", self.identity(s));
         shorts.iter().map(one).collect::<Vec<_>>().join("\n")
     }
 
-    /// `POST /api/v1/workspaces` by `caller` selecting `shorts`.
     fn create(&self, caller: &str, name: &str, shorts: &[&str]) -> Reply {
         let body = json!({
             "name": name, "description": "", "entries": self.entries(shorts), "message": "first",
@@ -441,7 +380,6 @@ impl Case {
         self.post("/api/v1/workspaces", &self.token(caller), &body)
     }
 
-    /// The ids of the workspaces `caller` lists, sorted.
     fn listed(&self, caller: &str) -> Vec<String> {
         let reply = self.get("/api/v1/workspaces", &self.token(caller));
         assert_eq!(reply.status, 200, "{}", reply.body);
@@ -452,9 +390,6 @@ impl Case {
         ids
     }
 
-    /// The node's manifest and its serving process, over this case's store and Valkey. With
-    /// local accounts it admits the console's agent tokens for the nodes: the console's `[ui]
-    /// public_url` and `[accounts]` over the public half alone.
     fn node(&self) -> (Server, String) {
         let node = self.dir.join("node");
         fs::create_dir_all(&node).unwrap();
@@ -508,8 +443,6 @@ impl Case {
         )
     }
 
-    /// A node token of the table's caller `name`: its login claim, no claims grant; with local
-    /// accounts, the agent token for the nodes the console issues it.
     fn node_token(&self, name: &str) -> String {
         if self.mode == Mode::Local {
             return self.local_token(name, NODES_SURFACE);
@@ -526,11 +459,6 @@ impl Case {
     }
 }
 
-/// `[accounts]` over the key files beside the manifest (`keys`: the private half's line, and the
-/// initial password's on the console), `[accounts.groups]` mapping `claims` to the claims grant of
-/// the table's `claims` caller,
-/// `[accounts.github]` on the table's host over the fake GitHub's API (`max_age` seconds) and
-/// `[postgres]`, as `Github::sections` gives `[oidc.github]` its own.
 fn accounts_sections(github: &Github, table: &Value, keys: &str, max_age: u64) -> String {
     let granted: Vec<String> = (table["callers"]["claims"]["claims_grant"]
         .as_array()
@@ -556,7 +484,6 @@ fn accounts_sections(github: &Github, table: &Value, keys: &str, max_age: u64) -
     )
 }
 
-/// What a node answers a `search` call at `path` for `token`: the status and the body.
 fn node_call(node: &Server, path: &str, token: &str, query: &str) -> (u16, String) {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .http_status_as_error(false)
@@ -577,8 +504,6 @@ fn node_call(node: &Server, path: &str, token: &str, query: &str) -> (u16, Strin
     (status, answer.body_mut().read_to_string().unwrap())
 }
 
-/// Waits until the node's permissions set is the one the job wrote: `token` reads the workspace
-/// route of `id` (200) or not.
 fn until_status(node: &Server, path: &str, token: &str, status: u16) -> String {
     let start = Instant::now();
     loop {
@@ -591,11 +516,6 @@ fn until_status(node: &Server, path: &str, token: &str, status: u16) -> String {
     }
 }
 
-/// The creation rows of the table, as the console answers them: an A-only caller creates Y+A and
-/// is refused Y+B (the refusal counts what its grant does not read and names nothing of B), a
-/// B-only caller the reverse, a caller in both groups the union; a direct role is the same as a
-/// group's; a claims grant or a token without a login creates nothing; the platform
-/// administrator selects the whole catalog. A caller-supplied actor or role is an unknown key.
 #[test]
 fn creation_follows_the_shared_table_and_trusts_no_asserted_identity() {
     if let Some(case) = Case::new("ws_create_table") {
@@ -603,9 +523,6 @@ fn creation_follows_the_shared_table_and_trusts_no_asserted_identity() {
     }
 }
 
-/// `creation_follows_the_shared_table_and_trusts_no_asserted_identity` with local accounts (#562):
-/// eligibility reads the verified login, the claims caller's group grant creates nothing and an
-/// account without a verified login is pending, as under an identity provider.
 #[cfg(feature = "accounts")]
 #[test]
 fn local_accounts_creation_follows_the_shared_table_and_trusts_no_asserted_identity() {
@@ -614,10 +531,7 @@ fn local_accounts_creation_follows_the_shared_table_and_trusts_no_asserted_ident
     }
 }
 
-/// The body of `creation_follows_the_shared_table_and_trusts_no_asserted_identity` and
-/// `local_accounts_creation_follows_the_shared_table_and_trusts_no_asserted_identity`, over `case`.
 fn creation_follows_the_shared_table_and_trusts_no_asserted_identity_as(case: Case) {
-    // Before any set: pending, for everyone, nothing stored.
     let early = case.create("alice", "early", &["Y"]);
     assert_eq!(
         (early.status, early.json()["error"]["reason"].clone()),
@@ -626,8 +540,6 @@ fn creation_follows_the_shared_table_and_trusts_no_asserted_identity_as(case: Ca
     case.refresh();
     case.ready();
     let (y, a, b) = (case.identity("Y"), case.identity("A"), case.identity("B"));
-    // The catalog and its check, as each caller may select: alice's login holds Y and A, the
-    // platform administrator selects the whole catalog, `acme/c` included.
     let identities = |reply: &Reply| -> Vec<String> {
         assert_eq!(reply.status, 200, "{}", reply.body);
         (reply.json()["repositories"].as_array().unwrap().iter())
@@ -690,11 +602,9 @@ fn creation_follows_the_shared_table_and_trusts_no_asserted_identity_as(case: Ca
             }
         }
     }
-    // A refusal that hides B says nothing of B.
     let refused = case.create("alice", "ya yb", &["Y", "B"]);
     assert_eq!(refused.status, 403);
     assert!(!refused.body.contains(&b), "{}", refused.body);
-    // A body past the bound is refused unread.
     let huge =
         json!({"name": "big", "entries": case.entries(&["Y"]), "message": "m".repeat(90 << 10)});
     assert_eq!(
@@ -702,7 +612,6 @@ fn creation_follows_the_shared_table_and_trusts_no_asserted_identity_as(case: Ca
             .status,
         413
     );
-    // A claims grant creates nothing; neither does a token without a login.
     for caller in ["claims", "nologin"] {
         let reply = case.create(caller, "none", &["Y"]);
         assert!(
@@ -715,14 +624,12 @@ fn creation_follows_the_shared_table_and_trusts_no_asserted_identity_as(case: Ca
         case.create("nologin", "none", &["Y"]).json()["error"]["reason"],
         "missing_login"
     );
-    // The administrator selects what the catalog holds, and `acme/c` nobody collaborates on.
     let all = case.post(
         "/api/v1/workspaces",
         &case.token("root"),
         &json!({"name": "everything", "entries": case.entries(&["Y", "A", "B"]), "message": "m"}),
     );
     assert_eq!(all.status, 201, "{}", all.body);
-    // Identity, role and grant come from the token: asserted ones are unknown keys.
     for forged in [
         json!({"actor": "root"}),
         json!({"role": "operator"}),
@@ -736,7 +643,6 @@ fn creation_follows_the_shared_table_and_trusts_no_asserted_identity_as(case: Ca
         let reply = case.post("/api/v1/workspaces", &case.token("alice"), &body);
         assert_eq!(reply.status, 400, "{}", reply.body);
     }
-    // A manifest naming what a named entry does not hold is an invalid entry, not a refusal.
     let invalid = case.post(
         "/api/v1/workspaces",
         &case.token("alice"),
@@ -746,17 +652,12 @@ fn creation_follows_the_shared_table_and_trusts_no_asserted_identity_as(case: Ca
         (invalid.status, invalid.json()["error"]["code"].clone()),
         (422, json!("invalid_entries"))
     );
-    // The same creator, name and entries are the same workspace.
     let again = case.create("alice", "alice Y+A", &["Y", "A"]);
     assert_eq!(again.status, 200, "{}", again.body);
     assert_eq!(again.json()["created"], false);
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// Group peers inherit viewer access through their own grants, and only the creator and the
-/// administrator operate: a workspace of Y+A is listed and shown to everyone whose grant reads
-/// both, never to a caller who reads only Y or only Y and B, which get the one 404 of an id that
-/// does not exist; the answers carry no operator list or editing control for a peer.
 #[test]
 fn peers_view_a_workspace_through_their_own_grants_and_operate_nothing() {
     if let Some(case) = Case::new("ws_peers") {
@@ -764,9 +665,6 @@ fn peers_view_a_workspace_through_their_own_grants_and_operate_nothing() {
     }
 }
 
-/// `peers_view_a_workspace_through_their_own_grants_and_operate_nothing` with local accounts
-/// (#562): the same listings, views and refusals, the local operator being the platform
-/// administrator.
 #[cfg(feature = "accounts")]
 #[test]
 fn local_accounts_peers_view_a_workspace_through_their_own_grants_and_operate_nothing() {
@@ -775,9 +673,6 @@ fn local_accounts_peers_view_a_workspace_through_their_own_grants_and_operate_no
     }
 }
 
-/// The body of `peers_view_a_workspace_through_their_own_grants_and_operate_nothing` and
-/// `local_accounts_peers_view_a_workspace_through_their_own_grants_and_operate_nothing`, over
-/// `case`.
 fn peers_view_a_workspace_through_their_own_grants_and_operate_nothing_as(case: Case) {
     case.refresh();
     case.ready();
@@ -785,7 +680,6 @@ fn peers_view_a_workspace_through_their_own_grants_and_operate_nothing_as(case: 
     let ya = id_of(&case.create("alice", "Y and A", &["Y", "A"]));
     let yb = id_of(&case.create("bob", "Y and B", &["Y", "B"]));
     let yab = id_of(&case.create("carol", "all", &["Y", "A", "B"]));
-    // Everyone sees what their grants read whole: dave (direct roles) and erin (maintain) as alice.
     assert_eq!(case.listed("alice"), vec![ya.clone()]);
     assert_eq!(case.listed("dave"), vec![ya.clone()]);
     assert_eq!(case.listed("erin"), vec![ya.clone()]);
@@ -794,10 +688,7 @@ fn peers_view_a_workspace_through_their_own_grants_and_operate_nothing_as(case: 
     every.sort();
     assert_eq!(case.listed("carol"), every);
     assert_eq!(case.listed("root"), every);
-    // Reading only Y (or reading by claims alone, which lists but never creates) lists nothing
-    // that holds more.
     assert!(case.listed("yoda").is_empty());
-    // The creator operates; a peer does not.
     let shown = case
         .get(&format!("/api/v1/workspaces/{ya}"), &case.token("alice"))
         .json();
@@ -821,7 +712,6 @@ fn peers_view_a_workspace_through_their_own_grants_and_operate_nothing_as(case: 
         peer.get("operators").is_none() && peer.get("hidden").is_none(),
         "{peer}"
     );
-    // A caller who cannot read the whole workspace gets the answer of an unknown id.
     let unknown = case.get("/api/v1/workspaces/0123456789abcdef", &case.token("bob"));
     for hidden in [ya.as_str(), yab.as_str()] {
         let denied = case.get(&format!("/api/v1/workspaces/{hidden}"), &case.token("bob"));
@@ -829,7 +719,6 @@ fn peers_view_a_workspace_through_their_own_grants_and_operate_nothing_as(case: 
     }
     let denied = case.get(&format!("/api/v1/workspaces/{yb}"), &case.token("yoda"));
     assert_eq!((denied.status, &denied.body), (404, &unknown.body));
-    // A cursor and a limit page the list; anything else is a fixed 400.
     let page = case
         .get("/api/v1/workspaces?limit=1", &case.token("root"))
         .json();
@@ -845,8 +734,6 @@ fn peers_view_a_workspace_through_their_own_grants_and_operate_nothing_as(case: 
         let reply = case.get(&format!("/api/v1/workspaces?{bad}"), &case.token("root"));
         assert_eq!(reply.status, 400, "{bad}");
     }
-    // The creator's workspace gives a peer no write: a viewer is refused as a non-operator, and
-    // a caller who cannot see the workspace gets the answer of an unknown id.
     let save = json!({"entries": case.entries(&["Y", "A"]), "message": "x", "base": 1});
     let write = case.post(
         &format!("/api/v1/workspaces/{ya}/versions"),
@@ -864,12 +751,6 @@ fn peers_view_a_workspace_through_their_own_grants_and_operate_nothing_as(case: 
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// The whole path: the creators select, the job pulls the contexts, checks sponsors, indexes each
-/// repository once and publishes one generation recording members and contexts, and a node
-/// serves each context to the callers whose grants read all of it. Y is indexed once for the
-/// three workspaces; a caller never reads another group's repository through Y or a link; the
-/// plain route serves the deployment workspace alone (empty here); pending ingestion shows as
-/// pending until the generation records it.
 #[test]
 fn a_created_workspace_becomes_queryable_for_group_peers_only() {
     if let Some(case) = Case::new("ws_query") {
@@ -877,9 +758,6 @@ fn a_created_workspace_becomes_queryable_for_group_peers_only() {
     }
 }
 
-/// `a_created_workspace_becomes_queryable_for_group_peers_only` with local accounts (#562): the
-/// job's ingestion membership and the node route answer agent tokens for the nodes as they answer
-/// the issuer's tokens.
 #[cfg(feature = "accounts")]
 #[test]
 fn local_accounts_a_created_workspace_becomes_queryable_for_group_peers_only() {
@@ -888,8 +766,6 @@ fn local_accounts_a_created_workspace_becomes_queryable_for_group_peers_only() {
     }
 }
 
-/// The body of `a_created_workspace_becomes_queryable_for_group_peers_only` and
-/// `local_accounts_a_created_workspace_becomes_queryable_for_group_peers_only`, over `case`.
 fn a_created_workspace_becomes_queryable_for_group_peers_only_as(case: Case) {
     case.refresh();
     case.ready();
@@ -899,7 +775,6 @@ fn a_created_workspace_becomes_queryable_for_group_peers_only_as(case: Case) {
     let yab = id_of(&case.create("carol", "all", &["Y", "A", "B"]));
     let (y, a, b) = (case.identity("Y"), case.identity("A"), case.identity("B"));
 
-    // The job: pull, role check, index, publish. The mirrors are the operator's.
     let pulled = case.job_ok(&["workspace", "pull", "--workspace", MANIFEST]);
     assert_eq!(pulled, "", "no deployment version, no id on stdout");
     let line = case.roles();
@@ -921,7 +796,6 @@ fn a_created_workspace_becomes_queryable_for_group_peers_only_as(case: Case) {
     let generation = case.job_ok(&["snapshot", "publish", "--workspace", MANIFEST]);
     let generation = generation.trim();
 
-    // The generation records Y once, as a member, and three contexts.
     let (node, pulled) = case.node();
     assert_eq!(pulled, generation);
     let document: Value = serde_json::from_slice(
@@ -947,7 +821,6 @@ fn a_created_workspace_becomes_queryable_for_group_peers_only_as(case: Case) {
             .all(|c| c.get("name").is_none() && c.get("operators").is_none())
     );
 
-    // Queries: group peers through their own grants, never another group's repository.
     let route = |id: &str, identity: &str| format!("/-/workspaces/{id}/{identity}");
     let matrix: [(&str, &str, &str, u16); 12] = [
         ("alice", &ya, &y, 200),
@@ -980,24 +853,18 @@ fn a_created_workspace_becomes_queryable_for_group_peers_only_as(case: Case) {
             );
         }
     }
-    // A peer of the creator has the same answers (dave holds Y and A directly).
     let dave = case.node_token("dave");
     until_status(&node, &route(&ya, &a), &dave, 200);
     until_status(&node, &route(&yb, &b), &dave, 404);
-    // A 404 lists only the workspaces the token may view; an unknown id is the same answer.
     let alice = case.node_token("alice");
     let (status, listing) = node_call(&node, &route(&yb, &y), &alice, "handle");
     assert_eq!((status, listing.trim()), (404, ya.as_str()));
     let (status, unknown) = node_call(&node, &route("0123456789abcdef", &y), &alice, "handle");
     assert_eq!((status, unknown), (404, listing));
-    // The plain route serves the deployment workspace, which has none of these.
     let (status, _) = node_call(&node, &format!("/{y}"), &alice, "handle");
     assert_eq!(status, 404);
-    // Nothing of B in an answer through Y and A.
     let (_, through) = node_call(&node, &route(&ya, &y), &alice, "handle");
     assert!(!through.contains(&b), "{through}");
-    // A pin reproduces the context as that generation recorded it, for the callers that read it
-    // today; a pin of a generation the node does not hold is a 404.
     let pinned = format!("{}@{generation}", route(&ya, &y));
     let (status, body) = node_call(&node, &pinned, &alice, "handle");
     assert_eq!(status, 200, "{body}");
@@ -1014,8 +881,6 @@ fn a_created_workspace_becomes_queryable_for_group_peers_only_as(case: Case) {
     );
     let bob = case.node_token("bob");
     assert_eq!(node_call(&node, &pinned, &bob, "handle").0, 404);
-    // A held generation with no such workspace for the caller names itself and the current one,
-    // and no workspace id.
     let (status, body) = node_call(
         &node,
         &format!("{}@{generation}", route(&yb, &y)),
@@ -1031,7 +896,6 @@ fn a_created_workspace_becomes_queryable_for_group_peers_only_as(case: Case) {
     let unheld = format!("{}@0123456789abcdef", route(&ya, &y));
     assert_eq!(node_call(&node, &unheld, &alice, "handle").0, 404);
     assert_eq!(node_call(&node, &unheld, &bob, "handle").0, 404);
-    // Reserved first segment: a hostile id that is no workspace is a plain 404.
     let (status, _) = node_call(
         &node,
         &format!("/-/workspaces/not-an-id/{y}"),
@@ -1040,8 +904,6 @@ fn a_created_workspace_becomes_queryable_for_group_peers_only_as(case: Case) {
     );
     assert_eq!(status, 404);
 
-    // Pending ingestion turns ready only when a generation records the context: the console
-    // pulls the generation it serves its own answers from.
     let pending = case
         .get(&format!("/api/v1/workspaces/{ya}"), &case.token("alice"))
         .json();
@@ -1059,7 +921,6 @@ fn a_created_workspace_becomes_queryable_for_group_peers_only_as(case: Case) {
             .iter()
             .all(|e| e["ingestion"] == "ready")
     );
-    // The console answers through a context under the same rule.
     let export = case.get(
         &format!(
             "/api/v1/workspaces/{ya}/repositories/{}/export",
@@ -1089,8 +950,6 @@ fn a_created_workspace_becomes_queryable_for_group_peers_only_as(case: Case) {
         &json!({"repository": y, "workspace": yb, "tool": "search", "arguments": {"query": "handle"}}),
     );
     assert_eq!(query.status, 404);
-    // A fetch or index failure of any member aborts the whole publication (#316): the pointer
-    // stays, and every workspace keeps answering from the last complete generation.
     let mirror = case.dir.join("mirrors").join(&b);
     fs::rename(&mirror, case.dir.join("b-away")).unwrap();
     let (_, stderr, code) = case.job(&["index", "--workspace", MANIFEST]);
@@ -1104,11 +963,6 @@ fn a_created_workspace_becomes_queryable_for_group_peers_only_as(case: Case) {
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// An entry no operator holds an accepted role on is a successful decision before the fetch, not
-/// a failed refresh: the administrator selects `acme/c` (in the catalog, nobody collaborates on
-/// it) and the role check excludes it from that workspace, so nothing is fetched or indexed for
-/// it, no mirror is needed, and the publication proceeds. Eligibility is read again from the
-/// newest set: losing the role excludes the entry at the next check.
 #[test]
 fn an_entry_without_a_sponsor_is_excluded_before_the_fetch_and_not_a_failure() {
     let Some(case) = Case::new("ws_sponsor") else {
@@ -1123,7 +977,6 @@ fn an_entry_without_a_sponsor_is_excluded_before_the_fetch_and_not_a_failure() {
     let created = case.post("/api/v1/workspaces", &case.token("root"), &body);
     assert_eq!(created.status, 201, "{}", created.body);
     let id = created.json()["id"].as_str().unwrap().to_string();
-    // The sponsor-ful workspace of alice shares nothing with it.
     let ya = case.create("alice", "ya", &["Y", "A"]).json()["id"]
         .as_str()
         .unwrap()
@@ -1155,7 +1008,6 @@ fn an_entry_without_a_sponsor_is_excluded_before_the_fetch_and_not_a_failure() {
         [ya.as_str()],
         "the orphan context records nothing"
     );
-    // The administrator sees the entry as excluded, in text, and not as ready.
     let shown = case
         .get(&format!("/api/v1/workspaces/{id}"), &case.token("root"))
         .json();
@@ -1164,11 +1016,6 @@ fn an_entry_without_a_sponsor_is_excluded_before_the_fetch_and_not_a_failure() {
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// One repository selected in two spellings (#508, option (a)): the deployment writes
-/// `github.com/Acme/Y` and alice's workspace holds `github.com/acme/y`, the catalog's spelling.
-/// The role check lists GitHub once and writes one `source` row under the first spelling, and a
-/// role row under each, since grants match exactly: the workspace stays visible to erin, a
-/// non-operator whose roles read Y and A, and hidden from yoda, who reads Y alone.
 #[test]
 fn a_repository_selected_in_two_spellings_keeps_the_grant_of_each() {
     let Some(case) = Case::new("ws_spellings") else {
@@ -1181,8 +1028,6 @@ fn a_repository_selected_in_two_spellings_keeps_the_grant_of_each() {
         .unwrap()
         .to_string();
     assert_eq!(case.listed("erin"), vec![ya.clone()]);
-    // The deployment's version names Y with uppercase letters, imported and applied from the
-    // command line; `apply` takes the refresh lock, so it reads a copy of the manifest with one.
     let upper = case.identity("Y").replace("acme/y", "Acme/Y");
     let text = format!("[[repository]]\nrepo = \"{upper}\"\npath = \"../y\"\n");
     fs::write(case.dir.join("ops/upper.toml"), text).unwrap();
@@ -1196,7 +1041,6 @@ fn a_repository_selected_in_two_spellings_keeps_the_grant_of_each() {
     let root = case.token("root");
     let line = case.refresh();
     assert!(line.ends_with(", 0 exclusions\n"), "{line}");
-    // The console has read the new set once its catalog lists Y as the deployment writes it.
     let start = Instant::now();
     loop {
         let listed = case.get("/api/v1/catalog", &root).json();

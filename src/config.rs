@@ -1,9 +1,3 @@
-//! `meada.toml`: what a repository consumes from its peers (`[[peer]]`), the hosts it serves on
-//! (`[serve]`) and the resources it reads or writes (`[[resource]]`, spec #19). Errors name the
-//! file, the line and the key. A workspace manifest entry reuses these shapes for a mirror with
-//! no `meada.toml` (`workspace::Manifest`, ADR 0011). The shapes and the text's checks are
-//! `meada_core::manifest`'s; this module reads the files.
-
 use std::fs;
 use std::path::Path;
 
@@ -58,33 +52,25 @@ pub struct Peer {
 }
 
 impl Config {
-    /// The peers whose base URL this repository reads from the variable `var`.
     pub fn peers_reading<'a>(&'a self, var: &'a str) -> impl Iterator<Item = &'a str> {
         let reads = move |p: &&Peer| p.base_url_env.iter().any(|v| v == var);
         self.peers.iter().filter(reads).map(|p| p.repo.as_str())
     }
 
-    /// The directory a Base URL declaration says the variable `var` reaches.
     pub fn declared_dir(&self, var: &str) -> Option<&str> {
         let declares = |b: &&BaseUrl| b.env.iter().any(|v| v == var);
         self.base_urls.iter().find(declares).map(|b| b.dir.as_str())
     }
 }
 
-/// `<root>/meada.toml`, or an empty configuration when the file does not exist.
 pub fn load(root: &Path) -> Result<Config> {
     Ok(load_own(root)?.unwrap_or_default())
 }
 
-/// `<root>/meada.toml`, or `None` when the file does not exist.
 pub fn load_own(root: &Path) -> Result<Option<Config>> {
     read_config_up_to(root, None)
 }
 
-/// `<root>/meada.toml` as `read_own_up_to` reads it, `None` when it does not exist, refused
-/// when a variable is in two Base URL declarations, a key in two Chart environment declarations
-/// or a call in two Client declarations (`listed_twice`). Every read of a `Config` goes through
-/// it.
 pub(crate) fn read_config_up_to(root: &Path, max: Option<u64>) -> Result<Option<Config>> {
     let file = root.join("meada.toml");
     let Some(src) = text(&file, max)? else {
@@ -103,9 +89,6 @@ pub(crate) fn read_config_up_to(root: &Path, max: Option<u64>) -> Result<Option<
     Ok(Some(config))
 }
 
-/// An error naming `file`, the line and the value when a value is written a second time under
-/// `key` in the `table` entries of `src` (in two entries, or twice in the list of one), at that
-/// second place.
 fn listed_twice(src: &str, file: &Path, table: &str, key: &str) -> Result<()> {
     use toml::de::{DeTable, DeValue};
     let Ok(parsed) = DeTable::parse(src) else {
@@ -143,15 +126,9 @@ fn listed_twice(src: &str, file: &Path, table: &str, key: &str) -> Result<()> {
     Ok(())
 }
 
-/// The most a mirror's `meada.toml` or `meada.decisions.toml` holds, in a server-mode mirror
-/// and in a pulled generation (ADR 0012) alike, since both are a clone of a repository its
-/// operator does not control; a larger one fails the mirror, naming the file.
 // ponytail: a flat 1 MiB, as `lang::MAX_BYTES`; real ones are a few kilobytes.
 pub(crate) const GENERATION_CONFIG_MAX: u64 = 1 << 20;
 
-/// `<root>/<name>` parsed as `T`, or `None` when the file does not exist; a parse error names
-/// the file, the line and the key. With `max`, it reads at most `max` bytes through no symbolic
-/// link (`read_unlinked`): a mirror's file, in a server-mode mirror or a pulled generation.
 pub(crate) fn read_own_up_to<T: DeserializeOwned>(
     root: &Path,
     name: &str,
@@ -164,10 +141,6 @@ pub(crate) fn read_own_up_to<T: DeserializeOwned>(
     }
 }
 
-/// The text of `file`, `None` when it does not exist; with `max`, the file is a mirror's in a
-/// mirror (hostile: a clone of a repository its operator does not control, ADR 0012), read as
-/// `read_unlinked` reads: a regular file of at most `max` bytes, and a symbolic link refused
-/// unopened, one that stays inside the mirror included.
 pub(crate) fn text(file: &Path, max: Option<u64>) -> Result<Option<String>> {
     let missing = |e: &std::io::Error| e.kind() == std::io::ErrorKind::NotFound;
     let Some(max) = max else {
@@ -196,8 +169,6 @@ pub(crate) fn parse<T: DeserializeOwned>(file: &Path, src: &str, name: &str) -> 
     )?)
 }
 
-/// An error about the dotted `key` of `src`, the content of `file`, as `parse` words one
-/// (`meada_core::manifest::error_at`).
 pub(crate) fn error_at(
     file: &Path,
     src: &str,
@@ -207,10 +178,6 @@ pub(crate) fn error_at(
     meada_core::manifest::error_at(&file.display().to_string(), src, key, message).into()
 }
 
-/// The content of the regular file `path` an operator configured (a secret or a CA a cloud
-/// module's section names, the indexed commit beside a server-mode index), at most `max` bytes.
-/// What is not a regular file is refused before it is opened: a FIFO would block the open for
-/// ever. A symbolic link is followed: Kubernetes mounts a secret through one.
 pub(crate) fn read_bounded(path: &Path, max: u64) -> std::result::Result<Vec<u8>, String> {
     let problem = io_problem(path);
     if !fs::metadata(path).map_err(problem)?.is_file() {
@@ -220,11 +187,6 @@ pub(crate) fn read_bounded(path: &Path, max: u64) -> std::result::Result<Vec<u8>
     read_up_to(path, file, max)
 }
 
-/// `read_bounded` for a file the repository holds (a mirror's `meada.toml` or
-/// `meada.decisions.toml`, in server mode or in a pulled generation), which goes through no
-/// symbolic link: one at `path` is refused unopened, naming the file. On Unix the file opened
-/// must be the one checked, so a link put in its place between the check and the open is
-/// refused too.
 fn read_unlinked(path: &Path, max: u64) -> std::result::Result<Vec<u8>, String> {
     let problem = io_problem(path);
     let Some(checked) = unlinked(path).map_err(problem)? else {
@@ -240,34 +202,26 @@ fn read_unlinked(path: &Path, max: u64) -> std::result::Result<Vec<u8>, String> 
     read_up_to(path, file, max)
 }
 
-/// The metadata of `path` itself, or `None` when `path` is a symbolic link, a dangling one
-/// included: the one test of a link for a file the repository holds, which a mirror's read
-/// (`read_unlinked`) and the save of `meada.decisions.toml` (`decisions::writable`) refuse.
 pub(crate) fn unlinked(path: &Path) -> std::io::Result<Option<fs::Metadata>> {
     let meta = fs::symlink_metadata(path)?;
     Ok((!meta.file_type().is_symlink()).then_some(meta))
 }
 
-/// Whether `a` and `b` are the metadata of the same file: its device and inode on Unix.
 #[cfg(unix)]
 fn same_file(a: &fs::Metadata, b: &fs::Metadata) -> bool {
     use std::os::unix::fs::MetadataExt;
     (a.dev(), a.ino()) == (b.dev(), b.ino())
 }
 
-/// Elsewhere std tells no file's identity, so only the check before the open stands.
 #[cfg(not(unix))]
 fn same_file(_: &fs::Metadata, _: &fs::Metadata) -> bool {
     true
 }
 
-/// An I/O error at `path` as the readers word it: the file and the error's kind, never what
-/// the file holds.
 fn io_problem(path: &Path) -> impl Fn(std::io::Error) -> String + Copy + '_ {
     move |e| format!("{}: {}", path.display(), e.kind())
 }
 
-/// The content of `file`, opened at `path`, when it holds at most `max` bytes.
 fn read_up_to(path: &Path, file: fs::File, max: u64) -> std::result::Result<Vec<u8>, String> {
     use std::io::Read;
     let mut bytes = Vec::new();
@@ -287,8 +241,6 @@ mod tests {
 
     use super::Serve;
 
-    /// `<temp>/meada-config-<case>-<pid>/`, empty, holding `outside` with `host secret` and
-    /// `meada.toml`, a symbolic link to it. Returns the directory, the link and its target.
     #[cfg(unix)]
     fn linked(case: &str) -> (PathBuf, PathBuf, PathBuf) {
         let dir = std::env::temp_dir().join(format!("meada-config-{case}-{}", std::process::id()));
@@ -301,8 +253,6 @@ mod tests {
         (dir, link, target)
     }
 
-    /// An operator's file (a secret Kubernetes mounts through `..data`) is read through a
-    /// symbolic link.
     #[cfg(all(
         unix,
         any(
@@ -319,8 +269,6 @@ mod tests {
         fs::remove_dir_all(&dir).unwrap();
     }
 
-    /// A file the repository holds goes through no symbolic link: one is refused unopened, so
-    /// the bytes behind it are never in the error.
     #[cfg(unix)]
     #[test]
     fn a_mirror_file_through_a_symbolic_link_is_refused() {
@@ -329,17 +277,14 @@ mod tests {
         assert_eq!(e, format!("{}: a symbolic link", link.display()));
         let e = super::text(&link, Some(64)).unwrap_err().to_string();
         assert_eq!(e, format!("{}: a symbolic link", link.display()));
-        // A dangling link is still a link, not a missing file.
         fs::remove_file(&target).unwrap();
         let e = super::text(&link, Some(64)).unwrap_err().to_string();
         assert_eq!(e, format!("{}: a symbolic link", link.display()));
-        // The file itself reads, and only up to `max`.
         fs::remove_file(&link).unwrap();
         fs::write(&link, "[serve]\n").unwrap();
         assert_eq!(super::read_unlinked(&link, 8).unwrap(), b"[serve]\n");
         let e = super::read_unlinked(&link, 7).unwrap_err();
         assert_eq!(e, format!("{}: larger than 7 bytes", link.display()));
-        // What is opened is checked to be the file checked, not one put in its place.
         fs::write(&target, "").unwrap();
         let meta = |path: &PathBuf| fs::symlink_metadata(path).unwrap();
         assert!(super::same_file(&meta(&link), &meta(&link)));
@@ -347,8 +292,6 @@ mod tests {
         fs::remove_dir_all(&dir).unwrap();
     }
 
-    /// `src` written as `meada.toml` in a directory of its own, read as `read_config_up_to`
-    /// reads it (`max` for a mirror's), the error as text.
     fn config_of(case: &str, src: &str, max: Option<u64>) -> Result<super::Config, String> {
         let dir =
             std::env::temp_dir().join(format!("meada-base-url-{case}-{}", std::process::id()));
@@ -395,12 +338,10 @@ mod tests {
         let e = config_of("twice", src, None).err().unwrap();
         assert!(e.contains("meada.toml:7: `base_url.env`"), "{e}");
         assert!(e.contains("A_URL"), "{e}");
-        // The inline form names the line the variable is written on.
         let src = "base_url = [\n  { env = [\"A_URL\"], dir = \"a\" },\n  \
                    { env = [\"A_URL\"], dir = \"b\" },\n]\n";
         let e = config_of("inline", src, None).err().unwrap();
         assert!(e.contains("meada.toml:3: `base_url.env`"), "{e}");
-        // One entry naming a variable twice is the same mistake.
         let src = "[[base_url]]\nenv = [\"A_URL\",\n  \"A_URL\"]\ndir = \"a\"\n";
         let e = config_of("same", src, None).err().unwrap();
         assert!(e.contains("meada.toml:3: `base_url.env`"), "{e}");
@@ -487,7 +428,6 @@ mod tests {
         );
     }
 
-    /// One `[[channel_client]]` with `call` and `topic` as written, the other keys valid.
     fn client(call: &str, topic: &str) -> String {
         format!(
             "[serve]\n\n[[channel_client]]\ncall = \"{call}\"\nrole = \"consumer\"\n\
@@ -569,7 +509,6 @@ mod tests {
         let s = "gateway strip /v1";
         let both = "gateway prefix /shop, gateway strip /v1";
         for (prefix, strip, code, gateway) in [
-            // Nothing declared: no gateway path.
             (None, None, "/orders", None),
             (Some("/shop"), None, "/orders", Some(("/shop/orders", p))),
             (None, Some("/v1"), "/v1/orders", Some(("/orders", s))),
@@ -579,16 +518,13 @@ mod tests {
                 "/v1/orders/{}",
                 Some(("/shop/orders/{}", both)),
             ),
-            // A code path that does not start with `strip` keeps all of it under `prefix`...
             (
                 Some("/shop"),
                 Some("/v1"),
                 "/health",
                 Some(("/shop/health", p)),
             ),
-            // ... and has no gateway path without a prefix.
             (None, Some("/v1"), "/health", None),
-            // `strip` matches whole segments; a version goes only when it is written.
             (
                 Some("/shop"),
                 Some("/v1"),
@@ -601,10 +537,8 @@ mod tests {
                 "/v1/orders",
                 Some(("/shop/v1/orders", p)),
             ),
-            // Stripping the whole path leaves the root.
             (None, Some("/v1"), "/v1", Some(("/", s))),
             (Some("/shop"), Some("/v1"), "/v1", Some(("/shop", both))),
-            // A rewrite that changes nothing is no gateway path.
             (Some("/v1"), Some("/v1"), "/v1/orders", None),
         ] {
             let got = serve(prefix, strip).gateway_path(code);

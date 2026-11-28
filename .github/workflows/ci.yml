@@ -1,35 +1,25 @@
 name: CI
 
 on:
-  # Only these events run the required gates (ADR 0010): an E2E label, a ready-for-review flip or
-  # a manual proof would otherwise post a newer, skipped check of the same name over a failure.
-  # `proof.yml` owns those events, with job names of its own.
   pull_request:
     types: [opened, reopened, synchronize]
   push:
-    # loop/**: the backlog loop's ticket branches, where this run is the gate before the merge.
     branches: [main, 'loop/**']
 
-# A newer push to a loop branch supersedes its run in progress; main and pull requests keep every run.
 concurrency:
   group: ci-${{ github.ref }}-integration
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/heads/loop/') }}
 
 env:
   CARGO_TERM_COLOR: always
-  # CPU-heavy reader probes share the runner; bound their concurrent test count.
   RUST_TEST_THREADS: '2'
 
 permissions:
   contents: read
 
-# rustup, preinstalled on the runners, installs the toolchain `rust-toolchain.toml` pins on the
-# first cargo command. The image is pinned: `ubuntu-latest` moves to 26.04 from 2026-10-19
-# (actions/runner-images#14748), and a new image is a change of its own.
 jobs:
   changes:
     runs-on: ubuntu-24.04
-    # E2E selection is the Proof workflow's (`proof.yml`): only the routine flags leave this job.
     outputs:
       routine: ${{ steps.scope.outputs.routine }}
       product: ${{ steps.scope.outputs.product }}
@@ -72,8 +62,6 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: cargo clippy --locked --all-targets -- -D warnings
 
-  # Each cloud feature builds alone (ADR 0012), and in the pairs the code gates on. Clippy only:
-  # the tests need services, and the `cloud` job runs them with `--all-features`.
   clippy-features:
     needs: changes
     if: needs.changes.outputs.routine == 'true' && needs.changes.outputs.product == 'true'
@@ -147,15 +135,12 @@ jobs:
           path: ${{ runner.temp }}/meada-benchmark
           if-no-files-found: error
 
-  # Cloud modules (ADR 0012): every feature, against a local Valkey and S3-compatible server.
   cloud:
     needs: changes
     if: needs.changes.outputs.routine == 'true' && needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
-    # scripts/test-services mirrors these services and env; tests/it/test_services.rs keeps them in step.
     services:
       valkey:
-        # 7.2 is the oldest Valkey ADR 0012 supports.
         image: valkey/valkey:7.2-alpine
         ports:
           - 6379:6379
@@ -167,7 +152,6 @@ jobs:
           RUSTFS_ACCESS_KEY: meada-test
           RUSTFS_SECRET_KEY: meada-test-secret
       postgres:
-        # 15 is the oldest Postgres ADR 0016 supports.
         image: postgres:15-alpine
         ports:
           - 5432:5432
@@ -177,18 +161,12 @@ jobs:
       MEADA_TEST_VALKEY_URL: redis://127.0.0.1:6379
       MEADA_TEST_S3_ENDPOINT: http://127.0.0.1:9000
       MEADA_TEST_POSTGRES_URL: postgres://postgres:meada-test@127.0.0.1:5432/postgres
-      # The second Postgres, over TLS (#483), that the step "Postgres over TLS" starts.
       MEADA_TEST_POSTGRES_TLS_URL: postgres://postgres:meada-test@127.0.0.1:5433/postgres
       MEADA_TEST_SERVICES_REQUIRED: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Postgres over TLS
-        # SCRAM's channel binding (#483) needs a Postgres with TLS, which a service container
-        # cannot be given a certificate for: a second one on 5433, started early so its initdb
-        # overlaps the steps before the wait. The CA signs with SHA-384, so the binding's hash is
-        # not SHA-256.
-        # The key belongs to the image's `postgres` user (uid 70), as Postgres requires.
         shell: bash
         run: |
           dir="$RUNNER_TEMP/postgres-tls"
@@ -207,7 +185,6 @@ jobs:
             -c ssl=on -c ssl_cert_file=/tls/server.pem -c ssl_key_file=/tls/server.key
           echo "MEADA_TEST_POSTGRES_TLS_CA=$dir/ca.pem" >> "$GITHUB_ENV"
       - name: Default build carries no module crate
-        # bash with pipefail, so a failing `cargo tree` fails the step.
         shell: bash
         run: |
           # Each module ticket adds the crates its feature brings, space-separated. The list
@@ -221,8 +198,6 @@ jobs:
           done
           exit $status
       - name: No Kotlin grammar crate beside the vendored one
-        # ADR 0017: every Kotlin grammar exports `tree_sitter_kotlin`, and the linker keeps one
-        # silently. The lock covers every feature and dependency kind.
         run: "! grep -q '^name = \"tree-sitter-kotlin' Cargo.lock"
       - name: Wait for the services
         run: |
@@ -234,8 +209,6 @@ jobs:
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo test --locked --all-features
 
-  # The standalone frontend gate (ADR 0014). Rust contributors need neither Node nor wasm-pack.
-  # Keep the core dependency boundaries here beside its browser build.
   frontend:
     needs: changes
     if: needs.changes.outputs.routine == 'true' && needs.changes.outputs.product == 'true'

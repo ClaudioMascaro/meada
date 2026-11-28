@@ -12,9 +12,9 @@ from proof_result import Comparisons, run_driver
 
 HERE = Path(__file__).resolve().parent
 PROBE = HERE / 'aws-java-private-fields'
-NONE = 'resource::dynamodb'  # the side with no table: unresolved
-PRE_PRIVATE_FIELDS = 'b73e1e5318508d69a8e98e1081e2e9fb3c61076e'  # parent of e78c38c in #885
-KEY = {  # (case, side) -> (historical, Java oracle)
+NONE = 'resource::dynamodb'
+PRE_PRIVATE_FIELDS = 'b73e1e5318508d69a8e98e1081e2e9fb3c61076e'
+KEY = {
     ('a', 'Fields.keptField'): (NONE, NONE + '::kept-private'),
     ('a', 'Fields.ownField'): (NONE, NONE + '::own-private'),
     ('b', 'Fields.keptField'): (NONE, NONE),
@@ -29,8 +29,6 @@ def selftest():
     for case in CASES:
         assert (PROBE / case).is_dir() and (PROBE / 'oracle' / case / 'Main.java').is_file(), case
         assert f'case {case}:' in sent, case
-    # Each name the head gives is one the Java run sends, and the run of each case the head leaves
-    # unnamed sends two tables for it, or one the source never names as the field's own.
     assert 'putItem kept-private' in sent and 'putItem own-private' in sent and 'putItem kept-new' in sent
     assert 'putItem held-old' in sent and 'putItem held-new' in sent
     assert all(expected == NONE or expected.removeprefix(NONE + '::') in sent for _, expected in KEY.values())
@@ -74,7 +72,7 @@ def main():
     out.mkdir(parents=True, exist_ok=False)
     shutil.copy(PROBE / 'README.md', out / 'README.md')
     shutil.copy(PROBE / 'oracle/java-run.txt', out / 'java-run.txt')
-    for case in CASES:  # one repository per case, committed once; each binary reads its own copy
+    for case in CASES:
         source = out / 'input' / case
         shutil.copytree(PROBE / case, source)
         git('-c', 'init.defaultBranch=main', 'init', '-q', cwd=source)

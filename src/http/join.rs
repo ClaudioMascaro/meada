@@ -1,22 +1,7 @@
-//! The RFC 3986 reference resolution the HTTP consumers share (section 5.2): a relative URL
-//! joined to a base, over the parts of a folded string. Swift's `URL(string:relativeTo:)` and
-//! TypeScript's `new URL(reference, base)` (WHATWG URL Standard, #dom-url-url, whose basic URL
-//! parser agrees with RFC 3986 for the references read here) resolve through `resolve`. A
-//! reference this does not read (a query or a fragment alone, one that starts with a part that is
-//! not text) and a base it cannot place (no visible scheme and authority) give `None`: the URL
-//! stays unknown. A parameter on either side waits for the call sites (`depends`).
-//!
-//! `opaque_lead` is TypeScript's alone: a base that is an environment read or a hole is no URL
-//! the resolver can place, yet an absolute-path reference replaces whatever path it has, so the
-//! path is certain: an environment read stays its origin, any other unknown origin leaves the URL
-//! hostless (#801).
-
 use crate::lang::{Part, Value};
 
-/// Where in the parts of a string a position is: the part and the byte in it (a text).
 pub(super) type At = (usize, usize);
 
-/// The first of `set` at or after `from` in the texts of `parts`.
 pub(super) fn find(parts: &[Part], from: At, set: &[char]) -> Option<At> {
     (from.0..parts.len()).find_map(|i| match &parts[i] {
         Part::Text(t) => {
@@ -27,7 +12,6 @@ pub(super) fn find(parts: &[Part], from: At, set: &[char]) -> Option<At> {
     })
 }
 
-/// The parts from `from` up to `to`.
 pub(super) fn slice(parts: &[Part], from: At, to: At) -> Vec<Part> {
     let mut out = Vec::new();
     for (i, part) in parts.iter().enumerate().take(to.0 + 1).skip(from.0) {
@@ -45,7 +29,6 @@ pub(super) fn slice(parts: &[Part], from: At, to: At) -> Vec<Part> {
     out
 }
 
-/// The parts of a string value; a name that is a wrapper's parameter is a part to be read later.
 pub(super) fn text_parts(value: &Value) -> Option<Vec<Part>> {
     match value {
         Value::Str(parts) => Some(parts.clone()),
@@ -54,18 +37,14 @@ pub(super) fn text_parts(value: &Value) -> Option<Vec<Part>> {
     }
 }
 
-/// Whether a name of a wrapper's parameter is among the parts.
 fn holds_ref(parts: &[Part]) -> bool {
     parts.iter().any(|p| matches!(p, Part::Ref(_)))
 }
 
-/// The two strings side by side, for a URL that depends on a parameter on either side: a
-/// placeholder the wrapper's call sites replace with the real resolution.
 pub(super) fn depends(a: &[Part], b: &[Part]) -> Option<Vec<Part>> {
     (holds_ref(a) || holds_ref(b)).then(|| merged([a, b].concat()))
 }
 
-/// How a reference is written, RFC 3986 section 4.2.
 enum Reference {
     Absolute,
     NetworkPath,
@@ -73,13 +52,10 @@ enum Reference {
     RelativePath,
 }
 
-/// The kind of a reference; none for one this does not read (a query or a fragment alone, or a
-/// start that is not text, whose scheme and path it could change).
 fn classify(relative: &[Part]) -> Option<Reference> {
     let Some(Part::Text(lead)) = relative.first() else {
         return None;
     };
-    // A scheme is letters, digits, `+`, `-` and `.` from a letter, then `:`, before any `/?#`.
     for (at, c) in lead.char_indices() {
         match c {
             ':' if at > 0 => return Some(Reference::Absolute),
@@ -102,9 +78,6 @@ fn classify(relative: &[Part]) -> Option<Reference> {
     }
 }
 
-/// The reference `relative` resolved against `base` as RFC 3986 does, dot segments removed;
-/// `None` when either does not say enough (a base with no visible scheme and authority, a
-/// reference that starts with a parameter, one that is a query or a fragment alone).
 pub(super) fn resolve(base: &[Part], relative: &[Part]) -> Option<Vec<Part>> {
     let kind = classify(relative)?;
     if let Reference::Absolute = kind {
@@ -114,8 +87,6 @@ pub(super) fn resolve(base: &[Part], relative: &[Part]) -> Option<Vec<Part>> {
         };
     }
     let end = (base.len(), 0);
-    // The scheme (up to its `:`), the authority and the path of the base, which its scheme
-    // leads: `${x}/fetch/https://h/` holds a URL in its path and is no base this places.
     let (scheme, colon) = (0, scheme_end(base)?);
     let path = find(base, (scheme, colon + 3), &['/', '?', '#']).unwrap_or(end);
     let stop = find(base, path, &['?', '#']).unwrap_or(end);
@@ -126,7 +97,6 @@ pub(super) fn resolve(base: &[Part], relative: &[Part]) -> Option<Vec<Part>> {
     }
     let mut route = match kind {
         Reference::AbsolutePath => Vec::new(),
-        // The base's path up to its last `/`, or the root when it has none.
         _ => {
             let slash = (path.0..=stop.0.min(base.len().saturating_sub(1)))
                 .rev()
@@ -150,8 +120,6 @@ pub(super) fn resolve(base: &[Part], relative: &[Part]) -> Option<Vec<Part>> {
     Some(merged(out))
 }
 
-/// Where the scheme of `url` ends, at the `:` of a `://` its first text starts with after a
-/// scheme's letters, digits, `+`, `-` and `.` from a letter.
 fn scheme_end(url: &[Part]) -> Option<usize> {
     let Some(Part::Text(t)) = url.first() else {
         return None;
@@ -165,8 +133,6 @@ fn scheme_end(url: &[Part]) -> Option<usize> {
     .then_some(colon)
 }
 
-/// `url` with the dot segments of the path after its authority, which starts at `authority`,
-/// removed (RFC 3986 5.2.2 removes them from every reference's path).
 fn dots_after(url: &[Part], authority: At) -> Option<Vec<Part>> {
     let end = (url.len(), 0);
     match find(url, authority, &['/', '?', '#']) {
@@ -179,9 +145,6 @@ fn dots_after(url: &[Part], authority: At) -> Option<Vec<Part>> {
     }
 }
 
-/// The path `path` (which starts with `/`, and may end in a query or a fragment) without its `.`
-/// and `..` segments; none when a `..` would remove a segment that holds a parameter, which may
-/// be several.
 fn without_dots(path: &[Part]) -> Option<Vec<Part>> {
     let end = (path.len(), 0);
     let cut = find(path, (0, 0), &['?', '#']).unwrap_or(end);
@@ -210,7 +173,6 @@ fn without_dots(path: &[Part]) -> Option<Vec<Part>> {
             return None;
         }
         match dot || up {
-            // A trailing dot segment leaves the slash.
             true if k == last => kept.push(Vec::new()),
             true => {}
             false => kept.push(segment),
@@ -225,7 +187,6 @@ fn without_dots(path: &[Part]) -> Option<Vec<Part>> {
     Some(merged(out))
 }
 
-/// `parts` with the neighbouring texts joined.
 pub(super) fn merged(parts: Vec<Part>) -> Vec<Part> {
     let mut out: Vec<Part> = Vec::new();
     for part in parts {
@@ -237,14 +198,6 @@ pub(super) fn merged(parts: Vec<Part>) -> Vec<Part> {
     out
 }
 
-/// The origin of a base that is an environment read or a hole, for a reference that is an
-/// absolute path: `/orders` replaces whatever path the base has, so `${API_URL}` + `/orders` is
-/// `${API_URL}/orders` and keeps the lead (`via env:API_URL`), and a base Meada could not read
-/// (a hole, an undecided read, a limit of value flow) + `/orders` is `/orders`, a hostless path
-/// (#801). `None` for anything else: a relative or network-path reference (the base's path or
-/// host would matter), a query or a fragment alone, a reference that starts with a part that is
-/// not text, and a base whose opaque part is not its whole origin (a port or a host written
-/// after it).
 // ponytail: TypeScript's rule alone, so an `EnvOr` lead (a default `fetches` reads) is not one;
 // Swift keeps its answers. Another pack takes it by calling this after `resolve` fails.
 pub(super) fn opaque_lead(base: &[Part], reference: &[Part]) -> Option<Vec<Part>> {
@@ -327,8 +280,6 @@ mod tests {
                 "{base} + {relative}"
             );
         }
-        // The scheme ends at a `:` before any `/?#`; `//` is a network path; dot segments go;
-        // the base's query is not its path.
         for (base, relative, url) in [
             (
                 "https://h.example.com/api/",
@@ -368,10 +319,8 @@ mod tests {
                 "{base} + {relative}"
             );
         }
-        // A query or a fragment alone, and a base with no scheme, are not read.
         assert_eq!(joined("https://h.example.com", "?q=1"), None);
         assert_eq!(joined("/api", "status"), None);
-        // An absolute or network-path reference loses its dot segments too (RFC 3986 5.2.2).
         for (base, relative, url) in [
             (
                 "https://h.example.com/api/",
@@ -395,7 +344,6 @@ mod tests {
 
     #[test]
     fn a_base_whose_scheme_does_not_lead_it_is_not_placed() {
-        // A URL inside a path (a proxy's `/fetch/https://..`) is no scheme of the base.
         assert_eq!(joined("prefix/https://api.example.com/", "x"), None);
         let base = [
             Part::Env("X".into()),
@@ -407,7 +355,6 @@ mod tests {
                 "{reference}"
             );
         }
-        // Over that opaque base an absolute path keeps the lead, as any other path of it does.
         let orders = [Part::Text("/orders".into())];
         assert_eq!(
             written(&opaque_lead(&base, &orders).unwrap()),
@@ -446,7 +393,6 @@ mod tests {
         let (base, users) = ([Part::Ref("b".into())], [Part::Text("users".into())]);
         assert!(resolve(&base, &users).is_none());
         assert!(depends(&base, &users).is_some());
-        // A string with no parameter that cannot be resolved stays unread.
         assert!(depends(&users, &users).is_none());
     }
 
@@ -457,7 +403,6 @@ mod tests {
             opaque_lead(&base, &[text(reference)]).map(|p| written(&p))
         };
         let env = || Part::Env("API_URL".into());
-        // The base's own path is replaced, its origin is the read.
         assert_eq!(
             lead(vec![env()], "/orders").as_deref(),
             Some("${API_URL}/orders")
@@ -466,7 +411,6 @@ mod tests {
             lead(vec![env(), text("/v1/")], "/orders").as_deref(),
             Some("${API_URL}/orders")
         );
-        // Any other unknown origin leaves the path alone: certain, and hostless (#801).
         assert_eq!(lead(vec![Part::Hole], "/a/../b").as_deref(), Some("/b"));
         let read = Part::Read {
             scope: "s".into(),
@@ -478,16 +422,12 @@ mod tests {
         assert_eq!(lead(vec![read], "/orders").as_deref(), Some("/orders"));
         let limit = Part::Limit(crate::lang::Limit::Parameter("base".into()));
         assert_eq!(lead(vec![limit], "/orders").as_deref(), Some("/orders"));
-        // A default (`Part::EnvOr`) has a path of its own that `fetches` would append to.
         let defaulted = Part::EnvOr("API_URL".into(), vec![text("http://h/api")]);
         assert_eq!(lead(vec![defaulted], "/orders"), None);
-        // A relative reference, a network path, a query and a fragment need the base's path or
-        // host: unknown. So does a reference that starts with a part that is not text.
         for reference in ["orders", "//h/orders", "?q=1", "#top", "../x"] {
             assert_eq!(lead(vec![env()], reference), None, "{reference}");
         }
         assert!(opaque_lead(&[env()], &[Part::Env("P".into()), text("/orders")]).is_none());
-        // A base whose opaque part is not its whole origin, and a literal base, are not this.
         assert_eq!(lead(vec![env(), text(":8080/api")], "/orders"), None);
         assert_eq!(lead(vec![env(), Part::Hole], "/orders"), None);
         assert_eq!(lead(vec![text("https://h")], "/orders"), None);
@@ -504,15 +444,11 @@ mod tests {
         assert!(depends(&base, &read).is_none());
         let hole = [Part::Hole, Part::Text("/orders".into())];
         assert!(resolve(&base, &hole).is_none());
-        // Over an opaque base the reference's lead matters as much.
         assert!(opaque_lead(&[Part::Env("API_URL".into())], &hole).is_none());
     }
 
     #[test]
     fn a_new_url_joins_a_literal_base_as_the_url_standard_reads_it() {
-        // The cases of the language rule (#dom-url-url): an absolute reference is itself,
-        // `//host/x` takes the host, `/orders` replaces the path, `orders` joins the base's
-        // directory (the last `/` ends it).
         for (reference, base, url) in [
             ("https://a.test/x", "https://h/api/", "https://a.test/x"),
             ("//a.test/x", "https://h/api/", "https://a.test/x"),

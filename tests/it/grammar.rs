@@ -1,9 +1,3 @@
-//! The output grammar of `docs/reference/output-grammar.md` against every rendered-answer golden:
-//! the document's tables are the grammar, so the check reads its line kinds from them. Every line
-//! of a `search`, `context` or `trace` golden matches a line kind of its tool, every line kind is
-//! shown by a golden (or named in `UNSHOWN`), and the document's levels, `search` kinds and entry
-//! kinds are the code's.
-
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 
@@ -13,66 +7,45 @@ use meada_core::export::{EntryKind, Level};
 
 const GRAMMAR: &str = "docs/reference/output-grammar.md";
 
-/// The tools whose answers the grammar covers, as golden file names spell them.
 const TOOLS: [&str; 3] = ["search", "context", "trace"];
 
-/// The terminals the matcher implements (`Grammar::ends`).
 const TERMINALS: [&str; 4] = ["word", "number", "text", "indent"];
 
-/// Line kinds no golden shows, each with the test that pins it instead.
 const UNSHOWN: &[(&str, &str)] = &[
-    // Only a file changing between the refresh and the read gives it: the unit test
-    // `engine::tests::a_span_changed_since_indexing_keeps_the_start_alone_in_the_first_line`.
     ("context", "unavailable"),
-    // A CI step that builds an image a workload runs (#833):
-    // `images::a_workload_links_to_each_ci_step_of_the_repository_that_builds_its_image`.
     ("context", "ci builds"),
     ("context", "image runner"),
 ];
 
-/// Forms of a field that no golden can show, left out when the goldens are checked: a fixture's
-/// files are all readable, so a place is always `<path>:<line>` there.
 const UNSHOWN_FORMS: &[(&str, &str)] = &[("place", "<path>")];
 
-/// One piece of a pattern: text that stands for itself, or a field, optional with `?`.
 #[derive(Debug, Clone)]
 enum Item {
     Text(String),
     Field { name: String, optional: bool },
 }
 
-/// A line kind: the tool it belongs to (`None`: every tool), its name and its pattern.
 struct Kind {
     tool: Option<String>,
     name: String,
     pattern: Vec<Item>,
 }
 
-/// The document's grammar: its line kinds, its fields with their forms, its terminals, and the
-/// words of its `search` kind table.
 struct Grammar {
     kinds: Vec<Kind>,
-    /// Each field's forms, as written and as items.
     fields: HashMap<String, Vec<(String, Vec<Item>)>>,
-    /// Field names in the order the document defines their forms, each once.
     order: Vec<String>,
     terminals: Vec<String>,
     search_kinds: Vec<String>,
-    /// The line kinds each section of a symbol's `context` holds, by the section's name (`None`:
-    /// before the first section).
     sections: HashMap<Option<String>, Vec<String>>,
 }
 
-/// What the check found: the lines no kind matches, as `<golden>:<line number>: <line>`, and
-/// the line kinds some line matched, as `(tool, name)` (`every` for a kind of every tool).
 #[derive(Default)]
 struct Report {
     failures: Vec<String>,
     shown: HashSet<(String, String)>,
 }
 
-/// The content of the code span that is all of `cell`, as CommonMark reads it: one space is
-/// stripped from each end when both ends have one.
 fn code(cell: &str) -> Option<String> {
     let cell = cell.trim();
     let ticks = cell.chars().take_while(|&c| c == '`').count();
@@ -81,7 +54,6 @@ fn code(cell: &str) -> Option<String> {
     }
     let fence = &cell[..ticks];
     let inner = cell[ticks..].strip_suffix(fence)?;
-    // A run of as many backticks inside would close the span early: the cell is no one span.
     let runs = inner.split(|c| c != '`').filter(|run| !run.is_empty());
     if inner.ends_with('`') || runs.into_iter().any(|run| run.len() == ticks) {
         return None;
@@ -93,8 +65,6 @@ fn code(cell: &str) -> Option<String> {
     })
 }
 
-/// `pattern` as items: `<name>` and `<name?>` are fields when `name` is lowercase letters,
-/// digits and hyphens starting with a letter; any other `<` is text.
 fn items(pattern: &str) -> Vec<Item> {
     let mut items = Vec::new();
     let mut text = String::new();
@@ -132,7 +102,6 @@ fn items(pattern: &str) -> Vec<Item> {
     items
 }
 
-/// `name` of the field `<name>`.
 fn unbracketed(field: &str) -> String {
     field
         .trim_start_matches('<')
@@ -140,15 +109,12 @@ fn unbracketed(field: &str) -> String {
         .to_string()
 }
 
-/// The cells of a table row, split at every pipe: no pattern of the document holds one.
 fn cells(row: &str) -> Vec<String> {
     let inner = row.trim().trim_start_matches('|').trim_end_matches('|');
     inner.split('|').map(|c| c.trim().to_string()).collect()
 }
 
 impl Grammar {
-    /// The grammar the tables of `doc` give. A table's header says what it holds; a line kind
-    /// belongs to the tool its `## ` section names (`## Every tool`: all of them).
     fn parse(doc: &str) -> Self {
         let mut grammar = Grammar {
             kinds: Vec::new(),
@@ -214,7 +180,6 @@ impl Grammar {
         grammar
     }
 
-    /// The positions of `line` that matching `items` from any of `starts` can end at.
     fn ends(&self, items: &[Item], line: &str, starts: Vec<bool>) -> Vec<bool> {
         items.iter().fold(starts, |at, item| match item {
             Item::Text(text) => {
@@ -236,10 +201,8 @@ impl Grammar {
         })
     }
 
-    /// The end positions of the field `name` when it starts at any position `at` marks.
     fn field(&self, name: &str, line: &str, at: &[bool]) -> Vec<bool> {
         let mut next = vec![false; at.len()];
-        // A run of characters each `fits`, at least one: every end after a start within it.
         let run = |fits: &dyn Fn(char) -> bool, next: &mut Vec<bool>| {
             let mut open = false;
             for (p, c) in line.char_indices() {
@@ -274,14 +237,12 @@ impl Grammar {
         next
     }
 
-    /// Whether `kind` matches all of `line`.
     fn matches(&self, kind: &Kind, line: &str) -> bool {
         let mut start = vec![false; line.len() + 1];
         start[0] = true;
         self.ends(&kind.pattern, line, start)[line.len()]
     }
 
-    /// The kinds of `tool` (its own and every tool's) that match `line`.
     fn kinds_of<'g>(&'g self, tool: &str, line: &str) -> Vec<&'g Kind> {
         (self.kinds.iter())
             .filter(|k| k.tool.as_deref().is_none_or(|t| t == tool))
@@ -289,8 +250,6 @@ impl Grammar {
             .collect()
     }
 
-    /// The grammar without the field forms `forms` names, `(field, form as written)`, each of
-    /// which it has.
     fn without(mut self, forms: &[(&str, &str)]) -> Self {
         for &(name, written) in forms {
             let field = (self.fields.get_mut(name)).unwrap_or_else(|| panic!("no field <{name}>"));
@@ -301,9 +260,6 @@ impl Grammar {
         self
     }
 
-    /// The kinds each line of the sections of a symbol's `context` matches, from `from` to the
-    /// end of the answer: a section line opens its section, and every other line matches the
-    /// kinds the section lists (or a kind of every tool). No kind: the line fails.
     fn sections(&self, lines: &[&str], from: usize) -> Vec<Vec<&Kind>> {
         let opens = [
             self.kind("context", "section"),
@@ -332,14 +288,12 @@ impl Grammar {
         out
     }
 
-    /// The documented kind `name` of `tool`; panics when there is none.
     fn kind(&self, tool: &str, name: &str) -> &Kind {
         (self.kinds.iter())
             .find(|k| k.tool.as_deref() == Some(tool) && k.name == name)
             .unwrap_or_else(|| panic!("no {tool} line kind `{name}` in {GRAMMAR}"))
     }
 
-    /// The fields every pattern and form names, terminals included.
     fn named(&self) -> BTreeSet<String> {
         let patterns = (self.kinds.iter().map(|k| &k.pattern))
             .chain(self.fields.values().flatten().map(|(_, form)| form));
@@ -351,7 +305,6 @@ impl Grammar {
             .collect()
     }
 
-    /// The text forms of the field `name`, in the document's order.
     fn words(&self, name: &str) -> Vec<String> {
         (self.fields[name].iter())
             .map(|(_, form)| match &form[..] {
@@ -362,8 +315,6 @@ impl Grammar {
     }
 }
 
-/// The rendered-answer goldens, `(file name, tool)`: those whose name has a part after the
-/// fixture that is a tool, alone or with a case (`chain.trace-down.txt`, `jvm-packages.search.txt`).
 fn rendered() -> Vec<(String, &'static str)> {
     let mut goldens: Vec<(String, &str)> = (fs::read_dir("tests/golden").unwrap())
         .map(|e| e.unwrap().file_name().into_string().unwrap())
@@ -379,12 +330,6 @@ fn rendered() -> Vec<(String, &'static str)> {
     goldens
 }
 
-/// Checks each golden `(name, tool, text)` against `grammar`. A blank line outside a symbol's
-/// span text separates two answers a test wrote into one golden. A symbol's answer in `context`
-/// is the line before a community line, that line and the processes line, the span text, then
-/// the sections: the span text is verbatim and matches no kind (its length is the head's range,
-/// shorter when its cut note follows it or when it is left out), and a line under a section
-/// matches a kind the document lists for that section.
 fn check(grammar: &Grammar, goldens: &[(String, &str, String)]) -> Report {
     let mut report = Report::default();
     for (name, tool, text) in goldens {
@@ -446,7 +391,6 @@ fn check(grammar: &Grammar, goldens: &[(String, &str, String)]) -> Report {
     report
 }
 
-/// The number of lines `<path>:<line>-<last>` names in a `context` head.
 fn range(head: &str) -> usize {
     let place = head.split(' ').nth(1).unwrap_or_default();
     let (_, range) = place.rsplit_once(':').unwrap_or_default();
@@ -456,12 +400,10 @@ fn range(head: &str) -> usize {
     (last + 1).saturating_sub(first)
 }
 
-/// The tool `kind` belongs to, `every` for a kind of every tool.
 fn tool_of(kind: &Kind) -> &str {
     kind.tool.as_deref().unwrap_or("every")
 }
 
-/// Every rendered-answer golden: its name, its tool and its text.
 fn goldens() -> Vec<(String, &'static str, String)> {
     (rendered().into_iter())
         .map(|(name, tool)| {
@@ -471,7 +413,6 @@ fn goldens() -> Vec<(String, &'static str, String)> {
         .collect()
 }
 
-/// The document's grammar, without the forms no golden can show.
 fn grammar() -> Grammar {
     Grammar::parse(&fs::read_to_string(GRAMMAR).unwrap()).without(UNSHOWN_FORMS)
 }
@@ -479,7 +420,6 @@ fn grammar() -> Grammar {
 #[test]
 fn every_line_of_every_rendered_answer_golden_is_of_a_documented_kind() {
     let goldens = goldens();
-    // The scan itself must see the goldens of every tool: each has well over 30.
     for tool in TOOLS {
         assert!(
             goldens.iter().filter(|g| g.1 == tool).count() > 30,
@@ -512,7 +452,6 @@ fn every_documented_line_kind_is_shown_by_a_golden() {
         "line kinds no golden shows: {unshown:?}"
     );
     for (tool, name) in UNSHOWN {
-        // Panics when the entry names no documented kind.
         grammar.kind(tool, name);
         let shown = report.shown.contains(&(tool.to_string(), name.to_string()));
         assert!(
@@ -554,14 +493,12 @@ fn every_section_of_context_lists_its_line_kinds() {
         "no row for the lines before `callers:`"
     );
     for name in grammar.sections.values().flatten() {
-        // Panics when a section lists no documented kind.
         grammar.kind("context", name);
     }
 }
 
 #[test]
 fn the_documented_levels_are_the_code_s_strongest_first() {
-    // A level's place, strongest first: a level added to the code stops this compiling.
     let strength = |level: Level| match level {
         Level::Exact => 0,
         Level::Declared => 1,
@@ -594,7 +531,6 @@ fn the_documented_entry_kinds_are_the_code_s() {
 
 #[test]
 fn the_documented_open_item_kinds_are_the_code_s() {
-    // An open item kind added to the code stops this compiling until it is listed.
     let listed = |kind: ItemKind| match kind {
         ItemKind::Ambiguous | ItemKind::Unresolved => kind.name(),
     };
@@ -609,7 +545,6 @@ fn the_documented_open_item_kinds_are_the_code_s() {
 fn the_documented_search_kinds_are_the_ones_search_takes() {
     let repo = fixture_repo("grammar_search_kinds", "ts-basic", None);
     let engine = Engine::open(&repo).unwrap();
-    // The refusal of an unknown kind lists the valid ones: `` `kind` takes `a`, `b` or `c`, ... ``.
     let refusal = engine
         .search("x", Some("nothing"), None)
         .unwrap_err()
@@ -622,7 +557,6 @@ fn the_documented_search_kinds_are_the_ones_search_takes() {
     assert_eq!(grammar().search_kinds, taken, "{refusal}");
 }
 
-/// A grammar of one kind per tool, for the tests of the check itself.
 const SMALL: &str = "\
 | Terminal | Matches |
 | --- | --- |
@@ -700,7 +634,6 @@ fn a_kind_documented_for_another_tool_does_not_match() {
 
 #[test]
 fn a_kind_left_out_of_the_document_fails_the_goldens_that_show_it() {
-    // The real grammar without its `trace` footer: every chain golden ends in an unknown line.
     let doc = fs::read_to_string(GRAMMAR).unwrap();
     let doc: String = (doc.lines())
         .filter(|l| !l.starts_with("| footer |"))

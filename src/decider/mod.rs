@@ -1,12 +1,3 @@
-//! Decider mode of `meada decide` (spec #18, ADR 0006): the configuration from the environment,
-//! the excerpt of each item, the requests of the configured protocol and the HTTP client. This
-//! is the only network path of Meada, and only `meada decide --decider` reaches it.
-//!
-//! The protocol adapters (`chat` and `decisions`) only turn questions into
-//! requests and answers into proposals; reading the environment, choosing the eligible items,
-//! printing and sending stay here. The key is held by `Config` alone, which has no `Debug`, and
-//! leaves it only as the `Authorization` header of a request on the wire.
-
 mod chat;
 mod decisions;
 mod validate;
@@ -28,20 +19,13 @@ use crate::lang;
 use crate::msg::Msg;
 use validate::Proposal;
 
-/// An item with more candidates than this is skipped in decider mode and reported as such; the
-/// excerpt would grow past what a judgment of one call needs. Human mode still offers it.
 // ponytail: the excerpt of one call stays small; past this an item is left to a person.
 pub const MAX_CANDIDATES: usize = 50;
 
-/// How long one request may take, connection to last byte. There are no retries.
 const TIMEOUT: Duration = Duration::from_secs(120);
 
-/// A model decision is written when its `p` is at least this, unless `--min-p` says otherwise;
-/// below it the proposal is only printed, as a suggestion. Changed by a PR with data (ADR 0006).
-/// With `chat` the probability is the model's own report about itself, not a calibrated measure.
 pub const MIN_P: f64 = 0.5;
 
-/// What `--show-request` prints in place of the `Authorization` header value.
 const HIDDEN: &str = "<hidden>";
 
 const PROTOCOL: &str = "MEADA_DECIDER_PROTOCOL";
@@ -49,11 +33,9 @@ const URL: &str = "MEADA_DECIDER_URL";
 const KEY: &str = "MEADA_DECIDER_KEY";
 const MODEL: &str = "MEADA_DECIDER_MODEL";
 
-/// The defaults of the `decisions` protocol: OpenRouter, and Jev.
 const DECISIONS_URL: &str = "https://openrouter.ai";
 const DECISIONS_MODEL: &str = "typesafe/jev-1.14";
 
-/// The task every protocol states, with the repository identity of the item.
 fn task(repository: &str) -> String {
     format!(
         "Pick the HTTP endpoint that a call in the repository {repository} reaches. You see the \
@@ -64,24 +46,18 @@ fn task(repository: &str) -> String {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Protocol {
-    /// OpenRouter's decisions API: one request carries every item.
     Decisions,
-    /// An OpenAI-compatible chat completions endpoint: one request per item.
     Chat,
 }
 
-/// The decider configuration. Deliberately not `Debug`: the key must never be printed.
 pub(crate) struct Config {
     pub protocol: Protocol,
-    /// The base URL, without a trailing `/`.
     pub url: String,
     key: Option<String>,
     pub model: String,
 }
 
 impl Config {
-    /// Reads the decider variables. A missing or invalid one is an error naming it; an empty
-    /// value counts as missing. Nothing is read from a file.
     pub(crate) fn from_env() -> Result<Self> {
         let var = |name: &'static str| match std::env::var(name) {
             Ok(value) if value.is_empty() => Ok(None),
@@ -114,7 +90,6 @@ impl Config {
             None if protocol == Protocol::Decisions => {
                 return Err(Msg::KeyMissing(KEY).text().into());
             }
-            // A token of visible ASCII only: anything else could not travel as a header value.
             Some(key) if !key.bytes().all(|b| b.is_ascii_graphic()) => {
                 return Err(Msg::DeciderInvalid(KEY).text().into());
             }
@@ -129,8 +104,6 @@ impl Config {
     }
 }
 
-/// HTTPS anywhere; plain HTTP only to a loopback address (a local model, the test stub). The
-/// scheme is case-insensitive.
 fn allowed(url: &str) -> bool {
     match url.split_once("://") {
         Some((scheme, rest)) if scheme.eq_ignore_ascii_case("https") => !rest.is_empty(),
@@ -139,7 +112,6 @@ fn allowed(url: &str) -> bool {
     }
 }
 
-/// Whether the host of `url` is `localhost` or a loopback IP address.
 fn loopback(url: &str) -> bool {
     let Some((_, rest)) = url.split_once("://") else {
         return false;
@@ -154,35 +126,20 @@ fn loopback(url: &str) -> bool {
         || host.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback())
 }
 
-/// What a decider sees of one item (ADR 0002, invariant 2): the call expression, the span of
-/// its enclosing function read from disk, and the candidates. No provider code, nothing else
-/// from the repository.
 pub(crate) struct Question {
-    /// The item id, its call-site identity.
     pub id: String,
     /// The identity of the repository that holds the call.
     pub repository: String,
-    /// The call as written, on one line.
     pub call: String,
-    /// The enclosing function as it is on disk; `None` for a call at the top level of a file,
-    /// or one whose enclosing symbol is no function (a class field initializer), which goes
-    /// alone: a whole class is more than the decision needs.
     pub enclosing: Option<String>,
-    /// Whether the call is at the top level of its file.
     pub top_level: bool,
-    /// The candidates, in candidate order.
     pub offers: Vec<Offer>,
-    /// The kind of decision that resolves the item.
     pub kind: Kind,
 }
 
-/// One candidate as a decider is offered it.
 pub(crate) struct Offer {
-    /// The candidate's 1-based position, as a string.
     pub key: String,
-    /// Its repository identity, method and path.
     pub description: String,
-    /// The `target` of the decision that picks it.
     pub target: String,
 }
 
@@ -217,7 +174,6 @@ impl Question {
         })
     }
 
-    /// The call and its enclosing function, as plain text.
     pub fn excerpt(&self) -> String {
         match (&self.enclosing, self.top_level) {
             (Some(function), _) => format!("Call:\n{}\n\nIn:\n{function}\n", self.call),
@@ -226,7 +182,6 @@ impl Question {
         }
     }
 
-    /// The candidates, one `<key>: <description>` per line.
     pub fn listing(&self) -> String {
         (self.offers.iter())
             .map(|o| format!("{}: {}\n", o.key, o.description))
@@ -238,11 +193,8 @@ impl Question {
     }
 }
 
-/// The setting the index stored for a file, by its path in the repository.
 pub(crate) type Stored<'a> = &'a dyn Fn(&str) -> Option<String>;
 
-/// The `LanguagePack::settings` of the file at `path`, from the config files of the pack in
-/// the directories above it (the nearest one decides, as in the index).
 fn setting_on_disk(pack: &dyn lang::LanguagePack, root: &Path, path: &str) -> String {
     let mut dirs = vec![String::new()];
     let mut walked = String::new();
@@ -274,11 +226,6 @@ fn setting_on_disk(pack: &dyn lang::LanguagePack, root: &Path, path: &str) -> St
     pack.settings(&configs)(path)
 }
 
-/// Whether the definition at `span` of the file at `path` is a function, a method or an inline
-/// function, by the language pack's own parse of `source`. The index keeps no symbol kind, so
-/// the file is parsed again, under the setting the index stored for it (the item macros of
-/// `LanguagePack::extend` are in it), or under the one its config files make when it has none;
-/// anything else, or a file no pack parses, is not.
 fn function_like(
     root: &Path,
     stored: Stored,
@@ -290,7 +237,6 @@ fn function_like(
     let Some(pack) = lang::pack_for(path).map(lang::pack) else {
         return false;
     };
-    // An allowlist: a kind added later sends its span only once it is listed here.
     let setting = stored(path).unwrap_or_else(|| setting_on_disk(pack, root, path));
     (pack.parse_with(path, source, &setting)).is_ok_and(|facts| {
         (facts.defs.iter())
@@ -298,17 +244,13 @@ fn function_like(
     })
 }
 
-/// One HTTP request of a run: always a `POST` of a JSON body.
 pub(crate) struct Request {
-    /// The ids of the items it asks about, in item order.
     pub items: Vec<String>,
-    /// The full endpoint URL.
     pub url: String,
     pub body: Value,
 }
 
 impl Config {
-    /// The requests the configured protocol sends for `questions`, in item order.
     fn requests(&self, questions: &[Question]) -> Vec<Request> {
         match self.protocol {
             Protocol::Chat => questions.iter().map(|q| chat::request(self, q)).collect(),
@@ -316,8 +258,6 @@ impl Config {
         }
     }
 
-    /// What the configured protocol reads out of the success `body` of `request`: one result
-    /// per item of the request, in order, each a validated proposal or its error text.
     fn answers(
         &self,
         request: &Request,
@@ -334,7 +274,6 @@ impl Config {
         }
     }
 
-    /// Prints `request` as it would leave the machine, with the key replaced by `HIDDEN`.
     fn show(&self, request: &Request, out: &mut impl Write) -> Result<()> {
         writeln!(out, "POST {}", request.url)?;
         if self.key.is_some() {
@@ -346,15 +285,6 @@ impl Config {
         Ok(())
     }
 
-    /// Sends `request` and returns the body of a success answer. The key goes only into the
-    /// `Authorization` header; no error message carries a header. An endpoint that reflects
-    /// the key in its answer would put it in what is printed and recorded, so every
-    /// occurrence in the body (as is, and as JSON escapes it) becomes `HIDDEN` here, before
-    /// anything parses the body.
-    ///
-    /// A non-success answer is an error with its status and, when its body has the usual
-    /// `{"error": {"message": ...}}` shape, that message: it is how a refusal (such as no
-    /// provider honouring the data-retention preferences) reaches the user. Nothing retries.
     fn send(&self, agent: &ureq::Agent, request: &Request) -> Result<String> {
         let mut call = agent
             .post(&request.url)
@@ -383,8 +313,6 @@ impl Config {
         Ok(body)
     }
 
-    /// The error text of a non-success answer: `http status: <code>`, then `: <message>` when
-    /// the body carries one, through `shown`.
     fn failure(&self, status: u16, body: &str) -> String {
         let message = serde_json::from_str::<Value>(body)
             .ok()
@@ -393,10 +321,6 @@ impl Config {
         Msg::HttpStatus { status, message }.text()
     }
 
-    /// Text from upstream made fit to print or record: control characters dropped (so it
-    /// cannot drive the terminal), then the key replaced by `HIDDEN`. Every decoded string an
-    /// answer contributes goes through here, since a JSON escape such as `&` hides the key
-    /// from the redaction of the raw body in `send`.
     pub(super) fn shown(&self, text: &str) -> String {
         let text: String = text.chars().filter(|c| !c.is_control()).collect();
         match &self.key {
@@ -406,12 +330,6 @@ impl Config {
     }
 }
 
-/// Decider mode over `items`: skips the items with no candidate or more than `MAX_CANDIDATES`
-/// and reports them, then prints the requests (`show_request`) or sends them in item order.
-/// Each answer is validated for its item alone: a proposal with `p` at least `min_p` is printed
-/// and returned to be written, a weaker one is printed as a suggestion, and a failed request
-/// or an invalid answer is printed under the item id and counted in `Outcome::failed`.
-/// Collect answers in request order and commit each accepted one before asking again.
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn run(
     config: &Config,
@@ -452,12 +370,9 @@ pub(crate) fn run(
     }
     let mut agent = ureq::Agent::config_builder()
         .timeout_global(Some(TIMEOUT))
-        // A redirect could carry the key to another host or drop HTTPS.
         .max_redirects(0)
-        // `send` reads the body of a non-success answer for the reason it gives.
         .http_status_as_error(false);
     if loopback(&config.url) {
-        // A proxy would carry the key and the excerpt off the machine, in clear over HTTP.
         agent = agent.proxy(None);
     }
     let agent: ureq::Agent = agent.build().into();
@@ -509,7 +424,6 @@ pub(crate) fn run(
     Ok(outcome)
 }
 
-/// A `--min-p` value, which must be a probability.
 pub(crate) fn min_p(value: f64) -> Result<f64> {
     match crate::decisions::probability(value) {
         true => Ok(value),
@@ -517,12 +431,9 @@ pub(crate) fn min_p(value: f64) -> Result<f64> {
     }
 }
 
-/// What a decider run produced.
 #[derive(Default)]
 pub(crate) struct Outcome {
-    /// The decisions to write: model decisions with `p` at least the threshold.
     pub decisions: Vec<Decision>,
-    /// How many items had a failed request or an invalid answer.
     pub failed: usize,
 }
 
@@ -541,7 +452,6 @@ mod tests {
     #[test]
     fn a_function_in_an_item_macro_body_is_function_like_under_the_stored_setting() {
         let root = Path::new("/nonexistent");
-        // What the index stored: the settings of the configs, then the item macros the file invokes.
         let stored = |_: &str| Some(lang::setting("", "cfg_rt"));
         assert!(function_like(
             root,
@@ -550,7 +460,6 @@ mod tests {
             SRC.as_bytes(),
             &span()
         ));
-        // A file with no stored setting is read under its configs alone, which add no item macro.
         let none = |_: &str| None;
         assert!(!function_like(
             root,

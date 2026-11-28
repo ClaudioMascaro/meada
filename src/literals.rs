@@ -1,8 +1,3 @@
-//! The shape of a route read from the object literals its handler returns (spec #23, ADR 0009):
-//! the last of a provider's sources, after a document. Properties give fields, array literals
-//! give `[]` elements, literal strings, numbers and booleans are scalar leaves, and anything
-//! Meada cannot read (a call, a parameter, a spread of an unknown value) is present and open.
-
 use std::collections::HashMap;
 
 use crate::declared::Types;
@@ -10,71 +5,46 @@ use crate::lang::{Call, Part, Step, Ty, Value, property};
 use crate::resolve::{Code, Target, scope_of};
 use crate::shape::{Budget, Import, Shape, Source, Spent, Want, under};
 
-/// What reading the literals of one file's handlers may cost: every call examined and every
-/// value read or constant followed, over all the handlers of the file. Past it, the file's
-/// remaining handlers give no shape, so their routes get no drift.
 // ponytail: one budget per handler file; real handlers spend a few hundred, a crafted chain of
 // constants or a huge literal would otherwise cost the whole file's time.
 const LITERALS_BUDGET: usize = 1 << 16;
 
-/// How deep reading follows nested literals and constants: the nesting of objects and arrays
-/// plus the constants followed on the way. A part deeper than that is present and open.
 // ponytail: real responses nest a handful of levels; the limit keeps a crafted chain of
 // constants, or a literal nested thousands of levels, from costing the stack.
 const LITERALS_DEPTH: usize = 32;
 
-/// Whose responses a handler sends, and so which calls send them.
 #[derive(Clone, Copy)]
 pub enum Handler {
-    /// An Express handler: `res.json(body)` and `res.send(body)`, `res` being its second
-    /// parameter, also after `res.status(code)`.
     Express,
-    /// A Next.js route handler: `NextResponse.json(body, init)` and `Response.json(body, init)`.
     Next,
 }
 
-/// Reads handlers, keeping the budget of each file, with the `Types` that read the types of
-/// their values: an extraction reaches types and zod schemas through this one, so each per-file
-/// budget is spent once.
 #[derive(Default)]
 pub struct Literals {
     spent: Budget<LITERALS_BUDGET>,
     types: Types,
 }
 
-/// The 2xx responses a handler sends.
 pub struct Responses<'a> {
     pub path: &'a str,
-    /// The body of each response Meada recognizes.
     pub bodies: Vec<Body<'a>>,
-    /// The declared return type of the handler, with the scope it is written in.
     pub returns: Option<(&'a str, &'a Ty)>,
-    /// Whether the handler may answer another way: a call whose result it returns, `res` handed
-    /// to another function, `next()`. Any shape read from the bodies alone is then incomplete.
     pub other: bool,
 }
 
-/// The body a response sends.
 pub struct Body<'a> {
-    /// The scope the body is written in.
     pub scope: &'a str,
     pub value: &'a Value,
-    /// The type the body is cast to (`body as Reply`).
     pub cast: Option<&'a Ty>,
 }
 
-/// What a call of a handler does with the response.
 enum Sends {
-    /// Nothing, or a response with a literal status outside 2xx, which the shape leaves out.
     No,
-    /// Sends a 2xx body, or one whose status cannot be read.
     Body,
-    /// Answers or hands the answer over in a way Meada does not read.
     Other,
 }
 
 impl Literals {
-    /// The types reader these handlers share.
     pub fn types(&mut self) -> &mut Types {
         &mut self.types
     }
@@ -89,10 +59,6 @@ impl Literals {
         }
     }
 
-    /// The 2xx responses the handler `name` of `path` sends: the bodies of the sends Meada
-    /// recognizes, a literal status outside 2xx leaving the response out (one whose status
-    /// cannot be read counts). `None` when the handler is not there or the file's budget is
-    /// spent. The one place that lists a route's responses, for each source that reads them.
     pub fn responses<'a>(
         &mut self,
         code: &Code<'a>,
@@ -107,7 +73,6 @@ impl Literals {
             name: &def.name,
         };
         let nested = format!("{name}.@");
-        // The calls in the handler's byte range, which source order keeps contiguous.
         let from = facts
             .calls
             .partition_point(|c| c.range.start < def.range.start);
@@ -158,9 +123,6 @@ impl Literals {
         Some(responses)
     }
 
-    /// The shape the 2xx `responses` of a handler give, as the union of their body literals,
-    /// the root open when the handler may answer another way; `None` when it sends no body
-    /// Meada reads, or past the budget.
     pub fn shape<'a>(&mut self, code: &Code<'a>, responses: &Responses<'a>) -> Option<Shape> {
         if responses.bodies.is_empty() {
             return None;
@@ -182,9 +144,6 @@ impl Literals {
         Some(reader.shape)
     }
 
-    /// The shape the package's index stores for the module-level constant `name` of `path`
-    /// when it holds an object or array literal (issue #175): what a handler spreading or
-    /// sending it gives. `None` for any other value, or past the budget.
     pub fn exported<'a>(&mut self, code: &Code<'a>, path: &'a str, name: &'a str) -> Option<Shape> {
         let (_, held) = code.constant(path, "", name)?;
         if !matches!(held, Value::Object(_) | Value::List(_)) {
@@ -199,20 +158,15 @@ impl Literals {
     }
 }
 
-/// Reads one handler's values into a shape.
 struct Reader<'c, 'a> {
     code: &'c Code<'a>,
     spent: Spent<'c, LITERALS_BUDGET>,
     types: &'c mut Types,
-    /// The types of the constants `resolve` followed, with the file of each.
     seen: Vec<(&'a str, &'a Ty)>,
     shape: Shape,
 }
 
 impl<'a> Reader<'_, 'a> {
-    /// `value`, written in `path` within `scope`, with the constants it names followed: the
-    /// value that stands for it, where that is written, and the depth reached. A name that is
-    /// no constant (a parameter, a definition) or past the depth limit is `Unknown`.
     fn resolve(
         &mut self,
         mut path: &'a str,
@@ -224,16 +178,12 @@ impl<'a> Reader<'_, 'a> {
         while let Value::Ref(name) = value {
             self.spent.charge()?;
             depth += 1;
-            // Nothing records a later write to a function-local constant's object
-            // (`body.next = cursor`), so only a module-level one is followed.
             let found = match depth <= LITERALS_DEPTH {
                 true => (self.code.constant(path, scope, name))
                     .filter(|((_, constant), _)| !constant.contains('.')),
                 false => None,
             };
             let Some(((at, constant), held)) = found else {
-                // A name imported from outside the repository stays a name: the query fills it
-                // from the package that exports it (issue #175).
                 let imported =
                     depth <= LITERALS_DEPTH && self.code.imported(path, scope, name).is_some();
                 let stop = if imported { value } else { &UNKNOWN };
@@ -249,9 +199,6 @@ impl<'a> Reader<'_, 'a> {
         Some((path, scope, value, depth))
     }
 
-    /// Opens the parts of the value at `at` that the type `ty`, written in `path` within
-    /// `scope`, gives an index signature: anything may be there. A type read past the budget
-    /// opens the whole value.
     fn typed(&mut self, path: &'a str, scope: &'a str, ty: &'a Ty, at: &str) {
         let Some(read) = self.types.read(self.code, path, scope, ty) else {
             return self.open(at);
@@ -259,7 +206,6 @@ impl<'a> Reader<'_, 'a> {
         for open in &read.open {
             self.open(&under(at, open));
         }
-        // A type a package exports gives its index signatures from the query (issue #175).
         for import in read.imports.into_iter().filter(|i| i.want == Want::Type) {
             let at = under(at, &import.at);
             let want = Want::Opens;
@@ -283,7 +229,6 @@ impl<'a> Reader<'_, 'a> {
         self.shape.scalars.insert(at.to_string());
     }
 
-    /// Adds the paths `value` gives below `at` to the shape; `None` past the budget.
     fn read(
         &mut self,
         path: &'a str,
@@ -303,7 +248,6 @@ impl<'a> Reader<'_, 'a> {
             Value::List(items) if depth < LITERALS_DEPTH => {
                 self.field(at);
                 let element = format!("{at}[]");
-                // An empty array, or one with a spread, has no element Meada can read.
                 if items.is_empty() {
                     self.open(&element);
                 }
@@ -312,7 +256,6 @@ impl<'a> Reader<'_, 'a> {
                 }
             }
             Value::Scalar(_) => self.scalar(at),
-            // A single part may be a name or a hole: anything, not a string.
             Value::Str(parts) if parts.len() != 1 || matches!(parts[0], Part::Text(_)) => {
                 self.scalar(at)
             }
@@ -322,8 +265,6 @@ impl<'a> Reader<'_, 'a> {
         Some(())
     }
 
-    /// The constant `name`, imported from outside the repository, at `at`: the query fills it
-    /// from the package that exports it, or opens it (issue #175).
     fn imported(&mut self, path: &'a str, scope: &'a str, name: &'a str, at: &str) {
         let Some(imported) = self.code.imported(path, scope, name) else {
             return self.open(at);
@@ -333,8 +274,6 @@ impl<'a> Reader<'_, 'a> {
         self.shape.imports.insert(import);
     }
 
-    /// The properties of an object literal as fields below `at`; a spread of a known object
-    /// merges its fields, one of anything else makes the object open.
     fn object(
         &mut self,
         path: &'a str,
@@ -364,7 +303,6 @@ impl<'a> Reader<'_, 'a> {
                     _ => self.open(at),
                 }
             } else if key.is_empty() || key.contains(['.', '[']) {
-                // A key with no spelling in a field path may be any field.
                 self.open(at);
             } else {
                 let child = match at.is_empty() {
@@ -377,8 +315,6 @@ impl<'a> Reader<'_, 'a> {
         Some(())
     }
 
-    /// The literal status `init`, the options of a `NextResponse.json`, a `Response.json` or a
-    /// `new Response`, sets.
     fn status(&mut self, path: &'a str, scope: &'a str, init: &'a Value) -> Option<Option<u32>> {
         let (path, scope, init, depth) = self.resolve(path, scope, init, 0)?;
         let Value::Object(properties) = init else {
@@ -390,7 +326,6 @@ impl<'a> Reader<'_, 'a> {
         self.number(path, scope, status, depth)
     }
 
-    /// The integer `value` holds when it is a literal or a constant naming one.
     fn number(
         &mut self,
         path: &'a str,
@@ -405,13 +340,10 @@ impl<'a> Reader<'_, 'a> {
     }
 }
 
-/// Whether `status` is a literal one outside 2xx: such a response is left out of the shape,
-/// whatever its form, so that an error body hides no drift on the success body.
 fn error(status: Option<u32>) -> bool {
     status.is_some_and(|s| !(200..300).contains(&s))
 }
 
-/// The `res` methods that set a header or the status and send nothing.
 const QUIET: [&str; 14] = [
     "status",
     "set",
@@ -429,11 +361,6 @@ const QUIET: [&str; 14] = [
     "get",
 ];
 
-/// What the call `i` of an Express handler does with the response. `res.json(body)` sends a
-/// body with no status; `res.status(code).json(body)` has the `code` written in its chain, and
-/// `res.sendStatus(code)` its own. Any other `res` method, `res` passed to another call and
-/// `next()` answer another way; `next(err)` takes Express's error path, which the shape leaves
-/// out like any response with a literal status outside 2xx. `None` overall is a spent budget.
 fn express<'a>(
     reader: &mut Reader<'_, 'a>,
     handler: Target<'a>,
@@ -452,7 +379,6 @@ fn express<'a>(
         return Some(Sends::Other);
     }
     if code.is_param(path, &call.scope, &call.callee, handler, 2) {
-        // `next('route')` and `next('router')` hand the answer to the next matching handler.
         let error = match args.first() {
             None | Some(Value::Undefined) => false,
             Some(Value::Str(parts)) => {
@@ -465,7 +391,6 @@ fn express<'a>(
     let Some((receiver, method)) = call.callee.rsplit_once('.') else {
         return Some(Sends::No);
     };
-    // `res.sendStatus(code)` sends the status it is given.
     let own = match (method, args.first()) {
         ("sendStatus", Some(arg)) => reader.number(path, &call.scope, arg, 0)?,
         _ => None,
@@ -476,8 +401,6 @@ fn express<'a>(
             false => Sends::No,
         });
     }
-    // The calls of the chain start where this one does and end before it; the first is on
-    // `res`, the last `status` call sets the status.
     let mut chain = Vec::new();
     for &j in &by_start[&call.range.start] {
         reader.spent.charge()?;
@@ -501,10 +424,6 @@ fn express<'a>(
     Some(response(method, own.or(status)))
 }
 
-/// What the `res` method `method`, with the literal `status` of its chain, does: with one
-/// outside 2xx, nothing the shape keeps; otherwise `json` and `send` send a body, the rest of
-/// `QUIET` nothing, anything else (`end`, `render`, `redirect`, `sendFile`, `sendStatus`, ...)
-/// answers another way.
 fn response(method: &str, status: Option<u32>) -> Sends {
     match method {
         _ if error(status) => Sends::No,
@@ -514,11 +433,6 @@ fn response(method: &str, status: Option<u32>) -> Sends {
     }
 }
 
-/// The same for the call `i` of a Next.js handler: `NextResponse.json` (imported from
-/// `next/server`) or the global `Response.json` send a body, with the status of their options.
-/// `new Response(body, init)` and `new NextResponse(body, init)` with a literal status outside
-/// 2xx are left out. Any other call whose result the handler itself returns (`return ok(user)`,
-/// `new Response(..)`, `NextResponse.redirect(..)`) answers another way.
 fn next<'a>(
     reader: &mut Reader<'_, 'a>,
     handler: Target<'a>,
@@ -546,7 +460,6 @@ fn next<'a>(
         return Some(Sends::No);
     }
     if !sends {
-        // A callback's `return` is not the handler's response.
         let returned = call.scope == handler.name
             && (code.uses(path, i)).is_some_and(|u| u.iter().any(|c| c.contains(&Step::Return)));
         return Some(if returned { Sends::Other } else { Sends::No });
@@ -569,7 +482,6 @@ mod tests {
     use crate::resolve::{Code, Resolver};
     use crate::shape::{Shape, Want};
 
-    /// The shape of the handler `name` of one file, read with `reader` (to share a budget).
     fn read_with(reader: &mut Literals, src: &str, name: &str, kind: Handler) -> Option<Shape> {
         let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("a.ts", &facts)]);
@@ -615,7 +527,6 @@ mod tests {
             "rows[].id",
         ];
         assert_eq!(paths(&shape.fields), fields);
-        // The spread of the request body opens the whole object.
         assert_eq!(paths(&shape.open), ["", "got", "mapped", "none[]"]);
         let scalars = ["kind", "n", "name", "ok", "rows[].id"];
         assert_eq!(paths(&shape.scalars), scalars);
@@ -635,7 +546,6 @@ mod tests {
             .collect();
         assert_eq!(at, [("", "BASE"), ("row", "ROW")]);
         assert!(shape.open.is_empty());
-        // A `catch` binding of the same name is no import: its spread is open.
         let shape = express(
             "import { BASE } from '@acme/shared';\n\
              export function h(req, res) {\n\
@@ -677,7 +587,6 @@ mod tests {
             let shape = express(&format!("{types}{handler}")).unwrap();
             paths(&shape.open).join(",")
         };
-        // The type of a constant, of a cast, and the declared return type of the handler.
         for (handler, open) in [
             (
                 "const body: Reply = { ok: true };\nexport function h(req, res) { res.json(body); }",
@@ -724,7 +633,6 @@ mod tests {
             ("res.status(201).json({ a: 1 });", "a,ok"),
             ("res.status(code).json({ a: 1 });", "a,ok"),
             ("res.json({ a: 1 });", "a,ok"),
-            // Not a response of `res`.
             ("other.status(404).json({ a: 1 });", "ok"),
             ("other.json({ a: 1 });", "ok"),
         ] {
@@ -746,16 +654,13 @@ mod tests {
 
     #[test]
     fn a_rebound_name_does_not_send() {
-        // `res` is the handler's second parameter only until a binding hides it.
         let hidden =
             "export function h(req, res) {\n  { const res = other(); res.json({ a: 1 }); }\n}\n";
         assert!(express(hidden).is_none());
         assert!(express("export function h(res) {\n  res.json({ a: 1 });\n}\n").is_none());
-        // `Response` is the global one only while nothing binds the name.
         let bound =
             "export function h() {\n  const Response = other;\n  Response.json({ a: 1 });\n}\n";
         assert!(next(bound).is_none());
-        // `NextResponse` must come from `next/server`.
         let other = "import { NextResponse } from 'elsewhere';\n\
                      export function h() {\n  NextResponse.json({ a: 1 });\n}\n";
         assert!(next(other).is_none());
@@ -782,7 +687,6 @@ mod tests {
             assert_eq!(paths(&shape.fields), ["cached"], "{body}");
             assert_eq!(paths(&shape.open), [""], "{body}");
         }
-        // Only the handler's own returns count: a callback's return is not its response.
         for body in [
             "rows.map((r) => { return f(r); }); return NextResponse.json({ a: 1 });",
             "log(x); return NextResponse.json({ a: 1 });",
@@ -831,25 +735,21 @@ mod tests {
             );
             express(&src).unwrap()
         };
-        // Left out: the success body alone is the shape.
         for body in [
             "res.sendStatus(404);",
             "res.status(404).end();",
             "res.status(GONE).render('missing');",
             "res.set('x', 'y').status(500).sendFile(f);",
-            // Express's error path: `next` called with an argument.
             "next(err);",
             "next(new Error('gone'));",
         ] {
             assert!(express(body).open.is_empty(), "{body}");
         }
-        // Answered another way: the root opens.
         for body in [
             "res.sendStatus(200);",
             "res.sendStatus(code);",
             "res.status(code).end();",
             "next();",
-            // Not an error: the next matching route answers.
             "next('route');",
             "next('router');",
         ] {
@@ -881,7 +781,6 @@ mod tests {
 
     #[test]
     fn a_function_local_constant_is_open() {
-        // Nothing records a later write to the object (`body.next = cursor`).
         let shape = express(
             "export function h(req, res) {\n  const body = { items };\n  \
              if (more) body.next = cursor;\n  res.json(body);\n}\n",
@@ -930,11 +829,9 @@ mod tests {
         };
         let path = |n: usize| vec!["a"; n].join(".");
         let shape = deep(LITERALS_DEPTH + 8);
-        // The object at depth `LITERALS_DEPTH` is present and open, with nothing read below it.
         assert_eq!(paths(&shape.open), [path(LITERALS_DEPTH)]);
         assert!(shape.fields.contains(&path(LITERALS_DEPTH)));
         assert!(!shape.fields.contains(&path(LITERALS_DEPTH + 1)));
-        // Within the limit nothing is open.
         assert!(deep(LITERALS_DEPTH - 1).open.is_empty());
     }
 
@@ -952,7 +849,6 @@ mod tests {
         assert!(known.open.is_empty());
         let unknown = express(&chain(LITERALS_DEPTH + 8)).unwrap();
         assert_eq!(paths(&unknown.open), [""]);
-        // Constants that name each other are no value either.
         let cycle = "const a = b;\nconst b = a;\nexport function h(req, res) { res.json(a); }\n";
         assert_eq!(paths(&express(cycle).unwrap().open), [""]);
     }
@@ -966,7 +862,6 @@ mod tests {
         );
         let mut spent = Literals::default();
         assert!(read_with(&mut spent, &src, "h", Handler::Express).is_none());
-        // The file's budget stays spent: the next handler of the file reads nothing either.
         assert!(read_with(&mut spent, &src, "g", Handler::Express).is_none());
         let mut fresh = Literals::default();
         assert!(read_with(&mut fresh, &src, "g", Handler::Express).is_some());

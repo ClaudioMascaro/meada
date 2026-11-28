@@ -238,7 +238,6 @@ pub fn read_contexts(dir: &Path) -> Result<Option<(Vec<Context>, String)>, Strin
         {
             return Err(bad());
         }
-        // The entries are a version document's: the text they make validates as a named text.
         let text = meada_core::workspace::entries_text(&entries).ok_or_else(bad)?;
         let checked = meada_core::named::version_entries(&shown, &text, ENTRIES_MAX as usize);
         let checked = checked.map_err(|_| bad())?;
@@ -323,7 +322,6 @@ pub fn member_path(mirrors: &Path, identity: &str) -> PathBuf {
 mod tests {
     use super::*;
 
-    /// The text of a reason and of an authority is stored, sent and shown as it is.
     #[test]
     fn each_reason_and_authority_is_its_text() {
         let reasons = [
@@ -398,14 +396,12 @@ mod tests {
         let ids: Vec<&str> = read.iter().map(|c| c.id.as_str()).collect();
         assert_eq!(ids, ["aaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbb"]);
         assert_eq!(read[0].identities(), ["h/o/y"]);
-        // A version id that is not the entries' is refused.
         let mut forged = context("cccccccccccccccc");
         forged.version = "0000000000000000".into();
         std::fs::write(dir.join(CONTEXTS), contexts_text(&[forged])).unwrap();
         assert!(read_contexts(&dir).is_err());
         std::fs::write(dir.join(CONTEXTS), "{\"contexts\": 3}").unwrap();
         assert!(read_contexts(&dir).is_err());
-        // A file past the bound is refused unread, and so is an operator that is no login.
         let mut forged = context("dddddddddddddddd");
         forged.operators = vec!["not a login".into()];
         std::fs::write(dir.join(CONTEXTS), contexts_text(&[forged])).unwrap();
@@ -417,9 +413,6 @@ mod tests {
         assert!(read_contexts(&dir).unwrap().is_none());
     }
 
-    /// The membership keeps, beside a context's entries the sponsor rule left in, the identities
-    /// it excluded, sorted (#510): what the generation records for the node's admission. A
-    /// context left with no entry is dropped.
     #[test]
     fn the_membership_records_each_context_s_exclusions() {
         let dir = std::env::temp_dir().join(format!("meada-membership-{}", std::process::id()));

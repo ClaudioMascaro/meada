@@ -10,26 +10,17 @@ import json
 import re
 import subprocess
 
-import hcl2  # python-hcl2: see SKILL.md's Gotchas for the venv that holds it
+import hcl2
 
 from tf_names import Names, Unchecked
 
 IDENT = r"[A-Za-z_][A-Za-z0-9_-]*"
-# A traversal: a root name, then attributes, indexes and splats; not after a `.`, a word
-# character or a quote, so `a.b` inside `x.a.b` or `"a.b"` is not a second one.
 TRAVERSAL = re.compile(rf"(?<![\w.\"-])({IDENT})((?:\.{IDENT}|\.\*|\[[^\[\]]*\])+)")
 STEP = re.compile(rf"\.({IDENT})|\.\*|\[([^\[\]]*)\]")
 SKIPPED_ROOTS = {"each", "count", "path", "terraform", "self"}
-EVAL_DEPTH = 32  # the ceiling ADR 0025 and docs/agents/ceilings name for names gone through
+EVAL_DEPTH = 32
 MODULE_DEPTH = 16
-NESTING = 64  # #640: a file nesting brackets deeper is unreadable
-# #782: the six registry sources #671's type table reads (docs/site/en/capabilities.md, "Registry
-# modules"; an optional `registry.terraform.io/` prefix), each with the input that names what it
-# creates in the upstream module's variables.tf and main.tf. A call without that input, or setting
-# one that changes the name or whether anything is created, leaves the name unchecked: the documents
-# give no name to expect then. Those inputs are each source's own below (a FIFO suffix, a generated
-# prefix, a creation control) and, for all six, `putin_khuylo`, on which lambda and s3-bucket gate
-# creation, upstream and in #671's table (s3-bucket since #787).
+NESTING = 64
 REGISTRY_NAMES = {
     "terraform-aws-modules/sqs/aws": ("name", {"fifo_queue", "use_name_prefix", "create"}),
     "terraform-aws-modules/sns/aws": ("name", {"fifo_topic", "use_name_prefix", "create"}),
@@ -81,7 +72,7 @@ def refs_in(value):
             steps = [(s.group(1), s.group(2)) for s in STEP.finditer(rest)]
             attrs = lambda at: steps[at][0] if at < len(steps) and steps[at][0] else None
             def keyed(at):
-                if at < len(steps) and steps[at][0] is None:  # an index or a splat
+                if at < len(steps) and steps[at][0] is None:
                     k = steps[at][1]
                     return (key_of(k) if k is not None else None), at + 1
                 return None, at
@@ -213,9 +204,6 @@ def read_repo(repo):
                         ty_, name_ = unquote(ty) or ty, unquote(name) or name
                         first, last = lines_of(text, kind, [ty_, name_])
                         m["blocks"].append({"kind": kind, "type": ty_, "name": name_, "path": rel, "line": first, "end": last,
-                                            # #658: Terraform's S3 resource names its bucket with
-                                            # `bucket`, not `name`. This is the provider's source
-                                            # field, independently read before any Meada answer.
                                             "name_raw": body.get("bucket" if ty_ == "aws_s3_bucket" else "name"),
                                             "count_raw": body.get("count"),
                                             "for_each_raw": body.get("for_each"),
@@ -227,8 +215,6 @@ def read_repo(repo):
                 source = unquote(body.get("source"))
                 registry = REGISTRY_NAMES.get(source.removeprefix("registry.terraform.io/") if isinstance(source, str) else None)
                 m["blocks"].append({"kind": "module", "type": "module", "name": name_, "path": rel, "line": first, "end": last,
-                                    # a module's `name` is an input, not what it creates, except a
-                                    # registry source's name input (REGISTRY_NAMES)
                                     "name_raw": body.get(registry[0]) if registry else None,
                                     "name_unchecked": bool(registry) and (registry[0] not in body or bool((registry[1] | {"putin_khuylo"}) & body.keys())),
                                     "count_raw": body.get("count"), "for_each_raw": body.get("for_each"),
@@ -246,8 +232,6 @@ def read_repo(repo):
                 if not k.startswith("__"):
                     m["locals"][k] = refs_in(v)
                     m["locals_raw"][k] = v
-    # #650: the var files Terraform loads by itself, `terraform.tfvars` first, then each
-    # `*.auto.tfvars` in name order, a later value winning; a value that is no constant is left out.
     def rank(r):
         f = r.rsplit("/", 1)[-1]
         return (r.rsplit("/", 1)[0] if "/" in r else "", 0 if f == "terraform.tfvars" else 1 if f == "terraform.tfvars.json" else 2, f)
@@ -303,7 +287,7 @@ def evaluate(repo):
     nodes, references = [], set()
     for root_dir in sorted(d for d in modules if d not in called):
         root = root_dir or "."
-        instances = []  # {dir, parent: (instance, block), nodes: {(kind,type,name): [(key, address)]}, children: {name: [(key, instance)]}}
+        instances = []
 
         names, pending, unchecked = Names(modules, instances, root_dir), [], []
 
@@ -328,7 +312,6 @@ def evaluate(repo):
             return me
 
         instantiate(root_dir, "", None, None, [root_dir])
-        # Every instance made, module outputs are read: the names are evaluated again with them.
         names.memo, names.outputs = {}, True
         for node, me, b, each in pending:
             found = names.physical(me, each, b)
@@ -379,7 +362,6 @@ def evaluate(repo):
     return nodes, sorted(references), unreadable
 
 
-# Where a hit line's name goes when the oracle could not evaluate it (`prove.py` matches any).
 UNCHECKED_NAME = "\x00"
 
 
@@ -426,10 +408,8 @@ def context_lines(identity, nodes, references, node):
     name += " (pattern)" if node["pattern"] else ""
     lines = [f"{identity} {node['path']}:{node['line']}-{node['end']} {node['address']}",
              f"type: {node['type']}", f"name: {name}", f"root: {node['root']}"]
-    # #664: source-derived SAM code metadata precedes the existing reference/value sections.
     lines += [f"{field}: " + json.dumps(node[field], ensure_ascii=False)
               for field in ("build", "handler") if field in node]
-    # #650: the root variables the name went through, in path and line order.
     lines.append("overridable:" if node["through"] else "overridable: none")
     lines += [f"{identity} {path}:{line} {var} ({'tfvars' if tfvars else 'default'})"
               for path, line, var, tfvars in node["through"]]

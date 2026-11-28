@@ -1,5 +1,3 @@
-//! Azure SDK policy: known constructors and child handles retain only identity arguments.
-//! The shared complete SDK walk owns exact returns, alternatives and evaluation budgets.
 use crate::contract::sdk::origins::{Evidence, Policy};
 use crate::contract::{EnvironmentScope, EnvironmentValue, Found, ReceiverIdentity, Role, Site};
 use crate::lang::Value;

@@ -1,5 +1,3 @@
-//! The Java language pack: one source file's syntax, with no compiler or build tool.
-
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
@@ -14,16 +12,12 @@ use super::{
 };
 use crate::{Result, qualify};
 
-/// How many named types may enclose a definition. Deeper bodies keep their enclosing symbol.
 // ponytail: real source nests a few types; this prevents quadratic qualified names.
 const DEFINITION_DEPTH: usize = 128;
-/// How deep arguments and concatenations are read before their value becomes unknown.
 // ponytail: real expressions nest a few levels; this bounds hostile source recursion.
 const VALUE_DEPTH: usize = 64;
-/// How many segments of a callee are kept before it becomes an unknown expression.
 // ponytail: real member paths are short; this keeps crafted chains cheap.
 const PATH_DEPTH: usize = 256;
-/// Enclosing-name bytes across syntax visits, before each visit's bounded metadata fanout.
 // ponytail: a long package prefix must not multiply across a broad file without a budget.
 const QUALIFICATION_BYTES: usize = 4 * 1024 * 1024;
 
@@ -78,8 +72,6 @@ impl LanguagePack for Java {
         ]
     }
 
-    /// The JDK types whose members are few and fixed; the table grows with evidence from the
-    /// dogfood repositories, never by guess (ADR 0019).
     fn known_outside(&self) -> super::KnownOutside {
         &[
             ("java.io.Serializable", &[]),
@@ -93,8 +85,6 @@ impl LanguagePack for Java {
         ]
     }
 
-    /// What the kinds read through `Indexed::configs`: Spring's base configuration, which its
-    /// reader lists (`jvm::spring::CONFIG_FILES`).
     fn config_files(&self) -> &'static [&'static str] {
         crate::jvm::spring::CONFIG_FILES
     }
@@ -110,12 +100,8 @@ impl LanguagePack for Java {
     fn layout(&self, _configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Result<Layout> {
         let mut packages: BTreeMap<String, Vec<String>> = BTreeMap::new();
         let mut types: BTreeMap<String, Vec<String>> = BTreeMap::new();
-        // What a Kotlin file declares at its top level: functions (by overload family) and
-        // constants, which an import names by fully qualified name too.
         let mut tops: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for (&path, facts) in files {
-            // A file a pack dropped has no facts, and a Kotlin script's declarations are its
-            // own: no package or import reaches them.
             if facts.unbuilt || facts.budget.is_some() || facts.misparsed || path.ends_with(".kts")
             {
                 continue;
@@ -140,9 +126,6 @@ impl LanguagePack for Java {
                 }
             }
         }
-        // A package keeps its files against a top-level declaration of its name (`fun util()`
-        // beside package `util`), whose import then binds nothing; a type wins over both, as
-        // before (Java forbids a type and a package of one name).
         let modules: BTreeMap<String, Rc<[String]>> = (tops.into_iter())
             .chain(
                 packages
@@ -163,10 +146,6 @@ impl LanguagePack for Java {
     }
 }
 
-/// The source with each unicode escape of a line terminator (`\u000a`, `\uu000D`) as a line
-/// feed padded with spaces to its length: javac translates escapes before it lexes (JLS 3.3), so
-/// one ends a line comment and the rest of the line is code. Every byte keeps its offset. A
-/// backslash after an odd run of raw backslashes starts no escape.
 fn escaped_breaks(src: &[u8]) -> Cow<'_, [u8]> {
     let mut out: Option<Vec<u8>> = None;
     let (mut at, mut slashes) = (0, 0);
@@ -198,7 +177,6 @@ struct Visit<'t> {
     definitions: bool,
     returning: bool,
     depth: usize,
-    /// The type parameters declared around the node: a type they name is no class.
     generics: Rc<Vec<String>>,
 }
 
@@ -218,7 +196,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
         ..Facts::default()
     };
     SYSTEM_BOUND.set(binds_system(tree.root_node(), src));
-    // The current package and java.lang are implicitly visible before explicit imports.
     wildcard("java.lang", false, &mut facts);
     let package = facts.package.clone();
     wildcard(&package, true, &mut facts);
@@ -235,35 +212,21 @@ fn parse(src: &[u8]) -> Result<Facts> {
         depth: 0,
         generics: Rc::new(Vec::new()),
     }];
-    // The fields by declaring scope: a local is hidden by those of its class or an enclosing one.
     let mut fields: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut locals = Vec::new();
     let mut returned: BTreeMap<String, Vec<Value>> = BTreeMap::new();
-    // The types declared so far: a local whose scope is one sits in an initializer.
     let mut classes = BTreeSet::new();
-    // Initializer calls of `var` locals (by `Class::Result` place) and chained calls (by place
-    // in `facts.calls`), linked to the calls they name once every call is read.
     let mut results: Vec<Range<usize>> = Vec::new();
     let mut chains: Vec<(usize, Range<usize>)> = Vec::new();
     let mut outside = BTreeSet::new();
-    // The instance `final` fields (class, name, initializer) and what constructors assign to
-    // fields, by class and field.
     let mut finals: Vec<(String, String, Option<Value>)> = Vec::new();
     let mut assigned: BTreeMap<(String, String), Vec<(Value, String)>> = BTreeMap::new();
-    // The writes of a name that can be a field (`f = v`, `this.f = v`, `x.f = v`, `f++`): where
-    // each is, its name, and whether it may be a field of the class around it (`this.f`, or a
-    // bare `f` no local or parameter declares).
     let mut written: Vec<(String, String, bool)> = Vec::new();
-    // The locals declared with an initializer, and every name the file assigns: a local the
-    // file assigns holds no one value, so its bound is dropped (`Facts::bound`).
     let mut initialized: Vec<Bound> = Vec::new();
     let mut reassigned = Vec::new();
     let mut rebound: Vec<Bound> = Vec::new();
-    // The method or constructor of each scope, and the names of the `final` fields: where their
-    // mentions are counted (`Facts::mentioned`).
     let mut bodies: Vec<(String, Node, Vec<String>)> = Vec::new();
     let mut final_fields: BTreeSet<String> = BTreeSet::new();
-    // The field names some declaration leaves open to another file (`Facts::private_fields`).
     let mut open_fields: BTreeSet<String> = BTreeSet::new();
     let mut seen = Declared::new(tree.root_node());
     let mut qualification_bytes = QUALIFICATION_BYTES;
@@ -279,10 +242,8 @@ fn parse(src: &[u8]) -> Result<Facts> {
     }) = stack.pop()
     {
         let Some(remaining) = qualification_bytes.checked_sub(scope.len()) else {
-            // A partial overload family could turn an ambiguous call into a false exact one.
             return Ok(Facts {
                 budget: Some(QUALIFICATION_BYTES),
-                // Read off the bytes: a file with no facts still says so (#775).
                 reflects: reflects(src),
                 ..Facts::default()
             });
@@ -299,9 +260,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
             && !defining
             && let Some(name) = node.child_by_field_name("name")
         {
-            // No definition stands for this method (an anonymous class's or an enum constant
-            // body's, at any depth below one, or past the depth), yet a call through a base type
-            // may dispatch to it (#772).
             facts.anonymous.push(text(name, src).to_string());
         }
         if anonymous || node.kind() == "lambda_expression" {
@@ -365,7 +323,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 assignments(node, src, &scope, &inner, &names, &mut assigned);
             }
             if kind == Kind::Method {
-                // The annotations of each parameter (`@Value("${key}") String base`).
                 for (n, parameter) in formal_parameters(node).enumerate() {
                     for annotation in annotations(parameter, src, &scope) {
                         let on = Marked::Param(inner.as_ref().clone(), n);
@@ -429,7 +386,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 private: kind == Kind::Method && modifiers.contains(&"private"),
                 ..Def::new(inner.as_ref().clone(), kind, node.byte_range())
             });
-            // `public static void main(String[])` (or `String...`) starts a program.
             if kind == Kind::Method
                 && !constructor
                 && name == "main"
@@ -500,7 +456,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 at.decorates = Some(inner.as_ref().clone());
                 facts.calls.push(at);
             }
-            // An annotation type is an interface (JLS 9.6).
             in_interface = matches!(
                 node.kind(),
                 "interface_declaration" | "annotation_type_declaration"
@@ -517,7 +472,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 facts.locals.push(qualify(&scope, &name));
             }
         }
-        // An interface's constant is public, whatever it writes.
         if matches!(node.kind(), "field_declaration" | "constant_declaration")
             && !modifiers(node).contains(&"private")
         {
@@ -548,7 +502,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 at.args = arguments(node, src, 0);
                 at.arity = Some(at.args.len());
                 at.receiver = node.child_by_field_name("object").map(|n| value(n, src, 0));
-                // `make().save()` and `make().x.save()`: the call the chain is made on.
                 let mut object = node.child_by_field_name("object");
                 while let Some(n) = object.filter(|n| n.kind() == "field_access") {
                     object = n.child_by_field_name("object");
@@ -577,7 +530,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     facts.calls.push(at);
                 }
             }
-            // `this(..)` calls a constructor of the class, `super(..)` one of its superclass.
             "explicit_constructor_invocation" if definitions => {
                 let class = crate::parent(scope.as_str());
                 let callee = match node.child_by_field_name("constructor").map(|c| c.kind()) {
@@ -595,9 +547,7 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 }
             }
             "local_variable_declaration" | "enhanced_for_statement" | "resource" if definitions => {
-                // A declared type, or the class a `var` takes from `new T(..)` or a call.
                 let declared = node.child_by_field_name("type");
-                // An initializer block's or a field lambda's local is no field of the class.
                 let initializer = classes.contains(scope.as_str());
                 let mut typed = |value: Option<Node>, dimensions: bool| match declared {
                     _ if dimensions || initializer => Class::Unknown,
@@ -628,7 +578,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 if let Some(name) = node.child_by_field_name("name") {
                     let value = node.child_by_field_name("value");
                     let dimensions = node.child_by_field_name("dimensions").is_some();
-                    // The element of a loop is no `var` initializer.
                     let value = value.filter(|_| node.kind() == "resource");
                     bind(name, typed(value, dimensions));
                 }
@@ -637,8 +586,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
                         let dimensions = declaration.child_by_field_name("dimensions").is_some();
                         let initial = declaration.child_by_field_name("value");
                         bind(name, typed(initial, dimensions));
-                        // An initializer block's local sits in its class's scope, which a method
-                        // of the class reads through: it is no bound.
                         if let Some(initial) = initial.filter(|_| !initializer) {
                             initialized.push(Bound {
                                 scope: scope.as_ref().clone(),
@@ -757,7 +704,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
                     _ => None,
                 };
                 if let Some((name, own)) = write {
-                    // The `this` of an anonymous class is not the class around it.
                     let own = own && definitions;
                     written.push((scope.as_ref().clone(), text(name, src).to_string(), own));
                 }
@@ -768,7 +714,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
             let declared = node.child_by_field_name("type");
             for declaration in named(node).filter(|n| n.kind() == "variable_declarator") {
                 if let Some(name) = declaration.child_by_field_name("name") {
-                    // A field of an anonymous class sits in the enclosing scope: untyped there.
                     let class = match declared {
                         Some(ty)
                             if definitions
@@ -818,7 +763,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
             outside.insert(text(receiver, src).to_string());
         }
         for child in named(node).collect::<Vec<_>>().into_iter().rev() {
-            // Calls in anonymous classes and lambdas remain owned by the enclosing symbol.
             stack.push(Visit {
                 node: child,
                 scope: inner.clone(),
@@ -834,9 +778,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
     for def in &mut facts.defs {
         def.return_values = returned.remove(&def.name).unwrap_or_default();
     }
-    // A `final` field holds the one value its initializer or a constructor gives it: a constant
-    // of the class, which no static context reads (it is no `statics`). Two values give none.
-    // A value a constructor assigns is written in that constructor, its parameters in scope.
     for (class, name, initial) in finals {
         let given = assigned.remove(&(class.clone(), name.clone()));
         let initial = initial.map(|v| (v, None));
@@ -852,10 +793,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
             });
         }
     }
-    // What `Code::field_written_in` reads: a field so assigned holds no one value. A write of
-    // the field of the class around it, the innermost one, names that class; any other, a field
-    // it inherits, one of an outer class its own class may inherit or one of another object,
-    // names none.
     let written: BTreeSet<(String, Option<String>)> = (written.into_iter())
         .map(|(scope, name, own)| {
             let around = innermost(&classes, &scope);
@@ -866,8 +803,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
     for (name, class) in written {
         facts.consts.push(field_write(&name, class.as_deref()));
     }
-    // A local is typed only where it is the one binding of its name in its scope; one named
-    // like a field may be read as the field before its declaration, so its class is unknown.
     let called: BTreeMap<(usize, usize), usize> = (facts.calls.iter().enumerate())
         .filter(|(_, c)| c.decorates.is_none())
         .map(|(n, c)| ((c.range.start, c.range.end), n))
@@ -876,8 +811,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
     for (outer, inner) in chains {
         facts.calls[outer].on = call_at(&inner);
     }
-    // A local is bound to its initializer when it is the one binding of its name in its
-    // definition, no field of an enclosing class shares the name and its binding is never assigned.
     let mut declared: BTreeMap<(&str, &str), usize> = BTreeMap::new();
     for local in &locals {
         *declared.entry((&local.scope, &local.name)).or_default() += 1;
@@ -897,8 +830,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
                 .map(move |scope| (scope.as_str(), name.as_str()))
         }))
         .collect();
-    // A bare write whose binding is not known stays conservative by spelling. Dropping
-    // it would prove an initializer unchanged from incomplete assignment knowledge.
     let mut unknown_writes = BTreeSet::new();
     let mut reassignments = BTreeMap::new();
     for (scope, name, change) in reassigned {
@@ -953,7 +884,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
     }
     for (scope, body, parameters) in &bodies {
         let mut names = named_in.get(scope.as_str()).cloned().unwrap_or_default();
-        // A parameter's too: a reader that follows one passed on counts its mentions (#772).
         for parameter in parameters {
             if !parameter.is_empty() && !names.contains(&parameter.as_str()) {
                 names.push(parameter);
@@ -977,10 +907,6 @@ fn parse(src: &[u8]) -> Result<Facts> {
             read: 0,
         });
     }
-    // Lombok adds members the source does not show (a `@Getter`'s accessor hands a private field
-    // out), so a file that spells its name anywhere, a comment included, lists none. Nor does a
-    // file that holds a Unicode escape (JLS 3.3) or a character the compiler drops from a name
-    // (JLS 3.8): one may spell that name, or a step on a field, where this pack reads other text.
     let holds = |needle: &[u8]| src.windows(needle.len()).any(|bytes| bytes == needle);
     if !holds(b"lombok") && !holds(b"\\u") && !ignorable(src) {
         facts.private_fields = (final_fields.difference(&open_fields).cloned()).collect();
@@ -1094,8 +1020,6 @@ fn import(node: Node, src: &[u8], facts: &mut Facts) {
     }
 }
 
-/// What the constructor `node` of `class` assigns to fields (`this.f = v`, or `f = v` when no
-/// parameter is `f`), by class and field. Lambdas and class bodies inside assign none of them.
 // ponytail: a local of the constructor named like a field and assigned with `f = v` counts as
 // the field; the field then holds two values or a wrong one only in such code.
 fn assignments(
@@ -1139,9 +1063,6 @@ fn assignments(
     }
 }
 
-/// What the children of each node declare (the node's id to each name with the offset of the
-/// first child that declares it), and the parent of each node, both read once per file:
-/// `Node::parent()` is found from the root, so a walk up by it costs the depth squared.
 struct Declared<'t> {
     root: Node<'t>,
     names: BTreeMap<usize, BTreeMap<String, usize>>,
@@ -1157,7 +1078,6 @@ impl<'t> Declared<'t> {
         }
     }
 
-    /// The parent of `node`, from an index of every node's parent built on first use.
     fn parent(&mut self, node: Node<'t>) -> Option<Node<'t>> {
         let root = self.root;
         let parents = self.parents.get_or_insert_with(|| {
@@ -1175,9 +1095,6 @@ impl<'t> Declared<'t> {
     }
 }
 
-/// Whether the identifier `name` is a local or a parameter declared before it, in a block
-/// around it, a loop, a `catch`, a `try` resource, a lambda or the method. `seen` holds what
-/// each block declares, read once, so a block of thousands of statements costs its width.
 // ponytail: a pattern variable (`o instanceof Foo base`) and a local of an earlier `case` group
 // are not read, so an assignment to either counts as a write of a field of that name.
 fn declared_before<'t>(name: Node<'t>, src: &[u8], seen: &mut Declared<'t>) -> bool {
@@ -1199,7 +1116,6 @@ fn declared_before<'t>(name: Node<'t>, src: &[u8], seen: &mut Declared<'t>) -> b
     false
 }
 
-/// The names the children of `parent` declare, and a compact constructor's parameters.
 fn declared_in(parent: Node, src: &[u8]) -> BTreeMap<String, usize> {
     let mut names = BTreeMap::new();
     if parent.kind() == "compact_constructor_declaration" {
@@ -1217,7 +1133,6 @@ fn declared_in(parent: Node, src: &[u8]) -> BTreeMap<String, usize> {
     names
 }
 
-/// Tells `out` each name `sibling`, a child of `parent`, declares.
 fn declares(parent: Node, sibling: Node, src: &[u8], out: &mut dyn FnMut(&str)) {
     match sibling.kind() {
         "local_variable_declaration" | "spread_parameter" => {
@@ -1237,7 +1152,6 @@ fn declares(parent: Node, sibling: Node, src: &[u8], out: &mut dyn FnMut(&str)) 
                 declares(sibling, n, src, out);
             }
         }
-        // A lambda's parameter, or a loop's variable.
         "identifier" => {
             let declared =
                 (parent.child_by_field_name("name")).or(parent.child_by_field_name("parameters"));
@@ -1256,11 +1170,8 @@ fn declares(parent: Node, sibling: Node, src: &[u8], out: &mut dyn FnMut(&str)) 
     }
 }
 
-/// The byte ranges of the lambdas and of the local and anonymous classes under `root`, nested ones
-/// included, in source order (`Facts::deferred`).
 fn deferred(root: Node) -> Vec<Range<usize>> {
     let mut out = Vec::new();
-    // A node and whether it sits in the body of a method, constructor, initializer or lambda.
     let mut stack = vec![(root, false)];
     while let Some((node, inside)) = stack.pop() {
         let kind = node.kind();
@@ -1287,7 +1198,6 @@ fn deferred(root: Node) -> Vec<Range<usize>> {
         let mut cursor = node.walk();
         let children: Vec<Node> = node.children(&mut cursor).collect();
         for child in children.into_iter().rev() {
-            // An instance initializer is a block straight in a class body.
             let initializer = kind == "class_body" && child.kind() == "block";
             stack.push((child, inside || body || initializer));
         }
@@ -1295,8 +1205,6 @@ fn deferred(root: Node) -> Vec<Range<usize>> {
     out
 }
 
-/// The byte ranges of the code each loop under `root` runs again, nested loops included, in
-/// source order (`Facts::repeated`).
 fn repeated(root: Node) -> Vec<Range<usize>> {
     let mut out = Vec::new();
     let mut stack = vec![root];
@@ -1311,15 +1219,10 @@ fn repeated(root: Node) -> Vec<Range<usize>> {
         }
         stack.extend(node.children(&mut cursor));
     }
-    // The walk keeps no order, and a loop written in an init clause starts before the range of
-    // the `for` that holds it.
     out.sort_by_key(|r| r.start);
     out
 }
 
-/// How often each of `names` is written as an identifier under `root`, in the order given. A
-/// method's name is no mention: a local `entries` passed to `.entries(entries)` is written once
-/// there (#773).
 fn mentions(root: Node, src: &[u8], names: &[&str]) -> Vec<u32> {
     let index: BTreeMap<&str, usize> = names.iter().enumerate().map(|(n, s)| (*s, n)).collect();
     let mut counts = vec![0; names.len()];
@@ -1346,7 +1249,6 @@ fn modifiers(node: Node<'_>) -> Vec<&str> {
         .map_or_else(Vec::new, |n| children(n).map(|c| c.kind()).collect())
 }
 
-/// The parameter nodes of the method or constructor `node`, in order.
 fn formal_parameters(node: Node) -> impl Iterator<Item = Node> {
     let list = node.child_by_field_name("parameters").or_else(|| {
         (node.kind() == "compact_constructor_declaration")
@@ -1357,7 +1259,6 @@ fn formal_parameters(node: Node) -> impl Iterator<Item = Node> {
         .filter(|p| matches!(p.kind(), "formal_parameter" | "spread_parameter"))
 }
 
-/// Each parameter's name, its type as written and the class that type names.
 fn parameters(node: Node, src: &[u8], generics: &[String]) -> Vec<(String, String, Class)> {
     formal_parameters(node)
         .map(|p| {
@@ -1371,8 +1272,6 @@ fn parameters(node: Node, src: &[u8], generics: &[String]) -> Vec<(String, Strin
             });
             let mut ty_class = ty.map_or(Class::Unknown, |t| class_of(t, src, generics));
             let mut ty = ty.map_or_else(String::new, |t| type_spelling(t, src));
-            // The grammar recovers an annotation before a varargs ellipsis as an ERROR
-            // child of a formal parameter. Only the ellipsis tokens survive this check.
             let spread = p.kind() == "spread_parameter"
                 || named(p).filter(Node::is_error).any(|n| {
                     children(n)
@@ -1393,8 +1292,6 @@ fn parameters(node: Node, src: &[u8], generics: &[String]) -> Vec<(String, Strin
         .collect()
 }
 
-/// The annotations of the declaration `node` (its `modifiers`), each as a call written in
-/// `scope`: its name the callee, its arguments positional or named.
 fn annotations(node: Node, src: &[u8], scope: &str) -> Vec<Call> {
     let mut out = Vec::new();
     for annotation in named(node)
@@ -1412,8 +1309,6 @@ fn annotations(node: Node, src: &[u8], scope: &str) -> Vec<Call> {
     out
 }
 
-/// The elements of the annotation `node` as written: the unnamed one and the named ones
-/// (`key = value`).
 fn elements(node: Node, src: &[u8], depth: usize) -> (Vec<Value>, Vec<(String, Value)>) {
     let (mut args, mut kwargs) = (Vec::new(), Vec::new());
     for argument in node
@@ -1458,8 +1353,6 @@ fn call(scope: &str, callee: String, range: Range<usize>) -> Call {
     }
 }
 
-/// The class a written type names, as a callee-like name: unknown for a primitive, an array,
-/// `var`, a type parameter or a type with arguments inside its path (`Outer<T>.Inner`).
 fn class_of(ty: Node, src: &[u8], generics: &[String]) -> Class {
     let ty = match ty.kind() {
         "generic_type" => named(ty).find(|n| n.kind() != "type_arguments"),
@@ -1477,8 +1370,6 @@ fn class_of(ty: Node, src: &[u8], generics: &[String]) -> Class {
     Class::Type(name)
 }
 
-/// The supertypes a type declaration writes in `extends` and `implements`, in order; one whose
-/// class cannot be read stays as an unread base (`(type)`), whose members are not known.
 fn bases(node: Node, src: &[u8], generics: &[String]) -> Vec<String> {
     let superclass = node
         .child_by_field_name("superclass")
@@ -1499,8 +1390,6 @@ fn bases(node: Node, src: &[u8], generics: &[String]) -> Vec<String> {
         .collect()
 }
 
-/// The superclass the class around `node` writes in `extends`, as a type name; `None` without
-/// one (`java.lang.Object`'s constructor is outside).
 fn superclass(node: Node, src: &[u8]) -> Option<String> {
     let mut at = node.parent();
     while let Some(n) = at {
@@ -1521,7 +1410,6 @@ fn type_name(node: Node, src: &[u8]) -> String {
     ty.split('<').next().unwrap_or(&ty).trim().to_string()
 }
 
-/// Keep type tokens, never annotation arguments, comments or literals recovered from errors.
 fn type_spelling(node: Node, src: &[u8]) -> String {
     let mut spelling = String::new();
     let mut pending = vec![node];
@@ -1580,7 +1468,6 @@ fn callee(node: Node, src: &[u8]) -> String {
     parts.join(".")
 }
 
-/// The variable `System.getenv("X")` (or `java.lang.System.getenv("X")`) reads, unless the file
 /// binds `System` to another type: by a single-type import, or by declaring one.
 // ponytail: a `System` type another file of the package declares is not seen; it hides
 // `java.lang.System` there, and its `getenv` still reads as an environment read.
@@ -1599,13 +1486,10 @@ fn getenv(node: Node, src: &[u8], depth: usize) -> Option<Part> {
 }
 
 thread_local! {
-    /// Whether the file `parse` reads binds `System` to a type other than `java.lang.System`
-    /// (`binds_system`), for `getenv`.
     static SYSTEM_BOUND: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// Whether the file binds `System` to another type: a single-type import of one, or a type it
-/// may declare by that name.
 fn binds_system(root: Node, src: &[u8]) -> bool {
     let imported = named(root)
         .filter(|n| n.kind() == "import_declaration")
@@ -1617,8 +1501,6 @@ fn binds_system(root: Node, src: &[u8]) -> bool {
     imported || declares_system(src)
 }
 
-/// Whether the source may declare a type named `System`: the word after `class`, `interface`,
-/// `enum` or `record`, wherever it stands (a comment that reads so counts too).
 fn declares_system(src: &[u8]) -> bool {
     let mut words = (src.split(|b| !(b.is_ascii_alphanumeric() || matches!(b, b'_' | b'$'))))
         .filter(|w| !w.is_empty());
@@ -1672,16 +1554,12 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
             .map_or(Value::Unknown, |ty| {
                 Value::New(type_name(ty, src), arguments(node, src, depth + 1))
             }),
-        // `Api.class`: the member `class` of the type, which a call such as Retrofit's
-        // `create(Api.class)` names its interface by.
         "class_literal" => named(node).next().map_or(Value::Unknown, |ty| {
             Value::Member(type_name(ty, src), "class".into())
         }),
         "array_initializer" | "element_value_array_initializer" => {
             Value::List(named(node).map(|n| value(n, src, depth + 1)).collect())
         }
-        // An annotation written as an element value (`@Queue("orders")` inside `@QueueBinding`):
-        // its name and its elements, the unnamed one as `value`, as Java reads it.
         "annotation" | "marker_annotation" => {
             let Some(name) = node.child_by_field_name("name") else {
                 return Value::Unknown;
@@ -1722,8 +1600,6 @@ fn value(node: Node, src: &[u8], depth: usize) -> Value {
     }
 }
 
-/// The innermost class of `classes` that is `scope` or encloses it, found by the prefixes of
-/// `scope` rather than a scan of the classes.
 fn innermost<'a>(classes: &'a BTreeSet<String>, scope: &str) -> Option<&'a str> {
     let ends = scope
         .match_indices('.')
@@ -1734,12 +1610,10 @@ fn innermost<'a>(classes: &'a BTreeSet<String>, scope: &str) -> Option<&'a str> 
         .map(String::as_str)
 }
 
-/// Whether `class` declares a field `name`.
 fn declares_field(fields: &BTreeMap<String, BTreeSet<String>>, name: &str, class: &str) -> bool {
     fields.get(name).is_some_and(|at| at.contains(class))
 }
 
-/// Whether the class scope `class` is `scope` or encloses it.
 fn encloses(class: &str, scope: &str) -> bool {
     scope == class
         || scope
@@ -1747,7 +1621,6 @@ fn encloses(class: &str, scope: &str) -> bool {
             .is_some_and(|rest| rest.starts_with('.'))
 }
 
-/// The methods of `Class` that read a field by its name (`Facts::reflects`).
 const REFLECTIVE: [&str; 4] = [
     "getDeclaredField",
     "getField",
@@ -1755,11 +1628,6 @@ const REFLECTIVE: [&str; 4] = [
     "getFields",
 ];
 
-/// Whether a file may read a field by its name (`Facts::reflects`): it spells one of
-/// `REFLECTIVE`, or `spells` cannot read it. UTF-16 puts a zero byte beside each letter and
-/// inside each Unicode escape, EBCDIC writes no letter in ASCII, and a multi-byte encoding
-/// writes a character the compiler drops from a name with bytes the scan keeps (GB18030's soft
-/// hyphen is 81 30 85 32).
 // ponytail: every file that is not UTF-8 counts, a Latin-1 one among them, so its repository
 // names no private field; tell the encodings of one byte a character apart when a repository
 // shows the need.
@@ -1767,11 +1635,6 @@ fn reflects(src: &[u8]) -> bool {
     spells(src, &REFLECTIVE) || src.contains(&0) || std::str::from_utf8(src).is_err()
 }
 
-/// Whether `src` may hold a character the compiler drops from a name (JLS 3.8,
-/// `Character.isIdentifierIgnorable`): a control that is no white space, or a format character
-/// (a soft hyphen, a zero-width space, a byte order mark). Text that is not UTF-8 may, and any
-/// character past the Basic Multilingual Plane counts, as do the unassigned ones beside the
-/// format characters of today's Unicode: a later version may make one of them.
 fn ignorable(src: &[u8]) -> bool {
     let Ok(text) = std::str::from_utf8(src) else {
         return true;
@@ -1786,19 +1649,10 @@ fn ignorable(src: &[u8]) -> bool {
     })
 }
 
-/// Whether `src` spells one of `names` as a whole identifier, anywhere: a call, a method
-/// reference, a comment, a string. A Unicode escape (`\u0046`, JLS 3.3) is read as the character
-/// it stands for, as the compiler reads it before anything else; one after an escaped backslash
-/// is read so too, which can only find a name the file does not spell. A control that is no
-/// white space and every character past ASCII, escaped or not, is read as not there: the
-/// compiler drops some from a name (JLS 3.8), and a letter among them makes a longer name, which
-/// this takes for the listed one, never the reverse. Each ASCII byte is read as the character it
-/// is in UTF-8: `reflects` answers for a file where it may be another.
 fn spells(src: &[u8], names: &[&str]) -> bool {
     let mut token: Vec<u8> = Vec::new();
     let mut at = 0;
     while at <= src.len() {
-        // One character: `\uXXXX`, with any number of `u`, or a byte.
         let escape = src[at..].strip_prefix(b"\\u").and_then(|rest| {
             let hex = &rest[rest.iter().take_while(|&&b| b == b'u').count()..];
             let digits = hex
@@ -1813,7 +1667,6 @@ fn spells(src: &[u8], names: &[&str]) -> bool {
         match (named, character) {
             (Some(c), _) => token.push(c),
             (None, Some(0x00..=0x08 | 0x0e..=0x1b | 0x7f..)) => {}
-            // Any other character, and the end of the file, end a name.
             _ => {
                 if names.iter().any(|name| name.as_bytes() == token) {
                     return true;
@@ -1830,8 +1683,6 @@ fn spells(src: &[u8], names: &[&str]) -> bool {
 mod tests {
     use super::*;
 
-    /// A long enclosing name repeated by every node under it exhausts the budget: the file keeps
-    /// no definitions and carries the budget `meada status` names, not `unbuilt`.
     #[test]
     fn a_file_past_the_qualification_budget_keeps_no_facts() {
         let name = "N".repeat(64 * 1024);
@@ -1841,7 +1692,6 @@ mod tests {
         assert!(facts.defs.is_empty() && facts.calls.is_empty());
         assert_eq!(facts.budget, Some(QUALIFICATION_BYTES));
         assert!(!facts.unbuilt && !facts.reflects);
-        // Whether it reads fields by reflection is read off its bytes, which no budget bounds.
         let reflective = src.replacen("f();", "getClass().getDeclaredField(\"b\");", 1);
         let facts = Java.parse("C.java", reflective.as_bytes()).unwrap();
         assert!(facts.budget.is_some() && facts.reflects);
@@ -1851,8 +1701,6 @@ mod tests {
         assert!(!facts.defs.is_empty());
     }
 
-    /// Each escape of a line terminator, with any number of `u`, becomes a line feed and spaces
-    /// of its length; one after an odd run of backslashes, or of another character, stays.
     #[test]
     fn escaped_line_breaks_are_line_feeds_of_their_length() {
         for (src, read) in [
@@ -1867,9 +1715,6 @@ mod tests {
         }
     }
 
-    /// The methods no definition stands for (#772): an anonymous class's or an enum constant
-    /// body's, and those of a class nested in one at any depth; a member or local class's
-    /// elsewhere are definitions.
     #[test]
     fn methods_with_no_definition_are_listed() {
         let src = "class C { enum E { A { void a() {} } } void h() { \
@@ -1879,9 +1724,6 @@ mod tests {
         assert_eq!(facts.anonymous, ["a", "hold", "k", "m"]);
     }
 
-    /// A `final` field is private when every field declaration of the file that spells its name
-    /// is (#775): a name another class declares without `private`, final or not, an interface's
-    /// constant and a field that is not `final` are not. A file that names Lombok lists none.
     #[test]
     fn final_fields_private_wherever_the_file_declares_them_are_listed() {
         let src = "class C { private static final B kept = b(); private final B own = b(); \
@@ -1891,16 +1733,12 @@ mod tests {
             class D { B twin; static B loose; } interface I { B shared = b(); }";
         let facts = Java.parse("C.java", src.as_bytes()).unwrap();
         assert_eq!(facts.private_fields, ["kept", "own"]);
-        // Lombok adds members the source does not show: its file lists none.
         let lombok = format!("import lombok.Getter; {src}");
         let facts = Java.parse("C.java", lombok.as_bytes()).unwrap();
         assert_eq!(facts.private_fields, Vec::<String>::new());
-        // A Unicode escape may spell Lombok's name, or a step on a field: its file lists none.
         let escaped = format!("{src} class E {{ String e = \"\\u00e9\"; }}");
         let facts = Java.parse("C.java", escaped.as_bytes()).unwrap();
         assert_eq!(facts.private_fields, Vec::<String>::new());
-        // So may a character the compiler drops from a name (JLS 3.8), which this pack reads as
-        // other text: a file that holds one, or is not UTF-8, lists none.
         for dropped in [
             "\u{ad}",
             "\u{200b}",
@@ -1916,15 +1754,11 @@ mod tests {
         let latin = [src.as_bytes(), b" // caf\xe9"].concat();
         let facts = Java.parse("C.java", &latin).unwrap();
         assert_eq!(facts.private_fields, Vec::<String>::new());
-        // Other text past ASCII is no such character.
         let accented = format!("{src} // \u{e9} \u{201c}ok\u{201d} \u{e7}\u{e3}o \u{d7}");
         let facts = Java.parse("C.java", accented.as_bytes()).unwrap();
         assert_eq!(facts.private_fields, ["kept", "own"]);
     }
 
-    /// A file reads fields by reflection where it spells one of the four methods of `Class` as a
-    /// whole name (#775): in a call, a method reference, a name written with a Unicode escape, a
-    /// comment. A longer name is another method.
     #[test]
     fn a_file_that_spells_a_reflective_field_read_says_so() {
         let reflects = |body: &str| {
@@ -1941,56 +1775,39 @@ mod tests {
             "errors.getFieldErrors(); form.getFieldName(); my_getField();"
         ));
         assert!(!reflects("holder.build(); String e = \"\\u00e9\";"));
-        // A character the compiler drops from a name (JLS 3.8) is read as not there: a soft
-        // hyphen, raw or escaped, a control, a zero-width space, in any encoding.
         assert!(reflects("Holder.class.getDeclared\u{ad}Field(\"b\");"));
         assert!(reflects("Holder.class.getDeclared\\u00adField(\"b\");"));
         assert!(reflects("Holder.class.getDeclared\u{7f}Field(\"b\");"));
         assert!(reflects("Holder.class.getF\\u200bield(\"b\");"));
         assert!(spells(b"x.getDeclared\xadField()", &REFLECTIVE));
-        // White space and punctuation end a name, escaped or not.
         assert!(!reflects(
             "get Field(); getDeclared.Field(); getDeclared\\u000aField();"
         ));
-        // The name ends the file.
         assert!(spells(b"x::getFields", &REFLECTIVE));
         assert!(!spells(b"x::getFieldsOf", &REFLECTIVE));
     }
 
-    /// A file the scan cannot read counts as reading fields by reflection (#775). The scan takes
-    /// each ASCII byte for the character it is in UTF-8, which UTF-16 (a zero byte beside every
-    /// letter), EBCDIC (no letter is ASCII) and a multi-byte encoding (GB18030 writes a soft
-    /// hyphen with two ASCII digits in it) do not keep. A file that is not UTF-8, or holds a zero
-    /// byte, may be any of them: a Latin-1 file is not told from the others.
     #[test]
     fn a_file_that_is_not_utf_8_or_holds_a_zero_byte_counts_as_reflecting() {
         let reflects = |src: &[u8]| Java.parse("C.java", src).unwrap().reflects;
         let utf16 = |text: &str, bytes: fn(u16) -> [u8; 2]| -> Vec<u8> {
             text.encode_utf16().flat_map(bytes).collect()
         };
-        // An escape in UTF-16 has a zero byte between its backslash and its `u`.
         let escaped = "class C { void f() { c.getDeclared\\u0046ield(n); } }";
         assert!(reflects(&utf16(escaped, u16::to_le_bytes)));
-        // A zero-width space in UTF-16 is the bytes 20 0B, a space. Big-endian text with no byte
-        // order mark is valid UTF-8.
         let spaced = utf16(
             "class C { void f() { c.getDeclared\u{200b}Field(n); } }",
             u16::to_be_bytes,
         );
         assert!(std::str::from_utf8(&spaced).is_ok() && reflects(&spaced));
-        // GB18030 writes U+00AD as 81 30 85 32.
         assert!(reflects(
             b"class C { void f() { c.getDeclared\x81\x30\x85\x32Field(n); } }"
         ));
-        // `class C { }` in EBCDIC (IBM037).
         assert!(reflects(b"\x83\x93\x81\xa2\xa2\x40\xc3\x40\xc0\x40\xd0"));
         assert!(reflects(b"class C { /* caf\xe9 */ }"));
-        // UTF-8 text past ASCII is read as before.
         assert!(!reflects("class C { /* caf\u{e9} */ }".as_bytes()));
     }
 
-    /// Code that runs when its caller says: every lambda and local or anonymous class, nested ones
-    /// too. A member class, a method and a field initializer without one are not.
     #[test]
     fn lambdas_and_local_and_anonymous_classes_are_deferred() {
         let src = "class C { Runnable f = () -> g(); class M { void m() {} } void h() { \
@@ -2011,7 +1828,6 @@ mod tests {
         assert!(facts.loops.len() == 1 && src[facts.loops[0].clone()].starts_with("for"));
     }
 
-    /// Every loop, nested ones too, from where each turn starts: a `for` after its init clause.
     #[test]
     fn every_loop_is_repeated_from_the_end_of_its_init_clause() {
         let src = "class C { void h() { for (int i = 0; i < 2; i++) { while (go()) { run(); } } \
@@ -2031,7 +1847,6 @@ mod tests {
 
     #[test]
     fn every_annotated_field_is_recorded_with_whether_it_is_static() {
-        // The kind decides what a `static` field takes (Spring injects none).
         let src = "class C { @Value(\"a\") static String s; @Value(\"b\") String t; }";
         let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
         let fields: Vec<_> = (facts.annotated.iter())
@@ -2045,7 +1860,6 @@ mod tests {
         assert_eq!(fields, [("s", true), ("t", false)]);
     }
 
-    /// The markers `Code::field_written_in` reads (`Const`s named `.f` or `.f@class`) of a source.
     fn writes(src: &str) -> Vec<String> {
         let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
         let mut marks: Vec<_> = (facts.consts.iter())
@@ -2056,7 +1870,6 @@ mod tests {
         marks
     }
 
-    /// A block of thousands of assignments costs its width: what a block declares is read once.
     #[test]
     fn a_block_of_many_assignments_is_read_in_linear_time() {
         let body = "a = 1;\n".repeat(50_000);
@@ -2065,12 +1878,9 @@ mod tests {
         let mut marks = writes(&src);
         marks.dedup();
         assert_eq!(marks, [".a@C"]);
-        // 1.8 s measured in a local debug build; the bound is over twenty times that.
         assert!(start.elapsed().as_secs() < 40, "{:?}", start.elapsed());
     }
 
-    /// Thousands of fields and thousands of locals cost their sum: a local finds the fields of
-    /// its name by a lookup, not a scan of every field.
     #[test]
     fn many_fields_and_locals_are_read_in_linear_time() {
         let fields = (0..5_000).fold(String::new(), |s, n| s + &format!("int f{n};\n"));
@@ -2080,15 +1890,11 @@ mod tests {
         let src = format!("class C {{ {fields} void f() {{ {locals} }} }}");
         let start = std::time::Instant::now();
         let facts = Java.parse("a/C.java", src.as_bytes()).unwrap();
-        // Every local shares its name with a field, so none is bound to its initializer; the
-        // control local, whose name no field has, is the one that is.
         assert_eq!(facts.bound.len(), 1);
         assert_eq!(facts.bound[0].name, "control");
         assert!(start.elapsed().as_secs() < 10, "{:?}", start.elapsed());
     }
 
-    /// Writes at the bottom of deeply nested blocks cost the depth each: a node's parent is read
-    /// from an index, not found from the root.
     #[test]
     fn deeply_nested_writes_are_read_in_linear_time() {
         let depth = 1_000;
@@ -2139,15 +1945,12 @@ mod tests {
 
     #[test]
     fn a_write_of_a_name_only_an_outer_class_declares_names_no_class() {
-        // `D` may inherit a `base` of its own.
         let src = "class C { String base; class D extends B { void s() { base = \"y\"; } } }";
         assert_eq!(writes(src), [".base"]);
         let src = "class C { void m() { java.util.function.BiConsumer<String, String> f = (url, x) -> { url = null; }; } }";
         assert_eq!(writes(src), Vec::<String>::new());
     }
 
-    /// A local with no initializer, a loop variable, a `try` resource, a `catch` parameter and a
-    /// lambda parameter are no bounds, and one sharing the name of a bound leaves it unread.
     #[test]
     fn a_local_is_bound_only_when_declared_once_with_an_initializer() {
         let held = |body: &str| {
@@ -2156,7 +1959,6 @@ mod tests {
             facts.bound.into_iter().map(|b| b.name).collect::<Vec<_>>()
         };
         assert_eq!(held("String a = x(); int b = 1, c;"), ["a", "b"]);
-        // An initializer block's local is keyed by its class, which methods read through.
         let src = "class C { { String a = x(); } }";
         assert!(
             Java.parse("a/C.java", src.as_bytes())

@@ -1,12 +1,3 @@
-//! Entry points (spec #31): the doors into a repository, each with the process it sets in
-//! motion. They are local facts, found from the repository's own contracts and calls when its
-//! index is written and stored in `entry_points`; the process itself is walked on demand
-//! (`trace::Graph::process`), never stored.
-//!
-//! An entry point's identity is its handler's identity plus, for a route or a channel, the contract
-//! identifier: `<repository>::<path>::<handler>::http::GET::/users/{}`. An export's is the
-//! symbol's own identity. No score or threshold picks them: every one gets its process.
-
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::contract::{self, Names, Role};
@@ -15,8 +6,6 @@ use crate::resolve::{Exported, scope_of};
 
 pub use meada_core::export::EntryKind;
 
-/// One entry point: its identity, kind and label (what names its process), and the `site`
-/// the process starts from, a symbol or a code file of the repository.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EntryPoint {
     pub identity: String,
@@ -26,8 +15,6 @@ pub struct EntryPoint {
 }
 
 impl EntryPoint {
-    /// The entry point a symbol is on its own: its identity is the symbol's, and its process
-    /// starts there.
     fn of_symbol(id: String, kind: EntryKind, label: String) -> Self {
         Self {
             identity: id.clone(),
@@ -38,40 +25,29 @@ impl EntryPoint {
     }
 }
 
-/// A contract side the code gives: the `site` it sits at (a symbol or a code file of the
-/// repository, as an identity) and its `contract`.
 pub struct Side {
     pub site: String,
     pub contract: String,
 }
 
-/// A program entry point a language pack declares: the `file` and the definition's name.
 pub struct Program {
     pub file: String,
     pub def: String,
 }
 
-/// What `find` reads, all of one repository.
 pub struct Local<'a> {
     pub identity: &'a str,
     pub files: &'a BTreeMap<&'a str, &'a Facts>,
     pub names: &'a Names,
-    /// Every symbol identity of the repository.
     pub symbols: &'a HashSet<String>,
-    /// Every symbol some call reaches, an ambiguous candidate included.
     pub called: &'a HashSet<String>,
     pub exported: &'a [Exported],
-    /// Each provider the code gives.
     pub providers: &'a [Side],
-    /// Each consumer the code gives.
     pub consumers: &'a [Side],
-    /// Each program entry point the language packs declare. A name with no symbol is dropped
-    /// silently: each pack's conformance golden catches a wrong one.
     pub programs: &'a [Program],
 }
 
 impl Local<'_> {
-    /// Whether `site` is a symbol or a code file of the repository.
     fn holds(&self, site: &str) -> bool {
         let file = site
             .strip_prefix(self.identity)
@@ -80,30 +56,22 @@ impl Local<'_> {
     }
 }
 
-/// The entry points of a repository, sorted by identity.
 pub fn find(local: &Local) -> Vec<EntryPoint> {
     let doors = doors(local);
-    // A program entry point comes first: dedup keeps it over an export of the same symbol.
     let mut found = programs(local);
     found.extend(doors);
     let served: HashSet<&str> = found.iter().map(|e| e.site.as_str()).collect();
     let exports = exports(local, &served);
     found.extend(exports);
     found.sort_by(|a, b| a.identity.cmp(&b.identity));
-    // The same handler can be registered twice on one full path.
     found.dedup_by(|a, b| a.identity == b.identity);
     found
 }
 
-/// Drops the export entry points whose identity is in `imported`, the symbols a call reaches
-/// through a package import of their own repository (a monorepo). Another kind stays a door
-/// even when called: a program is started from outside, a route or a channel by a request or a
-/// message.
 pub fn drop_imported_exports(found: &mut Vec<EntryPoint>, imported: &HashSet<&str>) {
     found.retain(|e| e.kind != EntryKind::Export || !imported.contains(e.identity.as_str()));
 }
 
-/// One entry point per program entry point a pack declares, whether or not anything calls it.
 fn programs(local: &Local) -> Vec<EntryPoint> {
     let mut found = Vec::new();
     for Program { file, def } in local.programs {
@@ -119,11 +87,6 @@ fn programs(local: &Local) -> Vec<EntryPoint> {
     found
 }
 
-/// One entry point per provider or consumer side whose kind makes a door of it: a symbol, or a
-/// code file when no function of its own holds it (its process starts from the file's
-/// top-level calls). A route only a document lists is no entry point. An unresolved channel
-/// side is one too: the handler still consumes from somewhere, and without its entry point it
-/// would show up nowhere (it would also be an export entry point otherwise).
 fn doors(local: &Local) -> Vec<EntryPoint> {
     let providers = local.providers.iter().map(|s| (Role::Provider, s));
     let consumers = local.consumers.iter().map(|s| (Role::Consumer, s));
@@ -145,18 +108,13 @@ fn doors(local: &Local) -> Vec<EntryPoint> {
     found
 }
 
-/// The exported functions and methods no call reaches, but for route handlers.
 fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
-    // Each definition the rows name, once: a file that re-exports it names it again.
     let mut targets = BTreeSet::new();
-    // The set an exporter's `__all__` is, once.
     let mut takers = HashMap::new();
     for e in local.exported {
         let (Some(file), Some(target)) = (&e.file, &e.target) else {
             continue;
         };
-        // A name the exporting file keeps out of a star import is no door: an import still
-        // reaches it, but it is that file's own.
         if let (Some(name), Some(exporter)) = (&e.name, local.files.get(e.path.as_str()))
             && exporter.star.is_public_set()
             && !takers
@@ -176,12 +134,10 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
         };
         let (keyed, hidden) = keyed.entry(file).or_insert_with(|| keyed_defs(facts));
         let named = keyed.get(target).map_or(&[][..], Vec::as_slice);
-        // The functions and classes of that name, and the methods of a class of that name.
         let class = named.iter().any(|d| d.kind == Kind::Class);
         for def in named {
             let own = match def.kind {
                 Kind::Function => true,
-                // A method of an exported class; a constructor is reached as `new Class`.
                 Kind::Method => {
                     class
                         && !def.name.ends_with(".constructor")
@@ -205,9 +161,6 @@ fn exports(local: &Local, served: &HashSet<&str>) -> Vec<EntryPoint> {
     found
 }
 
-/// A file's functions and classes by their name and its methods by their class's, so that an
-/// export finds its own definitions without a scan of them all, with the methods that are no
-/// door (`Facts::hidden`) as a set.
 fn keyed_defs(facts: &Facts) -> (HashMap<&str, Vec<&Def>>, HashSet<&str>) {
     let mut keyed: HashMap<&str, Vec<&Def>> = HashMap::new();
     for def in &facts.defs {
@@ -247,8 +200,6 @@ mod tests {
         assert_eq!(kept, ["r::cmd.ts::main", "r::a.ts::open"]);
     }
 
-    /// The `(label, kind)` of the entry points of a file with the symbols `main`, `run`
-    /// (exported) and `__main__`.
     fn found(programs: &[&str], called: &[&str]) -> Vec<(String, &'static str)> {
         let id = |n: &str| format!("r::cmd.py::{n}");
         let symbols: HashSet<String> = ["main", "run", "__main__"].map(id).into();
@@ -289,8 +240,6 @@ mod tests {
             .collect()
     }
 
-    /// The labels of the export entry points of `cmd.py`, which exports the functions `names`
-    /// (all uncalled) and holds `star` as the set a star import takes.
     fn export_doors(star: Star, names: &[&str]) -> Vec<String> {
         let mut facts = Facts {
             star,
@@ -331,7 +280,6 @@ mod tests {
     #[test]
     fn only_the_names_a_star_import_would_take_are_export_doors() {
         let names = ["shown", "_hidden", "listed", "default"];
-        // A pack that names a public set: no leading `_`, or a literal `__all__`.
         assert_eq!(
             export_doors(Star::Public, &names),
             ["default", "listed", "shown"]
@@ -340,7 +288,6 @@ mod tests {
             export_doors(Star::Only(vec!["listed".into(), "_hidden".into()]), &names),
             ["_hidden", "listed"]
         );
-        // One that names none (TypeScript) keeps every export, `default` included.
         assert_eq!(
             export_doors(Star::ExceptDefault, &names),
             ["_hidden", "default", "listed", "shown"]
@@ -353,7 +300,6 @@ mod tests {
         let names: Vec<&str> = names.iter().map(String::as_str).collect();
         let start = std::time::Instant::now();
         assert_eq!(export_doors(Star::Public, &names).len(), names.len());
-        // Each export read every definition of its file: minutes here.
         assert!(start.elapsed().as_secs() < 20, "{:?}", start.elapsed());
     }
 
@@ -361,7 +307,6 @@ mod tests {
     fn a_type_of_many_hidden_methods_finds_its_doors_in_linear_time() {
         let n = 100_000;
         let def = |name: String, kind| crate::lang::Def::new(name, kind, 0..0);
-        // `T` holds `n` lower-case methods, no door each, and `Run`.
         let methods = (0..n).map(|i| format!("T.a{i}"));
         let facts = Facts {
             defs: std::iter::once(def("T".into(), Kind::Class))
@@ -392,7 +337,6 @@ mod tests {
         };
         let start = std::time::Instant::now();
         let labels: Vec<String> = find(&local).into_iter().map(|e| e.label).collect();
-        // Each method was looked up among the hidden ones one by one: minutes here.
         assert!(start.elapsed().as_secs() < 20, "{:?}", start.elapsed());
         assert_eq!(labels, ["T.Run"]);
     }
@@ -404,7 +348,6 @@ mod tests {
         let listed = (0..500_000).map(|i| format!("n{i}")).collect();
         let start = std::time::Instant::now();
         assert!(export_doors(Star::Only(listed), &names).is_empty());
-        // Each export was looked up in `__all__` one by one: minutes here.
         assert!(start.elapsed().as_secs() < 20, "{:?}", start.elapsed());
     }
 

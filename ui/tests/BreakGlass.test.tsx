@@ -17,7 +17,6 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 const host = document.createElement('div');
 document.body.append(host);
 const root = createRoot(host);
-// The identity provider's config, with the break-glass mark (#563).
 const config: Config = { ...oidc, sign_in: 'oidc', break_glass: true };
 const t = accountCopy.en;
 const issued = (token: string, change = false) => Response.json({ token, expires_at: new Date(Date.now() + 3600_000).toISOString(), change_required: change });
@@ -39,7 +38,6 @@ test('a tab signs in on the console\'s own page only under break glass, on that 
   sessionStorage.setItem(SESSION_KEY, live());
   expect(breakGlassTab(config, '/workspace')).toBe(true);
   expect(breakGlassTab(oidc as Config, '/workspace')).toBe(false);
-  // An expired session is dropped, and the tab is the identity provider's again.
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token: 'old', expires_at: new Date(Date.now() - 1000).toISOString(), change_required: false }));
   expect(breakGlassTab(config, '/workspace')).toBe(false);
   expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
@@ -58,7 +56,6 @@ test('the choice offers the identity provider first and a discreet break-glass l
   expect(getByRole(host, 'link', { name: t.breakGlassLink })).toBeDefined();
   await act(async () => { fireEvent.click(getByRole(host, 'button', { name: t.identityProvider })); });
   expect(signIn).toHaveBeenCalledTimes(2);
-  // A sign-in that went on to the redirect leaves the button waiting.
   expect(getByRole(host, 'button', { name: t.redirecting }).hasAttribute('disabled')).toBe(true);
   await act(() => root.render(null));
   await act(() => root.render(<SignInChoicePage locale="pt-BR" onIdentityProvider={signIn} />));

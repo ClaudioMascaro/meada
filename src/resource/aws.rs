@@ -1,4 +1,3 @@
-//! The resource kind's AWS operation matrix and name arguments, shared by its language forms.
 use crate::contract::{Found, Role, Site};
 use crate::lang::{Value, property};
 use crate::names::{self, Argument};
@@ -512,7 +511,6 @@ const SERVICES: &[Service] = &[
                 role: Role::Consumer,
                 hierarchy: false,
             },
-            // A `ConditionCheck` reads its table even where the transaction writes others.
             SdkOperation {
                 method: "TransactWriteItems",
                 field: "TransactItems[].Put|Update|Delete.TableName",

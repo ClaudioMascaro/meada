@@ -65,5 +65,4 @@ export const workspaceCopy = {
   },
 };
 export type WorkspaceCopy = typeof workspaceCopy.en;
-/** The copy of a refusal's reason or change; an unknown one shows as the server sent it. */
 export const word = (t: WorkspaceCopy, kind: 'reason' | 'change', value: string) => (t as Record<string, string>)[`${kind}_${value}`] ?? value;

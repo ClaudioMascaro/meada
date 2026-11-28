@@ -1,7 +1,3 @@
-//! PyPI packages (spec #24): a named `pyproject.toml` of a workspace repository provides
-//! `package::pypi::<PEP 503 name>`, the dependencies of `pyproject.toml` and `requirements*.txt`
-//! consume it, and an import of one of its modules crosses into its symbols.
-
 use crate::common;
 
 use std::fs;
@@ -11,7 +7,6 @@ use common::{age, assert_golden, fixture_repo, without_processes};
 use meada::engine::{Direction, Engine, Start};
 use serde_json::Value;
 
-/// The library and its consumer as siblings: `pyweb` names `pylib` as its peer.
 fn pair(case: &str) -> (PathBuf, PathBuf) {
     let repo = |name: &str| {
         let origin = format!("https://example.com/pkg/{name}.git");
@@ -35,8 +30,6 @@ fn python_dependencies_and_imports_link_to_the_distribution() {
     assert_golden("pkg-pylib.export.json", &without_processes(&export(&lib)));
 }
 
-/// The `(consumer, provider, level, reason)` of every link of `json` whose consumer starts
-/// with `site`.
 fn links<'j>(json: &'j Value, site: &str) -> Vec<(&'j str, &'j str, &'j str, &'j str)> {
     (json["links"].as_array().into_iter().flatten())
         .filter(|l| l["consumer"].as_str().unwrap().starts_with(site))
@@ -54,9 +47,6 @@ fn each_import_level_reads_from_the_module_it_names() {
     let at = |caller: &str| links(&json, &format!("example.com/pkg/pyweb::{caller}"));
     let lib = "example.com/pkg/pylib::";
 
-    // The distribution's own name, through a re-export and through a submodule: `exact`. A
-    // `requirements.txt` in `tests/` that names other packages leaves the root's in force, and
-    // the one in the library's `src/shared_lib/` takes no file from its `pyproject.toml`.
     let range = "package::pypi::shared-lib >=1.0,<2 (local 1.2.0)";
     let exact = format!("{range}; import module name");
     for (caller, target) in [
@@ -82,8 +72,6 @@ fn each_import_level_reads_from_the_module_it_names() {
             "{caller}"
         );
     }
-    // A top-level module only one depended-on distribution exposes: `inferred`, with the range
-    // of the nearest manifest naming it (`worker/pyproject.toml`, before the root's).
     let tools = "package::pypi::shared-tools ^0.3 (local 0.3.0), range unchecked";
     assert_eq!(
         at("worker/job.py::run::"),
@@ -94,7 +82,6 @@ fn each_import_level_reads_from_the_module_it_names() {
             format!("{tools}; import top-level module").as_str(),
         )]
     );
-    // The same module exposed by both distributions the root manifests depend on: `ambiguous`.
     let extra = at("app/main.py::extra::");
     let reached: Vec<(&str, &str)> = extra.iter().map(|(_, p, l, _)| (*p, *l)).collect();
     assert_eq!(
@@ -110,7 +97,6 @@ fn each_import_level_reads_from_the_module_it_names() {
             ),
         ]
     );
-    // A local binding of the imported name, and a module outside the workspace, do not cross.
     assert!(at("app/main.py::hidden::").is_empty());
     assert!(at("app/main.py::encode::").is_empty());
 }
@@ -120,9 +106,6 @@ fn a_relative_import_never_reaches_a_package() {
     let (_, web) = pair("pypi_relative");
     let json: Value = serde_json::from_str(&export(&web)).unwrap();
 
-    // `from . import shared_lib`, `from .shared_lib import greet`, `from ..shared_lib.api import
-    // fetch` and `from . import sl_extras` name modules of the importing package, even when no
-    // such file exists and a dependency has that name.
     let site = "example.com/pkg/pyweb::app/rel.py::";
     for list in ["consumers", "links", "imports"] {
         let named =
@@ -149,8 +132,6 @@ fn an_npm_and_a_pypi_package_of_one_name_never_link() {
     let json: Value = serde_json::from_str(&export(&web)).unwrap();
 
     let all = links(&json, "example.com/pkg/pyweb::");
-    // `pylib` holds an npm `shared-lib` too, and `ui/package.json` names `shared-tools` (a PyPI
-    // distribution only): neither crosses ecosystems.
     assert!(!all.is_empty());
     for (consumer, provider, _, reason) in all {
         assert!(
@@ -183,9 +164,6 @@ fn trace_down_crosses_the_package_hop_and_onward() {
     assert_golden("pkg-pyweb.trace-down.txt", &down);
 }
 
-/// Bumps the library, narrows the `pyproject.toml` range, drops `shared-tools` from the root
-/// `requirements.txt` (so `sl_extras` from the root resolves through `shared-lib` alone) and
-/// adds a requirements file that names the library in `worker/`.
 fn edit(lib: &Path, web: &Path) {
     let replace = |repo: &Path, file: &str, from: &str, to: &str| {
         let text = fs::read_to_string(repo.join(file)).unwrap();
@@ -223,7 +201,6 @@ fn an_edited_pyproject_or_requirements_file_relinks_like_a_cold_export() {
     assert_eq!(levels, ["inferred"]);
 }
 
-/// The `(consumer, provider, level)` of every link of `json`, sorted.
 fn ends(json: &Value) -> Vec<(String, String, String)> {
     let mut found: Vec<_> = (json["links"].as_array().into_iter().flatten())
         .map(|l| {
@@ -243,8 +220,6 @@ fn a_uv_source_keeps_the_one_package_it_names() {
     assert_golden("pkg-uv-sources.export.json", &out);
     let json: Value = serde_json::from_str(&out).unwrap();
 
-    // `alpha` and `beta/libs/app` take the member of their own uv workspace, `pathy` the package
-    // its path names; `plain`, with no uv source, fits both packages of the name.
     let id = "example.com/pkg/uv-sources::";
     let (a, b) = (
         "alpha/packages/bird-feeder/pyproject.toml",
@@ -277,15 +252,12 @@ fn a_uv_source_keeps_the_one_package_it_names() {
         let call = format!("{dir}/{module}/main.py::run::feed#0");
         expected.push(want(&call, &feed(to), level));
     }
-    // The requirements files of `pinned` have no code, so only the entries link, to both packages.
     for file in ["requirements.txt", "requirements-dev.txt"] {
         for to in [a, b] {
             let entry = format!("pinned/{file}::requirements::bird-feeder");
             expected.push(want(&entry, &format!("{id}{to}"), "ambiguous"));
         }
     }
-    // `stub` is a lone package of the consumer's own repository named like a registry one (#535):
-    // with no uv source (`registry`) it is only `inferred`, with its path named (`local`) `exact`.
     let (stub, call) = ("stub/pyproject.toml", "stub/anyio/__init__.py::sleep");
     for (dir, level) in [("registry", "inferred"), ("local", "exact")] {
         let entry = format!("{dir}/pyproject.toml::project.dependencies::anyio");
@@ -293,7 +265,6 @@ fn a_uv_source_keeps_the_one_package_it_names() {
         let site = format!("{dir}/{dir}/main.py::run::sleep#0");
         expected.push(want(&site, &format!("{id}{call}"), level));
     }
-    // A `requirements.txt` names no source either.
     let entry = "registry/requirements.txt::requirements::anyio";
     expected.push(want(entry, &format!("{id}{stub}"), "inferred"));
     expected.sort();
@@ -314,8 +285,6 @@ fn a_uv_source_keeps_the_one_package_it_names() {
         "package::pypi::anyio >=4,<5 (local 4.3.0+foo)"
     );
 
-    // A pin no local version satisfies says `range mismatch`; a range one satisfies adds no
-    // words, and one rejects the other version (#534). Neither drops a candidate.
     let mut reasons: Vec<(String, String)> = (json["links"].as_array().unwrap().iter())
         .filter_map(|l| {
             let consumer = l["consumer"]
@@ -381,7 +350,6 @@ fn a_uv_git_source_keeps_the_repository_of_its_url_and_a_url_source_stays_out() 
     let json: Value = serde_json::from_str(&export(&repo)).unwrap();
     let feeder = "example.com/pkg/uv-feeder::pyproject.toml".to_string();
     assert_eq!(of(&json, entry), [(feeder.clone(), "exact".to_string())]);
-    // `plain`, with no source, fits the peer's package too.
     let plain = of(
         &json,
         "plain/pyproject.toml::project.dependencies::bird-feeder",

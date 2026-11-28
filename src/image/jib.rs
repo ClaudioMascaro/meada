@@ -1,9 +1,6 @@
-//! Jib build destinations, using the shared Gradle syntax scanner.
 use crate::jvm::gradle::{GRADLE_DEPTH, Token, tokens};
 use crate::lang::MAX_BYTES;
 
-/// Literal destination images of the Jib plugin. Shares the Gradle token scanner, so comments,
-/// computed strings and unrelated image assignments cannot supply a destination.
 pub(super) fn gradle(src: &[u8]) -> Vec<String> {
     if src.len() > MAX_BYTES {
         return Vec::new();

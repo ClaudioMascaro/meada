@@ -1,8 +1,3 @@
-//! The bounds every XML build file reader of the repository's files shares (Maven's POM in
-//! `jvm/maven.rs`, MSBuild project files in `dotnet/msbuild.rs`): a document past them is
-//! unreadable, checked in one linear pass before roxmltree parses it with `XML_NODES` nodes at
-//! most and no DTD.
-
 // ponytail: a build file is shallow; deeper elements make it unreadable.
 pub(crate) const XML_DEPTH: usize = 64;
 // ponytail: bounds the in-memory tree independently of the manifest's byte limit.
@@ -13,10 +8,6 @@ pub(crate) const XML_NAMESPACES: usize = 16;
 // ponytail: a build file's tag has a few attributes; roxmltree checks duplicates pairwise.
 pub(crate) const XML_ATTRIBUTES: usize = 64;
 
-/// Whether the document stays within the limits roxmltree's cost depends on, read in one linear
-/// pass before parsing: namespace declarations, attributes per tag and element depth. Comments,
-/// CDATA, processing instructions and declarations are skipped; an unterminated one, or an
-/// unterminated tag, is unreadable.
 pub(crate) fn within_limits(text: &str) -> bool {
     if text.matches("xmlns").count() > XML_NAMESPACES {
         return false;

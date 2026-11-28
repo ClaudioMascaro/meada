@@ -1,5 +1,3 @@
-//! Kind-owned projection of receiver names. The generic collector supplies scoped evidence.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{Argument, EnvironmentScope, EnvironmentValue, ReceiverIdentity};
@@ -15,8 +13,6 @@ pub(super) fn identity(name: &Argument, sub: Option<&Argument>) -> ReceiverIdent
     if let Some(sub) = sub {
         parts.push(match sub {
             Argument::Literal(sub) => {
-                // Persist only validated selectors. Invalid name arguments can themselves be
-                // credentials or connection strings; they carry no identity evidence.
                 if let Some(qualified) = crate::contract::azure::subscription(sub) {
                     Argument::Literal(qualified.trim_start_matches("subscription:").into())
                 } else if crate::contract::azure::subscription_target("topic", sub).is_some() {
@@ -81,8 +77,6 @@ fn choices(part: &Argument, values: &dyn Fn(&str) -> Vec<EnvironmentValue>) -> C
         Argument::Environment(variable) => {
             let mut scopes: BTreeMap<_, Vec<_>> = BTreeMap::new();
             for entry in values(variable) {
-                // An unread value remains in its scope and prevents accepting a conflicting
-                // known value. Typed resource references take precedence over raw text.
                 scopes.entry(entry.scope).or_default().push(Choice {
                     typed: entry.target.is_some(),
                     value: entry.target.or(entry.value).unwrap_or_default(),

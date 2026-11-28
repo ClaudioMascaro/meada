@@ -1,13 +1,9 @@
-//! Literal Ingress prefixes, kept with evaluated Service addresses for the HTTP kind.
-
 use super::{OBJECT_REFERENCES_MAX, UNIT_STORED_MAX, list, plain, text};
 use crate::iac::Ingress;
 use serde_json::Value;
 use std::collections::BTreeSet;
 
 pub(super) fn read(value: &Value) -> Vec<Ingress> {
-    // An unread rewrite or regular expression is an unread mount, including annotations of other
-    // controllers.
     let unread = value["metadata"]["annotations"]
         .as_object()
         .is_some_and(|annotations| {
@@ -29,8 +25,6 @@ pub(super) fn read(value: &Value) -> Vec<Ingress> {
         for path in list(rule, &["http", "paths"]) {
             let written = text(path, &["path"]).unwrap_or_default();
             let read = written.starts_with('/') && written.bytes().all(literal);
-            // A path read as no literal prefix is an unknown mount at its literal head, cut at
-            // its last slash, so the URLs it may serve fall back to no shorter route.
             let prefix = if read {
                 written.trim_end_matches('/')
             } else {
@@ -42,15 +36,12 @@ pub(super) fn read(value: &Value) -> Vec<Ingress> {
                 .filter(|name| plain(name))
                 .filter(|_| read && !unread && text(path, &["pathType"]) == Some("Prefix"))
                 .unwrap_or_default();
-            // Charge borrowed text before repeating a host for each path or cloning an alias.
             let size = host
                 .len()
                 .saturating_add(prefix.len())
                 .saturating_add(service.len());
             let next = remaining.checked_sub(size);
             if routes.len() == OBJECT_REFERENCES_MAX || next.is_none() {
-                // No partial prefix table may turn an unread longer rule into a shorter route:
-                // every host of the Ingress is one unknown mount.
                 let hosts = (list(value, &["spec", "rules"]).filter_map(host_of))
                     .map(str::to_ascii_lowercase)
                     .collect::<BTreeSet<_>>();
@@ -77,10 +68,6 @@ pub(super) fn read(value: &Value) -> Vec<Ingress> {
 mod tests {
     use serde_json::json;
 
-    /// A path the reader cannot take as a literal prefix is an unknown mount at its literal head,
-    /// cut at its last slash, so the URLs it may serve fall back to no other route; a path with
-    /// no `pathType`, or under a `use-regex` annotation, is an unknown mount at its own prefix,
-    /// since the controller reads it as it likes.
     #[test]
     fn an_unread_path_is_an_unknown_mount_at_its_literal_head() {
         let routes = |annotations: serde_json::Value, paths: serde_json::Value| {
@@ -103,7 +90,6 @@ mod tests {
             path("/api/*", Some("ImplementationSpecific"), "api"),
             path("/v1(.*)", Some("Prefix"), "v1"),
             path("/legacy", None, "old"),
-            // An ImplementationSpecific path may be left out: the controller's catch-all.
             json!({"pathType": "ImplementationSpecific", "backend": {"service": {"name": "any"}}}),
         ]);
         let pair = |prefix: &str, service: &str| (prefix.to_string(), service.to_string());
@@ -139,7 +125,6 @@ mod tests {
                     })
                 })
                 .collect::<Vec<_>>();
-            // A host whose rules come after the cut is no more read than the cut one.
             let later = json!({"host": "later.example.com", "http": {"paths": [
                 {"path": "/store", "pathType": "Prefix", "backend": {"service": {"name": "cart"}}}]}});
             let value =

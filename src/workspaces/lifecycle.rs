@@ -1,16 +1,3 @@
-//! The version lifecycle of named workspaces (#343, ADR 0021 contract 4): save, apply and
-//! rollback, rename, delete and the operator list, each one transaction on the workspace's row.
-//!
-//! This is the atomic boundary. `SELECT ... FOR UPDATE` on the row, then in this order: the
-//! workspace is not deleted, `seq` is the `base` the caller read, the actor is an operator of it
-//! or the platform administrator and, for an operation that adds or changes entries, the newest
-//! permissions set (read here, not the admission cache) holds every one of those entries
-//! eligible for the actor itself. Only then do `current` and `seq` move and the history row is
-//! inserted. A stale page, a revoked grant or a refused entry returns before any write, so every
-//! row stays as it was. Saving a version stores a row and moves nothing. The version document is
-//! the shared store's, written by the caller before this runs; nothing here names a row that
-//! points at a document that is not there.
-
 use std::collections::BTreeSet;
 
 use meada_core::authorize::Grant;
@@ -28,10 +15,6 @@ pub(crate) const PAGE_MAX: usize = 50;
 // ponytail: the longest subject a delegation names, in bytes.
 pub(crate) const SUBJECT_MAX: usize = 256;
 
-/// Whether an operators request is well formed: `add` pairs of subject and GitHub login and
-/// `remove` subjects, at least one change and at most `2 * OPERATORS_MAX` of them, every subject
-/// plain and within `SUBJECT_MAX`, every login one the sponsor rule can read, no subject twice in
-/// either list and none in both. The console and the CLI decide it here.
 pub(crate) fn operators_valid(add: &[(String, String)], remove: &[String]) -> bool {
     let subject_ok =
         |s: &str| !s.is_empty() && s.len() <= SUBJECT_MAX && !s.chars().any(char::is_control);
@@ -49,34 +32,21 @@ pub(crate) fn operators_valid(add: &[(String, String)], remove: &[String]) -> bo
         && added.intersection(&removed).next().is_none()
 }
 
-/// Why an operation did not happen. Nothing was written for any of them.
 #[derive(Debug)]
 pub(crate) enum Error {
-    /// The workspace does not exist or was deleted.
     NotFound,
-    /// `seq` is not the base the caller read: the current `seq`.
     Stale(i64),
-    /// The actor neither operates the workspace nor is the platform administrator.
     NotOperator,
-    /// The operation is the platform administrator's.
     NotAdministrator,
-    /// A condition of the platform or the caller that stops every selection (fail closed).
     Pending(Reason),
-    /// Some entry the operation adds or changes is not eligible for the actor.
     Refused(Creation),
-    /// The version is not one of this workspace's.
     UnknownVersion,
-    /// The version applied is the one that is current.
     AlreadyCurrent,
-    /// The operator list would hold none or more than `OPERATORS_MAX`: `last_operator` or
-    /// `too_many_operators`.
     Operators(&'static str),
-    /// A database error, scrubbed of the URL.
     Failed(String),
     Db(DbError),
 }
 
-/// A database error before it is scrubbed.
 pub(crate) struct DbError(tokio_postgres::Error);
 
 impl std::fmt::Debug for DbError {
@@ -89,25 +59,19 @@ fn db(e: tokio_postgres::Error) -> Error {
     Error::Db(DbError(e))
 }
 
-/// The fact an operation targets: the workspace, the `seq` the caller read and the version that
-/// was current when the entries it carries were computed against it.
 pub(crate) struct Target<'a> {
     pub id: &'a str,
     pub base: i64,
     pub current: &'a str,
 }
 
-/// What an operation changes.
 pub(crate) enum Op<'a> {
-    /// Stores a version row: `identities` are the version document's, `changed` the ones it adds
-    /// or changes against the current version.
     Save {
         version: &'a str,
         message: &'a str,
         identities: &'a [String],
         changed: &'a [String],
     },
-    /// Makes a stored version current.
     Apply {
         version: &'a str,
         identities: &'a [String],
@@ -118,26 +82,19 @@ pub(crate) enum Op<'a> {
         description: &'a str,
     },
     Delete,
-    /// The platform administrator's: operators to add (subject, login) and subjects to remove.
     Operators {
         add: &'a [(String, String)],
         remove: &'a [String],
     },
 }
 
-/// What an accepted operation did.
 #[derive(Debug)]
 pub(crate) struct Done {
-    /// The workspace's `seq` after it: the next base.
     pub seq: i64,
-    /// The history action, `save` for a stored version that moves nothing.
     pub action: &'static str,
-    /// For a save: whether the row was new (a version already stored is not stored again).
     pub saved: bool,
 }
 
-/// Runs `op` on the workspace `target` as `actor` in one transaction. `grant` is what the actor
-/// reads, to word a refusal.
 pub(crate) async fn transact(
     policy: &Policy<'_>,
     actor: &Creator<'_>,
@@ -196,8 +153,6 @@ async fn run(
             return Err(Error::NotOperator);
         }
     }
-    // The entries the operation carries were computed against another version than the one
-    // that is current: the base cannot be the same fact.
     if current != target.current {
         return Err(Error::Stale(seq));
     }
@@ -322,9 +277,6 @@ async fn run(
     }
 }
 
-/// The eligibility of the entries an operation adds or changes, for the actor itself, from the
-/// newest set in `tx`. Entries both versions hold and removals need none; a refusal names the
-/// identities `grant` reads and counts the others.
 async fn gate(
     tx: &tokio_postgres::Transaction<'_>,
     q: &str,
@@ -376,7 +328,6 @@ async fn history(
     Ok(())
 }
 
-/// Whether `version` was ever the workspace's current one: an apply of it is a rollback.
 async fn was_current_in(
     tx: &tokio_postgres::Transaction<'_>,
     q: &str,
@@ -390,8 +341,6 @@ async fn was_current_in(
     Ok(tx.query_one(&sql, &[&id, &version]).await?.get(0))
 }
 
-/// Whether applying `version` of the workspace is a rollback (the audit names the action before
-/// the transaction runs; the history is append only, so the answer holds).
 pub(crate) async fn was_current(
     postgres: &postgres::Config,
     id: &str,
@@ -408,25 +357,18 @@ pub(crate) async fn was_current(
     Ok(row.get(0))
 }
 
-/// One version of a workspace as a list shows it.
 pub(crate) struct VersionRow {
     pub version: String,
     pub author: String,
     pub saved: String,
     pub message: String,
-    /// The identities of its document, in manifest order.
     pub entries: Vec<String>,
-    /// Whether it is the workspace's current version.
     pub current: bool,
-    /// Where the next page of a list starts after this row.
     pub cursor: String,
 }
 
-/// The sort key of a version row and of the opaque cursor: its time at UTC to the microsecond,
-/// 20 digits, and then its id.
 const SAVED_KEY: &str = "to_char(v.saved AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISSUS')";
 
-/// The shape of a cursor: 20 digits and a version id.
 pub(crate) fn cursor_ok(after: &str) -> bool {
     after.len() == 36
         && after[..20].bytes().all(|b| b.is_ascii_digit())
@@ -453,9 +395,6 @@ fn version_row(row: &tokio_postgres::Row, bad: &dyn Fn() -> String) -> Result<Ve
 const VERSION_COLUMNS: &str = "v.version, v.author, to_char(v.saved AT TIME ZONE 'UTC', \
      'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'), v.message, v.entries, (v.version = w.current)";
 
-/// The versions of workspace `id`, newest first, after the cursor `after`, at most `limit`
-/// rows. `only` narrows to the versions whose every identity it holds (a reader that is no
-/// operator sees the versions it reads whole); `None` lists them all.
 pub(crate) async fn versions(
     postgres: &postgres::Config,
     id: &str,
@@ -486,7 +425,6 @@ pub(crate) async fn versions(
     rows.iter().map(|row| version_row(row, &bad)).collect()
 }
 
-/// One version of workspace `id`, or none when the workspace holds no such row.
 pub(crate) async fn version(
     postgres: &postgres::Config,
     id: &str,
@@ -504,7 +442,6 @@ pub(crate) async fn version(
     rows.first().map(|row| version_row(row, &bad)).transpose()
 }
 
-/// One row of a workspace's append-only history.
 pub(crate) struct Entry {
     pub seq: i64,
     pub action: String,
@@ -515,8 +452,6 @@ pub(crate) struct Entry {
     pub message: Option<String>,
 }
 
-/// The history of workspace `id`, newest first, the rows with a `seq` below `before`, at most
-/// `limit`.
 pub(crate) async fn histories(
     postgres: &postgres::Config,
     id: &str,
@@ -576,7 +511,6 @@ mod tests {
         assert!(!operators_valid(&[add("")], &[]));
         assert!(!operators_valid(&[add("a\nb")], &[]));
         assert!(!operators_valid(&[("a".into(), "not a login".into())], &[]));
-        // Past the longest subject, and past the most changes one request carries.
         let long = "x".repeat(SUBJECT_MAX + 1);
         assert!(operators_valid(&[add(&"x".repeat(SUBJECT_MAX))], &[]));
         assert!(!operators_valid(&[add(&long)], &[]));

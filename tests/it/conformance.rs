@@ -1,8 +1,3 @@
-//! The language conformance suite (ADR 0007): a language pack is done when the export of its
-//! conformance fixture holds exactly the expected definitions, every expected call at its
-//! expected level, and matches its golden file. A new pack adds a fixture under
-//! `tests/fixtures/conformance-<language>/` and one test calling `conform`.
-
 use crate::common;
 
 use common::{assert_golden, fixture_repo};
@@ -12,9 +7,6 @@ use serde_json::Value;
 const ORIGIN: &str = "https://example.com/acme/conformance.git";
 const REPO: &str = "example.com/acme/conformance";
 
-/// An expected call site: its id and level, and its targets (one for `exact` and `inferred`,
-/// every candidate for `ambiguous`, none when the call stays unresolved). Ids are relative to
-/// the repository.
 type ExpectedCall<'a> = (&'a str, Option<&'a str>, &'a [&'a str]);
 
 const EXACT: Option<&str> = Some("exact");
@@ -286,7 +278,6 @@ fn java() {
     );
 }
 
-/// Calls through typed receivers, written supertypes and name matches (#85).
 const JAVA_CALLS: &[ExpectedCall] = &[
     (
         "maven/api/src/main/java/example/calls/Repo.java::example.calls.Repo.touch(int)::super.touch#0",
@@ -351,7 +342,6 @@ const JAVA_CALLS: &[ExpectedCall] = &[
         INFERRED,
         &["maven/api/src/main/java/example/calls/Listing.java::example.calls.Listing.own()"],
     ),
-    // Known outside members: `Serializable` and `Comparable` hide `compareTo` alone.
     (
         "maven/api/src/main/java/example/calls/Ticket.java::example.calls.Ticket.use(Ticket)::t.open#0",
         EXACT,
@@ -481,10 +471,6 @@ fn java_context_shows_an_unresolved_consumer() {
     );
 }
 
-/// Each Java channel client links its producer to its handler (spec #26, #92): a topic from the
-/// module's Spring configuration, a publish to a named exchange routed by an annotation's and a
-/// configuration's bindings, the default exchange, a NATS wildcard as `inferred`, and a name
-/// that cannot be evaluated left unresolved on both sides.
 #[test]
 fn java_channel_clients_link_their_producers_to_their_handlers() {
     let repo = fixture_repo("java_channels", "conformance-java", Some(ORIGIN));
@@ -546,12 +532,6 @@ fn java_channel_clients_link_their_producers_to_their_handlers() {
     assert_eq!(unresolved("consumers"), ["Sales.onMissing(String)"]);
 }
 
-/// Each Kotlin channel client links its producer to its handler (spec #27, #104), as the Java
-/// ones do (`java_channel_clients_link_their_producers_to_their_handlers`): a topic from a
-/// constant, a companion's constant, the module's Spring configuration and a wrapper's caller;
-/// named arguments and array literals; a publish to a named exchange routed by an annotation's
-/// and a configuration's bindings; the default exchange; a NATS wildcard as `inferred`; and the
-/// names that cannot be evaluated left unresolved on both sides.
 #[test]
 fn kotlin_channel_clients_link_their_producers_to_their_handlers() {
     let repo = fixture_repo("kotlin_channels", "conformance-kotlin", Some(ORIGIN));
@@ -655,7 +635,6 @@ fn java_static_imports_an_outside_base_may_shadow_are_name_matches() {
     let plain = call("other.Plain.run()");
     assert_eq!(plain["level"], "exact", "{plain}");
     assert!(plain["target"].as_str().unwrap().ends_with(target));
-    // `Remote` may declare `single()`, which would shadow the import.
     let shadowed = call("other.Job.run()");
     assert_eq!(shadowed["level"], "inferred", "{shadowed}");
     assert!(shadowed["target"].as_str().unwrap().ends_with(target));
@@ -1258,7 +1237,6 @@ fn java_enum_and_interface_values_hide_imported_types() {
     };
     let enumerated = call("other.EnumValue.run()");
     assert_ne!(enumerated["level"], "exact", "{enumerated}");
-    // The constant's written type, not the import, owns the method.
     let typed = call("other.InterfaceValue.run()");
     assert_eq!(typed["level"], "exact", "{typed}");
     assert!(
@@ -1390,7 +1368,6 @@ fn java_package_paths_cannot_bypass_a_shadowing_value() {
                 .ends_with("provider.Caller.run(Holder)")
         })
         .unwrap();
-    // The field's written type, not the package path, owns the method.
     assert_eq!(call["level"], "exact", "{call}");
     assert!(
         call["target"]
@@ -1852,14 +1829,12 @@ fn kotlin() {
             "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.pair()",
             "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.listed()",
             "src/main/kotlin/example/web/VarargController.kt::example.web.VarargController.put()",
-            // Shapes the published grammar lost (ADR 0017).
             "src/main/kotlin/example/web/HealthController.kt::example.web.HealthController",
             "src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.Companion",
             "src/main/kotlin/example/web/HealthController.kt::example.web.HealthController.live()",
             "src/main/kotlin/example/OneLine.kt::example.Twins",
             "src/main/kotlin/example/OneLine.kt::example.Twins.left()",
             "src/main/kotlin/example/OneLine.kt::example.Twins.right()",
-            // Ktor routes (#98): each inline handler is named for its route.
             "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module()",
             "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /health",
             "src/main/kotlin/example/ktor/Server.kt::example.ktor.Application.module().GET /api/v1",
@@ -1891,7 +1866,6 @@ fn kotlin() {
             "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Routing.top().GET /top",
             "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.again()",
             "src/main/kotlin/example/ktor/hidden/Hidden.kt::example.ktor.hidden.Route.again().GET /cyc/loop",
-            // A local `val` before a line starting with `get` or `set` (ADR 0017's scanner patch).
             "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals()",
             "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /local",
             "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.locals().GET /",
@@ -1901,7 +1875,6 @@ fn kotlin() {
             "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spaced()",
             "src/main/kotlin/example/ktor/Locals.kt::example.ktor.Application.spacedPair()",
             "src/main/kotlin/example/ktor/Locals.kt::example.ktor.afterLocals()",
-            // JVM HTTP clients (#101): RestTemplate, WebClient, OkHttp and Retrofit.
             "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest",
             "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.list()",
             "src/main/kotlin/example/jvm/Rest.kt::example.jvm.Rest.one(String)",
@@ -2317,7 +2290,6 @@ fn kotlin() {
                 INFERRED,
                 &["src/main/kotlin/example/Members.kt::example.log(String)"],
             ),
-            // Known outside members: `Serializable` and `Comparable` hide `compareTo` alone.
             (
                 "src/main/kotlin/example/Known.kt::example.Ticket.check(Ticket)::t.open#0",
                 EXACT,
@@ -2696,7 +2668,6 @@ fn kotlin() {
                 EXACT,
                 &["src/main/kotlin/example/ext/Extensions.kt::example.ext.Cache.tag()"],
             ),
-            // A call on the class's name reaches the companion, one on an instance the class.
             (
                 "src/main/kotlin/example/Members.kt::example.twins(Twin)::Twin.m#0",
                 EXACT,
@@ -2712,8 +2683,6 @@ fn kotlin() {
                 EXACT,
                 &["src/main/kotlin/example/Members.kt::example.Twin.m()"],
             ),
-            // An extension in its class's file is no member: Java never reaches it, and a member
-            // of a Java base wins over it.
             (
                 "src/main/kotlin/example/legacy/Gauge.kt::example.legacy.gauges(Gauge,Meter)::gauge.reset#0",
                 EXACT,
@@ -2734,7 +2703,6 @@ fn kotlin() {
                 EXACT,
                 &["src/main/java/example/legacy/Port.java::example.legacy.Port.ext(int)"],
             ),
-            // A name read in a receiver's block is its member; a local around comes first.
             (
                 "src/main/kotlin/example/Receivers.kt::example.implicitMember(Shelf)::stock.clear#0",
                 EXACT,
@@ -2760,7 +2728,6 @@ fn kotlin() {
                 EXACT,
                 &["scripts/seed.kts::seed()"],
             ),
-            // The callers of a Retrofit interface reach its function like any call (#101).
             (
                 "src/main/kotlin/example/declarative/Remotes.kt::example.declarative.Books.open(String)::ledger.entry#0",
                 EXACT,
@@ -2775,8 +2742,6 @@ fn kotlin() {
                     "src/main/kotlin/example/declarative/Ledger.kt::example.declarative.Ledger.record()",
                 ],
             ),
-            // A base, an interface and a constructor named through a star import resolve as
-            // under a single-type import (#402); the call in the lambda stays a name match (#404).
             (
                 "src/main/kotlin/example/stars/sub/Sub.kt::example.stars.sub.Sub.go()::mark#0",
                 EXACT,
@@ -2802,8 +2767,6 @@ fn kotlin() {
                 EXACT,
                 &["src/main/kotlin/example/stars/Base.kt::example.stars.Base"],
             ),
-            // Each constructor, the primary one and the secondary ones, is a callable of the
-            // class's name: a call narrows among them by argument count.
             (
                 "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Parcel.Maker.assemble()::Parcel#0",
                 EXACT,
@@ -2849,8 +2812,6 @@ fn kotlin() {
                     "src/main/kotlin/example/ctors/Ctors.kt::example.ctors.Same.Same(String)",
                 ],
             ),
-            // A call made on another call's result is typed by the written return type of the
-            // first, or by the class a constructor builds.
             (
                 "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).latch#0",
                 EXACT,
@@ -2891,7 +2852,6 @@ fn kotlin() {
                 EXACT,
                 &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
             ),
-            // A type with arguments names its class; a function type names none.
             (
                 "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).peek#0",
                 EXACT,
@@ -2902,7 +2862,6 @@ fn kotlin() {
                 INFERRED,
                 &["src/main/kotlin/example/chains/Chains.kt::example.chains.Box.unlatch()"],
             ),
-            // A property read between the calls is the receiver, not the first call's result.
             (
                 "src/main/kotlin/example/chains/Chains.kt::example.chains.use()::(call_expression).lid.stamp#0",
                 AMBIGUOUS,
@@ -2911,8 +2870,6 @@ fn kotlin() {
                     "src/main/kotlin/example/chains/Chains.kt::example.chains.Lid.stamp()",
                 ],
             ),
-            // An explicit import wins over a star import; two star imports that give one name
-            // leave it ambiguous, and the members of a base so named unknown.
             (
                 "src/main/kotlin/example/stars/both/Both.kt::example.stars.both.Both.go()::Base#0",
                 EXACT,
@@ -2938,9 +2895,6 @@ fn kotlin() {
                 None,
                 &[],
             ),
-            // An `expect` class and its `actual` ones are one class, the `expect` one, under a
-            // single-type and a star import, as a base and as a receiver; a member only an
-            // `actual` declares is a name match.
             (
                 "src/main/kotlin/example/platform/named/Named.kt::example.platform.named.Named.go()::mark#0",
                 EXACT,
@@ -2981,8 +2935,6 @@ fn kotlin() {
     );
 }
 
-/// A `private` or `internal` member is no export door, and a public one is (export doors are
-/// the processes of kind `export`).
 #[test]
 fn kotlin_private_and_internal_members_are_no_export_doors() {
     let repo = fixture_repo("kotlin_doors", "conformance-kotlin", Some(ORIGIN));
@@ -2998,8 +2950,6 @@ fn kotlin_private_and_internal_members_are_no_export_doors() {
     assert!(!door("::example.util.Hidden.closed()"), "{doors:?}");
 }
 
-/// A Spring controller with two annotations, no constructor and a one-line companion body
-/// provides its mapping (the published grammar read the class as an infix call, ADR 0017).
 #[test]
 fn kotlin_annotated_class_with_a_one_line_companion_provides_its_mapping() {
     let (_, actual) = providers(
@@ -3014,12 +2964,6 @@ fn kotlin_annotated_class_with_a_one_line_companion_provides_its_mapping() {
     assert_eq!(actual, expected);
 }
 
-/// Ktor routes take the prefix of every enclosing `route` block, through the routing extension
-/// functions called in one (once per prefix), and each is served by its inline handler. Names
-/// like Ktor's without its import, type-safe routing, an unread prefix, an extension function
-/// no routing scope calls, one out of scope and one a parameter or a local function hides
-/// serve nothing; a path passed by name is read, a `Routing` receiver mounts and a cycle adds
-/// no prefix.
 #[test]
 fn kotlin_ktor_routes_take_every_enclosing_prefix() {
     let (json, actual) = providers(
@@ -3045,7 +2989,6 @@ fn kotlin_ktor_routes_take_every_enclosing_prefix() {
         ("http::GET::/api/named", &site(&module, "GET /api/named")),
         ("http::GET::/api/kw", &site(&module, "GET /api/kw")),
         ("http::GET::/top", &site(&hidden, "Routing.top().GET /top")),
-        // A route after a local `val`, with and without a path (ADR 0017's scanner patch).
         ("http::GET::/local", &site(locals, "GET /local")),
         ("http::GET::/", &site(locals, "GET /")),
         (
@@ -3074,7 +3017,6 @@ fn kotlin_ktor_routes_take_every_enclosing_prefix() {
         ),
     ]);
     assert_eq!(actual, expected);
-    // A call in a handler belongs to the handler.
     let calls = json["calls"].as_array().unwrap();
     let call = |id: &str| calls.iter().find(|c| c["id"] == format!("{REPO}::{id}"));
     let audit = format!("{module}.POST /api/v1/items/{{}}::(anonymous).audit#0");
@@ -3082,12 +3024,6 @@ fn kotlin_ktor_routes_take_every_enclosing_prefix() {
     assert_eq!(found["target"], format!("{REPO}::{server}.audit()"));
 }
 
-/// Ktor client calls are consumers with their URLs folded: every verb and `request` with the
-/// method its block sets, a `defaultRequest` base joined in front, strings, templates, `+` and
-/// constants folded (a hole that does not fold is a parameter), a wrapper read at each of its
-/// call sites through two levels (a cycle adds none), and a path that cannot be evaluated left
-/// unresolved. A name Ktor's `get` shares with a repository class, a map, a hidden client or another
-/// library's client is no consumer.
 #[test]
 fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
     let repo = fixture_repo("kotlin_ktor_client", "conformance-kotlin", Some(ORIGIN));
@@ -3118,7 +3054,6 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
         "host:legacy.example.com",
     );
     let expected = triples(&[
-        // Every verb, and `request` with the method its block sets.
         ("http::GET::/orders", orders, &at("verbs()", "orders.get#0")),
         (
             "http::POST::/orders",
@@ -3160,7 +3095,6 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             orders,
             &at("verbs()", "orders.request#1"),
         ),
-        // A `defaultRequest` base: joined, ignored by an absolute URL, folded from a template.
         (
             "http::GET::/api/invoices",
             billing,
@@ -3181,7 +3115,6 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             gateway,
             &at("Gateway.health()", "client.get#0"),
         ),
-        // Constants, templates and `+`; a hole that does not fold is a parameter.
         ("http::GET::/users", orders, &at("folds()", "orders.get#0")),
         (
             "http::GET::/users/me",
@@ -3199,18 +3132,14 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             orders,
             &at("folds()", "orders.get#4"),
         ),
-        // A path that cannot be evaluated, a `var` and a `url { path(..) }` builder.
         ("unresolved", "", &at("lookup()", "orders.get#0")),
         ("unresolved", "", &at("reassigned()", "orders.get#0")),
         ("unresolved", "", &at("builder()", "orders.get#0")),
-        // A client known by its written type alone.
         (
             "http::GET::/typed",
             orders,
             &probe("typed(HttpClient)", "client.get#0"),
         ),
-        // A wrapper at the call site that determines it, through two levels (`order` reaches
-        // `fetch`); a cycle reads the entry alone; an uncalled one has a hole.
         (
             "http::GET::/orders/a1",
             orders,
@@ -3227,15 +3156,11 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             orders,
             &wrapper("user(Int)", "orders.get#0"),
         ),
-        // `HttpClient` and the request functions imported by `*`.
         (
             "http::GET::/one",
             star,
             &file("Star", "star()", "starred.get#0"),
         ),
-        // A client a local holds with no type written, made by a call the walk finds, also as
-        // the receiver of `use`; each of two locals keeps its own configuration, and a local
-        // hides the client of the same name.
         (
             "http::GET::/untyped",
             local,
@@ -3266,7 +3191,6 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             shadow,
             &file("Local", "shadows()", "billing.get#0"),
         ),
-        // A local `val` folds, an environment read through a fallback too; a `var` does not.
         (
             "http::GET::/env",
             "env:LOCAL_URL",
@@ -3277,14 +3201,11 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             "",
             &file("Local", "varBase()", "(call_expression).get#0"),
         ),
-        // A client read in a receiver's block is the receiver's, with no base.
         (
             "http::GET::/implicit",
             "",
             &file("Local", "implicitClient(Rack)", "outer.get#0"),
         ),
-        // The method of a wrapper is substituted at each call site, whether the URL depends on
-        // the wrapper's parameters or not.
         (
             "http::DELETE::/users/1",
             orders,
@@ -3305,7 +3226,6 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             billing,
             &file("Methods", "callsFixed()", "sendFixed#0"),
         ),
-        // The block is the lambda argument wherever it is; `this.method` is the property.
         (
             "http::POST::/named",
             orders,
@@ -3321,7 +3241,6 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             orders,
             &file("Methods", "thisPut()", "orders.request#0"),
         ),
-        // A method Meada cannot read is unknown, never `GET`.
         (
             "unresolved",
             orders,
@@ -3346,7 +3265,6 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
             orders,
             &file("Methods", "parsed()", "orders.request#0"),
         ),
-        // Ktor 1's `defaultRequest`.
         (
             "http::GET::/v1/ping",
             legacy,
@@ -3359,7 +3277,6 @@ fn kotlin_ktor_client_calls_are_consumers_with_their_urls_folded() {
     );
 }
 
-/// Context lists the consumer a Ktor call that cannot be evaluated is, unresolved.
 #[test]
 fn kotlin_context_shows_an_unresolved_consumer() {
     let repo = fixture_repo(
@@ -3376,7 +3293,6 @@ fn kotlin_context_shows_an_unresolved_consumer() {
     );
 }
 
-/// Search finds an extension function by name.
 #[test]
 fn kotlin_search_finds_an_extension_function() {
     let repo = fixture_repo(
@@ -3393,7 +3309,6 @@ fn kotlin_search_finds_an_extension_function() {
     );
 }
 
-/// Context lists a function's callers and callees.
 #[test]
 fn kotlin_context_lists_callers_and_callees() {
     let repo = fixture_repo("kotlin_context_helper", "conformance-kotlin", Some(ORIGIN));
@@ -3406,8 +3321,6 @@ fn kotlin_context_lists_callers_and_callees() {
     );
 }
 
-/// Context lists a method's callers with their levels and reasons: typed receivers and scope
-/// functions exact, an untyped receiver a name match.
 #[test]
 fn kotlin_context_lists_callers_by_receiver_type() {
     let repo = fixture_repo("kotlin_context_wipe", "conformance-kotlin", Some(ORIGIN));
@@ -3420,7 +3333,6 @@ fn kotlin_context_lists_callers_by_receiver_type() {
     );
 }
 
-/// Tracked lambdas nested past the definition depth, and long `apply` chains, stay bounded.
 #[test]
 fn kotlin_hostile_scope_function_nesting_remains_bounded() {
     let repo = fixture_repo("kotlin_scopes_depth", "conformance-kotlin", Some(ORIGIN));
@@ -3445,17 +3357,11 @@ fn kotlin_hostile_scope_function_nesting_remains_bounded() {
         .filter(|c| c["span"]["path"] == "Nested.kt")
         .filter(|c| c["id"].as_str().unwrap().contains("::(anonymous).size#"))
         .collect();
-    // The innermost call is past the depth where lambdas are scopes: a name match.
     assert!(size.iter().any(|c| c["level"] == "inferred"), "{size:?}");
-    // A name read or called in each lambda looked for a local or local function around it at
-    // every level, from every level: cubic in the depth, over 100 s here in debug; about 12 s
-    // with one climb per lookup.
     eprintln!("kotlin scope functions, 300 deep: {took:?}");
     assert!(took < std::time::Duration::from_secs(30), "{took:?}");
 }
 
-/// Thousands of `apply` lambdas on one class index in time linear in their number: a lambda's
-/// scope adds no members to its receiver's class, so no lookup of the class reads them all.
 #[test]
 fn kotlin_scope_functions_on_one_class_stay_linear_in_width() {
     const WIDTH: usize = 4000;
@@ -3476,17 +3382,13 @@ fn kotlin_scope_functions_on_one_class_stay_linear_in_width() {
         .filter(|c| c["target"] == format!("{REPO}::Wide.kt::wide.Foo.size()"))
         .count();
     assert_eq!(exact, WIDTH);
-    // Quadratic work took 70 s here in debug; linear work, a few.
     eprintln!("kotlin scope functions, {WIDTH} wide: {took:?}");
     assert!(took < std::time::Duration::from_secs(30), "{took:?}");
 }
 
-/// A large file of nested lambdas (a Compose-like UI) is indexed: a lambda's scope costs the
-/// qualification budget where it is stored, not at every syntax node.
 #[test]
 fn kotlin_large_nested_lambda_file_stays_within_the_qualification_budget() {
     let repo = fixture_repo("kotlin_compose", "conformance-kotlin", Some(ORIGIN));
-    // The review's generator (20 sections, 6 levels, about 1,100 lines): the base indexed it.
     let (sections, depth) = (20, 6);
     let mut ui = String::from(
         "package com.example.feature.home.ui.screens.details\n\n\
@@ -3521,9 +3423,6 @@ fn kotlin_large_nested_lambda_file_stays_within_the_qualification_budget() {
     assert_eq!(found, sections);
 }
 
-/// Ktor `route` blocks nest as deep as prefixes are read. Past the depth where lambdas are
-/// scopes, a route and a routing extension function are served nowhere, never under part of
-/// their prefix, and many calls deep in the blocks index in bounded time.
 #[test]
 fn kotlin_ktor_deep_route_nesting_remains_bounded() {
     let repo = fixture_repo("kotlin_ktor_depth", "conformance-kotlin", Some(ORIGIN));
@@ -3632,8 +3531,6 @@ fn kotlin_qualification_expansion_discards_the_whole_file_and_keeps_other_files(
     assert!(called["level"].is_null());
 }
 
-/// `programs` are the program entry points the pack declares (spec #31), as identities relative
-/// to the repository, sorted; a pack with none passes an empty list.
 fn conform(fixture: &str, symbols: &[&str], programs: &[&str], calls: &[ExpectedCall]) {
     let repo = fixture_repo(&format!("conformance_{fixture}"), fixture, Some(ORIGIN));
     let export = Engine::open(&repo).unwrap().export().unwrap();
@@ -4158,7 +4055,6 @@ fn csharp() {
     let upper = format("Format.Upper(string)");
     let lower = format("Casing.Lower(string)");
     let mut calls: Vec<(String, Option<&str>, Vec<String>)> = vec![
-        // Unqualified calls, `this.`, local functions and lambdas in the type.
         (
             place("Check#0"),
             EXACT,
@@ -4177,7 +4073,6 @@ fn csharp() {
             AMBIGUOUS,
             vec![service(".Notify(int)"), service(".Notify(string)")],
         ),
-        // The project's global usings: a namespace, a static class and an alias.
         (place("Lower#0"), EXACT, vec![lower.clone()]),
         (place("Fmt.Upper#0"), EXACT, vec![upper.clone()]),
         (
@@ -4191,7 +4086,6 @@ fn csharp() {
             vec![format("Format.Pad(string)")],
         ),
         // A partial type: each part is its own definition, its members are all one type's, and
-        // constructing it with no constructor names its first part.
         (
             place("Order.Create#0"),
             EXACT,
@@ -4212,7 +4106,6 @@ fn csharp() {
             EXACT,
             vec![orders("Order.Lines.cs", "Order.Sum()")],
         ),
-        // Constructors, `: this(..)` and `: base(..)`; written bases and `base.`.
         (
             format!("{}::OrderService#0", service(".OrderService()")),
             EXACT,
@@ -4249,7 +4142,6 @@ fn csharp() {
             EXACT,
             vec![orders("Carrier.Fees.cs", "Carrier.Bill()")],
         ),
-        // An explicit interface implementation's calls are its type's.
         (
             format!("{}::Now#0", format("SystemClock")),
             EXACT,
@@ -4260,7 +4152,6 @@ fn csharp() {
             EXACT,
             vec![format("Point.Double(int)")],
         ),
-        // An attribute is a call on what it decorates, written in the scope around it.
         (
             format!("{CORE}/Orders/Shipping.cs::Acme.Core.Orders::Serializable#0"),
             None,
@@ -4271,7 +4162,6 @@ fn csharp() {
             None,
             vec![],
         ),
-        // Overloads narrowed by argument count, `params` taking any.
         (
             format!("{}::Save#0", store("Repository.SaveAll(T[])")),
             EXACT,
@@ -4287,8 +4177,6 @@ fn csharp() {
             EXACT,
             vec![store("Repository.SaveAll(T[])")],
         ),
-        // Another project: `using`, `using static`, aliases, a fully qualified name and the
-        // project file's `<Using>`.
         (
             format!(
                 "{}::OrderService#0",
@@ -4315,8 +4203,6 @@ fn csharp() {
             EXACT,
             vec![orders("Order.Lines.cs", "Order.Create()")],
         ),
-        // A type Acme.Core also declares under its name is Acme.Api's own from Acme.Api: the
-        // compiler prefers the project's type to a reference's.
         (
             run("OrderDto#0"),
             EXACT,
@@ -4327,8 +4213,6 @@ fn csharp() {
             EXACT,
             vec![api("Contracts.cs", "Acme.Hosting.Shell")],
         ),
-        // Opaque outside: a base from outside the repository, written on the type or on another
-        // of its parts, may declare the name, so what the file binds is a name match at most.
         (
             format!("{}::Upper#0", api("Opaque.cs", "Acme.Api.Home.Index()")),
             INFERRED,
@@ -4339,8 +4223,6 @@ fn csharp() {
             INFERRED,
             vec![upper.clone()],
         ),
-        // Known outside members: `IDisposable` and `IComparable` hide `Dispose` and `CompareTo`
-        // alone.
         (
             format!("{}::l.Open#0", api("Known.cs", "Acme.Api.Lease.Use(Lease)")),
             EXACT,
@@ -4367,7 +4249,6 @@ fn csharp() {
             None,
             vec![],
         ),
-        // A type of a second namespace in a file binds under that namespace alone.
         (
             format!(
                 "{}::Second.Make#0",
@@ -4387,9 +4268,6 @@ fn csharp() {
                 "Acme.Core.Outer.Inner.Second.Make()",
             )],
         ),
-        // A type of a namespace around the file's binds without a using, the innermost
-        // namespace's first and before a using's (#420): as a static call's receiver, a
-        // constructor and a base, in a file-scoped namespace and in nested blocks alike.
         (
             format!(
                 "{}::Util.Go#0",
@@ -4446,10 +4324,7 @@ fn csharp() {
             EXACT,
             vec![enclosing("Block/Util.cs", "Acme.Block.Util.Hello()")],
         ),
-        // Acme.Core's global usings stop at its project: a bare call no family declares and a
-        // type name nothing binds resolve to nothing.
         (run("Lower#0"), None, vec![]),
-        // The top-level statements of a file are the calls of its `Main`.
         (
             "src/Acme.Api/Top.cs::Main::Shout#1".to_string(),
             EXACT,
@@ -4460,14 +4335,12 @@ fn csharp() {
             EXACT,
             vec!["src/Acme.Api/Top.cs::Main.Shout".to_string()],
         ),
-        // The project's `<Using>` binds a type for the top-level statements too.
         (
             "src/Acme.Api/Top.cs::Main::Order.Create#0".to_string(),
             EXACT,
             vec![orders("Order.Lines.cs", "Order.Create()")],
         ),
         (run("Fmt.Upper#0"), None, vec![]),
-        // A caller of a Refit interface's method reaches it through the field's declared type.
         (
             api(
                 "Remote.cs",
@@ -4479,14 +4352,12 @@ fn csharp() {
                 "Acme.Api.Remote.IInventoryApi.Item(string)",
             )],
         ),
-        // A project file that is not SDK-style adds nothing.
         (
             "legacy/Old.cs::Legacy.Old.Run()::Upper#0".to_string(),
             None,
             vec![],
         ),
     ];
-    // Every binding form hides the type `Format` in its scope.
     for scope in [
         "Shadows.Parameter(object)",
         "Shadows.Local()",
@@ -4522,10 +4393,6 @@ fn csharp() {
     );
 }
 
-/// ASP.NET Core controllers are providers (spec #28, #109): `[controller]` and `[action]` are
-/// replaced, `{id:int}` and `{id?}` are parameters, a rooted template replaces the class prefix,
-/// a method `[Route]` without a method attribute serves every method, and a controller of a
-/// repository base class is not read.
 #[test]
 fn csharp_controllers_are_providers_with_their_full_paths() {
     let (_, actual) = providers(
@@ -4556,7 +4423,6 @@ fn csharp_controllers_are_providers_with_their_full_paths() {
         ),
         ("GET", "/ping", "PingController.Pong()"),
     ];
-    // What the controllers of `ControllerEdges.cs` serve: the rest of them is left out.
     let edges = [
         (
             "GET",
@@ -4584,13 +4450,10 @@ fn csharp_controllers_are_providers_with_their_full_paths() {
 
 const WEB: &str = "src/Acme.Web";
 
-/// A definition of the minimal API's routes (`Routes/<file>`, namespace `Acme.Web.Routes`).
 fn web(file: &str, name: &str) -> String {
     format!("{WEB}/Routes/{file}::Acme.Web.Routes.{name}")
 }
 
-/// The symbols of the minimal API project: the route handlers a kind claims are named for
-/// their route (the first one, when a handler serves several).
 fn web_symbols() -> Vec<String> {
     let mut symbols: Vec<String> = ["Main", "Main.GET /health"]
         .iter()
@@ -4634,9 +4497,6 @@ fn web_symbols() -> Vec<String> {
     symbols
 }
 
-/// The calls of the minimal API project: an extension method called on a group is a name
-/// match, a lambda's parameter hides a local of its name only inside the lambda (and its written type types it), and the
-/// application an outside call made reaches no method of the repository.
 fn web_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
     let main = |callee: &str| format!("{WEB}/Program.cs::Main::{callee}");
     let orders = web("OrderRoutes.cs", "OrderRoutes.MapOrders(RouteGroupBuilder)");
@@ -4658,22 +4518,15 @@ fn web_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
             vec![web("Admin.cs", "Admin.Map(RouteGroupBuilder)")],
         ),
         (main("shelf.Stock#0"), EXACT, vec![stock("Shelf")]),
-        // A local an outside call made is from outside: only an extension method answers it.
         (main("app.Run#0"), None, vec![]),
         (main("stocked.Stock#0"), None, vec![]),
-        // The lambda's parameter is written `Crate`: it types the receiver.
         (main("shelf.Stock#1"), EXACT, vec![stock("Crate")]),
     ]
 }
 
-/// Minimal APIs are providers (spec #28, #110): routes on the application and on nested
-/// groups, through locals, chains, a method argument, a return value and an extension method
-/// called on two groups (one provider per prefix), a group mounted inside itself, `MapMethods`
-/// and both handler forms; a builder in a lambda's parameter serves nothing.
 #[test]
 fn csharp_minimal_apis_are_providers_with_their_full_paths() {
     let (_, actual) = providers("csharp_minimal", "conformance-csharp", WEB);
-    // The project files beside the routes provide packages, not routes.
     let actual: Vec<_> = (actual.into_iter())
         .filter(|(contract, _)| contract.starts_with("http::"))
         .collect();
@@ -4711,12 +4564,6 @@ fn csharp_minimal_apis_are_providers_with_their_full_paths() {
     assert_eq!(actual, pairs(&expected));
 }
 
-/// Each C# channel client links its producer to its handler (spec #28, #115): Kafka topics from
-/// constants and an array, a RabbitMQ publish to the default exchange (`string.Empty`) and to a
-/// named exchange routed by a binding (`inferred`), the handler a consumer's `+=` attached (a
-/// method and a lambda), an SQS queue named by the end of its URL, a NATS wildcard subject
-/// (`inferred`), a Redis stream, a Service Bus queue and a topic (two processors on it, whatever
-/// their subscriptions), and the names that cannot be evaluated left unresolved.
 #[test]
 fn csharp_channel_clients_link_their_producers_to_their_handlers() {
     let repo = fixture_repo("csharp_channels", "conformance-csharp", Some(ORIGIN));
@@ -4757,9 +4604,7 @@ fn csharp_channel_clients_link_their_producers_to_their_handlers() {
         "exact channel::servicebus::dispatch BusDispatch.Send(ServiceBusMessage)::sender.SendMessageAsync#0 -> BusDispatch.OnDispatch(ProcessMessageEventArgs)",
         "exact channel::servicebus::dispatch.events BusDispatch.Send(ServiceBusMessage)::(invocation_expression).SendMessageAsync#0 -> BusDispatch.OnDispatch(ProcessMessageEventArgs)",
         "exact channel::servicebus::dispatch.events BusDispatch.Send(ServiceBusMessage)::(invocation_expression).SendMessageAsync#0 -> BusDispatch.Watch().servicebus dispatch.events",
-        // A sender made for a parameter is named by the callers of the method that makes it.
         "exact channel::servicebus::wrapped.orders BusWrapped.Order(ServiceBusMessage)::Send#0 -> BusWrapped.OnOrder(ProcessMessageEventArgs)",
-        // `String.Empty` is the default exchange, and each handler of the event is a consumer.
         "exact channel::amqp::fanout RabbitFanOut.Announce()::channel.BasicPublishAsync#0 -> RabbitFanOut.OnFirst(object,BasicDeliverEventArgs)",
         "exact channel::amqp::fanout RabbitFanOut.Announce()::channel.BasicPublishAsync#0 -> RabbitFanOut.OnSecond(object,BasicDeliverEventArgs)",
     ] {
@@ -4769,8 +4614,6 @@ fn csharp_channel_clients_link_their_producers_to_their_handlers() {
         );
     }
     assert_eq!(links.len(), 13, "{links:#?}");
-    // A name read from the environment is unresolved on both sides, and so is a sender made for
-    // one; a subject no publish names has no producer to link to.
     let unresolved = |side: &str, kind: &str| -> Vec<String> {
         let mut sites: Vec<String> = (json[side].as_array().unwrap().iter())
             .filter(|s| s["contract"] == kind)
@@ -4787,9 +4630,6 @@ fn csharp_channel_clients_link_their_producers_to_their_handlers() {
         unresolved("consumers", "channel::kafka"),
         ["KafkaFeed.OnMissing(IConsumer<string,string>)"]
     );
-    // A sender written more than once is unknown, never the one write that makes it: one made
-    // by a constructor and handed in by another, replaced by a setter, written by its initializer
-    // and again, and a local made twice (both sends).
     assert_eq!(
         unresolved("providers", "channel::servicebus"),
         [
@@ -4807,10 +4647,6 @@ fn csharp_channel_clients_link_their_producers_to_their_handlers() {
     );
 }
 
-/// HttpClient calls are consumers (spec #28, #111): every method, `SendAsync` with a request, a
-/// `BaseAddress` from an initializer, a constant and an assignment, strings folded across
-/// interpolation, `+`, verbatim text and constants of other types, and a wrapper read at each call
-/// site. A call whose URL cannot be evaluated is unresolved, and a named client is not read.
 #[test]
 fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
     let repo = fixture_repo("csharp_http_consumers", "conformance-csharp", Some(ORIGIN));
@@ -4819,10 +4655,7 @@ fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
     let at = |function: &str, call: &str| {
         format!("src/Acme.Api/Clients.cs::Acme.Api.Clients.{function}::{call}")
     };
-    // Each method with its verb, base address, folded URL, wrapper, and the names that hold no
-    // one value (`Reassigned`), read once through `Reads`.
     let expected = triples(&[
-        // Based.Run()
         (
             "http::GET::/api/items",
             "host:shared.example.com",
@@ -4848,7 +4681,6 @@ fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
             "host:slash.example.com",
             &at("Based.Run()", "slash.GetStringAsync#0"),
         ),
-        // Folds.Run(string)
         (
             "http::GET::/invoices/{}",
             "host:billing.example.com",
@@ -4884,7 +4716,6 @@ fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
             "host:format.example.com",
             &at("Folds.Run(string)", "http.GetAsync#6"),
         ),
-        // Reads.Run(int)
         (
             "http::GET::/property",
             "host:property.example.com",
@@ -4925,13 +4756,11 @@ fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
             "host:config.example.com",
             &at("Reads.Run(int)", "unknown.GetAsync#0"),
         ),
-        // Reassigned.Inner.Run()
         (
             "http::GET::/inner",
             "",
             &at("Reassigned.Inner.Run()", "shadow.GetAsync#0"),
         ),
-        // Reassigned.Run(bool)
         (
             "http::GET::/branch",
             "",
@@ -4962,15 +4791,11 @@ fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
             "",
             &at("Reassigned.Run(bool)", "twice.GetAsync#0"),
         ),
-        // Reassigned.Use()
         (
             "http::GET::/hidden",
             "host:arg.example.com",
             &at("Reassigned.Use()", "Hidden#0"),
         ),
-        // Settings.Run(): an environment variable, and a key of appsettings.json as its variable
-        // (its literal host is served by no provider of the workspace, so only that reading
-        // stays).
         (
             "http::GET::/api/invoices",
             "env:BILLING_URL",
@@ -4981,13 +4806,11 @@ fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
             "env:Services__Stock",
             &at("Settings.Run()", "http.GetAsync#1"),
         ),
-        // Unread.Run()
         (
             "http::GET::/x",
             "host:lookup.example.com",
             &at("Unread.Run()", "http.GetAsync#0"),
         ),
-        // Verbs.Run(int)
         (
             "http::DELETE::/orders/3",
             "host:orders.example.com",
@@ -5053,7 +4876,6 @@ fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
             "host:orders.example.com",
             &at("Verbs.Run(int)", "http.SendAsync#1"),
         ),
-        // Wrappers.Run(string)
         (
             "http::GET::/direct",
             "host:wrapped.example.com",
@@ -5073,11 +4895,6 @@ fn csharp_http_client_calls_are_consumers_with_their_urls_folded() {
     assert_eq!(consumers(&json, "src/Acme.Api/Clients.cs"), expected);
 }
 
-/// Typed clients and Refit interfaces are consumers (spec #28, #113): a typed client's calls take
-/// the base its registration or its constructor gives the client the container passes, and two
-/// registrations with different bases leave it unknown; each method of a Refit interface is a
-/// consumer with the base `RestService.For` makes it with, and one only `AddRefitClient`
-/// registers has an unknown base.
 #[test]
 fn csharp_typed_clients_and_refit_methods_are_consumers() {
     let repo = fixture_repo("csharp_typed_consumers", "conformance-csharp", Some(ORIGIN));
@@ -5144,7 +4961,6 @@ fn csharp_typed_clients_and_refit_methods_are_consumers() {
     assert_eq!(consumers(&json, "src/Acme.Api/Remote.cs"), expected);
 }
 
-/// Context lists the consumer an HttpClient call that cannot be evaluated is, unresolved.
 #[test]
 fn csharp_context_shows_an_unresolved_consumer() {
     let repo = fixture_repo(
@@ -5248,8 +5064,6 @@ fn billing_symbols() -> Vec<String> {
     symbols
 }
 
-/// Calls through the types the source declares (#108): each form of receiver, the base types
-/// written in a declaration, and the name rule for what no declared type answers.
 fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
     let accounts = |name: &str| billing("Accounts.cs", name);
     let run = |callee: &str| {
@@ -5277,7 +5091,6 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
         )
     };
     vec![
-        // A field, a property and a parameter; overloads narrowed by argument count.
         (run("vault.Freeze#0"), EXACT, vec![freeze.clone()]),
         (run("Primary.Accrue#0"), EXACT, vec![accrue.clone()]),
         (
@@ -5298,12 +5111,10 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
                 accounts("Account.Close(string)"),
             ],
         ),
-        // A local with its type written, `var` with `new`, a target-typed `new()`.
         (run("explicitly.Thaw#0"), EXACT, vec![thaw.clone()]),
         (run("made.Accrue#0"), EXACT, vec![accrue.clone()]),
         (run("made.Freeze#0"), EXACT, vec![freeze.clone()]),
         (run("targeted.Thaw#0"), EXACT, vec![thaw.clone()]),
-        // A method's declared return type, through a `var` and in a chain.
         (run("opened.Accrue#0"), EXACT, vec![accrue.clone()]),
         (
             run("(invocation_expression).Sweep#0"),
@@ -5315,10 +5126,8 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
             EXACT,
             vec![freeze.clone()],
         ),
-        // An interface receiver reaches the interface member, `?.` too.
         (run("reviewer.Review#0"), EXACT, vec![review.clone()]),
         (run("auditor.Review#0"), EXACT, vec![review.clone()]),
-        // Unqualified and `this.` calls look in the written base.
         (
             format!("{}::Freeze#0", accounts("Savings.Sweep()")),
             EXACT,
@@ -5329,8 +5138,6 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
             EXACT,
             vec![thaw.clone()],
         ),
-        // An extension method, on a type of the repository and on one outside it, and a method
-        // the known type lacks: name matches.
         (
             run("given.Summarize#0"),
             INFERRED,
@@ -5341,9 +5148,7 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
             INFERRED,
             vec![accounts("AccountExtensions.Archive(IEnumerable<Account>)")],
         ),
-        // A method of the repository's that the known type lacks is no extension method.
         (run("given.Accrue#0"), None, vec![]),
-        // A receiver of unknown type, or a type parameter's.
         (
             run("unknown.Sweep#0"),
             INFERRED,
@@ -5360,8 +5165,6 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
             INFERRED,
             vec![freeze.clone()],
         ),
-        // Probes: the type through a generic, a nullable and a qualified name; a base from
-        // outside; names two blocks bind differently; every binding hides the field.
         (
             probe("Written", "ledger.Post#0"),
             EXACT,
@@ -5416,8 +5219,6 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
             vec![freeze.clone()],
         ),
         (probe("Field", "slot.Freeze#0"), EXACT, vec![freeze.clone()]),
-        // Outside the repository, or the repository's type without the method: extension
-        // methods alone, overloads by the form of the call; an interface's base interface.
         (probe("Outside", "items.Count#0"), None, vec![]),
         (probe("Outside", "Teller.Accrue#0"), None, vec![]),
         (
@@ -5469,7 +5270,6 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
                 "{CORE}/Text/Format.cs::Acme.Core.Text.Format.Upper(string)"
             )],
         ),
-        // Another project: a field and a primary constructor's parameter.
         (
             format!("{API}/Desk.cs::Acme.Api.Desk.Serve(Account)::teller.Run#0"),
             EXACT,
@@ -5486,8 +5286,6 @@ fn billing_calls() -> Vec<(String, Option<&'static str>, Vec<String>)> {
     ]
 }
 
-/// Public and protected members of public types are export doors when uncalled; private and
-/// internal ones, and those of a type that is not public, are not.
 #[test]
 fn csharp_public_and_protected_members_are_export_doors() {
     let repo = fixture_repo("csharp_doors", "conformance-csharp", Some(ORIGIN));
@@ -5529,8 +5327,6 @@ fn csharp_search_finds_a_type_and_context_lists_callers_and_callees() {
     );
 }
 
-/// A method's callers, each with its level and why: a field, a parameter, a base type, a
-/// chain, a name match and a tie.
 #[test]
 fn csharp_context_lists_the_callers_of_a_method_with_levels_and_reasons() {
     let repo = fixture_repo("csharp_callers", "conformance-csharp", Some(ORIGIN));
@@ -5629,7 +5425,6 @@ fn csharp_qualification_expansion_discards_the_whole_file_and_keeps_other_files(
 }
 
 /// A type written in more files of one project than `TYPE_PARTS` is no one type: constructing
-/// it is ambiguous. Written in fewer, it is one, its first part constructed.
 #[test]
 fn csharp_a_type_in_too_many_parts_is_several_classes() {
     for (parts, level, candidates) in [(64, "exact", 0), (65, "ambiguous", 65)] {
@@ -5702,7 +5497,6 @@ fn typescript_and_javascript() {
             "src/messages/exchanges.ts::onAudit",
             "src/messages/exchanges.ts::onShipment",
             "src/messages/handlers.ts::onPayment",
-            // Exported top-level constants are symbols an import targets.
             "src/messages/kafka.ts::auditor",
             "src/messages/kafka.ts::consumer",
             "src/messages/kafka.ts::producer",
@@ -5711,7 +5505,6 @@ fn typescript_and_javascript() {
             "src/messages/rabbit.ts::confirming",
             "src/messages/topics.ts::CREATED",
             "src/messages/topics.ts::ORDERS",
-            // Top-level constants a file keeps to itself are symbols too: a use is held by them.
             "src/assigned.js::o",
             "src/messages/bullmq.ts::JOBS",
             "src/messages/bullmq.ts::REGION",
@@ -5824,10 +5617,8 @@ fn typescript_and_javascript() {
             "src/view.tsx::render",
             "src/widget.jsx::render",
         ],
-        // TS/JS declares no program entry points.
         &[],
         &[
-            // In-file scope: top level, nested function, `this.method` inside a class.
             ("src/math.ts::double::add#0", EXACT, &["src/math.ts::add"]),
             (
                 "src/math.ts::scale::double#0",
@@ -5844,7 +5635,6 @@ fn typescript_and_javascript() {
                 EXACT,
                 &["src/shapes/shape.ts::Shape.area"],
             ),
-            // Imports: named through `../` without extension, named with alias, default.
             (
                 "src/shapes/circle.ts::Circle.area::square#0",
                 EXACT,
@@ -5857,14 +5647,11 @@ fn typescript_and_javascript() {
                 &["src/math.ts::double"],
             ),
             ("src/app.ts::main::scale#0", EXACT, &["src/math.ts::scale"]),
-            // A namespace import whose `.js` extension names the `.ts` file.
             (
                 "src/app.ts::main::numbers.square#0",
                 EXACT,
                 &["src/math.ts::square"],
             ),
-            // Re-exports through `index` resolution: a namespace, a named one with its
-            // extension, a default renamed.
             ("src/app.ts::main::math.add#0", EXACT, &["src/math.ts::add"]),
             (
                 "src/app.ts::main::util.format#0",
@@ -5876,8 +5663,6 @@ fn typescript_and_javascript() {
                 EXACT,
                 &["src/util/log.js::default"],
             ),
-            // The `@/*` alias of `tsconfig.json`, to an `index` file re-exporting a class, then
-            // its static method; and from a TSX file.
             (
                 "src/app.ts::main::Shape.unit#0",
                 EXACT,
@@ -5888,9 +5673,7 @@ fn typescript_and_javascript() {
                 EXACT,
                 &["src/util/format.mjs::format"],
             ),
-            // A package outside the repository stays unresolved.
             ("src/app.ts::main::useState#0", None, &[]),
-            // The base supplies the static method and the typed parameter supplies its class.
             (
                 "src/app.ts::main::Circle.unit#0",
                 EXACT,
@@ -5906,7 +5689,6 @@ fn typescript_and_javascript() {
                 INFERRED,
                 &["src/legacy.cjs::legacy"],
             ),
-            // Several definitions fit: all are listed.
             (
                 "src/app.ts::main::shape.area#0",
                 AMBIGUOUS,
@@ -5920,10 +5702,7 @@ fn typescript_and_javascript() {
                 AMBIGUOUS,
                 &["src/view.tsx::render", "src/widget.jsx::render"],
             ),
-            // No definition has the name.
             ("src/util/log.js::default::console.log#0", None, &[]),
-            // Functions defined by assignment: a member, `let`, `var`, an object literal's
-            // method and property. `f` is assigned again, so it is no definition.
             (
                 "src/assigned.js::caller::app.use#0",
                 EXACT,
@@ -5945,15 +5724,10 @@ fn typescript_and_javascript() {
                 &["src/assigned.js::letArrow"],
             ),
             ("src/assigned.js::caller::f#0", None, &[]),
-            // A parameter spelled like the head hides the definition.
             ("src/assigned.js::hidden::app.use#0", None, &[]),
             ("src/assigned.js::hidden::o.litM#0", None, &[]),
-            // So do a nested definition, a `catch` binding.
             ("src/assigned.js::innerDef::app.use#0", None, &[]),
             ("src/assigned.js::innerCatch::o.litM#0", None, &[]),
-            // Hidden names: a `catch`, `for ... of`, `let` or `var` binding, an arrow parameter
-            // without parentheses, a nested or array parameter pattern, and one spelled like a
-            // constant or a parameter of the same function hide the top-level `helper`.
             (
                 "src/shadow.ts::plain::helper#0",
                 EXACT,
@@ -6421,9 +6195,6 @@ fn python() {
             "web/pages.py::order",
             "web/pages.py::shortcut",
         ],
-        // The main guards of `jobs/` (both spellings, neither of the lookalikes) and the
-        // console scripts of `pyproject.toml` that name a function of a file (`ghost.module`
-        // and `jobs.sync:missing` name none).
         &[
             "jobs/single.py::__main__",
             "jobs/sync.py::__main__",
@@ -6431,9 +6202,6 @@ fn python() {
             "reports/__init__.py::build",
         ],
         &[
-            // In-file scope: a comprehension and a nested function, a nested function called
-            // from its parent, a class body, methods, and lambdas, whose calls belong to the
-            // enclosing symbol (the module, here, or `sorted_names`).
             ("defs.py::fetch_all::plain#0", EXACT, &["defs.py::plain"]),
             ("defs.py::outer.inner::plain#0", EXACT, &["defs.py::plain"]),
             ("defs.py::outer::inner#0", EXACT, &["defs.py::outer.inner"]),
@@ -6461,15 +6229,11 @@ fn python() {
             ),
             ("defs.py::plain#0", EXACT, &["defs.py::plain"]),
             ("defs.py::sorted_names::plain#0", EXACT, &["defs.py::plain"]),
-            // Built-ins, a decorator from an imported package, parameters and `self`: no
-            // definition fits.
             ("defs.py::register::functools.wraps#0", None, &[]),
             ("defs.py::register.wrapper::func#0", None, &[]),
             ("defs.py::Registry.add::self.items.append#0", None, &[]),
             ("defs.py::Registry.build::cls#0", None, &[]),
             ("defs.py::sorted_names::sorted#0", None, &[]),
-            // Relative imports: `from .m import f`, and `from . import m` and `from .. import
-            // m`, where `m` is a module of the package.
             (
                 "geometry/shapes.py::scale::to_cm#0",
                 EXACT,
@@ -6495,13 +6259,11 @@ fn python() {
                 EXACT,
                 &["geometry/shapes.py::area_of"],
             ),
-            // `import a.b` binds `a.b` as a whole.
             (
                 "geometry/extra/measure.py::perimeter::geometry.shapes.scale#0",
                 EXACT,
                 &["geometry/shapes.py::scale"],
             ),
-            // The `src/` layout, with `from . import tax` and `from .tax import vat`.
             (
                 "src/billing/invoice.py::total::vat#0",
                 EXACT,
@@ -6512,9 +6274,6 @@ fn python() {
                 EXACT,
                 &["src/billing/tax.py::fee"],
             ),
-            // Imports through a package: a re-export of a class and of a function, the
-            // function as an attribute of the package, a submodule `__init__.py` imports, a
-            // deeper module named in full, and an alias of a module.
             (
                 "main.py::main::Round#0",
                 EXACT,
@@ -6545,8 +6304,6 @@ fn python() {
                 EXACT,
                 &["geometry/units.py::to_cm"],
             ),
-            // `from a.b import c as d`, a package re-export from the `src/` layout and a
-            // module alias in it.
             (
                 "main.py::main::grow#0",
                 EXACT,
@@ -6562,9 +6319,6 @@ fn python() {
                 EXACT,
                 &["src/billing/tax.py::vat"],
             ),
-            // `import *` brings in the exports: all public names, only `__all__` when it is
-            // a literal, and every public name when it is computed. What it leaves out is
-            // found by name alone.
             (
                 "main.py::main::format_name#0",
                 EXACT,
@@ -6606,9 +6360,6 @@ fn python() {
                 EXACT,
                 &["stars/computed.py::unnamed"],
             ),
-            // An explicit import or an attribute of a module sees every name, whatever
-            // `__all__` and the underscore prefix say, and a re-export `__all__` leaves out; a
-            // star import in a package is found by name too, `default` included.
             (
                 "explicit/use.py::report::outside#0",
                 EXACT,
@@ -6639,17 +6390,12 @@ fn python() {
                 EXACT,
                 &["explicit/core.py::default"],
             ),
-            // Of two imports of one name the later wins, and an explicit import of a package
-            // outside the repository is not overridden by a star import.
             (
                 "explicit/use.py::report::pick#0",
                 EXACT,
                 &["explicit/second.py::pick"],
             ),
             ("explicit/use.py::report::get#0", None, &[]),
-            // The latest import that binds a name decides: an external one after a resolving
-            // one leaves it unresolved, a star import after an explicit one takes the name
-            // over when it provides it, and only then.
             ("explicit/order.py::order::taken#0", None, &[]),
             (
                 "explicit/order.py::order::swept#0",
@@ -6661,7 +6407,6 @@ fn python() {
                 EXACT,
                 &["explicit/early.py::kept"],
             ),
-            // A package comes before a module of the same name.
             (
                 "explicit/use.py::report::from_package#0",
                 EXACT,
@@ -6672,18 +6417,13 @@ fn python() {
                 EXACT,
                 &["shadow/__init__.py::from_package"],
             ),
-            // A package outside the repository stays unresolved.
             ("main.py::main::np.array#0", None, &[]),
-            // Only a unique name match finds a function no import names.
             ("main.py::main::legacy#0", INFERRED, &["legacy.py::legacy"]),
-            // A local assigned from a constructor call, here through an aliased import.
             (
                 "main.py::main::circle.describe#0",
                 EXACT,
                 &["geometry/shapes.py::Circle.describe"],
             ),
-            // `self` and `cls` reach the class, then its bases in the order written, in
-            // Python's method resolution order, also from a nested function.
             (
                 "methods.py::Panel.draw::self.ping#0",
                 EXACT,
@@ -6719,7 +6459,6 @@ fn python() {
                 EXACT,
                 &["methods.py::Right.hook"],
             ),
-            // Attribute annotations, in a method and in the class body.
             (
                 "methods.py::Panel.draw::self.shape.area#0",
                 EXACT,
@@ -6730,8 +6469,6 @@ fn python() {
                 EXACT,
                 &["geometry/shapes.py::Circle.describe"],
             ),
-            // Parameter annotations: a name, `Optional[...]` and a string; a constructor
-            // call in the same scope, and at the module level.
             (
                 "methods.py::use::panel.draw#0",
                 EXACT,
@@ -6757,8 +6494,6 @@ fn python() {
                 EXACT,
                 &["methods.py::Panel.render"],
             ),
-            // By name: a method the class family lacks, a static method's parameter, what a
-            // function returns, and a local that shadows a typed module-level name.
             (
                 "methods.py::Panel.draw::self.spin#0",
                 INFERRED,
@@ -6787,13 +6522,9 @@ fn python() {
                     "geometry/shapes.py::Shape.area",
                 ],
             ),
-            // A receiver whose class, or whose value's callee, is outside the repository:
-            // what its methods are is not known, and no name match is tried.
             ("methods.py::outside::session.render#0", None, &[]),
             ("methods.py::outside::client.render#0", None, &[]),
             ("methods.py::outside::log.render#0", None, &[]),
-            // Python's method resolution order (C3), a hierarchy it rejects, bases outside the
-            // repository that come before the class defining a method, and `object`.
             (
                 "families.py::A.go::self.pick#0",
                 EXACT,
@@ -6819,7 +6550,6 @@ fn python() {
                 EXACT,
                 &["families.py::Plain.go"],
             ),
-            // `self` and `cls` whose family lacks the method: a name match.
             (
                 "families.py::Lone.go::self.pick#0",
                 AMBIGUOUS,
@@ -6830,10 +6560,6 @@ fn python() {
                 AMBIGUOUS,
                 &["families.py::D.pick", "families.py::E.pick"],
             ),
-            // Bindings that hide an outer one: `self.x = ...` without an annotation, a loop
-            // variable named `this`, `with`, comprehensions, `:=`, `except`, lambdas, a
-            // reassigned parameter, `global` and an import's fallback; an annotation stays
-            // stronger, and a single module-level binding is read from a function.
             (
                 "receivers.py::Untyped.run::self.engine.start#0",
                 INFERRED,
@@ -6894,7 +6620,6 @@ fn python() {
                 INFERRED,
                 &["geometry/shapes.py::Circle"],
             ),
-            // An annotated receiver whose family lacks the method, and `X | None` both ways.
             (
                 "receivers.py::lacking::engine.stride#0",
                 INFERRED,
@@ -6910,7 +6635,6 @@ fn python() {
                 EXACT,
                 &["receivers.py::Engine.start"],
             ),
-            // Bases and annotations that resolve through themselves, in one module or two.
             (
                 "cycles.py::Ping.go::self.ring#0",
                 INFERRED,
@@ -6941,10 +6665,6 @@ fn python() {
                 INFERRED,
                 &["cycles.py::Pong.ring"],
             ),
-            // A receiver attribute bound in a compound target or from a closure, a `nonlocal` that
-            // skips a class scope, a `case` capture and a function-local import hide an outer
-            // binding; a write from outside the class is not seen; a function-local import
-            // still resolves.
             (
                 "bindings.py::Unpacked.call::self.line.dial#0",
                 INFERRED,
@@ -6995,8 +6715,6 @@ fn python() {
                 EXACT,
                 &["geometry/shapes.py::scale"],
             ),
-            // One outside base shared by two classes (`ABC`, `object`) has one place in C3; a base
-            // that is not a name hides what comes after it.
             (
                 "bindings.py::Both.go::self.right#0",
                 EXACT,
@@ -7012,9 +6730,6 @@ fn python() {
                 INFERRED,
                 &["bindings.py::Store.stash"],
             ),
-            // The last top-level binding of a name decides: an assignment or a `del` after a
-            // definition leaves a name match alone, and a star import of a module whose
-            // `__all__` grows by `+=` takes what it adds.
             (
                 "rebound.py::reach::replaced#0",
                 INFERRED,
@@ -7030,10 +6745,7 @@ fn python() {
                 EXACT,
                 &["stars/grown.py::grown"],
             ),
-            // So does the last binding in a function: a nested definition rebound later is not
-            // what its name reaches, and no name match finds a nested one.
             ("rebound.py::nested::inner#0", None, &[]),
-            // A class body's names are in scope for its own statements, not for its methods.
             (
                 "scopes.py::Outer::Helper#0",
                 EXACT,
@@ -7044,7 +6756,6 @@ fn python() {
                 EXACT,
                 &["scopes.py::Helper"],
             ),
-            // Several definitions fit: a method on a parameter.
             (
                 "geometry/shapes.py::area_of::shape.area#0",
                 AMBIGUOUS,
@@ -7386,7 +7097,6 @@ fn rust() {
             "crates/billing/src/invoice.rs::Invoice.amount",
             "crates/billing/src/invoice.rs::Invoice.new",
             "crates/billing/src/invoice.rs::tax",
-            // A package the workspace's `exclude` lists is still a crate of the repository.
             "crates/scratch/src/lib.rs::ignored",
             "crates/worker/src/agents.rs::agents",
             "crates/worker/src/agents.rs::module_functions",
@@ -7568,7 +7278,6 @@ fn rust() {
             "crates/web/src/local.rs::Router.get",
             "crates/web/src/local.rs::wire",
         ],
-        // `fn main` of each binary target: `src/main.rs`, `src/bin/`, a `[[bin]] path`.
         &[
             "api/src/bin/sync/main.rs::main",
             "api/src/bin/tool.rs::main",
@@ -7576,7 +7285,6 @@ fn rust() {
             "api/tools/admin.rs::main",
         ],
         &[
-            // An inline module, by its path and through `self::`.
             (
                 "api/src/main.rs::inner.twice::helper#0",
                 EXACT,
@@ -7592,9 +7300,6 @@ fn rust() {
                 EXACT,
                 &["api/src/main.rs::inner.helper"],
             ),
-            // A glob gives a path's head as it gives a name called: through `super::*`, a
-            // parent's named import, `super::super::*` and `crate::<path>::*`, after the
-            // module's own items and named imports. A glob of an outside crate gives nothing.
             (
                 "api/src/globbed.rs::inner.make::free#0",
                 EXACT,
@@ -7631,10 +7336,6 @@ fn rust() {
                 &["api/src/store.rs::Store.new"],
             ),
             ("api/src/globbed.rs::outside.make::Ext.new#0", None, &[]),
-            // `super::` out of an inline module is read from the file's top, past the
-            // module's own `compute`.
-            // `#[cfg(test)] use crate::mock::client;` binds nothing: the production client.
-            // A module a test build compiles is indexed: `th` is declared under `any(test, ..)`.
             (
                 "api/src/gated.rs::caller::th.Client.new#0",
                 EXACT,
@@ -7660,8 +7361,6 @@ fn rust() {
                 EXACT,
                 &["api/src/main.rs::checks.compute"],
             ),
-            // `<name>.rs`, `mod.rs` and `#[path]` modules, those declared inside an inline
-            // module, and `crate::`; a `let` of a module's name does not hide it.
             (
                 "api/src/main.rs::main::store.Store.new#0",
                 EXACT,
@@ -7692,8 +7391,6 @@ fn rust() {
                 EXACT,
                 &["api/src/nested/plain.rs::walk"],
             ),
-            // A closure's call belongs to the function around it; the closure's binding hides
-            // the function of its name.
             (
                 "api/src/main.rs::main::start#0",
                 EXACT,
@@ -7704,7 +7401,6 @@ fn rust() {
                 INFERRED,
                 &["api/src/main.rs::run"],
             ),
-            // Paths into crates outside the repository.
             ("api/src/main.rs::main::String.new#0", None, &[]),
             ("api/src/main.rs::main::std.mem.drop#0", None, &[]),
             (
@@ -7732,8 +7428,6 @@ fn rust() {
                 EXACT,
                 &["api/src/main.rs::compute"],
             ),
-            // `Self::`, `Type::` and `Trait::` calls, inherent and trait `impl`s, and an
-            // `impl` in another file than the type.
             (
                 "api/src/store.rs::Store.new::Self.empty#0",
                 EXACT,
@@ -7764,7 +7458,6 @@ fn rust() {
                 EXACT,
                 &["api/src/store.rs::Persist.describe"],
             ),
-            // Two traits' default bodies, two blocks of one trait: each one fits.
             (
                 "api/src/store.rs::reset::Store.label#0",
                 AMBIGUOUS,
@@ -7781,9 +7474,6 @@ fn rust() {
                     "api/src/store.rs::Store.From.from",
                 ],
             ),
-            // An inline module does not see the file's own `Store`: `use crate::util::Store`
-            // names another one, which a `use super::*` glob does not override; the glob takes
-            // the file's private items.
             (
                 "api/src/store.rs::tests.t::Store.new#0",
                 EXACT,
@@ -7804,7 +7494,6 @@ fn rust() {
                 EXACT,
                 &["api/src/store/disk.rs::Store.check"],
             ),
-            // Crate roots from `src/bin/`, `src/bin/<name>/main.rs` and `[[bin]]`.
             (
                 "api/src/bin/tool.rs::main::helper.go#0",
                 EXACT,
@@ -7820,7 +7509,6 @@ fn rust() {
                 EXACT,
                 &["api/tools/shared.rs::ping"],
             ),
-            // The second member, its root named by `[lib] path`.
             (
                 "crates/billing/src/billing.rs::total::invoice.Invoice.new#0",
                 EXACT,
@@ -7836,8 +7524,6 @@ fn rust() {
                 EXACT,
                 &["crates/billing/src/invoice.rs::Invoice.amount"],
             ),
-            // A name match keeps to the crates the caller reaches: its own and the libraries it
-            // depends on, never `api`, which depends on it, nor `billing` from `ledger-core`.
             (
                 "crates/billing/src/billing.rs::copies::l.clone#0",
                 INFERRED,
@@ -7848,14 +7534,11 @@ fn rust() {
                 None,
                 &[],
             ),
-            // `use crate::util as u` renames a module written in place.
             (
                 "crates/billing/src/invoice.rs::tax::u.round#0",
                 EXACT,
                 &["crates/billing/src/billing.rs::util.round"],
             ),
-            // The other workspace member, by its name with the hyphen turned into an
-            // underscore, through a `use` of its module.
             (
                 "crates/billing/src/billing.rs::settle::ledger_core.post#0",
                 EXACT,
@@ -7866,7 +7549,6 @@ fn rust() {
                 EXACT,
                 &["crates/ledger-core/src/lib.rs::entries.add"],
             ),
-            // `use`s and `pub use`s, from the first member into the others.
             (
                 "api/src/main.rs::main::aid#0",
                 EXACT,
@@ -7917,9 +7599,7 @@ fn rust() {
                 EXACT,
                 &["crates/ledger-core/src/lib.rs::entries.add"],
             ),
-            // A crate outside the repository is external: `new` is not matched by name.
             ("api/src/main.rs::main::HashMap.new#0", None, &[]),
-            // Globs: the public items of a module, not its private `dup`.
             (
                 "api/src/main.rs::main::dup#0",
                 EXACT,
@@ -7930,7 +7610,6 @@ fn rust() {
                 EXACT,
                 &["api/src/prelude.rs::greet"],
             ),
-            // `pub use` renames three files deep, and a cycle of re-exports.
             (
                 "api/src/main.rs::main::ring.e.Wheel.spin#0",
                 EXACT,
@@ -7942,8 +7621,6 @@ fn rust() {
                 &["api/src/ring/c.rs::Gear.spin"],
             ),
             ("api/src/main.rs::main::ring.x.Loop.unheard#0", None, &[]),
-            // A `use` in a module binds there alone, hides the file's name of it and is not in
-            // scope outside; `use super::*` takes the private `compute`.
             (
                 "api/src/main.rs::scoped.go::aid#0",
                 EXACT,
@@ -7964,7 +7641,6 @@ fn rust() {
                 EXACT,
                 &["api/src/main.rs::compute"],
             ),
-            // A function's `use` binds in it alone, and a `let` hides a `use`d name.
             (
                 "api/src/main.rs::within::local_aid#0",
                 EXACT,
@@ -7973,10 +7649,7 @@ fn rust() {
             ("api/src/main.rs::elsewhere::local_aid#0", None, &[]),
             ("api/src/main.rs::loops.f::a#0", None, &[]),
             ("api/src/main.rs::hidden::aid#0", None, &[]),
-            // A parameter hides the `use` that spells its name.
             ("api/src/main.rs::with_param::aid#0", None, &[]),
-            // The file's `use`s and modules are not in scope in a module written in place: the
-            // names are crates outside the file there, never name-matched.
             ("api/src/main.rs::isolated.go::aid#0", None, &[]),
             ("api/src/main.rs::isolated.far::inner.helper#0", None, &[]),
             (
@@ -7989,7 +7662,6 @@ fn rust() {
                 EXACT,
                 &["api/src/main.rs::isolated.far"],
             ),
-            // An item of the module beats what a glob gives.
             (
                 "api/src/main.rs::local_wins.go::compute#0",
                 EXACT,
@@ -8000,7 +7672,6 @@ fn rust() {
                 EXACT,
                 &["api/src/main.rs::local_wins.go"],
             ),
-            // `mod launch; use launch::launch;`: a module is no value.
             (
                 "api/src/main.rs::main::launch#0",
                 EXACT,
@@ -8011,8 +7682,6 @@ fn rust() {
                 EXACT,
                 &["api/src/launch.rs::launch"],
             ),
-            // `mod meter; pub use meter::meter;` and a `pub use` in a `pub` module written in
-            // place, called from the other crate.
             (
                 "api/src/main.rs::main::ledger_core.meter#0",
                 EXACT,
@@ -8023,14 +7692,11 @@ fn rust() {
                 EXACT,
                 &["crates/ledger-core/src/lib.rs::internal.secret"],
             ),
-            // `scratch` lists no dependency: `ledger_core` is outside the repository to it.
             (
                 "crates/scratch/src/lib.rs::reach::ledger_core.post#0",
                 None,
                 &[],
             ),
-            // Method calls: the receiver's type is written on a `let`, a parameter (`&T`, `&mut T`),
-            // a field through `self`, or `self` itself; one fit is `exact`.
             (
                 "api/src/methods.rs::annotated::c.bump#0",
                 EXACT,
@@ -8071,7 +7737,6 @@ fn rust() {
                 EXACT,
                 &["api/src/methods.rs::Counter.bump"],
             ),
-            // `self` in a trait's block, and in the default body of a trait.
             (
                 "api/src/methods.rs::Counter.Probe.probe::self.read#0",
                 EXACT,
@@ -8082,7 +7747,6 @@ fn rust() {
                 EXACT,
                 &["api/src/methods.rs::Probe.probe"],
             ),
-            // The type is the declared return type of the function the `let` calls, `Self` included.
             (
                 "api/src/methods.rs::built::c.bump#0",
                 EXACT,
@@ -8093,7 +7757,6 @@ fn rust() {
                 EXACT,
                 &["api/src/methods.rs::Gauge.read"],
             ),
-            // Methods of `impl Trait for Type` are found through the type, with the trait's defaults.
             (
                 "api/src/methods.rs::probed::c.probe#0",
                 EXACT,
@@ -8104,8 +7767,6 @@ fn rust() {
                 EXACT,
                 &["api/src/methods.rs::Probe.summary"],
             ),
-            // A `dyn Trait`, a bounded generic and an `impl Trait` stop at the trait's method: no
-            // implementation is searched.
             (
                 "api/src/methods.rs::dynamic::p.probe#0",
                 EXACT,
@@ -8126,7 +7787,6 @@ fn rust() {
                 EXACT,
                 &["api/src/methods.rs::Probe.probe"],
             ),
-            // The type is not written (a `for` binding): the call goes by name.
             (
                 "api/src/methods.rs::named::c.reset#0",
                 INFERRED,
@@ -8148,7 +7808,6 @@ fn rust() {
                     "api/src/methods.rs::Gauge.read",
                 ],
             ),
-            // A type from outside the repository is opaque: `insert` is not `Gauge.insert`.
             ("api/src/methods.rs::outside::m.insert#0", None, &[]),
             ("api/src/methods.rs::outside::made.insert#0", None, &[]),
             (
@@ -8161,7 +7820,6 @@ fn rust() {
                 None,
                 &[],
             ),
-            // A binding of the name that disagrees with the typed one leaves it to the name match.
             (
                 "api/src/methods.rs::shadowed::c.bump#0",
                 AMBIGUOUS,
@@ -8178,8 +7836,6 @@ fn rust() {
                     "api/src/methods.rs::Gauge.bump",
                 ],
             ),
-            // `Self` of a trait's default body is the type the call named, not the trait; a type
-            // parameter as a result names no class; a parameter whose type names no item hides a `let`.
             (
                 "api/src/methods.rs::Build.make::Self.seed#0",
                 EXACT,
@@ -8217,7 +7873,6 @@ fn rust() {
                     "api/src/methods.rs::Gauge.read",
                 ],
             ),
-            // A type is read among types and modules: a parameter named like the module does not hide it.
             (
                 "api/src/methods.rs::modular::store.save#0",
                 EXACT,
@@ -8233,7 +7888,6 @@ fn rust() {
                 EXACT,
                 &["api/src/store.rs::Store.save"],
             ),
-            // Marker traits (`Send`, `Sync`, `Unpin`, `Sized`) and lifetimes are not a second bound.
             (
                 "api/src/methods.rs::marked::p.summary#0",
                 EXACT,
@@ -8249,16 +7903,13 @@ fn rust() {
                 EXACT,
                 &["api/src/methods.rs::Counter.reset"],
             ),
-            // A written type whose blocks lack the member: nothing, never another type's.
             ("api/src/methods.rs::derived::Plain.default#0", None, &[]),
             ("api/src/methods.rs::derived::q.clone#0", None, &[]),
-            // `self` of a block of a type from outside the repository is opaque.
             (
                 "crates/worker/src/derived.rs::Client.ApiExt.api::self.clone#0",
                 None,
                 &[],
             ),
-            // A call on another call's result is typed by the written result of the inner one.
             (
                 "api/src/chains.rs::chained::(call_expression).route#0",
                 EXACT,
@@ -8299,8 +7950,6 @@ fn rust() {
                 EXACT,
                 &["api/src/chains.rs::Router.route"],
             ),
-            // `?` and `.await` hand the call the type they unwrap: the `Option`'s argument, a
-            // plain `fn`'s future output.
             (
                 "api/src/chains.rs::tried::(try_expression).route#0",
                 EXACT,
@@ -8311,14 +7960,11 @@ fn rust() {
                 EXACT,
                 &["api/src/chains.rs::Router.route"],
             ),
-            // An inner call outside the repository leaves the outer one as it was: unresolved.
             (
                 "api/src/chains.rs::outside::(call_expression).route#0",
                 None,
                 &[],
             ),
-            // A chain that starts at a call of an outside crate is that crate's, whatever
-            // function of the file shares the crate's name.
             (
                 "crates/greeter/src/main.rs::rocket::(call_expression).mount#0",
                 None,
@@ -8329,24 +7975,17 @@ fn rust() {
                 None,
                 &[],
             ),
-            // An attribute is no call of a function: neither by name nor through a path.
             ("crates/greeter/src/main.rs::get#0", None, &[]),
             ("crates/greeter/src/names.rs::get#0", None, &[]),
             ("crates/actix/src/stray.rs::elsewhere.get#0", None, &[]),
         ],
     );
-    // The call inside `println!` is not indexed, and neither is a file no `mod` reaches.
     let repo = fixture_repo("conformance_rust_absent", "conformance-rust", Some(ORIGIN));
     let export = Engine::open(&repo).unwrap().export().unwrap();
     assert!(!export.contains(&format!("{MAIN}::main::compute#")));
     assert!(!export.contains("orphan.rs"));
 }
 
-/// Item macros in the Rust pack (#398): the body of a repository `macro_rules!` that passes
-/// items through is read as items of the module invoking it, under the `cfg` attributes its arm
-/// writes on each, and a `mod` in it reaches its file. So is one in an `impl` or a trait body
-/// (#505), and one written `crate::m!`. A macro that wraps its items, an item gated off, and
-/// `other::m!` or `self::m!` stay out.
 #[test]
 fn rust_item_macros() {
     conform(
@@ -8402,10 +8041,6 @@ fn rust_item_macros() {
     );
 }
 
-/// The Go pack (spec #25): functions, methods by their receiver's type, types and interface
-/// methods; imports through the module path of `go.mod`, a `replace` and a nested module; one
-/// scope per package directory; and build constraints for `linux/amd64`. A sibling repository of
-/// the workspace provides the module its `require` of `example.com/acme/ledger` names.
 #[test]
 fn go() {
     const OUTER: &str = "scopes/scopes.go::outer";
@@ -8768,8 +8403,6 @@ fn go() {
         ],
         &["main.go::main", "worker/main.go::main"],
         &[
-            // A function of the same file, and one called inside a function literal, which
-            // belongs to the function around it.
             (
                 "internal/shapes/shapes.go::NewCircle::clamp#0",
                 EXACT,
@@ -8780,9 +8413,7 @@ fn go() {
                 EXACT,
                 &["internal/shapes/shapes.go::clamp"],
             ),
-            // A parameter called is no definition.
             ("internal/shapes/shapes.go::Each::visit#0", None, &[]),
-            // A plain import names the directory the module path gives; an aliased one too.
             (
                 "main.go::main::shapes.NewCircle#0",
                 EXACT,
@@ -8798,31 +8429,26 @@ fn go() {
                 EXACT,
                 &["internal/shapes/shapes.go::NewCircle"],
             ),
-            // A dot import: the package's exports join the file scope.
             (
                 "main.go::main::Meters#0",
                 EXACT,
                 &["internal/units/units.go::Meters"],
             ),
             ("main.go::main::run#0", EXACT, &["main.go::run"]),
-            // A method on the value a constructor returns.
             (
                 "main.go::main::c.Area#0",
                 EXACT,
                 &["internal/shapes/shapes.go::Circle.Area"],
             ),
-            // The standard library and modules outside the workspace are external.
             ("main.go::main::fmt.Println#0", None, &[]),
             ("main.go::main::str.ToUpper#0", None, &[]),
             ("main.go::main::gin.Default#0", None, &[]),
-            // A function of another file of the package.
             ("report.go::report::run#0", EXACT, &["main.go::run"]),
             (
                 "store/store.go::New::helper#0",
                 EXACT,
                 &["store/helpers.go::helper"],
             ),
-            // Each `init` is a symbol of its own; a blank function is none.
             (
                 "store/store.go::init::open#0",
                 EXACT,
@@ -8839,7 +8465,6 @@ fn go() {
                 EXACT,
                 &["store/store.go::open"],
             ),
-            // A test file of the package shares its scope; the external test package does not.
             (
                 "store/store_test.go::TestNew::New#0",
                 EXACT,
@@ -8860,7 +8485,6 @@ fn go() {
                 EXACT,
                 &["store/store.go::New"],
             ),
-            // An import names every file of the directory.
             ("main.go::run::store.New#0", EXACT, &["store/store.go::New"]),
             (
                 "main.go::run::store.Exported#0",
@@ -8873,7 +8497,6 @@ fn go() {
                 EXACT,
                 &["store/helpers.go::helper"],
             ),
-            // A `replace` to a local directory; a nested module owns its subtree.
             (
                 "report.go::report::invoice.Total#0",
                 EXACT,
@@ -8886,7 +8509,6 @@ fn go() {
                 &["worker/jobs/jobs.go::Run"],
             ),
             ("worker/main.go::main::invoice.Total#0", None, &[]),
-            // Hidden names: a call through the inner binding is a name match at most.
             ("scopes/scopes.go::Plain::outer#0", EXACT, &[OUTER]),
             (
                 "scopes/scopes.go::Plain::store.New#0",
@@ -8911,8 +8533,6 @@ fn go() {
             ),
             ("scopes/scopes.go::Capture::outer#0", INFERRED, &[OUTER]),
             ("scopes/scopes.go::Import::store.New#0", None, &[]),
-            // Type parameters, a receiver's type arguments, the receiver, local types and
-            // constants, and the parameters of a blank function and of a top-level literal.
             ("scopes/scopes.go::Generic::outer#0", INFERRED, &[OUTER]),
             ("scopes/scopes.go::Box.Get::outer#0", INFERRED, &[OUTER]),
             ("scopes/scopes.go::H.Serve::outer#0", INFERRED, &[OUTER]),
@@ -8920,29 +8540,23 @@ fn go() {
             ("scopes/scopes.go::LocalConst::outer#0", INFERRED, &[OUTER]),
             ("scopes/scopes.go::outer#0", INFERRED, &[OUTER]),
             ("scopes/scopes.go::outer#1", INFERRED, &[OUTER]),
-            // Two imports that give one name leave it unknown.
             ("scopes/clash.go::Clash::http.NewRequest#0", None, &[]),
-            // A build constraint after a block comment counts.
             (
                 "store/store.go::New::sysOpen#0",
                 EXACT,
                 &["store/sys_unix.go::sysOpen"],
             ),
-            // A cgo file is left out, as the target builds without cgo.
             (
                 "store/store.go::New::encode#0",
                 EXACT,
                 &["store/codec_pure.go::encode"],
             ),
-            // A replace by a module from outside makes the module of the repository outside.
             ("report.go::report::old.Old#0", None, &[]),
             (
                 "worker/main.go::main::old.Old#0",
                 EXACT,
                 &["legacy/old/old.go::Old"],
             ),
-            // Method calls (spec #25): a receiver whose type is written is exact, one whose type
-            // is not is a name match, and an interface stops at its own method.
             (
                 "methods/calls.go::FromParam::c.Bump#0",
                 EXACT,
@@ -9122,7 +8736,6 @@ fn go() {
                 EXACT,
                 &["methods/types.go::Counter.Bump"],
             ),
-            // A call before the binding that hides a name, a block, and every binding form.
             (
                 "methods/calls.go::UseBefore::cur.Add#0",
                 AMBIGUOUS,
@@ -9168,7 +8781,6 @@ fn go() {
                 AMBIGUOUS,
                 &["methods/types.go::Gauge.Add", "methods/types.go::Log.Add"],
             ),
-            // A type declaration's parameters scope the declaration, not its methods.
             (
                 "methods/types.go::Box.M::t.Ping#0",
                 EXACT,
@@ -9181,7 +8793,6 @@ fn go() {
             ),
         ],
     );
-    // Files the build constraints leave out for `linux/amd64` are not indexed.
     let repo = fixture_repo("conformance_go_absent", "conformance-go", Some(ORIGIN));
     let export = Engine::open(&repo).unwrap().export().unwrap();
     assert!(!export.contains("disk_windows.go"));
@@ -9189,8 +8800,6 @@ fn go() {
     assert!(!export.contains("sys_other.go"));
 }
 
-/// A chi subrouter passed on through exact calls is followed to a limit: a chain of ten
-/// functions is served under the prefix of its `Route`, one past the limit is served nowhere.
 #[test]
 fn a_chi_subrouter_passed_on_past_the_limit_is_not_read() {
     let repo = fixture_repo("go_chi_chain", "conformance-go", Some(ORIGIN));
@@ -9215,11 +8824,6 @@ fn a_chi_subrouter_passed_on_past_the_limit_is_not_read() {
     assert!(!export.contains("http::GET::/long/end"));
 }
 
-/// A line comment inside a Go parameter list or argument list (`func NewRouter( //nolint:funlen`)
-/// is no parameter and no argument (#613): the router handed to `NewRouter` still reaches its
-/// routes. The fixture writes a comment in the call and in the signature (each shifts a
-/// position, so together they cancel); each file is also read without its comments, alone and
-/// together, and all four give the same three HTTP providers.
 #[test]
 fn a_go_comment_in_a_parameter_or_argument_list_shifts_no_position() {
     let expected = [
@@ -9253,20 +8857,12 @@ fn a_go_comment_in_a_parameter_or_argument_list_shifts_no_position() {
     }
 }
 
-/// The routers of the Go fixture (spec #25): `net/http` patterns, and gin, echo, chi and
-/// gorilla/mux groups, with every prefix a router is registered under (chi's `Route`, `Group`
-/// and `Mount`, gorilla's `PathPrefix(..).Subrouter()`), a group passed to or returned from a
-/// function, a function literal as the handler and a router reached under two prefixes. A name
-/// a block, a loop, a literal or an assignment binds again, an import a local hides, a router
-/// mounted inside a call and a prefix or a method Meada cannot read leave no provider.
 #[test]
 fn go_routes_are_providers_under_every_prefix() {
     let (_, actual) = providers("go_routes", "conformance-go", "web/");
     let mut expected = pairs(&[
-        // The default mux and a conversion to `HandlerFunc`.
         ("http::ANY::/health", "web/stdlib.go::Health"),
         ("http::ANY::/echo", "web/stdlib.go::Echo"),
-        // Go 1.22 patterns: a method, parameters, a rest wildcard, a dropped host, the anchor.
         ("http::GET::/users/{}", "web/stdlib.go::GetUser"),
         ("http::POST::/users", "web/stdlib.go::CreateUser"),
         ("http::ANY::/files/{}", "web/stdlib.go::Files"),
@@ -9277,25 +8873,15 @@ fn go_routes_are_providers_under_every_prefix() {
             "web/stdlib.go::Mux.DELETE /users/{}",
         ),
         ("http::GET::/ping", "web/stdlib.go::Ping"),
-        // A mux given as the handler sees the whole path: its routes are served where they fall
-        // under the outer pattern and for the outer method alone (`POST /a2` is outside `/sub/`,
-        // `POST /static/b` is not `GET`, `/exact/deeper` is below an exact pattern).
         ("http::GET::/plain/ledger", "web/stdlib.go::Ledger"),
         ("http::GET::/sub/a1", "web/stdlib.go::Ledger"),
         ("http::ANY::/sub/any", "web/stdlib.go::Ledger"),
         ("http::GET::/static/a", "web/stdlib.go::Ledger"),
         ("http::ANY::/exact", "web/stdlib.go::Ledger"),
-        // A mux a function returns is followed to where it is mounted. One inside
-        // `StripPrefix`, a middleware, `echo.WrapHandler` or `gin.WrapH`, or mounted on a router
-        // held in a field, is an unread mount: served nowhere (and no route for the call).
         ("http::GET::/returned/k1", "web/stdlib.go::Ledger"),
-        // `net/http` has no `:name`; its `*` is a literal.
         ("http::ANY::/star/*", "web/stdlib.go::Stats"),
-        // The route of the wrapper call is still read; its handler is not a function.
         ("http::ANY::/legacy/{}", "web/echo.go"),
         ("http::ANY::/legacy/{}", "web/gin.go"),
-        // gin: nested groups, every method, `Handle`, `Any`, the last of several handlers and a
-        // group made in a chain.
         ("http::GET::/v1/users/{}", "web/gin.go::Show"),
         ("http::POST::/v1/users", "web/gin.go::Save"),
         ("http::PUT::/v1/users/{}", "web/gin.go::Save"),
@@ -9311,13 +8897,10 @@ fn go_routes_are_providers_under_every_prefix() {
         ("http::ANY::/v1/users/any", "web/gin.go::Save"),
         ("http::GET::/files/{}", "web/gin.go::Serve"),
         ("http::GET::/mw/chained", "web/gin.go::Show"),
-        // A group passed to a function: one provider per prefix, and the cycle adds none.
         ("http::GET::/v1/audit", "web/gin.go::Audit"),
         ("http::GET::/admin/audit", "web/gin.go::Audit"),
-        // A group a function returns, and a router a closure captures.
         ("http::GET::/ops/status", "web/gin.go::Status"),
         ("http::GET::/captured", "web/gin.go::Show"),
-        // echo: the handler is the second argument, middleware follows.
         ("http::GET::/api/items/{}", "web/echo.go::Item"),
         ("http::POST::/api/items", "web/echo.go::Create"),
         ("http::PUT::/api/items/{}", "web/echo.go::Create"),
@@ -9332,7 +8915,6 @@ fn go_routes_are_providers_under_every_prefix() {
         ("http::GET::/static/{}", "web/echo.go::Wide"),
         ("http::GET::/api/billing", "web/echo.go::Billing"),
         ("http::GET::/internal/billing", "web/echo.go::Billing"),
-        // chi: every method, `Method`, `HandleFunc` and `Handle` for every method, a wildcard.
         ("http::GET::/ping", "web/chi.go::ChiPing"),
         ("http::POST::/things", "web/chi.go::ChiMake"),
         ("http::PUT::/things/{}", "web/chi.go::ChiEdit"),
@@ -9351,30 +8933,22 @@ fn go_routes_are_providers_under_every_prefix() {
         ("http::ANY::/any", "web/chi.go::ChiAny"),
         ("http::ANY::/handled", "web/chi.go::ChiAny"),
         ("http::GET::/files/{}", "web/chi.go::ChiFiles"),
-        // `Route` with a literal, nested and a named function; `Group` adds no prefix.
         ("http::GET::/rooms", "web/chi.go::ChiIndex"),
         ("http::GET::/rooms/members/{}", "web/chi.go::ChiShow"),
         ("http::PUT::/rooms/members/{}", "web/chi.go::ChiEdit"),
         ("http::GET::/rooms/teams", "web/chi.go::ChiTeam"),
         ("http::GET::/rooms/teams/{}/members", "web/chi.go::ChiTeam"),
         ("http::GET::/grouped", "web/chi.go::ChiPing"),
-        // `Mount` of a router a function returns, mounted again inside it, and one router under
-        // two prefixes.
         ("http::GET::/admin/stats", "web/chi.go::ChiAdmin"),
         ("http::GET::/admin/deep/x", "web/chi.go::ChiAdmin"),
         ("http::GET::/a/shared", "web/chi.go::ChiAdmin"),
         ("http::GET::/b/shared", "web/chi.go::ChiAdmin"),
-        // The subrouter of a `Route` function passed on to a function, through a name and to
-        // itself, and the same function called with another router.
         ("http::GET::/passed/users", "web/chi.go::ChiTeam"),
         ("http::GET::/users", "web/chi.go::ChiTeam"),
         ("http::GET::/passed/stats", "web/chi.go::ChiAdmin"),
         ("http::GET::/passed/loop", "web/chi.go::ChiPing"),
-        // A router nested under itself: the cycle adds nothing.
         ("http::GET::/audit", "web/chi.go::ChiTeam"),
         ("http::GET::/nested/audit", "web/chi.go::ChiTeam"),
-        // gorilla/mux: every method without `.Methods(..)`, one provider for each method it
-        // names, a regular expression in a parameter, and `Name` between the two calls.
         ("http::ANY::/", "web/gorilla.go::MuxIndex"),
         ("http::GET::/items/{}", "web/gorilla.go::MuxShow"),
         ("http::GET::/items/{}/tags", "web/gorilla.go::MuxShow"),
@@ -9387,8 +8961,6 @@ fn go_routes_are_providers_under_every_prefix() {
             "web/gorilla.go::GorillaRoutes.DELETE /inline",
         ),
         ("http::ANY::/handled", "web/gorilla.go::MuxAny"),
-        // Subrouters of `PathPrefix`, nested, chained, and passed to a function under two
-        // prefixes (the cycle adds nothing).
         ("http::GET::/api/users", "web/gorilla.go::MuxShow"),
         ("http::GET::/api/v2/users/{}", "web/gorilla.go::MuxShow"),
         ("http::GET::/chain/c", "web/gorilla.go::MuxShow"),
@@ -9399,10 +8971,6 @@ fn go_routes_are_providers_under_every_prefix() {
     assert_eq!(actual, expected);
 }
 
-/// The consumers of the Go fixture's `client/` (spec #25): `net/http` calls and requests, resty
-/// requests with the base of their client, URLs folded from literals, `+`, `fmt.Sprintf`,
-/// constants and package-level names (of the package, of another file and of another package), and
-/// wrappers read at their call sites. A path that cannot be evaluated is an unresolved consumer.
 #[test]
 fn go_http_calls_are_consumers_with_their_urls_folded() {
     let repo = fixture_repo("go_consumers", "conformance-go", Some(ORIGIN));
@@ -9415,7 +8983,6 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
     let field = |function: &str, call: &str| format!("client/fields.go::{function}::{call}");
     let chain = |verb: &str, n: usize| format!("(call_expression).{verb}#{n}");
     let expected = triples(&[
-        // The package, a `Client`, the default client and a client written as a literal.
         ("http::GET::/health", api, &net("Package", "http.Get#0")),
         ("http::HEAD::/ping", api, &net("Package", "http.Head#0")),
         ("http::POST::/items", api, &net("Package", "http.Post#0")),
@@ -9438,7 +9005,6 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
             &net("Clients", "http.DefaultClient.Get#0"),
         ),
         ("http::GET::/on-local", api, &net("Clients", "local.Get#0")),
-        // The construction of a request is the consumer; a method that is no literal is open.
         (
             "http::GET::/req/get",
             api,
@@ -9459,7 +9025,6 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
             api,
             &net("Requests", "http.NewRequestWithContext#1"),
         ),
-        // Literals, `+`, `fmt.Sprintf`, constants and names of the package and of others.
         ("http::GET::/raw", api, &net("Urls", "http.Get#0")),
         ("http::GET::/users/{}", api, &net("Urls", "http.Get#1")),
         (
@@ -9471,21 +9036,18 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
         ("http::GET::/orders", api, &net("Urls", "http.Get#4")),
         ("http::GET::/users/{}", api, &net("Urls", "http.Get#5")),
         ("http::GET::/v2/teams", api, &net("Urls", "http.Get#6")),
-        // A variable assigned in a function, in another file or in another package holds no value.
         ("unresolved", "", &net("Urls", "http.Get#7")),
         ("unresolved", "", &net("Urls", "http.Get#8")),
         ("unresolved", "", &net("Urls", "http.Get#9")),
         ("unresolved", "", &net("Unresolved", "http.Get#0")),
         ("unresolved", "", &net("Unresolved", "http.Get#1")),
         ("unresolved", "", &net("Unresolved", "http.Get#2")),
-        // Wrappers: one level, two levels, a method parameter, an unreadable argument, a cycle.
         ("http::GET::/wrapped", api, &wrap("Wrapped", "get#0")),
         ("http::GET::/users/42", api, &wrap("Wrapped", "getUser#0")),
         ("http::PUT::/wrapped/put", api, &wrap("Wrapped", "send#0")),
         ("http::GET::/", api, &wrap("Wrapped", "get#1")),
         ("http::GET::/cycle", api, &wrap("Cycle", "ping#0")),
         ("http::GET::/", api, &wrap("pong", "ping#0")),
-        // resty: the base URL of the client that issued the request.
         (
             "http::GET::/invoices",
             "host:billing.example.com",
@@ -9551,8 +9113,6 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
             "host:bare.example.com",
             &rest("Separate", &chain("Get", 1)),
         ),
-        // A client written as a type has a base Meada did not read, so the path after it is an
-        // open item (#801); a client of two bases has an unknown one.
         ("unresolved", "", &rest("Typed", &chain("Get", 0))),
         ("unresolved", "", &rest("Typed", "r.Get#0")),
         ("unresolved", "", &rest("Gateway.Items", &chain("Get", 0))),
@@ -9572,8 +9132,6 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
             "host:billing.example.com",
             &rest("Wrapper", "fetchJSON#0"),
         ),
-        // Two clients one factory makes keep their own bases; a wrapper given a traced client and
-        // one that is not has an unknown base; a client assigned again is no consumer.
         (
             "http::GET::/from-a",
             "host:a.example.com",
@@ -9582,8 +9140,6 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
         ("http::GET::/from-b", "", &rest("Factory", &chain("Get", 0))),
         ("unresolved", "", &rest("Mixed", "fetchBase#0")),
         ("unresolved", "", &rest("Mixed", "fetchBase#1")),
-        // A base URL read from the environment, by `os.Getenv` and by `os.LookupEnv` with a
-        // fallback.
         (
             "http::GET::/env/get",
             "env:API_URL",
@@ -9594,10 +9150,6 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
             "env:BILLING_URL",
             &format!("client/env.go::FromLookup::{}", chain("Get", 0)),
         ),
-        // A client kept in a struct field: the literals that set the field give its base. Two
-        // bases, a literal whose client is not traced, a selector write of the field, a base set
-        // through the field and a literal without field names leave it unknown; a field no
-        // literal sets is the client its type names.
         (
             "http::GET::/v1/items",
             "host:api.example.com",
@@ -9615,14 +9167,10 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
         ("unresolved", "", &field("Pair.Left", &chain("Get", 0))),
         ("unresolved", "", &field("Pool.Lease", &chain("Get", 0))),
         ("unresolved", "", &field("Unset.Idle", &chain("Get", 0))),
-        // A package variable another package writes through a selector (`config.Base = ..`,
-        // `&config.Path`, `config.Mode += ..`) is no constant; `Host` of a request is no write
-        // to the constant `Host`.
         ("unresolved", "", &net("Written", "http.Get#0")),
         ("unresolved", "", &net("Written", "http.Get#1")),
         ("unresolved", "", &net("Written", "http.Get#2")),
         ("http::GET::/stable", api, &net("Written", "http.Get#3")),
-        // A flag, width or precision makes a hole; `%d` prints integers only.
         ("http::GET::/pad/{}", api, &net("Formats", "http.Get#0")),
         ("http::GET::/prec/{}", api, &net("Formats", "http.Get#1")),
         ("http::GET::/num/{}", api, &net("Formats", "http.Get#2")),
@@ -9636,11 +9184,6 @@ fn go_http_calls_are_consumers_with_their_urls_folded() {
     assert_eq!(consumers(&json, "client/"), expected);
 }
 
-/// The axum service of the Rust fixture (spec #30): routes with every `nest` prefix, a router
-/// built in another module, one router under two prefixes, chained method routers, `any`, a
-/// closure handler and the wildcard spellings. A router mounted under a prefix Meada cannot
-/// read, or on a router held in a field, is served nowhere, and an Express-spelled `Router` of
-/// the crate's own is no provider.
 #[test]
 fn rust_axum_routes_are_providers_under_every_prefix() {
     let (_, actual) = providers("rust_axum", "conformance-rust", "crates/web/src/");
@@ -9664,23 +9207,17 @@ fn rust_axum_routes_are_providers_under_every_prefix() {
         ]
     };
     let mut expected: Vec<(String, String)> = [
-        // `nest(API, api)` reads the constant from another module; the closure is named for
-        // its route.
         (
             "http::GET::/api/ping",
             "crates/web/src/lib.rs::app.GET /api/ping",
         ),
-        // `merge` adds no prefix; `any` serves every method.
         ("http::GET::/health", "crates/web/src/health.rs::check"),
         ("http::ANY::/echo", "crates/web/src/health.rs::echo"),
         ("http::GET::/files/{}", "crates/web/src/files.rs::read"),
         ("http::GET::/blobs/{}", "crates/web/src/files.rs::read"),
-        // A router a function receives and returns, mounted under a literal.
         ("http::GET::/admin/stats", "crates/web/src/admin.rs::stats"),
         ("http::GET::/legacy/old", "crates/web/src/health.rs::check"),
-        // `{{raw}}` is the literal `{raw}`, not a parameter.
         ("http::GET::/{raw}", "crates/web/src/health.rs::check"),
-        // The method is axum's name for the function, not the file's.
         (
             "http::GET::/alias/renamed",
             "crates/web/src/health.rs::check",
@@ -9690,8 +9227,6 @@ fn rust_axum_routes_are_providers_under_every_prefix() {
             "crates/web/src/health.rs::echo",
         ),
         ("http::POST::/admin/reset", "crates/web/src/admin.rs::reset"),
-        // `orphans::router` is nested under a prefix that is a parameter: no provider at
-        // `/never`, under any prefix.
     ]
     .into_iter()
     .map(|(c, s)| (c.to_string(), s.to_string()))
@@ -9702,17 +9237,10 @@ fn rust_axum_routes_are_providers_under_every_prefix() {
     assert_eq!(actual, expected);
 }
 
-/// The actix-web service of the Rust fixture (spec #30): attribute routes (`route` with several
-/// methods included) registered bare, in a tuple, in nested scopes and through a function that
-/// returns a scope; route builders on the app, resources and the service configurations
-/// `.configure` takes. A prefix read at run time serves nothing, a handler no call names is
-/// served at its own path, one a call names on a receiver Meada cannot read is served nowhere,
-/// and another crate's `get` attribute is no route.
 #[test]
 fn rust_actix_routes_are_providers_under_every_mount() {
     let (_, actual) = providers("rust_actix", "conformance-rust", "crates/actix/src/");
     let expected = pairs(&[
-        // Attributes registered bare and in a tuple.
         ("http::GET::/accounts", "crates/actix/src/accounts.rs::list"),
         (
             "http::POST::/accounts",
@@ -9722,12 +9250,10 @@ fn rust_actix_routes_are_providers_under_every_mount() {
             "http::DELETE::/accounts/{}",
             "crates/actix/src/accounts.rs::remove",
         ),
-        // A scope nested in a scope; the handler is not served at the root as well.
         (
             "http::GET::/v1/admin/accounts/{}",
             "crates/actix/src/accounts.rs::show",
         ),
-        // A function that returns a scope, `#[route]` with two methods, `{tail:.*}`.
         (
             "http::PUT::/api/accounts/{}/sync",
             "crates/actix/src/accounts.rs::sync",
@@ -9740,14 +9266,12 @@ fn rust_actix_routes_are_providers_under_every_mount() {
             "http::GET::/api/files/{}",
             "crates/actix/src/accounts.rs::files",
         ),
-        // Route builders on the app.
         ("http::GET::/ping", "crates/actix/src/orders.rs::ping"),
         ("http::ANY::/echo", "crates/actix/src/orders.rs::echo"),
         (
             "http::PUT::/inline",
             "crates/actix/src/lib.rs::serve_catalog.PUT /inline",
         ),
-        // Resources.
         ("http::GET::/orders", "crates/actix/src/orders.rs::list"),
         ("http::POST::/orders", "crates/actix/src/orders.rs::create"),
         (
@@ -9759,7 +9283,6 @@ fn rust_actix_routes_are_providers_under_every_mount() {
             "http::DELETE::/orders/{}",
             "crates/actix/src/orders.rs::item.DELETE /orders/{}",
         ),
-        // `.configure(f)`: what `f` registers, with and without a scope around the call.
         ("http::GET::/status", "crates/actix/src/admin.rs::status"),
         (
             "http::GET::/admin/dashboard",
@@ -9769,18 +9292,12 @@ fn rust_actix_routes_are_providers_under_every_mount() {
             "http::GET::/tools/audit",
             "crates/actix/src/admin.rs::audit",
         ),
-        // Written nowhere in its crate but where it is defined: its own path, no prefix. Its
-        // name bound (a `let`, a parameter, a field), a reference a local of the name hides and
-        // a mention in another crate register nothing. Handlers that code Meada does not read
-        // (`services!`, `vec!`, `cfg_if!`, a reference before a `let` of the name) mentions are
-        // possibly registered there: served nowhere.
         ("http::GET::/stray/{}", "crates/actix/src/stray.rs::lonely"),
         ("http::GET::/bound", "crates/actix/src/stray.rs::bound"),
         (
             "http::GET::/shadowed",
             "crates/actix/src/stray.rs::shadowed",
         ),
-        // A configuration passed on to the function a function calls.
         (
             "http::GET::/more/extras",
             "crates/actix/src/admin.rs::extra",
@@ -9789,9 +9306,6 @@ fn rust_actix_routes_are_providers_under_every_mount() {
     assert_eq!(actual, expected);
 }
 
-/// The Rocket service of the Rust fixture (spec #30): attribute routes listed by `routes!` under
-/// each `mount` prefix, a function that returns the list, `<id>`, `<path..>` and a query part.
-/// A prefix read at run time serves nothing, and an unmounted handler is served at its own path.
 #[test]
 fn rust_rocket_routes_are_providers_under_their_mount() {
     let (_, actual) = providers("rust_rocket", "conformance-rust", "crates/rocket/src/");
@@ -9818,8 +9332,6 @@ fn rust_rocket_routes_are_providers_under_their_mount() {
     assert_eq!(actual, expected);
 }
 
-/// Rocket's canonical form (spec #30): `#[macro_use] extern crate rocket;` brings its attributes
-/// into every module of the crate, bare.
 #[test]
 fn rust_rocket_macro_use_brings_the_attributes_into_every_module() {
     let (_, actual) = providers("rust_greeter", "conformance-rust", "crates/greeter/src/");
@@ -9830,8 +9342,6 @@ fn rust_rocket_macro_use_brings_the_attributes_into_every_module() {
     assert_eq!(actual, expected);
 }
 
-/// A library whose root is not under `src/` (`[lib] path = "lib.rs"`) reads `#[macro_use]` from
-/// that root, as its crate's module tree says.
 #[test]
 fn rust_macro_use_follows_the_crate_root_wherever_it_is() {
     let (_, actual) = providers("rust_flat", "conformance-rust", "crates/flat/");
@@ -9842,8 +9352,6 @@ fn rust_macro_use_follows_the_crate_root_wherever_it_is() {
     assert_eq!(actual, expected);
 }
 
-/// A file writing more names than `Facts::mentions` keeps makes only its own crate's handlers
-/// possibly registered: one in another crate leaves the unregistered handler at its own path.
 #[test]
 fn a_file_past_the_mentions_limit_hides_only_its_own_crate() {
     let many: String = (0..20_000).map(|i| format!("    n{i};\n")).collect();
@@ -9864,8 +9372,6 @@ fn a_file_past_the_mentions_limit_hides_only_its_own_crate() {
     }
 }
 
-/// The constants and returns the handlers of a call are expanded from share one budget: a list
-/// that fits is served under its scope, the same list past the budget is read no further.
 #[test]
 fn an_actix_list_expanded_past_the_work_budget_is_not_read() {
     let repo = fixture_repo("rust_actix_work", "conformance-rust", Some(ORIGIN));
@@ -9889,8 +9395,6 @@ fn an_actix_list_expanded_past_the_work_budget_is_not_read() {
     assert!(!export.contains("http::GET::/b/h0\""));
 }
 
-/// A method router chain longer than the limit read is no provider; the same router with a
-/// short chain is.
 #[test]
 fn an_axum_method_router_chain_past_the_limit_is_not_read() {
     let repo = fixture_repo("rust_axum_chain", "conformance-rust", Some(ORIGIN));
@@ -9909,8 +9413,6 @@ fn an_axum_method_router_chain_past_the_limit_is_not_read() {
     assert!(!export.contains("http::GET::/long"));
 }
 
-/// A chain of thousands of `route` calls is read in one pass and only as far as the limit: the
-/// routes near its start are providers, the ones past it are not.
 #[test]
 fn a_long_axum_chain_is_read_up_to_its_limit() {
     let repo = fixture_repo("rust_axum_long", "conformance-rust", Some(ORIGIN));
@@ -9930,7 +9432,6 @@ fn a_long_axum_chain_is_read_up_to_its_limit() {
     assert!(!export.contains("http::GET::/r2999\""));
 }
 
-/// The consumers of the Rust conformance fixture's `worker` crate in `file` of its `src/`.
 fn rust_clients(case: &str, file: &str) -> Vec<Consumer> {
     let repo = fixture_repo(case, "conformance-rust", Some(ORIGIN));
     let export = Engine::open(&repo).unwrap().export().unwrap();
@@ -9944,7 +9445,6 @@ fn rust_reqwest_functions_are_consumers_and_get_on_other_objects_is_not() {
     let site =
         |function: &str, call: &str| format!("crates/worker/src/modules.rs::{function}::{call}");
     let expected = triples(&[
-        // A function of the crate, of its `blocking` module imported and written in full.
         ("http::GET::/health", host, &site("health", "reqwest.get#0")),
         (
             "http::GET::/blocking/health",
@@ -9958,7 +9458,6 @@ fn rust_reqwest_functions_are_consumers_and_get_on_other_objects_is_not() {
         ),
         ("http::GET::/items", host, &site("items", "client.get#0")),
     ]);
-    // `get` on a type of the crate and on a map is no consumer.
     assert_eq!(rust_clients("rust_http_modules", "modules.rs"), expected);
 }
 
@@ -9998,9 +9497,7 @@ fn rust_reqwest_clients_send_with_their_method_name_or_request() {
             host,
             &site("verbs", "client.head#0"),
         ),
-        // `Client::builder()...build()?` is a client.
         ("http::GET::/built", host, &site("built", "client.get#0")),
-        // `request(Method::X, url)`: the method written in full, through a `use` and a `let`.
         (
             "http::PUT::/requested/put",
             host,
@@ -10016,7 +9513,6 @@ fn rust_reqwest_clients_send_with_their_method_name_or_request() {
             host,
             &site("requested", "client.request#2"),
         ),
-        // A client that is never named, built in the expression.
         (
             "http::GET::/inline",
             host,
@@ -10027,7 +9523,6 @@ fn rust_reqwest_clients_send_with_their_method_name_or_request() {
             host,
             &site("inline", "(call_expression).post#0"),
         ),
-        // The blocking client, `use ... as`, and a builder chain called on in place.
         (
             "http::GET::/blocking/get",
             host,
@@ -10088,7 +9583,6 @@ fn rust_ureq_functions_and_agents_are_consumers_with_their_method() {
             host,
             &site("module_functions", "ureq.request#0"),
         ),
-        // An `Agent` from `agent()`, from a builder and from `Agent::new()`.
         (
             "http::GET::/agent/get",
             host,
@@ -10119,7 +9613,6 @@ fn rust_client_wrappers_are_expanded_through_their_exact_callers() {
     let site =
         |function: &str, call: &str| format!("crates/worker/src/wrappers.rs::{function}::{call}");
     let expected = triples(&[
-        // One level, and two: `resource` calls `api_get` with a path of its own parameter.
         (
             "http::GET::/wrapped/one",
             host,
@@ -10135,20 +9628,16 @@ fn rust_client_wrappers_are_expanded_through_their_exact_callers() {
             host,
             &site("wrapped", "resource#1"),
         ),
-        // The client is a parameter too: the caller's constructor is the client. One held by a
-        // struct (`Api.ping`) is no consumer.
         (
             "http::POST::/param/one",
             host,
             &site("through_a_parameter", "send#0"),
         ),
-        // A wrapper that calls itself: the cycle is cut, the outside caller's path is read.
         (
             "http::GET::/recursive/one",
             host,
             &site("recursive", "recurse#0"),
         ),
-        // A public function with no caller here keeps the parameter as a hole.
         (
             "http::GET::/open/{}",
             host,
@@ -10164,22 +9653,16 @@ fn rust_values_derived_from_a_client_and_name_matches_are_no_consumers() {
     let site =
         |function: &str, call: &str| format!("crates/worker/src/derived.rs::{function}::{call}");
     let expected = triples(&[
-        // `headers().get(..)` of a response, `get` on a JSON value and on `client.api()` (a method
-        // of a trait the crate defines) are not.
         (
             "http::GET::/derived/real",
             host,
             &site("derived", "client.get#0"),
         ),
-        // A client from `factory.make()`, found by name, is not one; a wrapper reached only by
-        // a name match keeps its parameter as a hole (the call `sender.send_named("called")` is
-        // not its caller).
         (
             "http::GET::/by-name/{}",
             host,
             &site("send_named", "reqwest.get#0"),
         ),
-        // A `{base}` that a loop or a closure parameter binds is not the `let base` around it.
         ("unresolved", "", &site("shadowed", "reqwest.get#0")),
         ("unresolved", "", &site("shadowed", "reqwest.get#1")),
         ("unresolved", "", &site("shadowed", "reqwest.get#2")),
@@ -10194,21 +9677,17 @@ fn rust_urls_fold_consts_format_concat_and_strings_built_in_the_function() {
         |function: &str, call: &str| format!("crates/worker/src/urls.rs::{function}::{call}");
     let get = |function: &str, n: usize| site(function, &format!("reqwest.get#{n}"));
     let expected = triples(&[
-        // A const of the file, one imported through `use`, one through a path, a `concat!` const,
-        // and a static captured in a format string.
         ("http::GET::/local", host, &get("consts", 0)),
         ("http::GET::/users", host, &get("consts", 1)),
         ("http::GET::/", host, &get("consts", 2)),
         ("http::GET::/tags", host, &get("consts", 3)),
         ("http::GET::/base/items", host, &get("consts", 4)),
-        // `{base}`, `{}`, `{0}`, `{b}` with `b = base`, `{{` and `concat!`.
         ("http::GET::/fmt/inline", host, &get("formats", 0)),
         ("http::GET::/fmt/positional/1", host, &get("formats", 1)),
         ("http::GET::/fmt/index", host, &get("formats", 2)),
         ("http::GET::/fmt/named", host, &get("formats", 3)),
         ("http::GET::/fmt/escaped/{}", host, &get("formats", 4)),
         ("http::GET::/concat/7", host, &get("formats", 5)),
-        // `push_str`, `push` and `+=`, `+`, and a read before a push sees the String as it was.
         ("http::GET::/strings/push/tail", host, &get("strings", 0)),
         ("http::GET::/strings/sum/chain", host, &get("strings", 1)),
         ("http::GET::/early", host, &get("strings", 2)),
@@ -10222,8 +9701,6 @@ fn rust_urls_that_do_not_fold_are_holes_or_unresolved() {
     let host = "host:api.example.com";
     let site = |function: &str| format!("crates/worker/src/dynamic.rs::{function}::reqwest.get#0");
     let expected = triples(&[
-        // A call's result, and a String a loop grows, are unreadable: the consumer has no
-        // contract. A format spec prints something else than the value: a hole.
         ("unresolved", "", &site("unresolved")),
         ("unresolved", "", &site("looped")),
         ("http::GET::/spec/{}", host, &site("spec")),
@@ -10236,7 +9713,6 @@ fn rust_base_urls_from_the_environment_are_the_variable_meada_never_reads() {
     let site =
         |function: &str, n: usize| format!("crates/worker/src/env.rs::{function}::reqwest.get#{n}");
     let expected = triples(&[
-        // `std::env::var` in full, `use std::env`, `use std::env::var` inside a function.
         ("http::GET::/std", "env:STD_URL", &site("full_path", 0)),
         (
             "http::GET::/imported",
@@ -10248,19 +9724,15 @@ fn rust_base_urls_from_the_environment_are_the_variable_meada_never_reads() {
             "env:FUNCTION_URL",
             &site("function_import", 0),
         ),
-        // `env!` bound to a name and inside `concat!`, and `dotenvy::var` with `?`.
         ("http::GET::/macro", "env:MACRO_URL", &site("macros", 0)),
         ("http::GET::/concat", "env:CONCAT_URL", &site("macros", 1)),
         ("http::GET::/dotenv", "env:DOTENV_URL", &site("dotenv", 0)),
-        // A fallback and string methods keep the one read.
         ("http::GET::/or", "env:OR_URL", &site("fallbacks", 0)),
         ("http::GET::/else", "env:ELSE_URL", &site("fallbacks", 1)),
         ("http::GET::/trim", "env:TRIM_URL", &site("fallbacks", 2)),
-        // A second read in the fallback leaves a hole, and `option_env!` is not read.
         ("unresolved", "", &site("two_reads", 0)),
         ("unresolved", "", &site("two_reads", 1)),
         ("unresolved", "", &site("optional", 0)),
-        // A read in the middle of the URL is a hole in the path, not the base.
         (
             "http::GET::/{}/mid",
             "host:api.example.com",
@@ -10277,18 +9749,14 @@ fn rust_calls_spelled_like_an_environment_read_but_not_one_are_not_read() {
     };
     let site = |function: &str| site2(function, 0);
     let expected = triples(&[
-        // The local `env::var` gives the URL its body returns. A bare `env::var` with
-        // no definition or import has no proven value.
         (
             "http::GET::/OWN_URL/own",
             "host:api.example.com",
             &site("own_module"),
         ),
         ("unresolved", "", &site("other.bare")),
-        // A parameter or a closure named `var` hides `use std::env::var`.
         ("unresolved", "", &site("hidden.parameter")),
         ("unresolved", "", &site("hidden.closure")),
-        // A `var`, an `env!` and a `format!` imported from a path outside `std`.
         ("unresolved", "", &site("foreign.read")),
         ("unresolved", "", &site2("foreign.read", 1)),
         ("unresolved", "", &site2("foreign.read", 2)),
@@ -10296,8 +9764,6 @@ fn rust_calls_spelled_like_an_environment_read_but_not_one_are_not_read() {
     assert_eq!(rust_clients("rust_http_not_env", "not_env.rs"), expected);
 }
 
-/// A read under hundreds of string methods is read only as far as `VALUE_DEPTH`, and a read with
-/// hundreds of fallbacks nested in it is a hole: the base is no variable, and indexing carries on.
 #[test]
 fn an_environment_read_under_a_deep_chain_is_a_hole() {
     let repo = fixture_repo("rust_env_long", "conformance-rust", Some(ORIGIN));
@@ -10327,9 +9793,6 @@ fn an_environment_read_under_a_deep_chain_is_a_hole() {
     assert_eq!(reads, [("unresolved", ""), ("unresolved", "")]);
 }
 
-/// A crate's exports are the `pub` items reachable from its root through `pub` modules and
-/// `pub use`; `pub(crate)` and narrower items stay inside it (the `exports` table, read as the
-/// next ticket's cross-repository imports do).
 #[test]
 fn rust_exports_are_the_public_items_reachable_from_the_root() {
     let repo = fixture_repo("conformance_rust_exports", "conformance-rust", Some(ORIGIN));
@@ -10352,11 +9815,7 @@ fn rust_exports_are_the_public_items_reachable_from_the_root() {
         .unwrap()
         .map(Result::unwrap)
         .collect();
-    // `api` has binaries alone (`src/main.rs`, `src/bin/`, a `[[bin]]`): no other crate can
-    // import them, so nothing in it is exported, whatever its `pub`s and modules say.
     let expected = [
-        // `pub use` at the root, `pub` modules and the items of a `pub` module written in
-        // place; a private module and what it holds are not.
         "crates/actix/src/lib.rs serve_catalog crates/actix/src/lib.rs serve_catalog",
         "crates/billing/src/billing.rs Invoice crates/billing/src/invoice.rs Invoice",
         "crates/billing/src/billing.rs copies crates/billing/src/billing.rs copies",
@@ -10370,10 +9829,7 @@ fn rust_exports_are_the_public_items_reachable_from_the_root() {
         "crates/ledger-core/src/lib.rs amounts crates/ledger-core/src/lib.rs amounts",
         "crates/ledger-core/src/lib.rs entries crates/ledger-core/src/lib.rs entries",
         "crates/ledger-core/src/lib.rs entries.add crates/ledger-core/src/lib.rs entries.add",
-        // A `pub use` in a `pub` module written in place is one of its members.
         "crates/ledger-core/src/lib.rs entries.secret crates/ledger-core/src/lib.rs internal.secret",
-        // `mod meter; pub use meter::meter;`: the private module's file exports nothing, and
-        // the root gives the item.
         "crates/ledger-core/src/lib.rs meter crates/ledger-core/src/meter.rs meter",
         "crates/ledger-core/src/lib.rs post crates/ledger-core/src/lib.rs post",
         "crates/scratch/src/lib.rs ignored crates/scratch/src/lib.rs ignored",
@@ -10400,14 +9856,10 @@ fn rust_exports_are_the_public_items_reachable_from_the_root() {
     assert_eq!(found, expected);
 }
 
-/// The Python conformance fixture's export, and its providers (contract, site) whose site is
-/// under `dir`, sorted.
 fn python_providers(case: &str, dir: &str) -> (Value, Vec<(String, String)>) {
     providers(case, "conformance-python", dir)
 }
 
-/// The export of `fixture`, and its providers (contract, site) whose site is under `dir`,
-/// sorted.
 fn providers(case: &str, fixture: &str, dir: &str) -> (Value, Vec<(String, String)>) {
     let repo = fixture_repo(case, fixture, Some(ORIGIN));
     let export = Engine::open(&repo).unwrap().export().unwrap();
@@ -10427,7 +9879,6 @@ fn providers(case: &str, fixture: &str, dir: &str) -> (Value, Vec<(String, Strin
     (json, providers)
 }
 
-/// `(contract, site)` pairs as owned strings, sorted.
 fn pairs(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
     let mut out: Vec<(String, String)> = (pairs.iter())
         .map(|(c, s)| (c.to_string(), s.to_string()))
@@ -10436,11 +9887,8 @@ fn pairs(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
     out
 }
 
-/// A consumer of the export: its contract (`unresolved` for none), how it names the provider's
-/// repository (empty for none) and its site.
 type Consumer = (String, String, String);
 
-/// The consumers of `json` whose site is under `dir`, sorted, with repository-relative sites.
 fn consumers(json: &Value, dir: &str) -> Vec<Consumer> {
     let mut found: Vec<Consumer> = json["consumers"]
         .as_array()
@@ -10461,7 +9909,6 @@ fn consumers(json: &Value, dir: &str) -> Vec<Consumer> {
     found
 }
 
-/// `(contract, via, site)` as owned strings, sorted.
 fn triples(items: &[(&str, &str, &str)]) -> Vec<Consumer> {
     let mut out: Vec<Consumer> = (items.iter())
         .map(|(c, v, s)| (c.to_string(), v.to_string(), s.to_string()))
@@ -10474,13 +9921,10 @@ fn triples(items: &[(&str, &str, &str)]) -> Vec<Consumer> {
 fn python_fastapi_and_flask_routes_are_providers_under_every_prefix() {
     let (json, actual) = python_providers("python_http_providers", "web/");
     let expected = [
-        // FastAPI: method decorators and `api_route` on the app.
         ("http::GET::/health", "web/api.py::health"),
         ("http::GET::/ping", "web/api.py::ping"),
         ("http::POST::/ping", "web/api.py::ping"),
         ("http::GET::/echo", "web/api.py::echo"),
-        // One router under three prefixes: nested in `v1` (its own prefix after the one given
-        // when including it), directly, and through a function that returns its argument.
         (
             "http::GET::/api/v1/items/catalog/{}",
             "web/items.py::read_item",
@@ -10493,24 +9937,18 @@ fn python_fastapi_and_flask_routes_are_providers_under_every_prefix() {
         ("http::POST::/legacy/catalog", "web/items.py::create_item"),
         ("http::GET::/relay/catalog/{}", "web/items.py::read_item"),
         ("http::POST::/relay/catalog", "web/items.py::create_item"),
-        // A router returned by a function and included by another one, as arguments.
         (
             "http::DELETE::/internal/admin/users/{}",
             "web/factory.py::build_admin.remove_user",
         ),
-        // Flask: `route` without methods serves GET; a Blueprint's own prefix, and one replaced
-        // on registration. The `get` shortcut yields nothing.
         ("http::GET::/", "web/pages.py::index"),
         ("http::GET::/orders/{}", "web/pages.py::order"),
         ("http::DELETE::/orders/{}", "web/pages.py::order"),
         ("http::GET::/reports/daily/{}", "web/pages.py::daily"),
         ("http::PUT::/members/{}", "web/accounts.py::update"),
-        // A prefix or a path with a part that cannot be read yields no route; a path
-        // parameter written in the literal stays one.
         ("http::GET::/partial/{}", "web/partial.py::read_part"),
     ];
     assert_eq!(actual, pairs(&expected));
-    // A Python function named `fetch` is no HTTP consumer.
     assert_eq!(consumers(&json, "web/"), []);
 }
 
@@ -10518,17 +9956,10 @@ fn python_fastapi_and_flask_routes_are_providers_under_every_prefix() {
 fn python_django_urlconfs_are_providers_with_the_methods_django_allows() {
     let (_, actual) = python_providers("python_django_providers", "shop/");
     let expected = [
-        // Unrestricted function views serve every method.
         ("http::ANY::/health", "shop/views.py::health"),
-        // `urlpatterns += [...]` and `urlpatterns = urlpatterns + [...]` extend the list; the
-        // `static(...)` added between them is left out and voids nothing.
         ("http::ANY::/about", "shop/views.py::about"),
         ("http::ANY::/contact", "shop/views.py::contact"),
-        // A `re_path()` with a simple named group; the one beyond them yields nothing, and so
-        // does a route with a part that cannot be read.
         ("http::ANY::/vintage/{}", "shop/views.py::vintage"),
-        // `include()` by dotted name, two levels deep: `require_http_methods`, a class-based
-        // view's own handler methods, and `require_safe` reached through its module.
         ("http::GET::/shop/orders/{}", "shop/orders/views.py::order"),
         (
             "http::DELETE::/shop/orders/{}",
@@ -10550,7 +9981,6 @@ fn python_django_urlconfs_are_providers_with_the_methods_django_allows() {
             "http::HEAD::/shop/items/{}/stock",
             "shop/orders/items.py::stock",
         ),
-        // `include()` of an imported module: `require_GET` and `require_POST`.
         (
             "http::GET::/catalog/products",
             "shop/catalog/urls.py::products",
@@ -10568,14 +9998,11 @@ fn python_django_urlconfs_an_include_may_name_are_not_served_at_the_root() {
     let (_, actual) = providers("python_django_includes", "python-django", "");
     let expected = [
         ("http::ANY::/health", "mysite/views.py::health"),
-        // `include()` of a tuple, holding a module's dotted name or a list of entries.
         ("http::ANY::/shop/items", "shop/views.py::items"),
         ("http::ANY::/extra/ping", "mysite/views.py::ping"),
-        // `apps/vendor/urls.py` may be what `include("vendor.urls")` names: no `/deals`.
     ];
     assert_eq!(actual, pairs(&expected));
 
-    // An `include()` whose argument cannot be read may name any URLconf: none is a root.
     let repo = fixture_repo("python_django_unknown", "python-django", Some(ORIGIN));
     let plugins = "from django.urls import include, path\nfrom registry import load\n\n\
                    urlpatterns = [path(\"plugins/\", include(load()))]\n";
@@ -10585,8 +10012,6 @@ fn python_django_urlconfs_an_include_may_name_are_not_served_at_the_root() {
     assert_eq!(json["providers"], serde_json::json!([]));
 }
 
-/// The leaf routes of a ladder of `levels` URLconfs, each including the next under each of
-/// `prefixes`.
 fn django_ladder(case: &str, levels: usize, prefixes: &[&str]) -> Vec<String> {
     let repo = fixture_repo(case, "python-django", Some(ORIGIN));
     let dir = repo.join("ladder");
@@ -10617,14 +10042,12 @@ fn django_ladder(case: &str, levels: usize, prefixes: &[&str]) -> Vec<String> {
 
 #[test]
 fn python_django_includes_are_read_to_a_budget() {
-    // A module included under two prefixes serves its routes under both.
     let mut routes = django_ladder("python_django_diamond", 2, &["a", "b"]);
     routes.sort();
     assert_eq!(
         routes,
         ["/a/a/x", "/a/b/x", "/b/a/x", "/b/b/x"].map(|p| format!("http::ANY::{p}"))
     );
-    // A ladder of 24 levels has 2^24 paths: the budget stops the walk well before them.
     let routes = django_ladder("python_django_ladder", 24, &["a", "b"]);
     assert!(!routes.is_empty());
     assert!(routes.len() < 1 << 20, "{}", routes.len());
@@ -10632,7 +10055,6 @@ fn python_django_includes_are_read_to_a_budget() {
 
 #[test]
 fn python_django_includes_are_followed_to_a_depth() {
-    // `INCLUDE_DEPTH` (64) includes, each of the next module.
     let chain =
         |levels: usize| django_ladder(&format!("python_django_chain_{levels}"), levels, &["a"]);
     assert_eq!(chain(64), [format!("http::ANY::{}/x", "/a".repeat(64))]);
@@ -10643,19 +10065,13 @@ fn python_django_includes_are_followed_to_a_depth() {
 fn python_routers_whose_mount_is_not_seen_are_not_served_at_the_root() {
     let (_, actual) = providers("python_mounts", "python-mounts", "");
     let expected = [
-        // The apps, at their root, and a sub-application under the path that mounts it.
         ("http::GET::/health", "backend/app/main.py::health"),
         ("http::GET::/v1/ping", "backend/app/main.py::ping"),
         ("http::GET::/about", "backend/app/site.py::about"),
-        // The users router and the pages Blueprint are mounted through imports that do not
-        // resolve, and `legacy` may be what an unreadable mount puts under `/legacy`: none of
-        // them is served at the root.
     ];
     assert_eq!(actual, pairs(&expected));
 }
 
-/// The levels of `checkout`'s two calls in `python-roots` under a given `pyproject.toml`: the
-/// call into `lib/shop` and the call into `src/other`.
 fn python_roots(case: &str, pyproject: &str) -> [Option<String>; 2] {
     let repo = fixture_repo(case, "python-roots", Some(ORIGIN));
     std::fs::write(repo.join("pyproject.toml"), pyproject).unwrap();
@@ -10672,10 +10088,7 @@ fn python_roots(case: &str, pyproject: &str) -> [Option<String>; 2] {
 #[test]
 fn python_source_roots_come_from_pyproject() {
     let exact = Some("exact".to_string());
-    // Nothing declared: `src` is a root, `lib` is not.
     assert_eq!(python_roots("python_roots_none", ""), [None, exact.clone()]);
-    // A `package-dir` whose directory is not named after the package, even by its last
-    // letters, says nothing about a root.
     assert_eq!(
         python_roots(
             "python_roots_package_dir_suffix",
@@ -10683,7 +10096,6 @@ fn python_source_roots_come_from_pyproject() {
         ),
         [None, exact.clone()]
     );
-    // A declared root replaces `src`, in each of the forms.
     for (case, pyproject) in [
         (
             "python_roots_package_dir_dotted",
@@ -10716,7 +10128,6 @@ fn python_source_roots_come_from_pyproject() {
 
 #[test]
 fn python_class_families_are_linearized_once() {
-    // A ladder of diamonds: walking every path through it would take 2^24 steps.
     let repo = fixture_repo("python_ladder", "python-roots", Some(ORIGIN));
     let mut src =
         String::from("class L0A:\n    def m(self):\n        return 0\n\n\nclass L0B:\n    pass\n");
@@ -10751,8 +10162,6 @@ fn python_class_families_are_linearized_once() {
 #[test]
 fn python_pyproject_that_cannot_be_read_declares_no_roots() {
     let exact = Some("exact".to_string());
-    // Hostile input: a file that is not TOML, or one past the size limit, still indexes, as
-    // a pyproject that declares nothing (`src` is a root, `lib` is not).
     assert_eq!(
         python_roots("python_roots_invalid", "[tool\n"),
         [None, exact.clone()]
@@ -10764,7 +10173,6 @@ fn python_pyproject_that_cannot_be_read_declares_no_roots() {
     assert_eq!(python_roots("python_roots_large", &large), [None, exact]);
 }
 
-/// The consumers of the Python conformance fixture's export in `file` of `clients/`.
 fn python_clients(case: &str, file: &str) -> Vec<Consumer> {
     let repo = fixture_repo(case, "conformance-python", Some(ORIGIN));
     let export = Engine::open(&repo).unwrap().export().unwrap();
@@ -10777,27 +10185,22 @@ fn python_requests_and_httpx_functions_are_consumers_with_their_evaluated_path()
     let host = "host:api.example.com";
     let site = |function: &str, call: &str| format!("clients/modules.py::{function}::{call}");
     let expected = triples(&[
-        // A literal and an imported constant joined with `+`.
         (
             "http::GET::/users",
             host,
             &site("list_users", "requests.get#0"),
         ),
-        // An f-string holding an imported constant; a keyword argument it does not read.
         (
             "http::POST::/users",
             host,
             &site("create_user", "httpx.post#0"),
         ),
-        // An f-string hole that does not fold is a parameter marker.
         (
             "http::PUT::/users/{}/name",
             host,
             &site("rename_user", "requests.put#0"),
         ),
-        // A function imported under another name.
         ("http::GET::/status", host, &site("status", "fetch_page#0")),
-        // `request(method, url)`, positionally and by keyword.
         (
             "http::DELETE::/cache",
             host,
@@ -10808,7 +10211,6 @@ fn python_requests_and_httpx_functions_are_consumers_with_their_evaluated_path()
             host,
             &site("purge", "httpx.request#0"),
         ),
-        // A module's attribute, joined with `+` and inside an f-string.
         (
             "http::GET::/orders",
             host,
@@ -10821,7 +10223,6 @@ fn python_requests_and_httpx_functions_are_consumers_with_their_evaluated_path()
         ),
     ]);
 
-    // `get` on a parameter or on another object (`lookup`) is no consumer.
     assert_eq!(
         python_clients("python_http_modules", "modules.py"),
         expected
@@ -10842,8 +10243,6 @@ fn a_python_import_inside_a_function_names_its_library_there_alone() {
     let export = Engine::open(&repo).unwrap().export().unwrap();
     let json = serde_json::from_str(&export).unwrap();
     let site = |function: &str, call: &str| format!("clients/local.py::{function}::{call}");
-    // `from requests import get` and `import requests as r` name the library in their function;
-    // `import json as requests` hides the module's `requests` there.
     let expected = triples(&[
         (
             "http::GET::/a",
@@ -10869,14 +10268,12 @@ fn python_client_methods_take_the_base_url_of_the_client_they_trace_back_to() {
     let host = "host:api.example.com";
     let site = |function: &str, call: &str| format!("clients/sessions.py::{function}::{call}");
     let expected = triples(&[
-        // A session in the module scope, and one assigned in the same scope.
         (
             "http::GET::/session",
             host,
             &site("from_module", "session.get#0"),
         ),
         ("http::POST::/orders", host, &site("from_scope", "s.post#0")),
-        // `base_url=` joins in front of a relative path; an absolute URL ignores it.
         (
             "http::GET::/v2/items",
             host,
@@ -10887,9 +10284,7 @@ fn python_client_methods_take_the_base_url_of_the_client_they_trace_back_to() {
             "host:other.example.com",
             &site("with_base", "client.options#0"),
         ),
-        // Without one the host stays unresolved.
         ("http::HEAD::/ping", "", &site("no_base", "client.head#0")),
-        // Bound by `with` and `async with`, a trailing `/` of the base or none leading the path.
         (
             "http::DELETE::/items/7",
             host,
@@ -10910,13 +10305,11 @@ fn python_client_methods_take_the_base_url_of_the_client_they_trace_back_to() {
             host,
             &site("bound_by_async_with", "http.get#0"),
         ),
-        // Assigned to a `self` attribute in the class.
         (
             "http::GET::/gateway/health",
             host,
             &site("Gateway.health", "self.http.get#0"),
         ),
-        // A parameter counts through the client a caller passes it.
         (
             "http::PUT::/handed/passed",
             host,
@@ -10924,7 +10317,6 @@ fn python_client_methods_take_the_base_url_of_the_client_they_trace_back_to() {
         ),
     ]);
 
-    // The annotated parameter, `Cache.get` and the response's `get` are no consumers.
     assert_eq!(
         python_clients("python_http_sessions", "sessions.py"),
         expected
@@ -10936,40 +10328,32 @@ fn python_client_wrappers_make_each_call_site_a_consumer_through_levels_and_a_cy
     let host = "host:api.example.com";
     let site = |function: &str, call: &str| format!("clients/wrappers.py::{function}::{call}");
     let expected = triples(&[
-        // Two wrapper levels down, the path by position and by keyword.
         ("http::GET::/orders", host, &site("list_orders", "get#0")),
         (
             "http::GET::/orders/kw",
             host,
             &site("list_by_keyword", "get#0"),
         ),
-        // The method comes from the wrapper and a hole in the path stays a parameter marker.
         (
             "http::DELETE::/orders/{}",
             host,
             &site("drop_order", "remove#0"),
         ),
-        // Through the cycle: `retry` reaches `get` without looping.
         (
             "http::GET::/orders/slow",
             host,
             &site("list_patiently", "retry#0"),
         ),
-        // A method wrapper over a client with a base URL.
         (
             "http::GET::/api/users/me",
             host,
             &site("Api.profile", "self.user#0"),
         ),
-        // A method wrapper called on an instance of its class; a call that only matches its
-        // name (`not_a_client`) is no consumer.
         (
             "http::GET::/stock",
             host,
             &site("stock", "inventory.fetch_item#0"),
         ),
-        // Called on the class: the instance passed explicitly takes the receiver, a class
-        // method's receiver is the class.
         (
             "http::GET::/pages",
             host,
@@ -10982,8 +10366,6 @@ fn python_client_wrappers_make_each_call_site_a_consumer_through_levels_and_a_cy
         ),
     ]);
 
-    // `Reports.pull` called on a receiver of unknown class (`unrelated`) is a name match: its
-    // `client.get` is no consumer.
     assert_eq!(
         python_clients("python_http_wrappers", "wrappers.py"),
         expected
@@ -10994,25 +10376,21 @@ fn python_client_wrappers_make_each_call_site_a_consumer_through_levels_and_a_cy
 fn python_wrapper_defaults_fill_the_arguments_a_caller_leaves_out() {
     let site = |function: &str, call: &str| format!("clients/defaults.py::{function}::{call}");
     let expected = triples(&[
-        // Method and base both from the defaults.
         (
             "http::GET::/defaults",
             "host:api.example.com",
             &site("list_defaults", "request#0"),
         ),
-        // The method by position; the base still from its default.
         (
             "http::POST::/defaults",
             "host:api.example.com",
             &site("create_default", "request#0"),
         ),
-        // The base by keyword; the method from its default.
         (
             "http::GET::/other",
             "host:other.example.com",
             &site("other_base", "request#0"),
         ),
-        // Keyword-only: the default when left out, the argument when given.
         (
             "http::PUT::/kw-default",
             "host:api.example.com",
@@ -11023,7 +10401,6 @@ fn python_wrapper_defaults_fill_the_arguments_a_caller_leaves_out() {
             "host:api.example.com",
             &site("override_keyword_only", "keyword_only#0"),
         ),
-        // Positional arguments past the named ones go to `*extra`, never to `method`.
         (
             "http::HEAD::/splat",
             "host:api.example.com",
@@ -11041,7 +10418,6 @@ fn python_wrapper_defaults_fill_the_arguments_a_caller_leaves_out() {
 fn python_calls_whose_path_cannot_be_evaluated_are_unresolved_consumers() {
     let site = |function: &str, call: &str| format!("clients/dynamic.py::{function}::{call}");
     let expected = triples(&[
-        // `str.format` and `%` stay unread. The function returns a constant plus text.
         ("unresolved", "", &site("formatted", "requests.get#0")),
         ("unresolved", "", &site("percent", "requests.delete#0")),
         (
@@ -11049,13 +10425,11 @@ fn python_calls_whose_path_cannot_be_evaluated_are_unresolved_consumers() {
             "host:api.example.com",
             &site("computed", "requests.post#0"),
         ),
-        // A method no caller gives: the host is still known.
         (
             "unresolved",
             "host:api.example.com",
             &site("unknown_method", "requests.request#0"),
         ),
-        // An environment read is the base, named by its variable.
         (
             "http::GET::/orders",
             "env:ORDERS_URL",
@@ -11075,13 +10449,11 @@ fn python_environment_reads_name_the_base_url_variable() {
     let orders = "http::GET::/orders";
     let env = "env:ORDERS_URL";
     let expected = triples(&[
-        // `os.environ[...]`, `os.environ.get(...)` and `os.getenv(...)`, also imported from `os`.
         (orders, env, &site("subscript", "requests.get#0")),
         (orders, env, &site("imported_subscript", "requests.get#0")),
         (orders, env, &site("environ_get", "requests.get#0")),
         (orders, env, &site("getenv_call", "requests.get#0")),
         (orders, env, &site("imported_getenv", "requests.get#0")),
-        // `or` fallbacks and default arguments: the variable, whatever its value would be.
         (orders, env, &site("fallback", "requests.get#0")),
         (orders, env, &site("default_argument", "requests.get#0")),
         (
@@ -11089,13 +10461,10 @@ fn python_environment_reads_name_the_base_url_variable() {
             env,
             &site("default_in_environ_get", "requests.get#0"),
         ),
-        // String methods, a module name, an f-string hole and a client's `base_url`.
         (orders, env, &site("string_methods", "requests.get#0")),
         (orders, env, &site("named", "requests.get#0")),
         (orders, env, &site("interpolated", "requests.get#0")),
         (orders, env, &site("client_base_url", "client.get#0")),
-        // Two variables, or a name only known at run time, name no base: the path after it is an
-        // open item (#801).
         ("unresolved", "", &site("two_variables", "requests.get#0")),
         (
             "unresolved",
@@ -11150,7 +10519,6 @@ fn express_promise_router_routers_export_their_routes_like_express_routers() {
         ),
         expected
     );
-    // A named export of the package, or a `Router` another package makes, is no Express router.
     assert!(
         routes(
             "import { Other as Router } from 'express-promise-router';",
@@ -11182,7 +10550,6 @@ fn express_router_passed_to_a_function_found_only_by_name_is_no_provider() {
         "{found:?}"
     );
 
-    // A receiver of known class is an exact call: the router flows.
     let known = plugin.replace(
         "  install(router)",
         "  run() { this.install(express()); }\n  install(router)",
@@ -11190,7 +10557,6 @@ fn express_router_passed_to_a_function_found_only_by_name_is_no_provider() {
     let found = providers("src/plugin.ts", &known);
     assert!(found.iter().any(|c| c == "http::GET::/plugin"), "{found:?}");
 
-    // A bare call no import binds, matched only by the function's name, may reach any function.
     providers(
         "src/mount.ts",
         "export function mount(router) { router.get('/mounted', handler); }\n\
@@ -11206,9 +10572,6 @@ fn express_router_passed_to_a_function_found_only_by_name_is_no_provider() {
     );
 }
 
-/// The kafkajs forms of the TS/JS pack (spec #20): every producer and consumer of the
-/// fixture, as `(consumer, producer, channel)`, all `exact`. `transport.send` and a client of
-/// another package produce nothing.
 #[test]
 fn typescript_and_javascript_kafkajs() {
     let repo = fixture_repo("conformance_kafkajs", "conformance-ts-js", Some(ORIGIN));
@@ -11269,9 +10632,6 @@ fn typescript_and_javascript_kafkajs() {
     assert_eq!(links, expected);
 }
 
-/// The SQS and NATS forms of the TS/JS pack (spec #20): the AWS SDK v3 commands, `sqs-consumer`
-/// and the `nats` connection, as `(consumer, producer, reason, level)`. A client of another
-/// package and `publish` on any object produce nothing; NATS wildcards link at `inferred`.
 #[test]
 fn typescript_and_javascript_sqs_and_nats() {
     let repo = fixture_repo("conformance_sqs_nats", "conformance-ts-js", Some(ORIGIN));
@@ -11378,10 +10738,6 @@ fn typescript_and_javascript_sqs_and_nats() {
     assert_eq!(links, expected);
 }
 
-/// The BullMQ and Redis stream forms of the TS/JS pack (spec #20), as `(consumer, producer,
-/// reason)`, every link `exact`: `Queue.add` and `Worker`, ioredis `xadd`/`xreadgroup` and
-/// node-redis `xAdd`/`xReadGroup`, client wrappers included. A client of another package, a
-/// `Set.add` and a name Meada cannot evaluate produce no link.
 #[test]
 fn typescript_and_javascript_bullmq_and_redis() {
     let repo = fixture_repo("conformance_jobs", "conformance-ts-js", Some(ORIGIN));
@@ -11428,7 +10784,6 @@ fn typescript_and_javascript_bullmq_and_redis() {
     };
     let mut expected = vec![
         job("runJob", "enqueueAll::jobs.add#0", "jobs"),
-        // The queue is named by the binding, so a wrapper's `add` is the producer.
         job("runJob", "enqueue::jobs.add#0", "jobs"),
         job(
             "startMail.bullmq mail-eu",
@@ -11449,7 +10804,6 @@ fn typescript_and_javascript_bullmq_and_redis() {
     ];
     expected.sort();
     assert_eq!(links, expected);
-    // The two names Meada cannot evaluate stay as unresolved sides of their broker kind.
     let unresolved = |broker: &str| {
         (json["providers"].as_array().unwrap())
             .iter()
@@ -11459,9 +10813,6 @@ fn typescript_and_javascript_bullmq_and_redis() {
     assert_eq!((unresolved("bullmq"), unresolved("redis")), (1, 1));
 }
 
-/// The amqplib forms of the TS/JS pack (spec #20): `sendToQueue`, `consume`, `bindQueue` and
-/// `publish` on a channel that traces back to `amqplib` (a confirm channel too), as
-/// `(consumer, producer, reason, level)`.
 #[test]
 fn typescript_and_javascript_amqplib() {
     let repo = fixture_repo("conformance_amqplib", "conformance-ts-js", Some(ORIGIN));
@@ -11492,7 +10843,6 @@ fn typescript_and_javascript_amqplib() {
             "exact",
         )
     };
-    // A publish to the exchange `events` reaches the queues whose binding matches its key.
     let published = |handler: &str, queue: &str, call: usize, binding: &str, level| {
         (
             format!("{exchanges}{handler}"),
@@ -11521,7 +10871,6 @@ fn typescript_and_javascript_amqplib() {
         published("onAlert", "alerts", 0, "order.#", "inferred"),
         published("onAlert", "alerts", 1, "order.#", "inferred"),
         published("onShipment", "shipments", 1, "*.shipped", "inferred"),
-        // The empty exchange is the queue `tasks`.
         (
             format!("{queues}work.amqp tasks"),
             format!("{exchanges}announce::channel.publish#2"),
@@ -11533,9 +10882,6 @@ fn typescript_and_javascript_amqplib() {
     assert_eq!(links, expected);
 }
 
-/// The channel sides of `file` in the Python fixture: the export, its producers as `(contract,
-/// site)` and its consumers as `(contract, via, site)`, sorted, with repository-relative sites.
-/// An unresolved side has the contract `channel::<broker>`.
 fn python_channels(case: &str, file: &str) -> (Value, Vec<(String, String)>, Vec<Consumer>) {
     let dir = format!("messages/{file}::");
     let (json, producers) = python_providers(case, &dir);
@@ -11543,11 +10889,8 @@ fn python_channels(case: &str, file: &str) -> (Value, Vec<(String, String)>, Vec
     (json, producers, consumers)
 }
 
-/// A link of the export as `(consumer, producer, reason, level)`, ids relative to the
-/// repository.
 type ChannelLink = (String, String, String, String);
 
-/// The links of `json` whose reason starts with `prefix`, sorted.
 fn channel_links(json: &Value, prefix: &str) -> Vec<ChannelLink> {
     let rel = |id: &str| id.strip_prefix(&format!("{REPO}::")).unwrap().to_string();
     let mut links: Vec<ChannelLink> = (json["links"].as_array().unwrap())
@@ -11566,15 +10909,10 @@ fn channel_links(json: &Value, prefix: &str) -> Vec<ChannelLink> {
     links
 }
 
-/// A link as `channel_links` lists it.
 fn link(consumer: String, producer: String, reason: &str, level: &str) -> ChannelLink {
     (consumer, producer, reason.into(), level.into())
 }
 
-/// The Kafka forms of the Python pack (spec #20, #73): confluent-kafka and kafka-python, as
-/// the sides of each file and the links between them, all `exact`. A producer of another
-/// package and `produce` on an object of the repository produce nothing; a topic from the
-/// environment and a client wrapper reached only by a method's name are unresolved producers.
 #[test]
 fn python_kafka_clients_are_channel_producers_and_consumers() {
     let confluent = |rest: &str| format!("messages/confluent.py::{rest}");
@@ -11616,7 +10954,6 @@ fn python_kafka_clients_are_channel_producers_and_consumers() {
                 "",
                 &confluent("consume_refunds")
             ),
-            // A topic that starts with `^` is a regular expression, so it names no topic.
             ("channel::kafka", "", &confluent("consume_pattern")),
         ])
     );
@@ -11640,14 +10977,12 @@ fn python_kafka_clients_are_channel_producers_and_consumers() {
             ),
         ])
     );
-    // The constructor's topics and `subscribe(topics=)`; a constructor with none is no consumer.
     assert_eq!(
         consumers,
         triples(&[
             ("channel::kafka::invoices", "", &kafka("listen_invoices")),
             ("channel::kafka::audits", "", &kafka("listen_invoices")),
             ("channel::kafka::retries", "", &kafka("listen_retries")),
-            // A constructor imported under another name.
             ("channel::kafka::alias", "", &kafka("listen_alias")),
         ])
     );
@@ -11699,17 +11034,10 @@ fn python_kafka_clients_are_channel_producers_and_consumers() {
     expected.sort();
     assert_eq!(channel_links(&json, "channel::kafka::"), expected);
 
-    // A name rebound in its scope (a parameter, `with`, `for`, `except`, the constructor's own
-    // name) is no client of the library.
     let (_, producers, consumers) = python_channels("python_kafka_shadowed", "shadowed.py");
     assert_eq!((producers, consumers), (vec![], vec![]));
 }
 
-/// The pika forms of the Python pack (spec #20, #73): `basic_publish`, `basic_consume` and
-/// `queue_bind` on a channel that traces back to `pika.BlockingConnection`, as sides and links.
-/// A publish to the default exchange is the queue its routing key names; one to `events` reaches
-/// the queues bound to it, `inferred` for a wildcard pattern. A channel of another package
-/// produces nothing.
 #[test]
 fn python_pika_channels_are_amqp_producers_consumers_and_bindings() {
     let rabbit = |rest: &str| format!("messages/pika_amqp.py::{rest}");
@@ -11741,7 +11069,6 @@ fn python_pika_channels_are_amqp_producers_consumers_and_bindings() {
                 "channel::amqp::reports",
                 &rabbit("Worker.enqueue::self.channel.basic_publish#0")
             ),
-            // Clients written as a chain of calls.
             (
                 "channel::amqp::chained",
                 &rabbit("send_chained::sender.basic_publish#0")
@@ -11752,7 +11079,6 @@ fn python_pika_channels_are_amqp_producers_consumers_and_bindings() {
             ),
         ])
     );
-    // A lambda is no definition: the function that consumes handles.
     assert_eq!(
         consumers,
         triples(&[
@@ -11799,10 +11125,6 @@ fn python_pika_channels_are_amqp_producers_consumers_and_bindings() {
     assert_eq!(channel_links(&json, "channel::amqp::"), expected);
 }
 
-/// The boto3 forms of the Python pack (spec #20, #73): `send_message`, `send_message_batch` and
-/// `receive_message` on a client made for `"sqs"` (also through a `Session`), the queue being
-/// the last segment of the URL. A client of another service or package produces nothing; a
-/// URL read from the environment is an unresolved consumer.
 #[test]
 fn python_boto3_sqs_clients_are_channel_producers_and_consumers() {
     let sqs = |rest: &str| format!("messages/sqs_boto.py::{rest}");
@@ -11825,7 +11147,6 @@ fn python_boto3_sqs_clients_are_channel_producers_and_consumers() {
                 "channel::sqs::session",
                 &sqs("send_session::queues.send_message#0")
             ),
-            // Clients written as a chain of calls; the one made for `"s3"` is no producer.
             (
                 "channel::sqs::chained",
                 &sqs("send_chained::chained.send_message#0")
@@ -11869,10 +11190,6 @@ fn python_boto3_sqs_clients_are_channel_producers_and_consumers() {
     assert_eq!(channel_links(&json, "channel::sqs::"), expected);
 }
 
-/// The nats-py forms of the Python pack (spec #20, #73): `publish` and `subscribe` on a
-/// connection from `nats.connect` (awaited, returned by a function or passed by a caller) or a
-/// `Client`, with the callback from `cb=`. A wildcard subject links at `inferred`, a connection
-/// of another package and `publish` on any object produce nothing.
 #[test]
 fn python_nats_connections_are_channel_producers_and_consumers() {
     let nats = |rest: &str| format!("messages/nats_py.py::{rest}");
@@ -11907,7 +11224,6 @@ fn python_nats_connections_are_channel_producers_and_consumers() {
             ("channel::nats", &nats("publish_unknown::nc.publish#0")),
         ])
     );
-    // A `cb` that is no definition: the function that subscribes handles.
     assert_eq!(
         consumers,
         triples(&[
@@ -11990,9 +11306,6 @@ fn python_nats_connections_are_channel_producers_and_consumers() {
     assert_eq!(channel_links(&json, "channel::nats::"), expected);
 }
 
-/// The redis-py stream forms of the Python pack (spec #20, #73): `xadd`, and the stream keys of
-/// `xreadgroup` (a literal, a constant or an f-string). A read with no consumer group and a
-/// client of another package produce nothing.
 #[test]
 fn python_redis_streams_are_channel_producers_and_consumers() {
     let redis = |rest: &str| format!("messages/redis_streams.py::{rest}");
@@ -12021,7 +11334,6 @@ fn python_redis_streams_are_channel_producers_and_consumers() {
                 &redis("append_audit::append#0")
             ),
             ("channel::redis", &redis("append_unknown::client.xadd#0")),
-            // The old class name, and `from_url` of `redis` and of `redis.asyncio`.
             (
                 "channel::redis::legacy",
                 &redis("append_more::legacy.xadd#0")
@@ -12063,9 +11375,6 @@ fn python_redis_streams_are_channel_producers_and_consumers() {
     assert_eq!(channel_links(&json, "channel::redis::"), expected);
 }
 
-/// The channel sides of `file` in the Rust fixture's worker crate: the export, its producers as
-/// `(contract, site)` and its consumers as `(contract, via, site)`, sorted, with
-/// repository-relative sites. An unresolved side has the contract `channel::<broker>`.
 fn rust_channels(case: &str, file: &str) -> (Value, Vec<(String, String)>, Vec<Consumer>) {
     let dir = format!("crates/worker/src/{file}::");
     let (json, producers) = providers(case, "conformance-rust", &dir);
@@ -12073,10 +11382,6 @@ fn rust_channels(case: &str, file: &str) -> (Value, Vec<(String, String)>, Vec<C
     (json, producers, consumers)
 }
 
-/// The rdkafka forms of the Rust pack (spec #30): `send` of a `FutureRecord` or `BaseRecord`
-/// on a producer, and `subscribe` on a consumer, both made by `ClientConfig`, whichever way the
-/// client and the record reach the call. A channel's `send` and a transport of the repository
-/// produce nothing; a topic from the environment is unresolved, and so is a regular expression.
 #[test]
 fn rust_rdkafka_clients_are_channel_producers_and_consumers() {
     let kafka = |rest: &str| format!("crates/worker/src/kafka.rs::{rest}");
@@ -12111,7 +11416,6 @@ fn rust_rdkafka_clients_are_channel_producers_and_consumers() {
             ),
         ])
     );
-    // A polling client: the function that subscribes handles.
     assert_eq!(
         consumers,
         triples(&[
@@ -12156,13 +11460,10 @@ fn rust_rdkafka_clients_are_channel_producers_and_consumers() {
     expected.sort();
     assert_eq!(channel_links(&json, "channel::kafka::"), expected);
 
-    // A parameter of the repository's own type, and a producer no caller passes, are no clients.
     let (_, producers, consumers) = rust_channels("rust_kafka_shadowed", "mq_shadowed.rs");
     assert_eq!((producers, consumers), (vec![], vec![]));
 }
 
-/// A builder chain is read to 64 calls (`CHAIN` in `channel/rust.rs`): a record or an SQS
-/// request with more setters than that is no producer, and one with fewer is.
 #[test]
 fn rust_builder_chains_past_the_bound_are_not_read() {
     let repo = fixture_repo("rust_chain_bound", "conformance-rust", Some(ORIGIN));
@@ -12211,11 +11512,6 @@ pub async fn bounded() {{
     );
 }
 
-/// The lapin forms of the Rust pack (spec #30): `basic_publish`, `basic_consume` and
-/// `queue_bind` on a channel that traces back to `Connection::connect`, as sides and links. A
-/// publish to the default exchange is the queue its key names; one to `events` reaches the
-/// queues bound to it, `inferred` for a wildcard pattern. A binding that cannot be evaluated is
-/// dropped, and an exchange that cannot makes an unresolved producer.
 #[test]
 fn rust_lapin_channels_are_amqp_producers_consumers_and_bindings() {
     let rabbit = |rest: &str| format!("crates/worker/src/rabbit.rs::{rest}");
@@ -12260,10 +11556,6 @@ fn rust_lapin_channels_are_amqp_producers_consumers_and_bindings() {
     assert_eq!(channel_links(&json, "channel::amqp::"), expected);
 }
 
-/// The aws-sdk-sqs forms of the Rust pack (spec #30): the `queue_url` of a `send_message`,
-/// `send_message_batch` or `receive_message` builder on a client from `Client::new`, the queue
-/// being the last segment of the URL. Another call on the queue and a builder of the repository
-/// produce nothing; a URL read from the environment is an unresolved producer.
 #[test]
 fn rust_aws_sdk_sqs_clients_are_channel_producers_and_consumers() {
     let sqs = |rest: &str| format!("crates/worker/src/queues.rs::{rest}");
@@ -12320,10 +11612,6 @@ fn rust_aws_sdk_sqs_clients_are_channel_producers_and_consumers() {
     assert_eq!(channel_links(&json, "channel::sqs::"), expected);
 }
 
-/// The async-nats forms of the Rust pack (spec #30): `publish`, `subscribe` and
-/// `queue_subscribe` on a client from `async_nats::connect` or `ConnectOptions`, whichever way
-/// the crate is named. A wildcard subject links at `inferred`; a bus of the repository produces
-/// nothing and a subject from the environment is an unresolved producer.
 #[test]
 fn rust_async_nats_clients_are_channel_producers_and_consumers() {
     let nats = |rest: &str| format!("crates/worker/src/subjects.rs::{rest}");
@@ -12413,10 +11701,6 @@ fn rust_async_nats_clients_are_channel_producers_and_consumers() {
     assert_eq!(channel_links(&json, "channel::nats::"), expected);
 }
 
-/// The redis forms of the Rust pack (spec #30): `xadd` and the keys of `xread_options` whose
-/// options carry a group, on a connection that traces back to `Client::open`. A read without a
-/// group, and an `xadd` of the repository's own type, produce nothing; a key from the
-/// environment is an unresolved side.
 #[test]
 fn rust_redis_streams_are_channel_producers_and_consumers() {
     let redis = |rest: &str| format!("crates/worker/src/streams.rs::{rest}");
@@ -12464,9 +11748,6 @@ fn rust_redis_streams_are_channel_producers_and_consumers() {
     assert_eq!(channel_links(&json, "channel::redis::"), expected);
 }
 
-/// The channel sides of `file` in the Go fixture's `messages` package: the export, its producers
-/// as `(contract, site)` and its consumers as `(contract, via, site)`, sorted, with
-/// repository-relative sites. An unresolved side has the contract `channel::<broker>`.
 fn go_channels(case: &str, file: &str) -> (Value, Vec<(String, String)>, Vec<Consumer>) {
     let dir = format!("messages/{file}::");
     let (json, producers) = providers(case, "conformance-go", &dir);
@@ -12474,10 +11755,6 @@ fn go_channels(case: &str, file: &str) -> (Value, Vec<(String, String)>, Vec<Con
     (json, producers, consumers)
 }
 
-/// The Kafka forms of the Go pack (spec #25, #82): segmentio/kafka-go, confluent-kafka-go and
-/// sarama, as the sides of each file and the links between them. A topic the writer names
-/// stands for its messages; a writer a function made, an environment read and a regular
-/// expression leave the side unresolved.
 #[test]
 fn go_kafka_clients_are_channel_producers_and_consumers() {
     let at = |file: &str, rest: &str| format!("messages/{file}.go::{rest}");
@@ -12522,8 +11799,6 @@ fn go_kafka_clients_are_channel_producers_and_consumers() {
                 "channel::kafka",
                 &segmentio("ProduceUnknown::w.WriteMessages#0")
             ),
-            // The repository's `NewWriter` is not kafka-go's, and a wrapper nobody calls keeps
-            // its parameter.
             (
                 "channel::kafka",
                 &segmentio("ProduceLookalike::w.WriteMessages#0")
@@ -12566,7 +11841,6 @@ fn go_kafka_clients_are_channel_producers_and_consumers() {
                 "channel::kafka",
                 &confluent("ConfluentProduce::p.Produce#2")
             ),
-            // The pointer is written through.
             ("channel::kafka", &confluent("ConfluentDeref::p.Produce#0")),
         ])
     );
@@ -12630,7 +11904,6 @@ fn go_kafka_clients_are_channel_producers_and_consumers() {
         ])
     );
 
-    // The handler of a group is its `ConsumeClaim`; a reader's is the function that built it.
     let links = channel_links(&json, "channel::kafka::");
     for (consumer, producer, reason) in [
         (
@@ -12656,9 +11929,6 @@ fn go_kafka_clients_are_channel_producers_and_consumers() {
     }
 }
 
-/// The RabbitMQ forms of the Go pack: the default exchange reaches the queue its key names,
-/// exactly; another exchange is a binding match; an exchange from a parameter leaves the
-/// producer unresolved.
 #[test]
 fn go_amqp_channels_are_producers_consumers_and_bindings() {
     let rabbit = |rest: &str| format!("messages/rabbit.go::{rest}");
@@ -12705,10 +11975,6 @@ fn go_amqp_channels_are_producers_consumers_and_bindings() {
     assert_eq!(channel_links(&json, "channel::amqp::"), expected);
 }
 
-/// The queue clients of the Go pack: SQS queue names are the last segment of the queue URL,
-/// folded through `aws.String`, an environment read leaves the producer unresolved; NATS
-/// callbacks are the handlers, wildcards link as inferred; only a Redis read in a consumer
-/// group is a consumer.
 #[test]
 fn go_sqs_nats_and_redis_clients_are_channel_producers_and_consumers() {
     let queues = |rest: &str| format!("messages/queues.go::{rest}");
@@ -12806,15 +12072,12 @@ fn go_sqs_nats_and_redis_clients_are_channel_producers_and_consumers() {
     );
 }
 
-/// A receiver that does not trace back to the library's constructor makes no side, whatever
-/// its methods are called.
 #[test]
 fn go_channel_methods_of_the_repositorys_own_types_are_no_sides() {
     let (_, producers, consumers) = go_channels("go_shadowed", "shadowed.go");
     assert_eq!((producers, consumers), (vec![], vec![]));
 }
 
-/// A field of the writer written after its literal (`w.Topic = ..`) leaves the topic unknown.
 #[test]
 fn go_kafka_writer_topic_written_after_the_literal_is_unresolved() {
     let (_, producers) = providers("go_kafka_written", "go-channels-written", "writer.go::");
@@ -12824,7 +12087,6 @@ fn go_kafka_writer_topic_written_after_the_literal_is_unresolved() {
     );
 }
 
-/// `conform` with owned ids, as the Swift tests build them.
 fn conform_owned(
     fixture: &str,
     symbols: &[String],
@@ -12841,9 +12103,6 @@ fn conform_owned(
     conform(fixture, &symbols, programs, &calls);
 }
 
-/// A SwiftPM repository with two targets (spec #29, #117): each target is a module, a member an
-/// extension declares belongs to the extended type, argument labels tell overloads apart, and
-/// an import reaches the public declarations of the module it names.
 #[test]
 fn swift() {
     let store = |file: &str, name: &str| format!("Sources/Store/{file}::{name}");
@@ -13054,8 +12313,6 @@ fn swift() {
     let run = |callee: &str| checkout("Checkout.swift", &format!("Checkout.run()::{callee}"));
     let place = |callee: &str| service(&format!("OrderService.place(order:quantity:)::{callee}"));
     let calls = vec![
-        // A member of an extension calls one of the same extension, and through `self` one of
-        // another; an extension of a nested type calls a member the type declares elsewhere.
         (
             pricing("Order.price(quantity:)::discount#0"),
             EXACT,
@@ -13071,13 +12328,11 @@ fn swift() {
             EXACT,
             one(order("Order.Line.total()")),
         ),
-        // A function of another file of the module, from a protocol's default implementation.
         (
             service("Notifier.notify(order:)::log#0"),
             EXACT,
             one(order("log(_:)")),
         ),
-        // A protocol extension calls the protocol's requirement.
         (
             service("Notifier.notifyAll(orders:)::notify#0"),
             EXACT,
@@ -13088,14 +12343,11 @@ fn swift() {
             EXACT,
             one(service("OrderService.init()")),
         ),
-        // Labels pick one overload of three.
         (
             service("OrderService.place(order:)::place#0"),
             EXACT,
             one(service("OrderService.place(order:quantity:)")),
         ),
-        // Overloads with the same labels tie: in the type's body, in its extension of the same
-        // file (all three named with their types) and in one of another file.
         (
             place("audit#0"),
             AMBIGUOUS,
@@ -13106,16 +12358,11 @@ fn swift() {
                 service("OrderService.audit(_:String)"),
             ],
         ),
-        // An initializer an extension declares in another file is the type's.
         (
             pricing("Order.init(json:)::self.init#0"),
             EXACT,
             one(order("Order.init(id:)")),
         ),
-        // A protocol an extension conforms to: its requirement; the type's own member, from a
-        // later extension of another file, before that protocol's default body; and an outside
-        // protocol keeps a bare name from the top-level function, unless the pack knows it
-        // declares no such name (`CustomStringConvertible`, Known outside members).
         (
             probe("Probe.run()::ping#0"),
             EXACT,
@@ -13136,13 +12383,11 @@ fn swift() {
             INFERRED,
             one(probe("describe()")),
         ),
-        // `self` reaches the requirement of a protocol the class conforms to.
         (
             place("self.notify#0"),
             EXACT,
             one(service("Notifier.notify(order:)")),
         ),
-        // A parameter typed in the source reaches the method of its type.
         (
             place("order.price#0"),
             EXACT,
@@ -13163,7 +12408,6 @@ fn swift() {
             EXACT,
             one(order("Order.init(id:)")),
         ),
-        // A trailing closure takes the last parameter, past one with a default value.
         (
             service("OrderService.run()::retry#0"),
             EXACT,
@@ -13174,21 +12418,16 @@ fn swift() {
             EXACT,
             one(service("OrderService.retry(times:_:)")),
         ),
-        // A call in a closure belongs to the function around it.
         (
             service("OrderService.run()::log#0"),
             EXACT,
             one(order("log(_:)")),
         ),
-        // A base from outside the repository may declare the member: a name match.
         (
             service("Reporter.report()::summary#0"),
             INFERRED,
             one(service("Reporter.summary()")),
         ),
-        // Known outside members: `Hashable` and `Codable` hide `hash`, `encode` and `init`
-        // alone, a raw value type and `CaseIterable` their own names, and `RouteCollection`
-        // `boot`.
         (
             store("Tag.swift", "Tag.use(_:)::t.open#0"),
             EXACT,
@@ -13205,7 +12444,6 @@ fn swift() {
             one(store("Tag.swift", "Tag.hash(into:)")),
         ),
         (store("Tag.swift", "Tag.use(_:)::t.missing#0"), None, vec![]),
-        // The overloads of a member merge across modules.
         (
             checkout("Tagging.swift", "tagging(_:)::tag.open#0"),
             EXACT,
@@ -13237,8 +12475,6 @@ fn swift() {
             EXACT,
             one(checkout("Routes.swift", "OrderController.mountSelf(_:)")),
         ),
-        // Across the import: a public initializer and function, the module's name as a
-        // qualifier, and an internal function the import does not reach.
         (
             checkout("Checkout.swift", "Checkout::OrderService#0"),
             EXACT,
@@ -13254,7 +12490,6 @@ fn swift() {
         (run("format#0"), EXACT, one(order("format(order:)"))),
         (run("format#1"), None, vec![]),
         (run("Store.format#0"), EXACT, one(order("format(order:)"))),
-        // The file's own module first: its `log(level:)`, not the imported module's public one.
         (
             run("summarize#0"),
             EXACT,
@@ -13278,15 +12513,11 @@ fn swift() {
         ship.clone(),
     ];
     calls.extend([
-        // A property, a parameter, an optional one and a local with a written type reach their
-        // type's method; the labels pick the overload of the type.
         (depot("truck.ship#0"), EXACT, one(ship.clone())),
         (depot("self.truck.ship#0"), EXACT, one(fast.clone())),
         (depot("lorry.ship#0"), EXACT, one(ship.clone())),
         (depot("wrapped.ship#0"), EXACT, one(ship.clone())),
         (depot("local.ship#0"), EXACT, one(ship.clone())),
-        // A local initialized with `Type(..)` and a property initialized so are of that type;
-        // the overloads of one label tie.
         (
             depot("made.load#0"),
             AMBIGUOUS,
@@ -13298,7 +12529,6 @@ fn swift() {
         (depot("Truck#0"), EXACT, one(dispatch("Truck"))),
         (depot("boat.moor#0"), EXACT, one(moor.clone())),
         (dispatch("Depot::Boat#0"), EXACT, one(dispatch("Boat"))),
-        // A protocol-typed receiver stops at the requirement, whatever conforms to it.
         (
             depot("carrier.ship#0"),
             EXACT,
@@ -13309,13 +12539,11 @@ fn swift() {
             EXACT,
             one(dispatch("Carrier.ship(parcel:)")),
         ),
-        // A receiver whose type is not read matches by name and labels.
         (depot("ships.first.moor#0"), INFERRED, one(moor.clone())),
         (depot("lookup#0"), EXACT, one(dispatch("Depot.lookup()"))),
         (depot("found.ship#0"), AMBIGUOUS, every_ship.clone()),
         (depot("found.ship#1"), INFERRED, one(fast)),
         (depot("found.moor#0"), INFERRED, one(moor)),
-        // A name bound twice with other types in one function has no type.
         (
             dispatch("Depot.again(lorry:)::lorry.ship#0"),
             AMBIGUOUS,
@@ -13332,8 +12560,6 @@ fn swift() {
             one(dispatch("Parcel")),
         ),
     ]);
-    // Opaque outside: a receiver whose written type, or whose capitalized name, is outside the
-    // repository reaches its type's extensions alone; an untyped one matches by name.
     let clients = |callee: &str| checkout("Clients.swift", callee);
     let warm = clients("URLSession.warm(from:)");
     calls.extend([
@@ -13379,7 +12605,6 @@ fn swift() {
     );
 }
 
-/// Outgoing HTTP calls of Swift are consumers with their URLs evaluated (spec #29, #121).
 #[test]
 fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
     let repo = fixture_repo("swift_http_consumers", "conformance-swift", Some(ORIGIN));
@@ -13397,8 +12622,6 @@ fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
     let unresolved = |call: &str| at("unresolved(path:flag:)", call);
     let mutated = |call: &str| at("mutated(id:)", call);
     let expected = triples(&[
-        // URLSession: `data(from:)` is a `GET`, on `URLSession.shared`, a typed parameter and a
-        // local made by `URLSession(configuration:)`.
         (
             "http::GET::/ping",
             api,
@@ -13411,7 +12634,6 @@ fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
         ),
         ("http::GET::/users/{}", api, &sessions("session.data#0")),
         ("http::GET::/health", api, &sessions("session.data#1")),
-        // `data(for:)` sends the method the request is assigned, `GET` when none.
         (
             "http::POST::/orders/new",
             orders,
@@ -13424,7 +12646,6 @@ fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
             api,
             &sessions("URLSession.shared.data#3"),
         ),
-        // Alamofire: `GET` when `method:` is absent, on `AF` and on a `Session`.
         ("http::GET::/af", api, &alamofire("AF.request#0")),
         ("http::POST::/af/{}", api, &alamofire("AF.request#1")),
         ("http::DELETE::/users", api, &alamofire("session.request#0")),
@@ -13434,7 +12655,6 @@ fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
             api,
             &alamofire("Session.default.request#0"),
         ),
-        // AsyncHTTPClient: a request sent with `execute`.
         (
             "http::POST::/ahc",
             api,
@@ -13445,7 +12665,6 @@ fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
             api,
             &at("asyncHTTP(client:)", "HTTPClient.shared.execute#0"),
         ),
-        // A property typed or made by `URLSession.shared`, read through `self` or by name.
         (
             "http::GET::/gateway",
             api,
@@ -13456,9 +12675,7 @@ fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
             api,
             &at("Gateway.pong()", "session.data#0"),
         ),
-        // Wrappers: each call site, through two levels, with a cycle.
         ("http::GET::/direct", api, &at("useApi()", "api.fetch#0")),
-        // A local the call site folds.
         ("http::GET::/local/a", api, &at("useApi()", "api.fetch#1")),
         ("http::GET::/whole", api, &at("useApi()", "whole#0")),
         ("http::GET::/users/{}", api, &at("Api.profile()", "user#0")),
@@ -13467,12 +12684,9 @@ fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
             api,
             &at("useApi()", "api.remove#0"),
         ),
-        // `relativeTo` is resolved at each call site of the wrapper, as RFC 3986 does.
         ("http::GET::/v1/users", api, &at("versions()", "relative#0")),
         ("http::GET::/health", api, &at("versions()", "relative#1")),
         ("http::GET::/up", api, &at("versions()", "relative#2")),
-        // A method called on a `var` may change it, and a global `var` is open to every file:
-        // neither folds its initial value. A request is changed through its members alone.
         ("unresolved", "", &mutated("URLSession.shared.data#0")),
         ("unresolved", "", &mutated("URLSession.shared.data#1")),
         (
@@ -13481,7 +12695,6 @@ fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
             &mutated("URLSession.shared.data#2"),
         ),
         ("unresolved", "", &mutated("URLSession.shared.data#3")),
-        // A `do` block runs its statements in place.
         (
             "http::POST::/do",
             api,
@@ -13492,14 +12705,12 @@ fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
             api,
             &unresolved("URLSession.shared.data#0"),
         ),
-        // A URL or a method Meada cannot evaluate.
         ("unresolved", "", &unresolved("URLSession.shared.data#1")),
         ("unresolved", "", &unresolved("URLSession.shared.data#2")),
         ("unresolved", api, &unresolved("URLSession.shared.data#3")),
         ("unresolved", api, &unresolved("URLSession.shared.data#4")),
     ]);
     assert_eq!(consumers(&json, "Sources/Checkout/Clients.swift"), expected);
-    // An import of UIKit alone spells Foundation's `URLSession`.
     assert_eq!(
         consumers(&json, "Sources/Checkout/Ui.swift"),
         triples(&[(
@@ -13510,7 +12721,6 @@ fn swift_http_clients_are_consumers_with_their_urls_evaluated() {
     );
 }
 
-/// A repository without `Package.swift` is one module (spec #29, #117).
 #[test]
 fn swift_without_a_package_manifest() {
     let item = |name: &str| format!("Sources/Model/Item.swift::{name}");
@@ -13598,7 +12808,6 @@ fn swift_without_a_package_manifest() {
             EXACT,
             one(item("Item.Size.scaled(by:)")),
         ),
-        // A type that declares no initializer is what its name constructs.
         (
             loader("FileLoader.load(from:)::Item#0"),
             EXACT,
@@ -13616,7 +12825,6 @@ fn swift_without_a_package_manifest() {
         ),
         (limit("print#0"), None, vec![]),
         (limit("Array#0"), None, vec![]),
-        // A parameter and a local hide the functions of their names in the whole function.
         (report("format#0"), None, vec![]),
         (report("render#0"), None, vec![]),
         (report("render#1"), None, vec![]),
@@ -13632,7 +12840,6 @@ fn swift_without_a_package_manifest() {
             EXACT,
             one(loader("FileLoader.load(from:limit:)")),
         ),
-        // The top-level functions of a name in the module's files are one family.
         (
             main("main::render#0"),
             AMBIGUOUS,
@@ -13647,15 +12854,12 @@ fn swift_without_a_package_manifest() {
     let mut calls = calls;
     let outside = |callee: &str| receivers(&format!("outside(_:_:_:_:)::{callee}"));
     calls.extend([
-        // A standard-library type is outside the repository: its extensions alone answer.
         (outside("name.label#0"), None, vec![]),
         (
             outside("name.shout#0"),
             INFERRED,
             one(receivers("String.shout()")),
         ),
-        // A protocol-typed receiver stops at the requirement; a class-typed one resolves its
-        // labels; a nested type is read as written.
         (
             outside("loader.load#0"),
             EXACT,
@@ -13676,8 +12880,6 @@ fn swift_without_a_package_manifest() {
             EXACT,
             one(item("Item.Size.scaled(by:)")),
         ),
-        // A name a `guard let` or a type parameter binds again in the function has no known type
-        // there; a closure parameter hides it in the closure alone, a scope of its own.
         (
             receivers("hidden(_:_:)::item.label#0"),
             EXACT,
@@ -13698,7 +12900,6 @@ fn swift_without_a_package_manifest() {
             INFERRED,
             one(item("Item.label()")),
         ),
-        // A local hides the global of its name, and is of its own type.
         (
             receivers("typed(_:)::loader.report#0"),
             EXACT,
@@ -13710,10 +12911,6 @@ fn swift_without_a_package_manifest() {
             one(item("Item.label()")),
         ),
     ]);
-    // A typed local of an accessor, a deinitializer, a top-level closure or a nested block
-    // hides its name beyond its own scope: the calls it could leak into are name matches. A
-    // type parameter of the type an extension extends, in another file, or an associated type of the protocol,
-    // is no type of the repository.
     let places = vec![scopes("Ship.place()"), scopes("Store.place()")];
     calls.extend([
         (scopes("Sub::store.place#0"), AMBIGUOUS, places.clone()),
@@ -13739,8 +12936,6 @@ fn swift_without_a_package_manifest() {
             AMBIGUOUS,
             places.clone(),
         ),
-        // The typed `session` of a closure is that closure's own scope: the global one is
-        // `Store`'s.
         (
             "Sources/Handler.swift::run()::session.place#0".to_string(),
             EXACT,
@@ -13762,7 +12957,6 @@ fn swift_without_a_package_manifest() {
             one(item("Item.label()")),
         ),
     ]);
-    // A type parameter's construction (`Item()`) is no construction of the repository's type.
     calls.extend([
         (scopes("make()::Item#0"), None, vec![]),
         (scopes("Page.own()::Item#0"), None, vec![]),
@@ -13772,8 +12966,6 @@ fn swift_without_a_package_manifest() {
             vec![],
         ),
     ]);
-    // Each binding form hides the function of its name in its scope: a call of it is a name
-    // match.
     for (scope, callee, target) in [
         ("closures(_:)", "shadow", "shadow()"),
         ("optionals(_:)", "shadow", "shadow()"),
@@ -13797,9 +12989,6 @@ fn swift_without_a_package_manifest() {
     );
 }
 
-/// A Swift call whose callee is capitalized is read as constructor syntax only when the name
-/// binds a type; one that binds a function is a plain call, and `await` decides an `async`
-/// target.
 #[test]
 fn swift_a_capitalized_callee_binds_a_function() {
     conform(
@@ -13882,9 +13071,6 @@ fn swift_search_finds_the_program_entry_points() {
     );
 }
 
-/// Hostile Vapor input stays bounded: values and group chains past the pack's `VALUE_DEPTH`
-/// serve nothing, and so do more groups than `VAPOR_NODES`, in time that does not grow with
-/// the squares of their number.
 #[test]
 fn swift_hostile_values_and_groups_remain_bounded() {
     let served = |repo: &std::path::Path, file: &str| -> Vec<String> {
@@ -13923,11 +13109,9 @@ fn swift_hostile_values_and_groups_remain_bounded() {
     std::fs::write(repo.join("Many.swift"), groups(10)).unwrap();
     assert_eq!(served(&repo, "Many.swift").len(), 10);
     std::fs::write(repo.join("Many.swift"), groups(4200)).unwrap();
-    // Only the repository's `Package.swift` still gives its package contract.
     assert_eq!(served(&repo, ""), ["package::swiftpm::Shop"]);
 }
 
-/// Context lists the consumers a Swift call that cannot be evaluated is, unresolved (spec #29, #121).
 #[test]
 fn swift_context_shows_an_unresolved_consumer() {
     let repo = fixture_repo(
@@ -13944,9 +13128,6 @@ fn swift_context_shows_an_unresolved_consumer() {
     );
 }
 
-/// Hostile URLs stay bounded: a `+` chain, a chain of `appendingPathComponent` and calls nested
-/// past the pack's `VALUE_DEPTH` are unresolved consumers, in time that stays small, and a
-/// call after them is still read.
 #[test]
 fn swift_hostile_urls_remain_bounded() {
     let repo = fixture_repo("swift_hostile_urls", "conformance-swift", Some(ORIGIN));
@@ -13978,9 +13159,6 @@ fn swift_hostile_urls_remain_bounded() {
     );
 }
 
-/// A type of the repository named `URL`, `URLRequest` or `HTTPClientRequest` hides the
-/// library's: the consumer is unresolved, not read as the library's (spec #29, #121). Each
-/// type is in a module of its own, so the others stay the library's there.
 #[test]
 fn swift_a_repository_type_hides_the_library_s_request_and_url() {
     let repo = fixture_repo("swift_hidden_names", "conformance-swift", Some(ORIGIN));
@@ -14034,8 +13212,6 @@ fn swift_a_repository_type_hides_the_library_s_request_and_url() {
     }
 }
 
-/// A client is followed through eight names at most: past that the call is no consumer, and a
-/// short chain still is one (spec #29, #121).
 #[test]
 fn swift_a_client_held_through_many_names_is_not_followed_past_the_limit() {
     let repo = fixture_repo("swift_client_depth", "conformance-swift", Some(ORIGIN));
@@ -14064,8 +13240,6 @@ fn swift_a_client_held_through_many_names_is_not_followed_past_the_limit() {
     assert_eq!(found, ["http::GET::/near"]);
 }
 
-/// `search` finds a member an extension declares, under the extended type, and `context` on
-/// a method lists its callers and callees with their levels (spec #29, #117, #118).
 #[test]
 fn swift_search_finds_an_extension_member_and_context_lists_callers_and_callees() {
     let repo = fixture_repo("swift_queries", "conformance-swift", Some(ORIGIN));
@@ -14080,7 +13254,6 @@ fn swift_search_finds_an_extension_member_and_context_lists_callers_and_callees(
             .context("OrderService.place(order:quantity:)", None)
             .unwrap(),
     );
-    // Callers through a typed receiver are `exact`; a receiver of unread type matches the name.
     assert_golden(
         "conformance-swift.context-ship.txt",
         &engine.context("Truck.ship(parcel:)", None).unwrap(),
@@ -14091,9 +13264,6 @@ fn swift_search_finds_an_extension_member_and_context_lists_callers_and_callees(
     );
 }
 
-/// An annotation name on a method is read through the file's imports, past a base from outside
-/// the repository: a member type of that base could shadow it (JLS 6.4.1), an accepted miss
-/// (#354). Single-type and on-demand imports agree.
 #[test]
 fn java_method_annotations_resolve_past_an_outside_base() {
     let repo = fixture_repo(
@@ -14197,8 +13367,6 @@ class Listener extends BaseListener { @KafkaListener(topics = \"based-topic\") v
     );
 }
 
-/// The same in Kotlin: a method annotation of a class with an outside base is read through the
-/// imports, a class without a base alike, and a name no import binds stays unread.
 #[test]
 fn kotlin_method_annotations_resolve_past_an_outside_base() {
     let repo = fixture_repo(
@@ -14261,9 +13429,6 @@ class Unbound : BaseController() { @GetMapping(\"/{id}\") fun get(): String = \"
     );
 }
 
-/// A Swift call through an implicit member (`.make()`) keeps its member name under a head no
-/// declaration binds: it resolves by name and labels, never `exact` and never to a free
-/// function of that name; an implicit initializer stays unresolved (issue #407).
 #[test]
 fn swift_an_implicit_member_call_resolves_by_name() {
     conform(
@@ -14318,10 +13483,6 @@ fn swift_an_implicit_member_call_resolves_by_name() {
     );
 }
 
-/// Swift modules are targets of one package (issue #410): two packages that each declare a
-/// target `App` give two modules, each package's call binds its own function, a
-/// `@testable import App` reaches the `internal` function of the package's own `App` but not
-/// its `fileprivate` one, and a plain `import App` reaches neither.
 #[test]
 fn swift_same_named_targets_of_two_packages_are_two_modules() {
     let at = |pkg: &str, file: &str, name: &str| format!("{pkg}/{file}::{name}");
@@ -14364,12 +13525,6 @@ fn swift_same_named_targets_of_two_packages_are_two_modules() {
     conform("conformance-swift-packages", &symbols, &[], &calls);
 }
 
-/// Swift calls through a `typealias`, a hidden initializer and a trailing closure (issue #411):
-/// a receiver written as an alias is typed as its target (through an alias of an alias, an
-/// optional and a property), a cycle of aliases types nothing and an alias of an outside type
-/// leaves its receiver outside; an initializer another module keeps to itself is no candidate;
-/// a trailing closure fills only a parameter whose written type is a function type, a generic
-/// parameter or a repository alias of a function type.
 #[test]
 fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
     let lib = |name: &str| format!("Sources/Lib/Lib.swift::{name}");
@@ -14442,10 +13597,6 @@ fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
         ),
         (lib("inside()::Reduce#0"), EXACT, vec![internal]),
         (aliases("Feature.tap()::store.send#0"), EXACT, vec![send]),
-        // A cycle of aliases types its receiver: it reaches no `spin` by name, as a receiver of
-        // no known type does. An alias of an outside type, or a chain of them, reaches the
-        // repository's extensions of that type, `inferred` as a receiver written as the type
-        // itself; one of a type with none reaches nothing.
         (app("cycle(_:_:)::a.spin#0"), None, vec![]),
         (
             app("cycle(_:_:)::anim.spin#0"),
@@ -14469,8 +13620,6 @@ fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
             vec![aliases("Animation.spin()"), app("Wheel.spin()")],
         ),
         (app("local()::x.send#0"), EXACT, vec![lib("Store.send(_:)")]),
-        // A type parameter named like an alias hides it, and an alias in a type hides a type
-        // of its name around it.
         (
             app("generic(_:)::x.send#0"),
             AMBIGUOUS,
@@ -14496,13 +13645,7 @@ fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
         ),
         (trailing("x.on#0"), EXACT, vec![app("Sender.on(_:h:)")]),
         (trailing("run#0"), EXACT, vec![app("run(_:)")]),
-        // An alias its module keeps to itself types nothing in another module.
         (app("hidden(_:)::x.send#0"), None, vec![]),
-        // A parameter written as a name from outside the repository (`Ext.CompletionHandler`)
-        // may be an alias of a function type (issue #456): a trailing closure that fits an
-        // overload only through one is never `exact`, whether it has a sibling that reads as a
-        // function type or none (a lone candidate is a name match). A parameter written as a
-        // type of the repository (`Wheel?`) still refuses it.
         (
             app("outside(_:_:_:)::x.load#0"),
             AMBIGUOUS,
@@ -14536,7 +13679,6 @@ fn swift_calls_through_an_alias_a_hidden_init_or_a_trailing_closure() {
     );
 }
 
-/// The level and target of the call to `callee` in `main` of `dir/main.py`, in `python-nested-pyproject`.
 fn nested_pyproject_call(
     json: &Value,
     dir: &str,
@@ -14559,7 +13701,6 @@ fn python_imports_resolve_through_the_nearest_nested_pyproject() {
     );
     let export = Engine::open(&repo).unwrap().export().unwrap();
     let json: Value = serde_json::from_str(&export).unwrap();
-    // The template's shape, siblings that both hold `app`, and a Poetry `from` of its own.
     for (dir, callee, target) in [
         ("backend", "create", "backend/app/crud.py::create"),
         ("a", "f", "a/app/util.py::f"),
@@ -14575,7 +13716,6 @@ fn python_imports_resolve_through_the_nearest_nested_pyproject() {
 
 #[test]
 fn python_nested_pyproject_that_cannot_be_read_declares_no_roots() {
-    // Not TOML, not UTF-8, or past the size limit: no declared roots, and the rest indexes.
     let large = format!("[tool.poetry]\n# {}\n", "x".repeat(1 << 20));
     for (case, bytes) in [
         ("python_nested_invalid", b"[tool\n".to_vec()),
@@ -14592,8 +13732,6 @@ fn python_nested_pyproject_that_cannot_be_read_declares_no_roots() {
     }
 }
 
-/// A CommonJS `exports.y = function () {}` defines the symbol `exports.y`, exported as `y`: Node
-/// binds no local `y`, so a bare `y()` reaches nothing, and `m.y()` through the module does.
 #[test]
 fn ts_js_a_commonjs_export_binds_no_bare_name() {
     let repo = fixture_repo("ts_commonjs_bare", "conformance-ts-js", Some(ORIGIN));
@@ -14625,7 +13763,6 @@ fn ts_js_a_commonjs_export_binds_no_bare_name() {
             .unwrap()
             .ends_with("cjs.js::exports.y")
     );
-    // Known ceiling (docs/agents/ceilings.md): the inner `send()` reaches `exports.send`.
     let send = call("cjs.js::exports.send::send#0");
     assert!(
         send["target"]

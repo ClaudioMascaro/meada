@@ -1,32 +1,3 @@
-//! C# HTTP consumers (spec #28, #111): the `HttpClient` methods that send a request. A call
-//! counts only when its receiver is an `HttpClient` by its declared type or by the construction
-//! it is made on, the type read through the usings (`Code::written` gives the type the source
-//! writes, `names::spellings` the names the imports give it), never by text; a client
-//! `IHttpClientFactory.CreateClient(name)` made, held by a local or a field, is a named client,
-//! which is not read.
-//!
-//! The call is read whole (`Expand::Chain`), so a wrapper (a method that takes the path, the
-//! method or the client as a parameter) turns each of its call sites into a consumer with its
-//! arguments substituted, and a `HttpMethod.X` arrives as a `Value::External` spelled by the
-//! imports of the file that writes it. The URL folds string literals, interpolated, verbatim and
-//! raw strings, `+`, `const` and `static readonly` fields (the pack's `Facts::consts`), locals
-//! bound once (`Facts::bound`) and `new Uri(..)`. A name assigned anywhere in its file (`=`,
-//! `+=`, `++`, `out`, `ref`) holds no one value, so a reassigned local, request or client is
-//! unknown. A client's base is the `BaseAddress` its construction sets in an object
-//! initializer (`new HttpClient { BaseAddress = new Uri(base) }`, in a local, a field, a
-//! property or a `static readonly` field), or the one `BaseAddress = new Uri(base)` assignment
-//! made on the name the call is made on, in the scope that declares the name: a base not read
-//! (two assignments, one that may not run, one that sets another address than the initializer,
-//! a name that is assigned or hidden) is unknown: a path from the root replaces its path, so it is
-//! the contract alone, and a relative one leaves the consumer an open item that names the client's
-//! base (#801). A relative URL joins the base as `Uri` does (RFC 3986).
-//!
-//! A typed client (#113): the `HttpClient` a dependency injection container passes to a
-//! constructor nothing calls (`Injected::Param`) has the one `BaseAddress` the constructor sets on
-//! it when no registration sets another, else the one every `AddHttpClient<T>(..)` of its class
-//! sets (`registered`), and a `readonly` field the constructor assigns it holds it (the pack's
-//! `Const::scope`). Two registrations with different bases, or one Meada cannot read, leave it
-//! unknown.
 // ponytail: a field set from a method's parameter or assigned twice has an unknown base, and so
 // has a client a wrapper takes whose callers build it elsewhere; an instance `readonly` field
 // holds only what one constructor assigns it.
@@ -44,7 +15,6 @@ use std::collections::BTreeMap;
 const HTTP_CLIENT: &str = "System.Net.Http.HttpClient";
 const REQUEST: &str = "System.Net.Http.HttpRequestMessage";
 const HTTP_METHOD: &str = "System.Net.Http.HttpMethod.";
-/// The methods of an `HttpClient` that send one method.
 const CLIENT_METHODS: &[(&str, &str)] = &[
     ("GetAsync", "GET"),
     ("PostAsync", "POST"),
@@ -58,7 +28,6 @@ const CLIENT_METHODS: &[(&str, &str)] = &[
     ("PostAsJsonAsync", "POST"),
     ("PutAsJsonAsync", "PUT"),
 ];
-/// The members of `HttpMethod` that name one method.
 const MEMBERS: &[(&str, &str)] = &[
     ("Get", "GET"),
     ("Post", "POST"),
@@ -68,15 +37,11 @@ const MEMBERS: &[(&str, &str)] = &[
     ("Head", "HEAD"),
     ("Options", "OPTIONS"),
 ];
-/// The member `BaseAddress` of an `HttpClient`.
 const BASE: &str = "BaseAddress";
-/// The framework's registration of a typed client, `services.AddHttpClient<T>(..)`.
 const REGISTER: &str = "AddHttpClient";
 
-/// C# HTTP consumers: see the module.
 pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
     let reads = Reads::new(indexed.configs);
-    // Read the first time a typed client's constructor is met.
     let typed = OnceCell::new();
     let inject = |code: &Code<'a>, _: &'a str, on: Injected<'a>| match on {
         Injected::Param(ctor, n) => {
@@ -118,12 +83,9 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
     found
 }
 
-/// What a call of the method `callee` ends in sends.
 #[derive(Clone, Copy)]
 enum Sent {
-    /// The method of this name sends this HTTP method.
     Verb(&'static str),
-    /// `SendAsync(new HttpRequestMessage(method, url))`.
     Request,
 }
 
@@ -136,9 +98,6 @@ fn sent(callee: &str) -> Option<Sent> {
     }
 }
 
-/// Whether the call at `index` of `path`, made on `receiver`, is made on an `HttpClient`: the
-/// receiver is written as one (a field, a property, a parameter, a typed local), or was made by
-/// `new HttpClient(..)`; one `CreateClient` made, held by a local or a field, is a named client.
 fn is_client<'a>(code: &Code<'a>, path: &'a str, index: usize, receiver: &'a str) -> bool {
     let scope = code.files()[path].calls[index].scope.as_str();
     if named(code, (path, scope), receiver) {
@@ -147,22 +106,16 @@ fn is_client<'a>(code: &Code<'a>, path: &'a str, index: usize, receiver: &'a str
     if let Some((at, within, ty)) = code.written(path, scope, receiver) {
         return is_http_client(code, at, within, ty);
     }
-    // No type written: the construction in place, or a local made by `new HttpClient()`.
     match code.receiver(path, index) {
         Some(Value::New(ty, _)) => is_http_client(code, path, scope, ty),
         _ => false,
     }
 }
 
-/// Whether `ty`, written in `scope` of `path`, is `System.Net.Http.HttpClient`, in full or
-/// through the usings.
 fn is_http_client<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, ty: &'a str) -> bool {
     is_type(code, path, scope, ty, HTTP_CLIENT)
 }
 
-/// Whether the name `receiver` holds the client `CreateClient(name)` made: a local declared
-/// with it, or a name assigned it (`_n = factory.CreateClient("x")`), at the scope that
-/// declares it.
 fn named<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), receiver: &'a str) -> bool {
     let name = receiver.strip_prefix("this.").unwrap_or(receiver);
     let made =
@@ -179,9 +132,6 @@ fn named<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), receiver: &'a s
             })
 }
 
-/// The binding of `name.member` (a member assigned through the name), when the scope that
-/// binds it is the one that declares `name`: a parameter that hides a field, or a nested type's
-/// own field, keeps its own.
 fn written<'a>(
     code: &Code<'a>,
     (path, scope): (&'a str, &'a str),
@@ -195,8 +145,6 @@ fn written<'a>(
     (at == path && bound.scope == within).then_some(bound)
 }
 
-/// The URL and the method of `call`, read whole by `Expand::Chain`, made on `receiver` (as the
-/// stored call writes it) at `at`.
 fn sends<'a>(
     code: &Code<'a>,
     reads: &Reads,
@@ -211,7 +159,6 @@ fn sends<'a>(
         Sent::Verb(verb) => (call.args.first(), text(verb)),
         Sent::Request => match call.args.first() {
             Some(Value::New(ty, args)) if is_request(code, (path, scope), ty) => {
-                // `request.Method = HttpMethod.X`, set after the construction, wins.
                 let set = match code.call(path, index).and_then(|c| c.args.first()) {
                     Some(Value::Ref(name)) => written(code, (path, scope), name, "Method"),
                     _ => None,
@@ -222,17 +169,14 @@ fn sends<'a>(
                 };
                 (args.get(1), method)
             }
-            // A request a wrapper takes: read at each caller.
             Some(Value::Ref(name)) => return (Value::Ref(name.clone()), Value::Ref(name.clone())),
             _ => (None, Value::Unknown),
         },
     };
     let url = reads.value(code, path, self::url(code, (path, scope), url));
     match call.receiver.as_deref() {
-        // A client a wrapper takes: its base is read at each caller.
         Some(Value::Ref(name)) => (Value::Ref(name.clone()), method),
         client => {
-            // The assignment on the name the call is made on wins over the initializer.
             let assigned = (written(code, (path, scope), receiver, BASE))
                 .map(|b| code.value(path, &b.within, &b.value));
             let base = base(code, reads, path, client, assigned.as_ref());
@@ -241,8 +185,6 @@ fn sends<'a>(
     }
 }
 
-/// The method a folded `HttpMethod.X` gives: the member as text, a parameter as it is (the call
-/// is a wrapper's), anything else unknown.
 fn http_method(value: Option<&Value>) -> Value {
     let member = |s: &str| {
         let name = s.strip_prefix(HTTP_METHOD)?;
@@ -258,9 +200,6 @@ fn http_method(value: Option<&Value>) -> Value {
     }
 }
 
-/// The method a `HttpMethod.X` assigned to a request names (`Method = HttpMethod.X`), written as
-/// is in `scope` of `path`: unknown when it is not one of the members or `HttpMethod` is not the
-/// framework's.
 fn member_set<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), value: &'a Value) -> Value {
     let named = match value {
         Value::Ref(r) => r.rsplit_once('.'),
@@ -278,8 +217,6 @@ fn member_set<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), value: &'a
     }
 }
 
-/// The URL a folded argument gives: through `new Uri(..)` of one argument, which the
-/// repository does not declare.
 fn url<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), value: Option<&Value>) -> Value {
     match value {
         Some(Value::New(ty, args)) if is_uri(code, (path, scope), ty) && args.len() == 1 => {
@@ -290,13 +227,10 @@ fn url<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), value: Option<&Va
     }
 }
 
-/// Whether `ty`, written in `scope`, is `System.Uri`: no type of the repository hides it.
 fn is_uri<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), ty: &str) -> bool {
     ty == "System.Uri" || (ty == "Uri" && code.definition(path, scope, "Uri").is_none())
 }
 
-/// Whether `ty`, written in `scope`, is `HttpRequestMessage`: in full or through the usings of
-/// the call (`is_type`).
 // ponytail: the type of a construction read whole is no name of the file, so it is looked up as
 // the end of `REQUEST` it writes; an alias using (`using R = ..HttpRequestMessage`) is not seen.
 fn is_request<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), ty: &str) -> bool {
@@ -304,8 +238,6 @@ fn is_request<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), ty: &str) 
     end.is_some_and(|end| end == ty && is_type(code, path, scope, end, REQUEST))
 }
 
-/// The base address of a client folded as `client` (a construction with an initializer) or
-/// assigned (`BaseAddress = new Uri(base)`); a hole when neither is read. Its environment and configuration reads are decided (`Reads`).
 fn base<'a>(
     code: &Code<'a>,
     reads: &Reads,
@@ -320,8 +252,6 @@ fn base<'a>(
         },
         _ => None,
     };
-    // An assignment may come after the call, or not run: one that sets another address than
-    // the initializer leaves the base unknown.
     let [assigned, initial] = [assigned, initial].map(|v| v.map(|v| address(code, reads, path, v)));
     match (assigned, initial) {
         (Some(a), Some(i)) if a != i => crate::http::client_base(),
@@ -330,8 +260,6 @@ fn base<'a>(
     }
 }
 
-/// The parts of the address a `BaseAddress = new Uri(base)` written in `path` sets, its reads
-/// decided; a hole when it is not read.
 fn address<'a>(code: &Code<'a>, reads: &Reads, path: &'a str, set: &Value) -> Vec<Part> {
     match set {
         Value::New(_, args) if args.len() == 1 => match reads.value(code, path, args[0].clone()) {
@@ -343,19 +271,11 @@ fn address<'a>(code: &Code<'a>, reads: &Reads, path: &'a str, set: &Value) -> Ve
     }
 }
 
-/// The typed clients the repository registers with the framework's `AddHttpClient<T>(..)`
-/// (`AddHttpClient<I, T>`: the last type argument), by the class's qualified name: the address
-/// each registration's configuring lambda sets on its client parameter
-/// (`c => c.BaseAddress = new Uri(base)`), read where it is written. A registration that only
-/// names the client adds none; one Meada cannot read (a method group, a lambda that passes its
-/// client on, a `ConfigureHttpClient` chained on it) adds an unknown one.
 // ponytail: a lambda's address is folded where it is written: a parameter of the method that
 // registers the client is unknown.
 fn registered<'a>(code: &Code<'a>, reads: &Reads) -> BTreeMap<&'a str, Vec<Vec<Part>>> {
     let mut out: BTreeMap<&'a str, Vec<Vec<Part>>> = BTreeMap::new();
     for (&path, facts) in code.files().iter().filter(|(p, _)| p.ends_with(".cs")) {
-        // Built the first time a registration is met: the file's calls by scope, by the call
-        // they are made on, and its bindings by scope.
         let index = OnceCell::new();
         for (n, stored) in facts.calls.iter().enumerate() {
             if member(&stored.callee) != REGISTER
@@ -394,8 +314,6 @@ fn registered<'a>(code: &Code<'a>, reads: &Reads) -> BTreeMap<&'a str, Vec<Vec<P
     out
 }
 
-/// A file's calls by the scope they are written in and by the call they are made on
-/// (`Call::on`), and its bindings by scope (`Facts::receivers`).
 struct Index<'a> {
     by_scope: BTreeMap<&'a str, Vec<usize>>,
     on: BTreeMap<usize, Vec<usize>>,
@@ -426,15 +344,12 @@ impl<'a> Index<'a> {
     }
 }
 
-/// What the registration at call `n` of `path` sets as its client's `BaseAddress`: `Some(None)`
-/// when it configures nothing, `None` when Meada cannot read what it configures.
 fn registration<'a>(
     code: &Code<'a>,
     (path, facts): (&'a str, &'a Facts),
     index: &Index<'a>,
     n: usize,
 ) -> Option<Option<&'a Bound>> {
-    // A `ConfigureHttpClient` on the registration's builder configures the client again.
     let mut chain = vec![n];
     while let Some(m) = chain.pop() {
         for &next in index.on.get(&m).into_iter().flatten() {
@@ -447,11 +362,9 @@ fn registration<'a>(
     let args = &code.call(path, n)?.args;
     let lambda = match args.last() {
         Some(Value::Function(lambda)) => lambda.as_str(),
-        // The client's name, or nothing.
         _ if args.iter().all(|a| matches!(a, Value::Str(_))) => return Some(None),
         _ => return None,
     };
-    // The lambda's parameters: its bindings of no class and no value (a local holds one).
     let params: Vec<&str> = (index.bindings.get(lambda).into_iter().flatten())
         .filter(|r| r.class == Class::Unknown)
         .filter(|r| {
@@ -459,7 +372,6 @@ fn registration<'a>(
         })
         .map(|r| r.name.as_str())
         .collect();
-    // A call in the lambda (or deeper) that takes a parameter may set anything on it.
     let inside = (index.by_scope.range(lambda..))
         .take_while(|(s, _)| s.starts_with(lambda))
         .filter(|(s, _)| s.len() == lambda.len() || s[lambda.len()..].starts_with('.'))
@@ -483,10 +395,6 @@ fn registration<'a>(
     }
 }
 
-/// The client a dependency injection container passes for the parameter `n` of the
-/// constructor `ctor`, when it is an `HttpClient`: one with the address the constructor sets on
-/// the parameter, or else the one address every registration of its class as a typed client
-/// sets (`registered`). `None` when neither gives one.
 fn injected<'a>(
     code: &Code<'a>,
     reads: &Reads,
@@ -507,8 +415,6 @@ fn injected<'a>(
     let own = code.bounds(ctor.path, ctor.name, &format!("{}.{BASE}", param.name));
     let registered = registered.get(class).map_or(&[][..], Vec::as_slice);
     let parts = match (own.as_slice(), registered) {
-        // The constructor's own address, which no registration contradicts: one set after an
-        // early `return`, or not at all, would leave the registration's.
         ([b], _) => {
             let own = code.value(ctor.path, &b.within, &b.value);
             let own = address(code, reads, ctor.path, &own);
@@ -525,16 +431,10 @@ fn injected<'a>(
     Some(Value::New(HTTP_CLIENT.into(), vec![set]))
 }
 
-/// `url` with `base` in front when `url` is relative to it, as `Uri` joins them (RFC 3986): a
-/// path from the root (`/orders`) replaces the base's own path, and a relative one replaces the
-/// base's last segment (`https://c/v1` and `orders` give `/orders`, `https://c/v1/` gives
-/// `/v1/orders`). Over a base whose origin Meada could not read, a path from the root is the
-/// path alone (#801).
 fn based_on(base: Vec<Part>, url: Value) -> Value {
     if crate::http::rooted_over_unread(&base, &url) {
         return url;
     }
-    // A base read from configuration (`Part::EnvOr`) joins on the literal it defaults to.
     let base = match &base[..] {
         [Part::EnvOr(var, default)] => {
             vec![Part::EnvOr(var.clone(), rebase(default.clone(), &url))]
@@ -544,7 +444,6 @@ fn based_on(base: Vec<Part>, url: Value) -> Value {
     based(Some(&base), &url)
 }
 
-/// `base` cut where `url` starts from, as `Uri` joins them (`based_on`).
 fn rebase(mut base: Vec<Part>, url: &Value) -> Vec<Part> {
     let first = match url {
         Value::Str(parts) => match parts.first() {
@@ -556,7 +455,6 @@ fn rebase(mut base: Vec<Part>, url: &Value) -> Vec<Part> {
     match (first, path_start(&base)) {
         (Some(t), Some((n, at))) if t.starts_with('/') => cut(&mut base, n, at),
         (Some(t), Some((n, at))) if !t.contains("://") => {
-            // After the last `/` of the base's path.
             let last = (n..base.len()).rev().find_map(|m| match &base[m] {
                 Part::Text(t) => {
                     let from = if m == n { at } else { 0 };
@@ -573,7 +471,6 @@ fn rebase(mut base: Vec<Part>, url: &Value) -> Vec<Part> {
     base
 }
 
-/// `base` kept up to byte `at` of its part `n`.
 fn cut(base: &mut Vec<Part>, n: usize, at: usize) {
     if let Part::Text(t) = &mut base[n] {
         t.truncate(at);
@@ -581,9 +478,6 @@ fn cut(base: &mut Vec<Part>, n: usize, at: usize) {
     base.truncate(n + 1);
 }
 
-/// The part and byte where the path of `base` begins: the first `/` after the host, which is
-/// what follows a literal `://`, or the first text after a part that is not literal when the
-/// scheme is not (an address read from configuration).
 fn path_start(base: &[Part]) -> Option<(usize, usize)> {
     let (mut scheme, mut opaque) = (false, false);
     for (n, part) in base.iter().enumerate() {
@@ -614,13 +508,11 @@ mod tests {
     use crate::resolve::Resolver;
     use std::collections::BTreeMap;
 
-    /// A consumer as `(contract, via, method)`, the method only for an unresolved one.
     type Sent = (Option<String>, Option<String>, Option<String>);
 
     const USINGS: &str = "using System;\nusing System.Net.Http;\nusing System.Net.Http.Json;\n\
                           using Microsoft.AspNetCore.Builder;\nusing Microsoft.Extensions.Configuration;\n";
 
-    /// The consumers `code` has, with `configs` as the config files the index read.
     fn found(code: &Code, configs: &[(&str, &[u8])]) -> Vec<Found> {
         let indexed = Indexed {
             manifests: &[],
@@ -634,12 +526,10 @@ mod tests {
         consumers(code, &indexed)
     }
 
-    /// The consumers of the class body `body` in `A/C.cs`, with other files of the repository.
     fn sent_with(body: &str, others: &[(&str, &str)]) -> Vec<Sent> {
         sent_in(body, others, &[])
     }
 
-    /// `sent_with`, with config files (`(path, bytes)`) beside the sources.
     fn sent_in(body: &str, others: &[(&str, &str)], configs: &[(&str, &[u8])]) -> Vec<Sent> {
         let mut found: Vec<Sent> = (consumers_of(body, others, configs).into_iter())
             .map(|f| (f.contract, f.via, f.method))
@@ -648,14 +538,12 @@ mod tests {
         found
     }
 
-    /// `sent_in`'s consumers as they are found.
     fn consumers_of(body: &str, others: &[(&str, &str)], configs: &[(&str, &[u8])]) -> Vec<Found> {
         let src = format!("{USINGS}\nnamespace A;\npublic class C {{\n{body}\n}}\n");
         let mut parsed = vec![("A/C.cs", CSharp.parse("A/C.cs", src.as_bytes()).unwrap())];
         for (path, source) in others {
             parsed.push((path, CSharp.parse(path, source.as_bytes()).unwrap()));
         }
-        // The projects give each file its unit, as the index does.
         let join = {
             let raw: BTreeMap<&str, &_> = parsed.iter().map(|(p, f)| (*p, f)).collect();
             CSharp.join(configs, &raw)
@@ -674,7 +562,6 @@ mod tests {
         sent_with(body, &[])
     }
 
-    /// The contracts of the consumers of `body`.
     fn contracts(body: &str) -> Vec<String> {
         sent(body).into_iter().filter_map(|(c, ..)| c).collect()
     }
@@ -687,7 +574,6 @@ mod tests {
         (Some(contract.into()), Some(format!("host:{host}")), None)
     }
 
-    /// An unresolved consumer of `method`.
     fn open(method: &str) -> Sent {
         (None, None, Some(method.into()))
     }
@@ -731,9 +617,6 @@ mod tests {
         );
     }
 
-    /// A client whose base Meada did not read (#801): `Uri` resolves a path from the root over the
-    /// base, replacing its path, so that request links by its path alone; a relative one follows
-    /// the unknown path, so it is an open item that names the client's base.
     #[test]
     fn a_relative_request_on_a_client_whose_base_was_not_read_names_the_client_base() {
         let body = format!(
@@ -954,9 +837,6 @@ mod tests {
         );
     }
 
-    /// A type written in full is the library's unless the repository declares that very name:
-    /// the compiler prefers the source's type. Another type under the library's root hides
-    /// nothing.
     #[test]
     fn a_type_written_in_full_is_the_library_s_unless_the_repository_declares_it() {
         let body = "System.Net.Http.HttpClient _full;\n\
@@ -990,7 +870,6 @@ mod tests {
         assert_eq!(found, ["http::GET::/alias"]);
     }
 
-    /// A client with a base, in C# source.
     fn client(host: &str) -> String {
         format!("new HttpClient {{ BaseAddress = new Uri(\"https://{host}.example.com\") }}")
     }
@@ -1212,7 +1091,6 @@ mod tests {
 
     #[test]
     fn a_get_async_of_the_repository_beside_the_client_call_is_not_called_by_it() {
-        // The pack's call, not the kind's: the client call must stay a call of the outside type.
         let body = format!(
             "{CLIENT}async Task F() {{ await _http.GetAsync(\"https://z.example.com/z\"); }}"
         );
@@ -1223,8 +1101,6 @@ mod tests {
         );
     }
 
-    /// An unresolved consumer's `via` and a resolved one's, with the twin readings of a
-    /// configuration default (`http::fetches`) as the kind gives them.
     fn env(contract: &str, var: &str) -> Sent {
         (Some(contract.into()), Some(format!("env:{var}")), None)
     }
@@ -1256,7 +1132,6 @@ mod tests {
             format!("{GET_ENV}(\"X\")!.TrimEnd('/') + \"/a\""),
             format!("({GET_ENV}(\"X\") ?? \"d\").TrimEnd('/').Trim() + \"/a\""),
             format!("System.{GET_ENV}(\"X\") + \"/a\""),
-            // A fallback chain with one read, whatever else the fallbacks are.
             format!("({GET_ENV}(\"X\") ?? Other.Get(\"Y\")) + \"/a\""),
             format!("({GET_ENV}(\"X\") ?? \"d\" ?? \"e\") + \"/a\""),
             format!("(({GET_ENV}(\"X\") ?? \"d\") ?? \"e\") + \"/a\""),
@@ -1270,14 +1145,11 @@ mod tests {
     #[test]
     fn an_environment_read_is_one_read_and_the_framework_s() {
         let not = [
-            // Two reads.
             format!("({GET_ENV}(\"X\") ?? {GET_ENV}(\"Y\")) + \"/a\""),
-            // Three operands: the reads count across the whole chain.
             format!("({GET_ENV}(\"X\") ?? \"d\" ?? {GET_ENV}(\"Y\")) + \"/a\""),
             format!("({GET_ENV}(\"X\") ?? {GET_ENV}(\"Y\") ?? \"d\") + \"/a\""),
             format!("(({GET_ENV}(\"X\") ?? \"d\") ?? {GET_ENV}(\"Y\")) + \"/a\""),
             format!("({GET_ENV}(\"X\") ?? {GET_ENV}(\"Y\") ?? {GET_ENV}(\"Z\")) + \"/a\""),
-            // Not a literal name, or another call with a literal.
             format!("{GET_ENV}(name) + \"/a\""),
             format!("{GET_ENV}(\"X\", Machine) + \"/a\""),
             "Settings.Get(\"X\") + \"/a\"".to_string(),
@@ -1286,10 +1158,8 @@ mod tests {
         for url in not {
             let body =
                 format!("{CLIENT}async Task F(string name) {{ await _http.GetAsync({url}); }}");
-            // No read names the base: the path after it is an open item (#801).
             assert_eq!(sent(&body), [open("GET")], "{url}");
         }
-        // A type of the repository named `Environment` hides the framework's.
         let hiding = "namespace A;\npublic static class Environment { \
                       public static string GetEnvironmentVariable(string s) => s; }\n";
         let body = format!(
@@ -1317,7 +1187,6 @@ mod tests {
                 format!("{field}{CLIENT}async Task F() {{ {decl} await _http.GetAsync({url}); }}");
             assert_eq!(sent(&body), [env("http::GET::/a", "X")], "{decl} {url}");
         }
-        // A local bound to a call with a literal that is no read stays unknown.
         let body = format!(
             "{CLIENT}async Task F() {{ var web = Other.Get(\"X\"); await _http.GetAsync(web + \"/a\"); }}"
         );
@@ -1364,7 +1233,6 @@ mod tests {
              await _http.GetAsync(_config[\"AUDIT\"] + \"/audit\");\n\
              await _http.GetAsync(_config[\"Api:Local\"] + \"/local\");\n}";
         let mut expected = Vec::new();
-        // `orders` has no slash after the variable: that reading names no path.
         expected.push((
             None,
             Some("env:Api__Url|host:api.example.com".into()),
@@ -1376,7 +1244,6 @@ mod tests {
                 .skip(1),
         );
         expected.extend(twins("http::GET::/audit", "AUDIT", "audit.example.com"));
-        // `localhost:5000` is a host too: both readings stay until a workspace serves it.
         expected.extend(twins("http::GET::/local", "Api__Local", "localhost:5000"));
         expected.sort();
         let mut found = configured(body);
@@ -1431,7 +1298,6 @@ mod tests {
         assert_eq!(made("WebApplication.CreateSlimBuilder"), twin);
         assert_eq!(made("WebApplication.CreateBuilder"), twin);
         assert_eq!(made("Other.CreateBuilder"), [open("GET")]);
-        // Another type, an undeclared name, a dictionary, a section and a method result.
         for (receiver, decl) in [
             ("_c", "Dictionary<string, string> _c;"),
             ("_c", "IConfigurationSection _c;"),
@@ -1491,8 +1357,6 @@ mod tests {
              var rel = new HttpClient { BaseAddress = new Uri(_config[\"Api:Url\"]!) };\n\
              await rel.GetAsync(\"orders\");\n\
              await rel.GetAsync(\"/root\");\n}";
-        // The variable's reading keeps the relative URL beside the base (`/orders`); the
-        // default's joins on the literal (`Uri`: `/v1/` + `orders`, a root-relative URL replaces the path).
         let mut expected = Vec::new();
         expected.extend(twins("http::GET::/root", "Api__Url", "api.example.com"));
         expected.push((
@@ -1531,33 +1395,25 @@ mod tests {
              async Task F() {{ await _http.GetAsync(_config[\"audit\"] + \"/x\"); }}"
         );
         let twin = twins("http::GET::/x", "audit", "audit.example.com").to_vec();
-        // The file of another project (`B/`) does not configure `A/C.cs` once a project holds it.
         let found = sent_in(
             &body,
             &[],
             &[("A/A.csproj", SDK), ("B/appsettings.json", SETTINGS)],
         );
         assert_eq!(found, [env("http::GET::/x", "audit")]);
-        // A project file the pack does not read (old-style) is no project: the SDK one above holds
-        // the file, as the pack's `join` says.
         let configs = [
             ("Root.csproj", SDK),
             ("A/Old.csproj", OLD),
             ("appsettings.json", SETTINGS),
         ];
         assert_eq!(sent_in(&body, &[], &configs), twin);
-        // A file in no project reads the nearest file above it.
         assert_eq!(sent_in(&body, &[], &[("appsettings.json", SETTINGS)]), twin);
     }
 
-    /// A typed client `C`: its constructor takes the `HttpClient`, a field holds it. It sends `/a`,
-    /// from the root, and `b`, relative: over a base Meada did not read, the first is its path
-    /// alone and the second an open item (#801).
     const TYPED: &str = "private readonly HttpClient _http;\n\
                          public C(HttpClient http) { _http = http; }\n\
                          public async Task F() { await _http.GetAsync(\"/a\"); await this._http.GetAsync(\"b\"); }";
 
-    /// The consumers of `TYPED`, with `registered` written in a method of another file.
     fn typed(registered: &str) -> Vec<Sent> {
         let startup = format!(
             "{USINGS}using Microsoft.Extensions.DependencyInjection;\nnamespace A;\n\
@@ -1591,7 +1447,6 @@ mod tests {
             typed(&format!("{read}\nservices.AddHttpClient<C>();")),
             [
                 twins("http::GET::/a", "Api__Url", "api.example.com").to_vec(),
-                // The variable's own value is unknown: a relative URL follows its root.
                 vec![twins("http::GET::/b", "Api__Url", "api.example.com")[0].clone()],
                 vec![twins("http::GET::/v1/b", "Api__Url", "api.example.com")[1].clone()],
             ]
@@ -1612,7 +1467,6 @@ mod tests {
             typed(&format!("{one}\n{one}"))[0].1.as_deref(),
             Some("host:one.example.com")
         );
-        // Registered as another class, and a base that does not fold.
         assert_eq!(
             typed(
                 "services.AddHttpClient<Startup>(c => c.BaseAddress = new Uri(\"https://other.example.com\"));"
@@ -1652,7 +1506,6 @@ mod tests {
         );
     }
 
-    /// `TYPED` with the constructor `ctor` in place of its own, registered with `registered`.
     fn typed_with(ctor: &str, registered: &str) -> Vec<Sent> {
         let body = TYPED.replace("public C(HttpClient http) { _http = http; }", ctor);
         let startup = format!(
@@ -1678,7 +1531,6 @@ mod tests {
         ] {
             assert_eq!(typed_with(ctor, REGISTERED), unknown, "{ctor}");
         }
-        // The same address as the registration's, or no registration, is the constructor's.
         let own = "public C(HttpClient http) { http.BaseAddress = new Uri(\"https://typed.example.com/\"); _http = http; }";
         assert_eq!(
             typed_with(own, REGISTERED),
@@ -1728,11 +1580,9 @@ mod tests {
         let ctor = "public C(HttpClient http) { _http = http; }";
         let other =
             "services.AddHttpClient<C>(c => c.BaseAddress = new Uri(\"https://two.example.com\"));";
-        // `ConfigureHttpClient` on the registration sets it again.
         let chained = "services.AddHttpClient<C>(c => c.BaseAddress = new Uri(\"https://one.example.com\"))\
                        .ConfigureHttpClient(c => c.BaseAddress = new Uri(\"https://two.example.com\"));";
         assert_eq!(typed_with(ctor, chained), unknown);
-        // A method group, or a lambda that passes the client on, beside another registration.
         let group = "services.AddHttpClient<C>(Configure);";
         let passed = "services.AddHttpClient<C>(c => Configure(c));";
         for unread in [group, passed] {
@@ -1747,11 +1597,9 @@ mod tests {
                 "{unread}"
             );
         }
-        // A base set on a local of the lambda is no base of its client.
         let local = "services.AddHttpClient<C>((sp, c) => { var o = new HttpClient(); \
                      o.BaseAddress = new Uri(\"https://other.example.com\"); c.Timeout = TimeSpan.FromSeconds(1); });";
         assert_eq!(typed_with(ctor, local), unknown);
-        // A named registration, and one that only names the client, configure nothing else.
         let named = "services.AddHttpClient<C>(\"n\", c => c.BaseAddress = new Uri(\"https://two.example.com\"));\n\
                      services.AddHttpClient<C>();";
         assert_eq!(

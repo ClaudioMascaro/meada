@@ -1,4 +1,3 @@
-//! AWS provisioners and subscription routing (#658, ADR 0026).
 use crate::common::{assert_golden, fixture_repo};
 use meada::engine::Engine;
 use serde_json::Value;
@@ -195,7 +194,6 @@ fn aws_subscriptions_link_target_consumers_to_source_producers_and_trace_them() 
         "{context}"
     );
     assert_golden("aws-subscriptions.context.txt", &context);
-    // The infrastructure view walks references and provisioning links to the same consumers.
     let from_infra = Engine::open(&infra)
         .unwrap()
         .trace(
@@ -251,8 +249,6 @@ fn aws_orphans_are_reported_per_kind_only_when_the_workspace_has_both_sides() {
     );
     assert_eq!(text.lines().count(), 20, "{text}");
     assert_golden("aws-orphans.status.txt", &text);
-    // Removing all SSM provisioners reports the unmatched use only while another SSM
-    // provisioner is present; a wholly absent kind must not produce a status warning.
     for dir in ["literal", "arn"] {
         let path = infra.join(dir).join("main.tf");
         let text = std::fs::read_to_string(&path).unwrap();
@@ -303,7 +299,6 @@ fn subscription_edits_refresh_links_and_partial_queries_equal_the_full_export() 
     assert_eq!(queries(), meada::engine::with_every_row(queries));
     let path = infra.join("routes/main.tf");
     let original = std::fs::read_to_string(&path).unwrap();
-    // Same-size endpoint change, followed by restore, exercises the warm summary refresh.
     std::fs::write(
         &path,
         original.replace("aws_sqs_queue.sns.arn", "aws_sqs_queue.bus.arn"),

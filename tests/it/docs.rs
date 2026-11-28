@@ -1,16 +1,7 @@
-//! The repository map keeps up with the code: every limit marked `ponytail:` is named in
-//! `docs/agents/ceilings.md` or a part of `docs/agents/ceilings/` (CODING_STANDARDS.md, hostile input),
-//! source comments use `ponytail:` rather than `shortcut:`, every
-//! entry point kind and process step mark is in the list the map gives of them, every module has
-//! its line in `docs/agents/architecture.md`, and every Markdown file under `docs/agents` stays
-//! within its size budget (the map and the files split by `examples/split_agents.rs`).
-
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
-/// The name a `const` item on this line declares: `pub const NAME: u8` gives `NAME`, while a
-/// `const fn` and a line of comment give none.
 fn const_name(line: &str) -> Option<String> {
     let (_, rest) = line
         .split_once("const ")
@@ -22,9 +13,6 @@ fn const_name(line: &str) -> Option<String> {
     })
 }
 
-/// Every `const` of the text with whether its comment block holds `ponytail:`. The block is the
-/// `//` lines right above the const, or above the first of a run of consecutive `const` lines
-/// (a const with a comment of its own starts a run of its own): a run shares its marker.
 fn consts(text: &str) -> Vec<(String, bool)> {
     let lines: Vec<&str> = text.lines().collect();
     let mut out = Vec::new();
@@ -48,14 +36,12 @@ fn consts(text: &str) -> Vec<(String, bool)> {
     out
 }
 
-/// The `const` names whose comment block holds `ponytail:` (see `consts`).
 fn marked(text: &str) -> Vec<String> {
     (consts(text).into_iter())
         .filter_map(|(name, marked)| marked.then_some(name))
         .collect()
 }
 
-/// The sources whose limits the checks guard: the binary's and the core's.
 fn limit_sources() -> Vec<(String, String)> {
     let mut files = Vec::new();
     sources(Path::new("src"), &mut files);
@@ -79,7 +65,6 @@ fn sources(dir: &Path, out: &mut Vec<(String, String)>) {
 
 #[test]
 fn every_marked_limit_is_a_known_ceiling() {
-    // The list is the index and the area files of `docs/agents/ceilings/` (split by budget, #644).
     let ceilings: String = (agents_markdown().into_iter())
         .filter(|(path, _)| path.starts_with("docs/agents/ceilings"))
         .map(|(_, text)| text)
@@ -88,7 +73,6 @@ fn every_marked_limit_is_a_known_ceiling() {
     let found: Vec<(&String, String)> = (files.iter())
         .flat_map(|(path, text)| marked(text).into_iter().map(move |n| (path, n)))
         .collect();
-    // The scan itself must see the limits it guards.
     assert!(found.iter().any(|(_, name)| name == "MAX_NESTING"));
     let missing: Vec<String> = (found.into_iter())
         .filter(|(_, name)| !ceilings.contains(&format!("`{name}`")))
@@ -107,8 +91,6 @@ fn a_marker_counts_only_in_the_comment_block_right_above() {
     assert_eq!(marked(text), vec!["A".to_string()]);
 }
 
-/// Names that look like a limit (`MAX_*`, `*_MAX`, `*_LIMIT`, `*_CAP`) and are not a ceiling,
-/// each with its reason.
 const NOT_CEILINGS: &[(&str, &str)] = &[
     (
         "MAX_AGE_MIN",
@@ -127,15 +109,11 @@ fn looks_like_a_limit(name: &str) -> bool {
         || name.ends_with("_CAP")
 }
 
-/// What is wrong with the limits of `files`: a const named like a limit without a `ponytail:`
-/// marker, and a marked limit name declared twice (the ceilings list limits by name, so one name
-/// stands for one limit).
 fn limit_problems(files: &[(String, String)], allowed: &[(&str, &str)]) -> Vec<String> {
     let mut problems = Vec::new();
     let mut seen: BTreeSet<String> = BTreeSet::new();
     for (path, text) in files {
         for (name, marked) in consts(text) {
-            // Only limit names must be unique: each language pack keeps its own `VALUE_DEPTH`.
             if marked && looks_like_a_limit(&name) && !seen.insert(name.clone()) {
                 problems.push(format!(
                     "{path}: {name} is a second marked const of that name"
@@ -167,7 +145,6 @@ fn every_limit_is_marked_once() {
         .collect();
     for (name, reason) in NOT_CEILINGS {
         assert!(looks_like_a_limit(name) && !reason.is_empty(), "{name}");
-        // An excuse outlives its const unnoticed otherwise.
         assert!(
             unmarked.contains(*name),
             "{name} is excused but no unmarked const has it"
@@ -178,7 +155,6 @@ fn every_limit_is_marked_once() {
 #[test]
 fn an_unmarked_or_repeated_limit_is_a_problem() {
     let file = |text: &str| vec![("a.rs".to_string(), text.to_string())];
-    // A run shares the comment block above its first const.
     let run = "// ponytail: both\nconst A_MAX: u8 = 1;\nconst B_LIMIT: u8 = 2;\n";
     assert!(limit_problems(&file(run), &[]).is_empty());
     let bare = "const FOO_MAX: u8 = 1;\n";
@@ -191,8 +167,6 @@ fn an_unmarked_or_repeated_limit_is_a_problem() {
     assert_eq!(limit_problems(&two_files, &[]).len(), 2);
 }
 
-/// The names in `names` that `doc` does not hold in backticks between `anchor` and the first
-/// `end` after it, where the doc lists them.
 fn unlisted(doc: &str, anchor: &str, end: &str, names: &[String]) -> Vec<String> {
     let text = fs::read_to_string(doc).unwrap();
     let start = (text.find(anchor)).unwrap_or_else(|| panic!("{anchor} in {doc}"));
@@ -207,7 +181,6 @@ fn unlisted(doc: &str, anchor: &str, end: &str, names: &[String]) -> Vec<String>
 #[test]
 fn every_entry_point_kind_is_listed_in_the_map() {
     let entry = fs::read_to_string("meada-core/src/export.rs").unwrap();
-    // The arms of `EntryKind::name`: `EntryKind::Route => "route",`.
     let kinds: Vec<String> = (entry.lines())
         .filter_map(|l| l.trim().strip_prefix("EntryKind::")?.split_once(" => \""))
         .map(|(_, name)| name.trim_end_matches("\",").to_string())
@@ -229,7 +202,6 @@ fn every_entry_point_kind_is_listed_in_the_map() {
 fn every_process_mark_is_listed_in_the_queries_map() {
     let trace = fs::read_to_string("meada-core/src/export.rs").unwrap();
     let start = trace.find("\npub enum Mark {").expect("enum Mark");
-    // The variants as serde's `kebab-case` writes them: `DepthLimit` is `depth-limit`.
     let marks: Vec<String> = (trace[start..].lines().skip(2))
         .map(str::trim)
         .take_while(|l| *l != "}")
@@ -266,7 +238,6 @@ const DETAIL_BUDGET: u64 = 24 * 1024;
 // file past it is split by `examples/split_agents.rs`, never trimmed (#644).
 const AREA_BUDGET: u64 = 64 * 1024;
 
-/// Every Markdown file under `docs/agents`, as (path, text), in path order.
 fn agents_markdown() -> Vec<(String, String)> {
     fn walk(dir: &Path, out: &mut Vec<(String, String)>) {
         let mut entries: Vec<_> = fs::read_dir(dir)
@@ -288,7 +259,6 @@ fn agents_markdown() -> Vec<(String, String)> {
     out
 }
 
-/// The files of `sizes` (path, bytes) past their budget, each as the failure message names it.
 fn over_budget(sizes: &[(String, u64)]) -> Vec<String> {
     (sizes.iter())
         .map(|(path, size)| {
@@ -327,7 +297,6 @@ fn over_budget(sizes: &[(String, u64)]) -> Vec<String> {
 #[test]
 fn every_agents_markdown_file_stays_within_its_budget() {
     let files = agents_markdown();
-    // The scan sees the map, the index of the ceilings and the parts the splitter wrote.
     for seen in [
         "architecture.md",
         "ceilings.md",
@@ -335,7 +304,6 @@ fn every_agents_markdown_file_stays_within_its_budget() {
     ] {
         assert!(files.iter().any(|(p, _)| p.ends_with(seen)), "{seen}");
     }
-    // The scan above covers `src/` only: the budgets of this file are named by hand.
     let ceilings: String = (files.iter())
         .filter(|(path, _)| path.starts_with("docs/agents/ceilings"))
         .map(|(_, text)| text.as_str())
@@ -419,8 +387,6 @@ fn every_relative_link_of_the_agents_docs_resolves() {
     );
 }
 
-/// The map's bullets that link a file in `map/`, as (lead, linked files): the lead is what they name
-/// before the first `: `, the files are the `map/*.md` they link. A bullet with no `: ` has no lead.
 fn module_leads(map: &str) -> Vec<(String, Vec<String>)> {
     let mut bullets: Vec<String> = Vec::new();
     for line in map.lines() {
@@ -433,7 +399,6 @@ fn module_leads(map: &str) -> Vec<(String, Vec<String>)> {
         }
     }
     (bullets.iter())
-        // A bullet that names an area file points to it with a link into `map/`.
         .filter(|b| b.contains("](map/"))
         .filter_map(|b| {
             let (lead, _) = b.split_once(": ")?;
@@ -446,7 +411,6 @@ fn module_leads(map: &str) -> Vec<(String, Vec<String>)> {
 
 #[test]
 fn every_ui_module_is_named_in_the_console_frontend_map() {
-    // Tests under `ui/tests` are out of scope; stale symbol names stay a review judgement.
     let docs: String = (agents_markdown().into_iter())
         .filter(|(p, _)| p.ends_with("architecture.md") || p.contains("/map/"))
         .map(|(_, text)| text)
@@ -465,7 +429,6 @@ fn every_ui_module_is_named_in_the_console_frontend_map() {
 #[test]
 fn every_module_has_a_line_in_the_map_naming_its_area_file() {
     let map = fs::read_to_string("docs/agents/architecture.md").unwrap();
-    // Module lines sit under Crates and Modules, before the Console frontend pointer.
     let modules = &map[..map
         .find("\n## Console frontend")
         .expect("a Console frontend section")];
@@ -488,20 +451,17 @@ fn every_module_has_a_line_in_the_map_naming_its_area_file() {
                     format!("`{stem}/`"),
                     format!("`meada-core/src/{stem}.rs`"),
                 ];
-                // `meada-core` shares file names with the binary's crate: its lines say so.
                 if (lead.contains("meada-core") != (dir != "src"))
                     || !forms.iter().any(|f| lead.contains(f.as_str()))
                 {
                     continue;
                 }
                 named = true;
-                // The linked file holds the module's detail: it names the module as the line does.
                 let written: Vec<String> = (forms.iter())
                     .filter(|f| lead.contains(f.as_str()))
                     .map(|f| f.trim_matches('`').to_string())
                     .collect();
                 for file in files {
-                    // A split area file keeps its detail in the parts of its directory (#644).
                     let area = format!("docs/agents/map/{file}");
                     let parts = area.trim_end_matches(".md");
                     let named_in = |text: &str| written.iter().any(|w| text.contains(w.as_str()));
@@ -551,12 +511,8 @@ fn a_module_lead_is_what_a_bullet_with_an_area_link_names_before_its_colon() {
     );
 }
 
-/// Phrases that say where a feature stands, which the roadmap and the site say and a glossary
-/// entry does not: the glossary defines a term (#853).
 const STATE_PHRASES: &[&str] = &["not yet delivered", "planned", "not yet implemented"];
 
-/// The phrases of `STATE_PHRASES` the text holds, as whole words (`_` joins a word, as in
-/// `planned_values`), across line breaks.
 fn state_phrases(text: &str) -> Vec<&'static str> {
     let words = |t: &str| -> Vec<String> {
         (t.split(|c: char| !c.is_alphanumeric() && c != '_'))
@@ -595,8 +551,6 @@ fn a_phrase_of_state_counts_across_a_line_break_and_not_inside_another_word() {
     );
 }
 
-/// `CHANGELOG.md merge=union` (#576): two branches adding a bullet under the same heading merge
-/// clean and keep both.
 #[test]
 fn changelog_union_merge_keeps_both_bullets() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -632,9 +586,6 @@ fn changelog_union_merge_keeps_both_bullets() {
     assert!(!merged.contains("<<<<<<<"), "{merged}");
 }
 
-/// Problems of a changelog: a `###` heading twice in one `## [...]` section (what a
-/// `merge=union` of two branches that each opened it leaves), and an `[Unreleased]` bullet that
-/// names no issue (`#n`) on any of its lines, or repeats an earlier bullet of the section.
 fn changelog_problems(text: &str) -> Vec<String> {
     let has_issue = |bullet: &str| {
         bullet
@@ -722,7 +673,6 @@ fn schema_version_matches_the_migrations() {
         .nth(1)
         .and_then(|rest| rest.split("\n];").next())
         .unwrap();
-    // Each entry is a string literal opening at the list's own indentation.
     let count = list.lines().filter(|l| l.starts_with("    \"")).count();
     assert_eq!(
         count as u32,

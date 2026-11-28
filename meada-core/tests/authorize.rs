@@ -1,6 +1,3 @@
-//! Authorization and a team operator's save at the public core seam, driven by the shared table
-//! Vitest also reads through the WebAssembly bundle.
-
 use meada_core::authorize::{
     Change, Grant, Reason, Refusal, Role, authorize_entries, compose_entries, role,
 };
@@ -14,7 +11,6 @@ struct Case {
     #[serde(default)]
     groups: Vec<String>,
     grant: Option<Grant>,
-    /// The subject's login and the GitHub grant provider's host; both none without it (#333).
     login: Option<String>,
     github_host: Option<String>,
     #[serde(default)]
@@ -22,7 +18,6 @@ struct Case {
     #[serde(default)]
     new: Vec<Json>,
     refused: Option<Vec<Refusal>>,
-    /// The time `compose_entries` stamps on an `added_by` it writes (#454).
     #[serde(default)]
     now: String,
     composed: Option<Vec<Json>>,
@@ -84,7 +79,6 @@ fn every_composition_case_stores_the_entries_the_table_lists() {
     assert!(seen >= 7, "{seen} composition cases");
 }
 
-/// The role apply recomputes under the lock: a group owning an entry the grant reads.
 #[test]
 fn the_role_follows_the_entries_the_grant_reads() {
     let current = [json!({"repo": "a.com/a", "path": "a", "owner": "team-a"})];
@@ -104,8 +98,6 @@ fn the_role_follows_the_entries_the_grant_reads() {
     assert!(serde_json::from_value::<Grant>(json!("a.com/a")).is_err());
 }
 
-/// An entry whose only difference is `added_by` is edited (#330): without the GitHub grant
-/// provider ADR 0015's rules apply to it, under it the change is refused `added_by_change` (#333).
 #[test]
 fn an_added_by_change_alone_is_an_edit() {
     let entry = |added_by: Option<&str>| match added_by {

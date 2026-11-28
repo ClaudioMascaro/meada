@@ -19,7 +19,7 @@ export function RecoveryControl({ file, identity, onOpen, busy, t }: ActionButto
   const [invalid, setInvalid] = useState(false);
   const id = useId();
   let command: string | undefined;
-  try { command = recoverAction(floor, file).command; } catch { /* The form reports invalid floors on submit. */ }
+  try { command = recoverAction(floor, file).command; } catch {  }
   return <form className="fence-recovery" aria-label={`${t.recover} ${identity}`} onSubmit={event => {
     event.preventDefault();
     try { const operation = recoverAction(floor, file); setInvalid(false); onOpen(operation); }

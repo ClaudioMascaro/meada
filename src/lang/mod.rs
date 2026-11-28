@@ -1,7 +1,3 @@
-//! The language adapter (ADR 0007): the seam between a language pack, which reads one file
-//! at a time, and the shared resolution in `resolve`, which connects calls to definitions.
-//! A pack never touches the index or other files.
-
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 use std::rc::Rc;
@@ -21,61 +17,32 @@ pub mod swift;
 pub mod ts;
 
 pub trait LanguagePack {
-    /// The file extensions the pack parses, without the dot.
     fn extensions(&self) -> &'static [&'static str];
 
-    /// Whether a file with one of the pack's extensions is code the pack parses: Kotlin's Gradle
-    /// build scripts (`build.gradle.kts`, `settings.gradle.kts`) are manifests, which the
-    /// package ecosystems read instead.
     fn is_code(&self, _path: &str) -> bool {
         true
     }
 
-    /// The pack whose resolution takes this pack's files too, when it is another one: Kotlin's
-    /// files resolve with Java's, in one `Resolver` and one `Code` under that pack's `layout`
-    /// and flags, so calls between them resolve by fully qualified name (`resolver_of`).
     fn resolves_with(&self) -> Option<&'static dyn LanguagePack> {
         None
     }
 
-    /// What one file defines, imports, exports and calls. `path` is repository-relative.
     fn parse(&self, path: &str, src: &[u8]) -> Result<Facts>;
 
-    /// `parse` under the file's `setting`, what `settings` answers for its path. A pack whose
-    /// facts depend on its config files overrides both; a change of the setting parses the file
-    /// again, whatever its content.
     fn parse_with(&self, path: &str, src: &[u8], _setting: &str) -> Result<Facts> {
         self.parse(path, src)
     }
 
-    /// What the config files make of each file's facts, from the config files as `modules`
-    /// gets them: Rust's default features of the crate a file belongs to.
     fn settings(&self, _configs: &[(&str, &[u8])]) -> Box<dyn Fn(&str) -> String> {
         Box::new(|_| String::new())
     }
 
-    /// What the facts of the pack's files add to the setting of each (`setting`), by path, from
-    /// every file of the pack as parsed: the Rust item macros a file invokes that the repository
-    /// defines (#398). It reads only facts no setting changes, so a file parsed again under
-    /// what it adds gives it the same answer, and one more parse settles every file.
     fn extend(&self, _files: &BTreeMap<&str, &Facts>) -> BTreeMap<String, String> {
         BTreeMap::new()
     }
 
-    /// Repository-relative files that configure how imports name files, such as
-    /// `tsconfig.json`, or what the pack's contract kinds read (Java's Spring
-    /// `application.properties`, through `Indexed::configs`). The shared side reads those
-    /// present, hands them to `layout` and refreshes the contracts when one changes. A name starting with `**/` names every file of that name the walk finds, at
-    /// any depth, in path order (`**/Cargo.toml`: a Cargo workspace's members), and `**/*`
-    /// every file whose name ends with the rest (`**/*.csproj`).
     fn config_files(&self) -> &'static [&'static str];
 
-    /// Further config inputs the pack's config files name (#689): Backstage's `$include`
-    /// targets of an `app-config*.yaml`. The pack asks `read` for each path it would read, as
-    /// the config files `configs` (in `config_files` order) name them, and the index keeps each
-    /// file `read` gives as one of the pack's config files (in its digest, so an edit to it alone
-    /// extracts the pack's group again) and each symbolic link it refuses
-    /// (`Indexed::symlinks`). None by default.
     fn config_inputs<'b>(
         &self,
         _configs: &[(&str, &[u8])],
@@ -83,27 +50,13 @@ pub trait LanguagePack {
     ) {
     }
 
-    /// What the pack's files give one another before they resolve (`Join`), built from the
-    /// config files as `layout` gets them and the facts of every file of the pack, as parsed:
-    /// C#'s `global using` directives and a project file's usings bind in every file of their
-    /// project. The index keeps the facts as parsed and joins each file's again on every
-    /// refresh, before `layout`, and those it parses again for their values too, so a file
-    /// another one's change affects resolves anew without being parsed again.
     fn join(&self, _configs: &[(&str, &[u8])], _files: &BTreeMap<&str, &Facts>) -> Join {
         Box::new(|_, _| {})
     }
 
-    /// How imports name files in one repository, built from its config files as
-    /// `(path, contents)`, in `config_files` order, and from the facts of the pack's files: a
-    /// Rust `mod` declaration names a file by where the declaring file sits in its crate's
-    /// module tree. The default `layout` calls it.
     fn modules(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>)
     -> Result<Modules>;
 
-    /// What the config files and every parsed file of the language make of the repository,
-    /// built once per refresh (`Layout`): Rust builds its crates' module trees once for all five
-    /// answers. The default keeps every file, publishes them all, names no program and lets a
-    /// name match reach every file, with `modules` for how imports name files.
     fn layout(&self, configs: &[(&str, &[u8])], files: &BTreeMap<&str, &Facts>) -> Result<Layout> {
         Ok(Layout {
             members: None,
@@ -115,217 +68,113 @@ pub trait LanguagePack {
         })
     }
 
-    /// A keyword naming the instance of the enclosing class anywhere in it, such as `this`. A
-    /// language that names it as a parameter (`self`) writes it in `Facts::receivers` instead.
     fn receiver(&self) -> Option<&'static str> {
         None
     }
 
-    /// Whether bare names in a method can name the enclosing class's members (Java).
     fn members_in_scope(&self) -> bool {
         false
     }
 
-    /// Whether a reference (`Facts::references`) to a name of an outside package gives no row
-    /// (Go: every `*http.Request` or `context.Context` would otherwise be a row with no target
-    /// and a package link's site), rather than a row with no target the package kind reads.
     fn drops_external_uses(&self) -> bool {
         false
     }
 
-    /// Whether a definition named by a dotted path (`app.use` of `app.use = function () {}`, `o.m`
-    /// of a method of `const o = {}`) is what that path written in a call reaches, though its
-    /// head is a local or a constant (JavaScript's).
     fn assigned_members(&self) -> bool {
         false
     }
 
-    /// Whether `Call::constructs` is a guess from the case of the callee (Swift has no `new`): a
-    /// call that constructs nothing the repository holds is read again as a plain call.
     fn guesses_constructs(&self) -> bool {
         false
     }
 
-    /// Whether wildcard imports combine their candidates rather than the latest one winning.
-    /// An inside glob has priority over public globs (the class's own package in Java).
     fn unordered_globs(&self) -> bool {
         false
     }
 
-    /// Whether the globs giving one name combine into `ambiguous` (Rust: two globs that both
-    /// give a name are E0659, so only `cfg` alternatives reach here). Implied by `unordered_globs`.
     fn combines_globs(&self) -> bool {
         self.unordered_globs()
     }
 
-    /// Whether a static import of a type (`import static a.B.*;`) takes the members its bases
-    /// declare too. C#'s `using static T` takes only those `T` declares: inherited members
-    /// aren't imported.
     fn static_imports_inherit(&self) -> bool {
         true
     }
 
-    /// Whether a dotted type name may bind through the layout without an import, when no
-    /// lexical value hides its head (Java's fully qualified types).
     fn qualified_types(&self) -> bool {
         false
     }
 
-    /// Whether a type's qualified name starts with the namespace an on-demand import names
-    /// (Java's `p.Own`, C#'s namespaces), so a glob of a namespace takes the types declared in
-    /// it alone (`Binding::of_namespace`). A Swift module is no part of its types' names, and a
-    /// Rust type's name is its path in its file.
     fn namespaced(&self) -> bool {
         true
     }
 
-    /// A keyword naming the base of the enclosing class, such as `super`: what its members
-    /// are is not resolved, except an overload family (`Facts::overloads`), read through the
-    /// class's family past the class itself.
     fn base_receiver(&self) -> Option<&'static str> {
         None
     }
 
-    /// Whether the order of a class's written bases says nothing about precedence (Java's
-    /// `implements I, J`): C3 then merges the bases' families without the written list, so a
-    /// redundant interface (`J extends I`) is no conflict. A subtype still comes before its
-    /// supertypes, and the first base written before the next.
     fn unordered_bases(&self) -> bool {
         false
     }
 
-    /// Methods every class has without declaring them (Java's `java.lang.Object` members): a
-    /// bare call of one that the class's family does not declare is unknown, and the climb to
-    /// outer classes and imports stops there.
     fn implicit_members(&self) -> &'static [&'static str] {
         &[]
     }
 
-    /// Outside types whose declared member names are a fixed fact of the platform (Known
-    /// outside members, `docs/adr/0019-known-outside-members.md`): each type's qualified name
-    /// and the names it declares, empty for a marker, a name spelled as the pack spells a
-    /// member (with its labels in Swift). Such a base hides from its family only the names it
-    /// declares; any other outside base may hide every name (Opaque outside). The `Resolver`
-    /// of a pack reads the tables of the packs that resolve with it too.
     fn known_outside(&self) -> KnownOutside {
         &[]
     }
 
-    /// Whether a member call of the pack's files may reach an extension function
-    /// (`Facts::extensions`) in scope of its file where no member answers it (Kotlin): those its
-    /// explicit imports bring, then those of its package, then those of its star imports.
     fn extension_functions(&self) -> bool {
         false
     }
 
-    /// Whether the members of a class may be extended from outside it (C#'s `this` parameter),
-    /// where the pack does not read the extensions (`extension_functions`): a method whose first
-    /// parameter is `Binds::Instance` takes its receiver there. A call on a typed receiver that
-    /// no member answers, one of a class of the repository without an opaque base or one of a
-    /// type outside it, is a name match among those methods; otherwise it resolves to nothing.
     fn extension_methods(&self) -> bool {
         false
     }
 
-    /// Whether a block (`Facts::impls`) may add members to a type from outside the repository
-    /// (Swift's `extension URLSession`). A call no binding answers, on a receiver whose type the
-    /// source writes or constructs and the repository lacks, or on a capitalized name nothing in
-    /// it binds (`URLSession.shared`, `AF`), is a name match among the members of that type's
-    /// blocks alone, and past a member read on such a name it resolves to nothing.
     fn outside_blocks(&self) -> bool {
         false
     }
 
-    /// Whether a method call that no function of the repository answers may hand back the
-    /// value it was called on, as a builder does (`Router::new().route(..)` in Rust):
-    /// `Code::origins` then follows the call's `receiver`, to a constructor whose outside name
-    /// the question's table (`Follow::Values`) says passes every method on the way. A chain that
-    /// starts at no outside constructor ends the flow. A language whose methods return anything
-    /// stays with the call as the origin.
     fn fluent(&self) -> bool {
         false
     }
 
-    /// Whether the source writes everything a name of the repository is (Rust): the blocks of a
-    /// type hold every member it has there, so a member they lack on a type the receiver or the
-    /// path writes is outside the repository (a derive, a blanket or outside trait) and resolves
-    /// to nothing; and an attribute (`Call::decorates`) is a macro, no call of a function, so it
-    /// resolves to nothing too. Otherwise both fall to a name match.
     fn strict(&self) -> bool {
         false
     }
 
-    /// Names every file of the language may call without binding them, which contract kinds
-    /// read, such as `fetch`.
     fn globals(&self) -> &'static [&'static str] {
         &[]
     }
 
-    /// Whether a star import binds the names it takes as any other top-level binding does, in
-    /// statement order, the last binding of a name deciding (Python's `from m import *`): the
-    /// pack then lists `Facts::exports` last binding first. Otherwise a star only re-exports (an
-    /// ES `export * from`): the module's own exports win over it, and two that give a name
-    /// differently export neither.
     fn stars_bind(&self) -> bool {
         false
     }
 }
 
-/// The repository-relative paths an import of a specifier (second argument) from a file
-/// (first argument) may name, most likely first. The shared side takes the first one that
-/// the pack parses. A namespace's list is shared, not copied, so a lookup costs the same
-/// whatever the namespace holds.
 pub type Modules = Box<dyn Fn(&str, &str) -> Rc<[String]>>;
 
-/// What `LanguagePack::join` does to a file's facts (second argument), by its path (first).
 pub type Join = Box<dyn Fn(&str, &mut Facts)>;
 
-/// Whether code in a file (first argument) may call into another (second argument).
 pub type Reaches = Box<dyn Fn(&str, &str) -> bool>;
 
-/// What a language makes of the whole repository (`LanguagePack::layout`), from its config files
-/// and the facts of every file it parsed.
 pub struct Layout {
-    /// The files the language builds, when it says which: a Rust file is part of a crate only
-    /// when a `mod` declaration reaches it from a crate root. `None` keeps every file. A file
-    /// left out has no symbol or call, and resolves nothing.
     pub members: Option<BTreeSet<String>>,
-    /// How imports name files (`LanguagePack::modules`).
     pub modules: Modules,
-    /// The files whose exports (the `exports` table) another package can import, when the
-    /// language says which: a Rust file's `pub` items are reachable from outside its crate only
-    /// through a library root and `pub mod` declarations, and a binary exports nothing. `None`
-    /// keeps every file.
     pub published: Option<BTreeSet<String>>,
-    /// The program entry points only the whole repository tells, as `(file, qualified name)`
-    /// among the members: a Rust `fn main` starts a program only in a binary target's root,
-    /// which `parse` of one file cannot know. `Facts::programs` still applies.
     pub programs: Vec<(String, String)>,
-    /// The definitions a name match may reach from a file, when the language says which: a
-    /// Rust crate calls into its own files and the libraries of the repository it depends on.
-    /// `None` reaches every file.
     pub reaches: Option<Reaches>,
-    /// The groups of files that share one top-level scope, each sorted (a file in none has a
-    /// scope of its own): a Go package is the files of one directory that declare one package.
-    /// Each file sees the top-level definitions and constants of the others, private ones
-    /// included, after its own names and imports, and an import that names one of them names
-    /// them all: a member is what any of them exports, several that define it `ambiguous`.
     pub shared: Vec<Vec<String>>,
 }
 
-/// What the index finds at a path a pack's config file names (`LanguagePack::config_inputs`).
 #[derive(Clone)]
 pub enum ConfigInput<'b> {
-    /// The file's bytes, read as a config file is (`index::read_config`): up to one byte past
-    /// `MAX_BYTES`, so a longer file shows as longer than the limit.
     Read(std::borrow::Cow<'b, [u8]>),
-    /// A symbolic link on the way to the path, which the index does not follow.
     Symlink,
-    /// No file the walk sees: absent, ignored (`.gitignore`, `.meadaignore`) or hidden.
     Missing,
 }
 
-/// Every pack Meada ships, in a fixed order.
 const PACKS: &[&dyn LanguagePack] = &[
     &ts::TsJs,
     &python::Python,
@@ -337,13 +186,9 @@ const PACKS: &[&dyn LanguagePack] = &[
     &swift::Swift,
 ];
 
-/// Whether a file named `file` is one a `**/` name of `config_files` names (`pattern`, past
-/// the `**/`): that name, for `*.ext` any name ending so, and for `start*.ext` any name with
-/// that start and ending (`app-config*.yaml`: `app-config.yaml`, `app-config.local.yaml`).
 pub fn names_config(pattern: &str, file: &str) -> bool {
     match pattern.split_once('*') {
         Some((start, ending)) => {
-            // `*.ext` needs a name before the extension; `start*.ext` may match `start.ext`.
             let shortest = start.len() + ending.len() + usize::from(start.is_empty());
             file.len() >= shortest && file.starts_with(start) && file.ends_with(ending)
         }
@@ -351,14 +196,10 @@ pub fn names_config(pattern: &str, file: &str) -> bool {
     }
 }
 
-/// One known outside type (`LanguagePack::known_outside`): its qualified name and the member
-/// names it declares.
 pub type KnownEntry = (&'static str, &'static [&'static str]);
 
-/// A pack's table of known outside types.
 pub type KnownOutside = &'static [KnownEntry];
 
-/// The index of the pack that parses `path`, if any.
 pub fn pack_for(path: &str) -> Option<usize> {
     let (_, extension) = path.rsplit_once('.')?;
     PACKS
@@ -367,16 +208,12 @@ pub fn pack_for(path: &str) -> Option<usize> {
         .filter(|&pack| PACKS[pack].is_code(path))
 }
 
-/// The index of the pack whose `Resolver` takes the files of the pack `index`: its own, or the
-/// one it resolves with (`LanguagePack::resolves_with`). Extensions name one pack each.
 pub fn resolver_of(index: usize) -> usize {
     (PACKS[index].resolves_with())
         .and_then(|with| (PACKS.iter()).position(|p| p.extensions() == with.extensions()))
         .unwrap_or(index)
 }
 
-/// The known outside members (`LanguagePack::known_outside`) the `Resolver` of `language` reads:
-/// its own, then those of every pack that resolves with it (Kotlin's, with Java's).
 pub fn known_outside(language: &dyn LanguagePack) -> Vec<KnownEntry> {
     let with = |p: &&dyn LanguagePack| {
         (p.resolves_with()).is_some_and(|w| w.extensions() == language.extensions())
@@ -386,7 +223,6 @@ pub fn known_outside(language: &dyn LanguagePack) -> Vec<KnownEntry> {
         .collect()
 }
 
-/// Sets each definition's `hash` to the BLAKE3 of the exact bytes of its range in `src`.
 pub fn hash_spans(facts: &mut Facts, src: &[u8]) {
     for def in &mut facts.defs {
         let text = src.get(def.range.clone()).unwrap_or_default();
@@ -402,8 +238,6 @@ thread_local! {
     static VALUES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-/// Whether a value of `Facts` the index does not keep (see `Call::args`) is left out of a
-/// serialization: always, but inside `with_values`.
 fn lean<T>(_: &T) -> bool {
     !VALUES.get()
 }
@@ -416,8 +250,6 @@ fn lean_or_absent<T>(value: &Option<T>) -> bool {
     lean(value) || value.is_none()
 }
 
-/// Runs `f` with `Facts` serializing their values too, for the values cache (ADR 0027): what
-/// `LanguagePack::parse_with` gives, whole. What `LanguagePack::join` sets stays out.
 pub fn with_values<T>(f: impl FnOnce() -> T) -> T {
     struct Restore(bool);
     impl Drop for Restore {
@@ -429,7 +261,6 @@ pub fn with_values<T>(f: impl FnOnce() -> T) -> T {
     f()
 }
 
-/// `Part::Read::scope` as a plain string: each read deserialized holds its own copy.
 mod as_str {
     use std::sync::Arc;
 
@@ -448,331 +279,144 @@ pub fn pack(index: usize) -> &'static dyn LanguagePack {
     PACKS[index]
 }
 
-/// Every pack, in `PACKS` order.
 #[cfg(test)]
 pub fn packs() -> impl Iterator<Item = &'static dyn LanguagePack> {
     PACKS.iter().copied()
 }
 
-/// One file's facts, each list in source order. The index keeps them, so a refresh resolves
-/// unchanged files without parsing them again.
 #[derive(Default, Serialize, Deserialize)]
 pub struct Facts {
     pub defs: Vec<Def>,
-    /// Callable names whose definitions carry distinct written signatures. A call resolves
-    /// to their definitions after narrowing by its argument count.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub overloads: BTreeMap<String, Vec<String>>,
-    /// Constructor families, separate from methods of the same name in the enclosing type.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub constructors: BTreeMap<String, Vec<String>>,
-    /// The members a class makes available through a static wildcard import.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub statics: Vec<String>,
     pub imports: Vec<Import>,
-    /// The specifiers the file loads without a binding (TS/JS), sorted and unique: `import 'x'`,
-    /// a dynamic `import('x')` of one plain string, and `require('x')` of one plain string while
-    /// `require` is the runtime's. Nothing resolves through them; a lockfile change roots the
-    /// files that load what moved (`trace --affected`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub loads: Vec<String>,
-    /// Everything an explicit import can name: `exports` lists every binding the file makes
-    /// available, and `star` narrows what a star import takes from them.
     pub exports: Vec<Export>,
     pub star: Star,
     pub calls: Vec<Call>,
-    /// `const` bindings that hold no function or class, such as `const USERS = "/users"` or
-    /// `const app = express()`. Their values are not kept in the index (see `Call::args`).
     pub consts: Vec<Const>,
-    /// The top-level declarations of the file that are no definitions (TS/JS), exported or not,
-    /// each a symbol an import can target or a use can be held by. Stored, unlike `consts`' values: `resolve_file` reads it
-    /// from the facts of files not parsed again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub declarations: Vec<Declaration>,
-    /// Each use of a name that is no call (TS/JS): one per scope, name and kind, first range
-    /// kept. Stored, as `declarations`: `resolve_file` resolves them from the facts of files not
-    /// parsed again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub references: Vec<Reference>,
-    /// Each struct field whose tag names an environment variable (Go's `env:"X"`): the read of
-    /// the field wherever the types reach it. Stored, as `declarations`: a file of another
-    /// package resolves through it from the facts of files not parsed again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub env_fields: Vec<EnvField>,
-    /// The scope and value of each `let` whose name is bound again in its scope or assigned
-    /// again (Rust): no constant, since the name holds no one value, but a value that flows
-    /// somewhere unread. Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub rebound: Vec<(String, Value)>,
-    /// The qualified name and value of each `let mut` of a plain name that nothing else binds
-    /// or assigns (Rust). It is no constant, since a method may change what it holds (a
-    /// `String` is pushed to), but an object it holds is still the one its call made: the flow
-    /// of a client reads it (`Code::mutable`). Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub mutable: HashMap<String, Value>,
-    /// Every other name a binding makes, qualified like `Const::name` by the definition whose
-    /// body or parameters hold it (a function that is no definition lends its names to the
-    /// one around it, at the top level the whole file): `let` and `var`, destructuring, `catch`
-    /// and `for ... of` bindings, and each parameter name `Def::params` does not hold (a nested,
-    /// array or rest pattern, or any parameter of a function that is no definition); in Python,
-    /// a name `del` unbinds, and a definition a later binding of its scope rebinds (at the top
-    /// level or in a function, not in a class body). Each hides
-    /// the same spelling in its whole scope (`Resolver::lexical`), whatever block it sits in: an
-    /// outer name, and a definition, constant or parameter of its own scope.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub locals: Vec<String>,
-    /// Names bound in a scope whose class the syntax may tell, one per scope and name: what a
-    /// method call on the name reaches. Each also hides an outer binding of its name.
     pub receivers: Vec<Receiver>,
-    /// Lexical visibility of TS bindings of names with a receiver, indexed by qualified name.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub ts_locals: BTreeMap<String, Vec<TsLocal>>,
-    /// Member writes on a fresh, lexically visible local object, by receiver and write offset.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub ts_local_literal_writes: BTreeMap<String, BTreeSet<usize>>,
-    /// Additional lexical bindings for computed TS record keys, kept with the values.
     #[serde(default, skip_serializing_if = "lean_or_empty")]
     pub ts_record_locals: BTreeMap<String, Vec<TsLocal>>,
-    /// Declaration offsets of annotated receivers initialized with an object literal.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub ts_annotated_literals: BTreeSet<usize>,
-    /// Member calls on a namespace proven global, identified by their full call span.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub ts_global_calls: BTreeSet<(usize, usize)>,
-    /// Reads written as this.field.method in a scope with a different this.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub ts_rebound_this: BTreeSet<(usize, usize)>,
-    /// TypeScript class members which affect dispatch without defining a method.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub ts_classes: BTreeMap<String, TsClass>,
-    /// Top-level TS/JS const literal methods, true when a later key may replace the method.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub ts_literal_methods: BTreeMap<String, BTreeMap<String, bool>>,
-    /// The program entry points of the file (spec #31), set by `parse`, which sees the path and
-    /// the source: the qualified names (`Def::name`) of the definitions that start a program,
-    /// such as `func main` in package `main`, `fn main` in `src/main.rs`. Where the entry point
-    /// is top-level code rather than a function (`if __name__ == "__main__":`), `parse` yields a
-    /// definition for that code, with the calls it makes, and names it here. Each becomes an
-    /// entry point of kind `program`, labelled by its qualified name. A name with no symbol is
-    /// dropped without a word: each pack's conformance golden is what catches a wrong one.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub programs: Vec<String>,
-    /// The blocks that add definitions to a type written elsewhere, such as Rust's `impl`:
-    /// the shared side looks a member of the type up in each block too.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub impls: Vec<Impl>,
-    /// The blocks of a type's extension functions (Kotlin's `fun String.shout()`), one per
-    /// receiver type and scope written in: their definitions (`scope.<name>`) are no members of
-    /// the type. A call of the pack (`LanguagePack::extension_functions`) on a receiver no
-    /// member answers reaches those its file has in scope.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extensions: Vec<Impl>,
-    /// Names a path of the file begins with that nothing in it binds: the crates outside the
-    /// file (Rust's extern prelude). They resolve after every import and glob: to another crate
-    /// of the repository by its name, else to something outside it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub externs: Vec<String>,
-    /// The crates the file brings in with `#[macro_use] extern crate x;` (Rust): their macros
-    /// and attributes are in scope in every file of the crate, as if imported.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub macro_use: Vec<String>,
-    /// The names the file writes as a value, a path or inside a macro call, apart from the
-    /// names it defines and the route attributes it carries (Rust): `None` where the pack does
-    /// not tell, or the file writes more than the pack reads. A name no file mentions is
-    /// registered by no code. Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub mentions: Option<BTreeSet<String>>,
-    /// The `exports` names only the package itself sees (Rust's items that are not `pub`):
-    /// they resolve for the package's own files but are not in the exports table.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub private: Vec<String>,
-    /// The methods (`Class.method`) that are no export door though their class is (Go's
-    /// lower-case methods of an exported type).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden: Vec<String>,
-    /// The interfaces of the file (Java's `interface`), by qualified name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub interfaces: Vec<String>,
-    /// The type aliases of the file whose target is a function type (Swift's `typealias
-    /// Handler = (Int) -> Void`), by qualified name: a parameter written as one takes a
-    /// trailing closure (`Closure::Named`). An alias of a named type is an import
-    /// (`Imported::Path`) instead.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub function_aliases: Vec<String>,
-    /// Whether the file is left out of the build for the target: a Rust file that opens with an
-    /// inner `#![cfg(..)]` that is false (as if no `mod` reached it), a Go file whose build
-    /// constraints exclude it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unbuilt: bool,
-    /// The size in bytes of the budget the file exhausted, a hostile-input drop (the Java,
-    /// Kotlin, Swift and C# `QUALIFICATION_BYTES`): the file has no facts and `meada status`
-    /// names it. Unlike `unbuilt`, a file the pack leaves out on purpose never sets it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub budget: Option<usize>,
-    /// The count of usings a project may give its files, set on a file its project passed
-    /// (C#'s `PROJECT_USINGS`): the file has no facts and `meada status` names it. Set by
-    /// `LanguagePack::join`, not by a parse, and written to the stored facts after the joins
-    /// (cleared once the project is back within the count), since the count is the project's
-    /// and the file's own parse cannot see it. Like `budget`, never set for a file left out on
-    /// purpose.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usings: Option<usize>,
-    /// Whether the grammar misread a declaration of the file as an infix call (Kotlin's
-    /// `misparsed`): the file has no facts and `meada status` names it. A grammar defect, not a
-    /// limit, so no size is kept. Like `budget`, never set for a file left out on purpose.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub misparsed: bool,
-    /// The package the file declares (Go's `package` clause), which `layout` groups files by
-    /// (`Layout::shared`).
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub package: String,
-    /// The annotations written on fields and parameters (Java's `@Value("${key}") String base`),
-    /// which no definition carries: contract kinds read what they inject (`Code::expand_with`).
-    /// Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub annotated: Vec<Annotated>,
-    /// The value each Kotlin, Java, C# or Swift local, or the parameter of a tracked lambda, was
-    /// given, where no constant records it: the call a `val` (a Swift `let`) holds, the receiver
-    /// `use` passes on; in Java, the initializer of a local the file never assigns; in C#, the
-    /// creation or call a field or a local is initialized with, and a member written through a
-    /// name (`c.BaseAddress = v`, named `c.BaseAddress`). Not kept in
-    /// the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub bound: Vec<Bound>,
-    /// What the file assigns to a name besides the initializer `bound` keeps: each value assigned
-    /// to a bare name (`b = a.f()`), and the initializer of a local `bound` drops because the name
-    /// holds no one value (assigned again, declared twice, hidden by a field). A reader that must
-    /// see every use of a value (Java builders, which change in place) reads what these name.
-    /// Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub assigned: Vec<Bound>,
-    /// How many times the file writes the name of each local `bound` keeps, and in Java of each
-    /// parameter, in the body of its scope, and of each `final` field, in the whole file (scope
-    /// `""`): every identifier of that
-    /// spelling, whatever it is part of. A reader that must see every use of a value compares it
-    /// with the uses it reads; one more is a use its model of the syntax does not show (a cast, a
-    /// ternary, a return). Java, and for the locals of a function Go (those it keeps as
-    /// constants) and C# (`mentioned`). Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub mentioned: Vec<Mentioned>,
-    /// The names of the `final` fields that every field declaration of the file spelling them
-    /// makes `private` (Java): no other file can write a call on one, so a call on that name
-    /// there is on another variable. None for a file that names Lombok, whose accessors the
-    /// source does not show, or that holds a Unicode escape or a character the compiler drops
-    /// from a name, which may spell that name or a step on a field where the pack reads other
-    /// text. Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub private_fields: Vec<String>,
-    /// Whether the file spells, as a whole name, a method of `Class` that reads a field by its
-    /// name (Java: `getDeclaredField`, `getField` and their plurals): in a call, a method
-    /// reference, a comment or a string, a Unicode escape read as the character it stands for
-    /// and a character the compiler drops from a name as not there. Read off the file's bytes:
-    /// a file a budget leaves without facts still says so. A `private` field of any file may
-    /// change where a file does (#775). Kept in the index: the SDK reader reads it from every
-    /// file.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub reflects: bool,
-    /// The names of the methods the file declares that no definition stands for (Java): an
-    /// anonymous class's or an enum constant body's, a class's nested in one, or past the
-    /// definition depth. A call through a base type may dispatch to one (#772). Kept in the
-    /// index: the SDK reader reads it from every file.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub anonymous: Vec<String>,
-    /// A stable first binding of a multiple-result call (Go). This is a result projection,
-    /// not a scalar constant: only a reader proving that call's result may follow it.
-    /// Not kept in the lean index, like the bound values above.
     #[serde(default, skip_serializing_if = "lean")]
     pub first_results: Vec<FirstResult>,
-    /// The private fields of each class (TypeScript `private`, `#x`), each with every non-null
-    /// value its class assigns it: its initializer and each plain `this.f = v` statement of any
-    /// of its methods, with the scope it is written in. A field another write reaches (an
-    /// operator, a pattern, a computed member of `this`, an assignment that is no statement) has
-    /// none. Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub field_writes: Vec<FieldWrites>,
-    /// Scoped selector assignments/deletions, with their source order. None means this
-    /// parse does not establish complete write knowledge; no literal values are retained.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub member_writes: Option<Vec<MemberWrite>>,
-    /// Fields traversed by a TS selector write. Their records can change independently of the field binding.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ts_record_writes: Vec<MemberWrite>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub ts_record_writes_incomplete: bool,
-    /// The byte ranges of the outermost loops, in source order: a member write inside one may
-    /// come before a read it follows in the source (`resolve/mutations.rs`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub loops: Vec<Range<usize>>,
-    /// The byte ranges of every lambda and every local or anonymous class, in source order (Java).
-    /// Their code runs when a caller says, after the statements that follow them in the source: a
-    /// reader of a value changed in place cannot order what they hold against what follows.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub deferred: Vec<Range<usize>>,
-    /// The byte ranges of the code each loop runs again, nested loops included, in source order
-    /// (Java): the statement, and a `for` from the end of its init clause, which runs once. What
-    /// is declared before one and changed in place is, on each turn, what the turn before left.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub repeated: Vec<Range<usize>>,
-    /// What the file gives every file of its project, in the pack's spelling, which
-    /// `LanguagePack::join` applies to each: C#'s `global using` directives (`A.B`, `static
-    /// A.B`, `X = A.B`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub project: Vec<String>,
-    /// The types the file declares in parts (C#'s `partial`), by qualified name: the classes of
-    /// one such name in the files of one `unit` are one type (`Resolver::parts`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub partial: Vec<String>,
-    /// The classes the file declares `expect` (Kotlin), by qualified name: one with the
-    /// `actual` classes of its name is one class, the `expect` one (`Resolver::one_type`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub expect: Vec<String>,
-    /// The classes the file declares `actual` (Kotlin), by qualified name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub actual: Vec<String>,
-    /// The compilation the file belongs to, which `LanguagePack::join` sets (C#'s project):
-    /// the parts of a partial type come from one. Not kept in the index: it is joined again.
     #[serde(skip)]
     pub unit: String,
-    /// The compilations (`unit`) its own references, directly or through the references that
-    /// pass on (C#'s `ProjectReference`s), nearest first, which `LanguagePack::join` sets.
-    /// Not kept in the index: it is joined again.
     #[serde(skip)]
     pub unit_references: Vec<String>,
-    /// The modules the file imports `@testable` (Swift), by the name written: they show it their
-    /// `internal` declarations.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub testable: Vec<String>,
-    /// The `private` names only their file sees (Swift's `fileprivate` and `private`), which
-    /// even a module imported `testable` keeps to itself.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub confined: Vec<String>,
-    /// The constructors only their own class calls (Kotlin's `private`), as the family member
-    /// that builds: the class's name for a primary one, `C.C(types)` for a secondary one.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sealed: Vec<String>,
-    /// The compilations (`unit`) whose `private` declarations the file sees, which
-    /// `LanguagePack::join` sets (Swift's `testable` imports, as the modules they name here).
-    /// Not kept in the index: it is joined again.
     #[serde(skip)]
     pub internals: Vec<String>,
-    /// The `settings` the file was parsed under; the index parses it again when they change.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub setting: String,
-    /// The `macro_rules!` the file writes, by name (Rust, #398), read whatever the setting: the
-    /// outer attributes the first arm writes on each item it passes through, as tokens, or
-    /// `None` for a definition that is no item macro (another first arm, a transcriber that
-    /// wraps or rewrites the items, one written inside a macro's tokens, two that disagree).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub macro_rules: BTreeMap<String, Option<Vec<String>>>,
-    /// The macros the file invokes with braces, by the name written last before the `!`
-    /// (Rust, #398), inside macro tokens too, read whatever the setting: those the repository
-    /// defines as item macros reach its setting (`LanguagePack::extend`).
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub invokes: BTreeSet<String>,
 }
 
-/// The setting a file is parsed under: what `LanguagePack::settings` answers for its path and,
-/// on the lines after it, what `LanguagePack::extend` adds, when it adds anything.
 pub fn setting(base: &str, extra: &str) -> String {
     match extra {
         "" => base.to_string(),
@@ -780,29 +424,23 @@ pub fn setting(base: &str, extra: &str) -> String {
     }
 }
 
-/// What `LanguagePack::settings` answered in a `setting`.
 pub fn base(setting: &str) -> &str {
     setting.split_once('\n').map_or(setting, |(base, _)| base)
 }
 
-/// What `LanguagePack::extend` added to a `setting`.
 pub fn extra(setting: &str) -> &str {
     setting.split_once('\n').map_or("", |(_, extra)| extra)
 }
 
-/// How many times `name` is written in `scope` (`Facts::mentioned`).
 #[derive(Serialize, Deserialize)]
 pub struct Mentioned {
     pub scope: String,
     pub name: String,
     pub count: u32,
-    /// The mentions left out of `count` as reads that change nothing (Go's `len(x)`), for
-    /// a reader that finds the platform's name hidden by the repository's own code (#774).
     #[serde(default)]
     pub read: u32,
 }
 
-/// The value a name bound in `scope` holds, written in `within` (`Facts::bound`).
 #[derive(Serialize, Deserialize)]
 pub struct Bound {
     pub scope: String,
@@ -811,12 +449,9 @@ pub struct Bound {
     pub value: Value,
 }
 
-/// A private field and the values its class assigns it (`Facts::field_writes`).
 #[derive(Serialize, Deserialize)]
 pub struct FieldWrites {
-    /// The field's qualified name, its class's then its own (`Client.#consumer`).
     pub name: String,
-    /// Each non-null value, with the scope it is written in.
     pub values: Vec<(String, Value)>,
 }
 
@@ -827,8 +462,6 @@ pub struct FirstResult {
     pub call: Range<usize>,
 }
 
-/// The byte ranges of the statements of `kinds` under `root` that no other one holds, in source
-/// order (`Facts::loops`).
 pub(crate) fn outermost(root: Node, kinds: &[&str]) -> Vec<Range<usize>> {
     let mut out = Vec::new();
     let mut stack = vec![root];
@@ -844,13 +477,6 @@ pub(crate) fn outermost(root: Node, kinds: &[&str]) -> Vec<Range<usize>> {
     out
 }
 
-/// `Facts::mentioned` for the `(scope, name)` locals of a pack whose scopes are its definitions:
-/// how many identifiers written inside the functions named `scope` spell `name`, nested
-/// functions included, in one walk of the file. A name of no function (a field, a package
-/// variable) gets no count: code outside the file may write it. No name gets one in a file that
-/// spells an identifier with an escape (C#'s `\u0061`), which no count compares. An identifier
-/// `read` takes is no mention but a read (`Mentioned::read`): a use that reads the value and
-/// cannot change it (Go's `len(x)`, #774).
 pub(crate) fn mentioned<'l>(
     root: Node,
     src: &[u8],
@@ -859,7 +485,6 @@ pub(crate) fn mentioned<'l>(
     read: impl Fn(Node) -> bool,
 ) -> Vec<Mentioned> {
     let locals: BTreeSet<(&str, &str)> = locals.collect();
-    // Where each name is written, and where it is read (`read`).
     let mut written: HashMap<&str, [Vec<usize>; 2]> = locals
         .iter()
         .map(|&(_, name)| (name, Default::default()))
@@ -873,7 +498,6 @@ pub(crate) fn mentioned<'l>(
             let Some(text) = node.utf8_text(src).ok().filter(|t| !t.contains('\\')) else {
                 return Vec::new();
             };
-            // C# spells a name that is also a keyword `@name`.
             if let Some(at) = written.get_mut(text.trim_start_matches('@')) {
                 at[usize::from(read(node))].push(node.start_byte());
             }
@@ -914,7 +538,6 @@ pub(crate) fn mentioned<'l>(
 pub struct MemberWrite {
     pub scope: String,
     pub object: String,
-    /// None is a computed selector that may write any member.
     pub field: Option<String>,
     pub range: Range<usize>,
 }
@@ -929,7 +552,6 @@ impl MemberWrite {
 }
 
 impl Facts {
-    /// Retained selector evidence shares the source byte ceiling.
     pub(crate) fn member_write(&mut self, write: MemberWrite, spent: &mut usize) {
         *spent = spent.saturating_add(write.bytes());
         if *spent > MAX_BYTES {
@@ -941,54 +563,38 @@ impl Facts {
     }
 }
 
-/// What a method call's receiver is reached through from the call it is made on (Rust).
 #[derive(Clone, Copy, Default)]
 pub struct Through {
-    /// One `?`: the receiver is `Def::unwrapped`.
     pub tried: bool,
-    /// An `.await`: the receiver is `Def::output` of a future signature.
     pub awaited: bool,
 }
 
-/// An annotation written on a field or a parameter: the binding it marks and the annotation as
-/// a call (`callee` its name, `args` and `kwargs` its arguments, `scope` the class around it).
 #[derive(Serialize, Deserialize)]
 pub struct Annotated {
     pub on: Marked,
     pub annotation: Call,
 }
 
-/// What an annotation marks (`Annotated`).
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Marked {
-    /// The field `name` of the class `class` (`Def::name`), `static` or not: the kind decides
-    /// what each takes.
     Field {
         class: String,
         name: String,
         is_static: bool,
     },
-    /// The parameter at this position of the function or the constructor (`Def::name`).
     Param(String, usize),
 }
 
 /// A block whose definitions are members of a type: those named `scope.<member>`. An inherent
-/// Rust `impl Store` is the scope `Store`; a trait's `impl Persist for Store` is `Store.Persist`,
-/// whose members come after the inherent ones, and whose trait lends its default bodies.
 #[derive(Serialize, Deserialize)]
 pub struct Impl {
     pub scope: String,
-    /// The type, as a callee-like name resolved from `within`.
     pub ty: String,
-    /// The trait a trait's block implements, resolved the same way.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub of: Option<String>,
-    /// The scope enclosing the block: an inline module, or the top level.
     pub within: String,
 }
 
-/// A name bound in `scope`: a local, a parameter, or, when `scope` is a class, an attribute of
-/// its instances. The shared side follows a method call on it to the class it holds.
 #[derive(Serialize, Deserialize)]
 pub struct Receiver {
     pub scope: String,
@@ -1000,10 +606,8 @@ pub struct Receiver {
 pub struct TsLocal {
     pub block: Range<usize>,
     pub declared: usize,
-    /// Index into receivers, absent for a binding with no known class.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receiver: Option<usize>,
-    /// Initializer in Facts::consts, for record keys in this file.
     #[serde(default, skip_serializing_if = "lean_or_absent")]
     pub constant: Option<usize>,
 }
@@ -1018,13 +622,10 @@ pub struct TsClass {
     pub private: Vec<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub initialized: BTreeMap<String, usize>,
-    /// Constructor assignments that supply a receiver if no other write reaches the field.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub constructed: BTreeMap<String, usize>,
-    /// A constructor parameter held in the field; the position distinguishes an explicit write.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub parameters: BTreeMap<String, TsFieldParameter>,
-    /// Object records assigned directly in the constructor, with their initialization site.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub records: BTreeMap<String, (usize, Value)>,
 }
@@ -1038,51 +639,22 @@ pub struct TsFieldParameter {
     pub strip: Option<SlashStrip>,
 }
 
-/// What the syntax says a name holds. It is read as written: the shared side decides whether
-/// the name it gives is a class, and no type is inferred beyond that.
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum Class {
-    /// An instance of the class whose body encloses the scope, or that class: `self`, `cls`.
     Enclosing,
-    /// A local constructed by a global or holding the awaited global fetch result.
     TsGlobalValue,
-    /// A built-in type written at an annotation or return site without a shadowing binding.
     TsGlobalType(String),
-    /// A generic annotation may filter library candidates, but gives no exact class.
     TsGeneric(String),
-    /// What this callee-like name (`Circle`, `shapes.Circle`), resolved from the scope, gives
-    /// an instance of: a constructor call or an annotation. A function's result is unknown.
     Named(String),
-    /// What this path (`Store`, or `store::Store` as `store.Store`), written as a type, names:
-    /// an instance of that class. Its head is read among types and modules, so a local or a
-    /// parameter of the same name does not hide it (Rust's `store: store::Store`).
     Type(String),
-    /// What the function this callee-like name gives, called in the scope, returns: the class
-    /// its `Def::result` names (Rust's `let s = Store::new()`). Something outside the
-    /// repository stays outside; a function with no written result is unknown.
     Returned(String),
-    /// `Returned`, for a call written as a value (Go's `s.Open()`, `shapes.NewCircle()`): the
-    /// name is read as an expression, so its head may be a local or a parameter whose class
-    /// the source writes, and a method of that class is the function called.
     Called(String),
-    /// What the call at this place of the file's `Facts::calls` gives (Java's `var x =
-    /// make(1)`): as `Call::on` reads it, so the overload the call's argument count picks
-    /// decides.
     Result(usize),
-    /// A member read on a callee-like name, as written (Swift's `let s = URLSession.shared`):
-    /// not a constructor, a returned value or a call result, so it gives no instance. Its head,
-    /// the first segment, may name a type outside the repository, which makes the value opaque.
     Member(String),
-    /// Bound by an import in the scope: what the file's imports bind the name to.
     Imported,
-    /// Bound otherwise, so an outer binding of the name is hidden.
     Unknown,
 }
 
-/// A file-level binding to what another module exports: `import { name as local } from
-/// 'source'`. Several imports may bind one `local`: the latest in source order decides. A
-/// `local` may be a dotted name (`a.b.c`), which a call whose callee starts with it uses as its
-/// head.
 #[derive(Serialize, Deserialize)]
 pub struct Import {
     pub local: String,
@@ -1092,29 +664,15 @@ pub struct Import {
 
 #[derive(Serialize, Deserialize)]
 pub enum Imported {
-    /// The fully qualified definition named by `source`, rather than an export of a module
-    /// (`import example.Tools`). Outside the repository its spelling is `source` itself.
     Qualified,
-    /// One exported name; a default import is the name `default`.
     Name(String),
-    /// A name the module exports or, when it exports none (or the module is not a file of
-    /// the repository), the module `module`: `from p import m` names `m` of `p` or the
-    /// submodule `p.m`. `module` is a specifier, as `Import::source` is.
-    Member { name: String, module: String },
-    /// The whole module.
+    Member {
+        name: String,
+        module: String,
+    },
     Namespace,
-    /// Every name the module's `star` takes, as `from source import *` binds them (`local` is
-    /// unused). It binds a name only when the module takes it, and then like an import of
-    /// that name written there.
     All,
-    /// What this callee-like name (`crate.a.f`, `inner.helper`) gives, resolved from the scope
-    /// that holds `local` (Rust's `use a::f as local`). `source` is unused. Only the scope
-    /// of the name's own `local` sees it, and a binding of the name in a scope inside hides it.
     Path(String),
-    /// Every name the module this callee-like name gives takes, as a `use path::*` binds them
-    /// (`local` is the scope's `*`, `qualify(scope, "*")`; `source` is unused). `inside` is
-    /// whether the scope is within that module, which then gives its private items too.
-    /// `public` is whether the glob re-exports (`pub use`).
     Glob {
         path: String,
         inside: bool,
@@ -1124,19 +682,20 @@ pub enum Imported {
 
 #[derive(Serialize, Deserialize)]
 pub enum Export {
-    /// `exported` names the file-level binding `local`: a definition or an import.
-    Local { exported: String, local: String },
-    /// `exported` names what `source` exports as `name`: a re-export.
+    Local {
+        exported: String,
+        local: String,
+    },
     From {
         exported: String,
         source: String,
         name: Imported,
     },
-    /// Every name `source` exports that its `star` lets through.
-    All { source: String },
+    All {
+        source: String,
+    },
 }
 
-/// Every specifier the file loads: its imports, the sources it re-exports from, and `loads`.
 pub(crate) fn loaded(facts: &Facts) -> BTreeSet<&str> {
     let exported = facts.exports.iter().filter_map(|e| match e {
         Export::From { source, .. } | Export::All { source } => Some(source.as_str()),
@@ -1148,24 +707,16 @@ pub(crate) fn loaded(facts: &Facts) -> BTreeSet<&str> {
         .collect()
 }
 
-/// Which of a file's exports a star import (`export * from`, `from m import *`) takes.
 #[derive(Default, Serialize, Deserialize)]
 pub enum Star {
-    /// Every one except `default`.
     #[default]
     ExceptDefault,
-    /// Those not starting with `_`.
     Public,
-    /// Only these names: a literal `__all__`.
     Only(Vec<String>),
-    /// Some of those not starting with `_`, not known which: a computed `__all__`. A star
-    /// import may or may not take each, so what it binds is not sure to rebind a name.
     Computed,
 }
 
 impl Star {
-    /// Whether a star import takes the export `name`. A literal `__all__` is read for each
-    /// name: ask `taker` for many.
     pub fn takes(&self, name: &str) -> bool {
         match self {
             Star::ExceptDefault => name != "default",
@@ -1174,7 +725,6 @@ impl Star {
         }
     }
 
-    /// `takes` for many names: a literal `__all__` is looked up, not scanned.
     pub fn taker(&self) -> Taker<'_> {
         let only = match self {
             Star::Only(names) => names.iter().map(String::as_str).collect(),
@@ -1183,21 +733,17 @@ impl Star {
         Taker { star: self, only }
     }
 
-    /// Whether the pack names a public set: every export but those a star import leaves out is
-    /// one. `ExceptDefault` names none, since a default export is as public as any.
     pub fn is_public_set(&self) -> bool {
         !matches!(self, Star::ExceptDefault)
     }
 }
 
-/// `Star::takes`, with a literal `__all__` held as a set.
 pub struct Taker<'a> {
     star: &'a Star,
     only: HashSet<&'a str>,
 }
 
 impl Taker<'_> {
-    /// Whether a star import takes the export `name`.
     pub fn takes(&self, name: &str) -> bool {
         match self.star {
             Star::Only(_) => self.only.contains(name),
@@ -1211,90 +757,49 @@ pub enum Kind {
     Function,
     Class,
     Method,
-    /// An anonymous function passed as an argument, such as a route handler or a callback.
-    /// The last segment of its name is `@<byte offset>`, which no identifier can be: the
-    /// shared side names it when a contract kind says what it is (an inline route handler)
-    /// and folds it into its enclosing definition otherwise.
     Inline,
-    /// A module written in place (Rust's `mod inner { }`): its definitions are named under it
-    /// (`inner.helper`), and a function of it is matched by name like a top-level one.
     Module,
 }
 
-/// A definition. `name` is qualified by its enclosing definitions: `outer.inner`,
-/// `Class.method`.
 #[derive(Serialize, Deserialize)]
 pub struct Def {
     pub name: String,
     pub kind: Kind,
     pub range: Range<usize>,
-    /// A function's parameters in order; a destructured one has an empty name and lists the
-    /// names it binds in `fields`.
     pub params: Vec<Param>,
-    /// A class's bases as written, in order, as callee-like names resolved from the scope
-    /// enclosing the class.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bases: Vec<String>,
-    /// The decorators written as a bare name (`@require_GET`, `@http.require_safe`), as
-    /// callee-like names resolved from the scope enclosing the definition. A decorator call
-    /// is a `Call` that names the definition in `Call::decorates`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub decorators: Vec<String>,
-    /// What a function returns, one value per `return`. Not kept in the index (see
-    /// `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub return_values: Vec<Value>,
-    /// Parameter names written again in this function. The argument alone no longer gives
-    /// their value. Only the full facts used in extraction retain them.
     #[serde(default, skip_serializing_if = "lean")]
     pub reassigned_params: Vec<String>,
-    /// Whether an untyped function has a terminal return or an expression body. Without
-    /// this evidence, a Python or JS/TS function can also return implicitly.
     #[serde(default, skip_serializing_if = "lean")]
     pub terminal_return: bool,
-    /// A synchronous JS/TS function whose entire body is one return expression.
-    /// Contract kinds outside HTTP only fold a string written in this form.
     #[serde(default, skip_serializing_if = "lean")]
     pub single_return: bool,
-    /// A function's declared return type, inside the `Promise` and `NextResponse` it is wrapped
-    /// in (`Promise<z.infer<typeof S>>` gives that schema), when it lists any fields. Not kept in
-    /// the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub returns: Option<Ty>,
-    /// The names of a function's or type's type parameters in order (`get<T>`). Kept in the
-    /// index: Swift's join reads them from every file of its pack, kept or parsed.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub type_params: Vec<String>,
-    /// The class a function's written return type names (`Self`, `Store`, a trait of `impl
-    /// Trait`), as a callee-like name resolved from the function's own scope: what a call to
-    /// it gives (`Class::Returned`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result: Option<Class>,
-    /// The class `?` unwraps the written result to: the first argument of a `Result` or `Option`
-    /// (Rust), as a callee-like name resolved from the function's own scope.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unwrapped: Option<Class>,
-    /// The class `.await` yields from a future signature (`impl Future<Output = T>`), when the
-    /// function is not an `async fn` (whose written result is already the awaited value).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output: Option<Class>,
-    /// A call fits the function only when written under `await` (Swift's `async`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub suspends: bool,
-    /// The call produces an async result; its written return values require an awaited call.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub asynchronous: bool,
-    /// A method no other definition can override (Java's and Kotlin's `private`): an exact call
-    /// runs it, whatever other classes of the repository spell (#810).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub private: bool,
-    /// The BLAKE3 of the exact bytes of `range`, in hex; empty until `hash_spans` fills it.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub hash: String,
 }
 
 impl Def {
-    /// A definition with nothing but its name, kind and range.
     pub fn new(name: impl Into<String>, kind: Kind, range: Range<usize>) -> Self {
         Def {
             name: name.into(),
@@ -1323,43 +828,24 @@ impl Def {
 #[derive(Serialize, Deserialize)]
 pub struct Param {
     pub name: String,
-    /// Which argument of a call binds it.
     #[serde(default)]
     pub binds: Binds,
-    /// The argument label a call writes for it, `_` when it takes none (Swift's `order` in
-    /// `place(order o: Order)`), in a language whose calls label their arguments: a call then
-    /// fits the function only with its labels in order (`Call::labels`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    /// The default value, as written. Not kept in the index (see `Call::args`).
     #[serde(default, skip_serializing_if = "lean")]
     pub default: Option<Value>,
-    /// The names an object pattern binds, in order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<Field>,
-    /// Whether a trailing closure (Swift's `f(a) { }`, an empty `Call::labels` entry) may fill
-    /// it, as its written type says.
     #[serde(default, skip_serializing_if = "Closure::takes")]
     pub closure: Closure,
 }
 
-/// Whether a trailing closure may fill a parameter (`Param::closure`).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub enum Closure {
-    /// It may: a function type, a type parameter, or a pack that does not tell.
     #[default]
     Takes,
-    /// It may not: any other written type, and a name the pack reads as no function type (a type
-    /// of the repository, a standard value type).
     Refuses,
-    /// Written as a name the pack cannot read: a type from outside the repository, which may be
-    /// an alias of a function type. A call that fits only if it takes the trailing closure is
-    /// never `exact`, and never absent (`Closure::Unknown` fits as `Fit::Maybe`).
     Unknown,
-    /// Written as this name, which `LanguagePack::join` reads among the repository's aliases of
-    /// a function type (Swift's `typealias Handler = (Int) -> Void`): `Takes` when one is so
-    /// named, `Refuses` for a type the repository declares or a standard value type, else
-    /// `Unknown`. The resolver reads one left as `Takes`.
     Named(String),
 }
 
@@ -1369,66 +855,41 @@ impl Closure {
     }
 }
 
-/// Which argument of a call binds a parameter. A positional argument binds the parameters that
-/// take one in order; a keyword argument binds the parameter of its name.
 #[derive(Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub enum Binds {
-    /// A positional or a keyword argument.
     #[default]
     Any,
-    /// Only a keyword argument: a Python parameter after `*` or `*args`.
     Keyword,
-    /// No single argument: Python's `*args` and `**kwargs`, Kotlin's `vararg`.
     Rest,
-    /// A positional or a keyword argument that a call may leave out: a Kotlin parameter with a
-    /// default value. The argument counts an overload takes (`Resolver::narrow`) allow for it.
     Optional,
-    /// The receiver of a method (`self`): a call on an instance binds it, so its positional
-    /// arguments start at the next parameter; a call on the class passes it first.
     Instance,
-    /// The receiver of a class method (`cls`): the call binds it, on the class or on an
-    /// instance.
     Class,
 }
 
-/// A name bound by a destructured object parameter: `{ key: name = default }`.
 #[derive(Serialize, Deserialize)]
 pub struct Field {
     pub name: String,
-    /// The property of the argument it reads.
     pub key: String,
-    /// The default value, as written. Not kept in the index.
     #[serde(default, skip_serializing_if = "lean")]
     pub default: Option<Value>,
 }
 
-/// A top-level declaration of a file that is no definition, exported or not: a constant holding
-/// no function or class, a type, an enum, or a default-exported expression (`default`).
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Declaration {
     pub name: String,
     pub range: Range<usize>,
-    /// The BLAKE3 of the exact bytes of `range`, in hex; empty until `hash_spans` fills it.
     pub hash: String,
 }
 
-/// How a name is used where it is not called (`Reference::kind`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Use {
-    /// Rendered as a JSX element (`<Button/>`, `<Ns.Comp/>`).
     Jsx,
-    /// Written as a type, or as `typeof x` in one.
     Type,
-    /// Read as a value: an argument, an element, a property value, a returned value.
     Value,
-    /// Read as a member chain (`config.url`), or the head of a dotted callee (`client`).
     Member,
-    /// Extended or implemented by a class or an interface.
     Extends,
-    /// Re-exported from another module (`export { X } from`, `*` for `export * from`).
     Reexport,
-    /// Taken off a dynamic `import()` of a literal specifier (`Reference::from`).
     Dynamic,
 }
 
@@ -1443,9 +904,6 @@ impl Use {
         Use::Dynamic,
     ];
 
-    /// Whether the row id `id` is a use's, `<caller>::(<kind>)<name>#<n>`: read off the id, so
-    /// it holds where the rows themselves are not read. No callee starts with a kind in
-    /// parentheses.
     pub fn names(id: &str) -> bool {
         let last = id.rsplit("::").next().unwrap_or(id);
         (Self::ALL.iter()).any(|k| {
@@ -1456,7 +914,6 @@ impl Use {
         })
     }
 
-    /// The `calls.kind` value and the id prefix of a row of this kind.
     pub fn as_str(self) -> &'static str {
         match self {
             Use::Jsx => "jsx",
@@ -1470,46 +927,30 @@ impl Use {
     }
 }
 
-/// A use of a name that is no call (`Facts::references`).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Reference {
-    /// The enclosing definition, as `Call::scope`.
     pub scope: String,
-    /// The dotted name as written: `Button`, `Ns.Comp`, `config.url`; `*` for `export *`.
     pub name: String,
     pub kind: Use,
     pub range: Range<usize>,
-    /// The specifier a `Reexport` re-exports from, or of the `import()` a `Dynamic` one takes
-    /// its name off; `None` for the other kinds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<String>,
 }
 
-/// A struct field whose tag names the environment variable it is read from
-/// (`Facts::env_fields`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnvField {
-    /// The struct, as `Def::name`.
     pub class: String,
     pub field: String,
     pub var: String,
 }
 
-/// A `const` binding, qualified by its enclosing definitions like `Def::name`.
 #[derive(Serialize, Deserialize)]
 pub struct Const {
     pub name: String,
-    /// Not kept in the index (see `Call::args`).
     #[serde(default = "unknown", skip_serializing_if = "lean")]
     pub value: Value,
-    /// The type the constant is declared to have, by an annotation or a cast (spec #23), when
-    /// it lists fields: the value as written may lack what the type has, an index signature.
-    /// Not kept in the index, like `value`.
     #[serde(default, skip_serializing_if = "lean")]
     pub ty: Option<Ty>,
-    /// The scope `value` is written in when it is not the constant's own (`scope_of(name)`):
-    /// a Java `final` field one constructor assigns holds a value written in that constructor.
-    /// Not kept in the index, like `value`.
     #[serde(default, skip_serializing_if = "lean")]
     pub scope: Option<String>,
 }
@@ -1518,9 +959,6 @@ fn unknown() -> Value {
     Value::Unknown
 }
 
-/// The marker constant for a write of the field `name` (`Code::field_written_in`): `.name` for a
-/// write whose class is unknown, `.name@class` for one in the code of `class`. The value is
-/// none: a field so written holds no one value.
 pub fn field_write(name: &str, class: Option<&str>) -> Const {
     Const {
         name: match class {
@@ -1533,152 +971,79 @@ pub fn field_write(name: &str, class: Option<&str>) -> Const {
     }
 }
 
-/// A call site. `scope` is the qualified name of the enclosing definition, empty at the top
-/// level; `callee` is the normalized call expression: `a.b.c` for identifier and member
-/// chains, `(<node kind>)` for any other expression.
 #[derive(Serialize, Deserialize)]
 pub struct Call {
     pub scope: String,
     pub callee: String,
-    /// Argument count for languages that narrow overloads by arity. Unlike values it survives
-    /// a cached file's facts, so a refreshed resolution agrees with a cold one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub arity: Option<usize>,
-    /// The label of each argument, in a language whose calls label them (Swift's
-    /// `place(order: o, quantity: 2)`): `_` for an unlabelled one, empty for a trailing closure,
-    /// which takes a parameter of any label. A function fits the call when its parameters
-    /// (`Param::label`) take them in order. Kept in cached facts, like `arity`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub labels: Option<Vec<String>>,
-    /// Whether this call uses constructor syntax, in languages with a distinct constructor
-    /// namespace. Kept with its argument count in cached facts.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub constructs: bool,
-    /// Whether the call is written under `await` (Swift), as a `Def::suspends` target needs.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub awaited: bool,
     pub range: Range<usize>,
-    /// The arguments, as far as the call's own syntax tells: what contract kinds read URLs
-    /// and options from. Not kept in the index: they hold string literals, so the index
-    /// parses a file again when a contract needs them.
     #[serde(default, skip_serializing_if = "lean")]
     pub args: Vec<Value>,
-    /// The keyword arguments, as written, after the positional ones. Not kept in the index.
     #[serde(default, skip_serializing_if = "lean")]
     pub kwargs: Vec<(String, Value)>,
-    /// The qualified name of the definition a decorator call applies to: `@app.get("/")`
-    /// written on `def index()` decorates `index`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decorates: Option<String>,
-    /// The callee is a path (Rust's `a::b::f()`), not a member chain: the name match a call
-    /// that does not resolve falls back to takes functions as well as methods.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub by_path: bool,
-    /// The call of the same file whose result this call is made on (`make()` in
-    /// `make().save()`, whose callee is `(method_invocation).save`), by its place in
-    /// `Facts::calls`, when the pack gives it: the receiver is an instance of the class the
-    /// declared result of that call's exact target names.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on: Option<usize>,
-    /// Whether `on` is crossed through `?` (Rust): the receiver is then the class `on`'s exact
-    /// target's `Def::unwrapped` names, not its `Def::result`.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unwraps: bool,
-    /// Whether `on` is crossed through `.await` (Rust): the receiver is then the class of a
-    /// future signature's `Def::output`, when the target has one.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub awaits: bool,
-    /// The name a method call on a call chain starts at (`client` in `client.get(u).send()`,
-    /// whose callee is `(call_expression).send`), when it is a plain name or a member chain of
-    /// them. An outside type owns the whole chain, so the resolver reads the call as one on
-    /// that name. TS also records a named receiver inside parentheses or await for class lookup.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root: Option<String>,
-    /// The value a method is called on (`Router::new()` in `Router::new().route(..)`), when
-    /// the pack gives it; a pack whose `fluent` is true has it followed. Not kept in the
-    /// index, like `args`.
     #[serde(default, skip_serializing_if = "lean")]
     pub receiver: Option<Value>,
-    /// The type each argument is cast to (`body as Reply`), by position, when it lists fields
-    /// (spec #23). Not kept in the index, like `args`.
     #[serde(default, skip_serializing_if = "lean")]
     pub arg_types: Vec<Option<Ty>>,
-    /// Shape facts (spec #23), an optional part of a pack's output: what the function making
-    /// the call does with its result, one chain of steps per use, such as `res.json()` then
-    /// `.items`, `[0]` and `.id`. A pack that leaves it empty gives its consumers no shape.
-    /// Not kept in the index, like `args`.
     #[serde(default, skip_serializing_if = "lean")]
     pub uses: Vec<Vec<Step>>,
 }
 
 impl Call {
-    /// The keyword argument `name`.
     pub fn keyword(&self, name: &str) -> Option<&Value> {
         self.kwargs.iter().find(|(k, _)| k == name).map(|(_, v)| v)
     }
 }
 
-/// One step of what code does with a value (spec #23): the value read through a chain of
-/// member and element accesses and method calls, then maybe returned. A chain ends where the
-/// pack cannot follow the value (passed to a function, stored, rebound).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Step {
-    /// `.name`, `?.name` or `["name"]`.
     Field(String),
-    /// An element: `[0]`, an index with a literal number.
     Element,
-    /// A call of the method `name` on the value: `.json()`.
     Call(String),
     /// The value is declared to have this type: by a cast, a type argument of the method called
-    /// or an annotation on the variable that receives it. A chain ends here, but the reads that
-    /// follow the cast go on in a chain of their own.
     Typed(Ty),
-    /// The type arguments the call itself is given (`get<Row>(path)`), in order. They type the
-    /// result only if the function called says so (a cast of its result to a type parameter, or
-    /// a return type that is one): the caller cannot tell. A chain of its own, at the start.
     Argument(Vec<Ty>),
-    /// The value is returned by the function making the call.
     Return,
 }
 
-/// How deep a pack reads a type, and the shared side follows one (spec #23): the nesting of
-/// the type as written, and the names it follows on the way. A part deeper than that adds no
-/// fields.
 // ponytail: real types nest a handful of levels; the limit keeps a crafted chain of `extends`
 // or aliases, or a type nested thousands of levels, from costing the stack.
 pub const TYPE_DEPTH: usize = 32;
 
-/// The largest manifest or pack config read (`package.json`, `pyproject.toml`,
-/// `requirements*.txt`, `Cargo.toml`, `go.mod`, `tsconfig.json`); a larger one counts as empty.
-/// Real manifests are a few kilobytes, and the stored summary and the export stay proportional
-/// to what is read.
 // ponytail: a flat 1 MiB; a streaming reader that keeps only the dependency tables lifts it.
 pub(crate) const MAX_BYTES: usize = 1 << 20;
 
-/// A type as written (spec #23), as far as drift reads it: the fields it lists. A form that
-/// lists none is `Unknown`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Ty {
-    /// `{ a: A; b?: B }`, or an interface body. `open` when it has an index signature.
     Object { members: Vec<Member>, open: bool },
-    /// A name: an interface, an alias, a class or an import; the shared side resolves it.
-    /// Type arguments are not substituted.
     Named(String),
-    /// `A & B`, and an interface with the types it extends.
     Intersection(Vec<Ty>),
-    /// `T[]` and `Array<T>`.
     Array(Box<Ty>),
-    /// `z.infer<typeof S>`: the name of the schema.
     Schema(String),
-    /// A type parameter of the function around the use (`as T` in `get<T>`): the caller's type
-    /// argument stands for it. One of an interface or alias adds no fields.
     Param(String),
-    /// Any other form: a union, a primitive, a mapped type.
     Unknown,
 }
 
 impl Ty {
-    /// Whether a type parameter is written in the type.
     pub fn has_param(&self) -> bool {
         match self {
             Ty::Param(_) => true,
@@ -1690,7 +1055,6 @@ impl Ty {
     }
 }
 
-/// A property of an object type.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Member {
     pub name: String,
@@ -1698,76 +1062,36 @@ pub struct Member {
     pub ty: Ty,
 }
 
-/// An expression as written. The pack does not follow names: the shared side folds
-/// `Ref`s into the constants and arguments they name (`resolve`), and after that only
-/// parameters whose arguments are not known remain as `Ref`s.
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Value {
-    /// The value obtained by awaiting an expression (Python), retained through aliases.
     Await(Box<Value>),
-    /// A string: literals, template literals and `+` concatenation, folded into parts.
     Str(Vec<Part>),
-    /// An object literal's properties; a spread `...x` is the key `...` with the value of `x`.
-    /// A Python dict literal is one too: an entry whose key is no string literal is the key
-    /// `[]` with the list of its key and value.
     Object(Vec<(String, Value)>),
-    /// A name: a constant, a parameter, a definition.
     Ref(String),
-    /// `undefined`, or an argument the call leaves out.
     Undefined,
-    /// The result of a call, such as `express.Router()`.
     Call(Invocation),
-    /// A property of a named value, such as `parsed.data` (spec #23).
     Member(String, String),
-    /// A value declared to have the type a schema infers, such as `x as z.infer<typeof S>`
-    /// (spec #23): the name of the schema.
     Schema(String),
-    /// The result of `new` on the normalized callee, such as `Kafka` for `new Kafka(...)`, with
-    /// the arguments. A value written with its type and its fields is one too, the fields as
-    /// one `Object`: a Go composite literal, and a Java annotation written as an element value
-    /// (`@Queue("orders")`, its unnamed element as `value`), which only an annotation's
-    /// arguments hold and the index never keeps.
     New(String, Vec<Value>),
-    /// An array, list or tuple literal's items.
     List(Vec<Value>),
-    /// An `interface` or `type` declaration (spec #23), held by a `Const` of the name it
-    /// declares: the type namespace shares the name of a `const` of the same spelling.
     Type(Ty),
-    /// A number or a boolean literal (spec #23): a scalar. A number written as a plain integer
-    /// carries it (an HTTP status).
     Scalar(Option<u32>),
-    /// An anonymous function written in place, by the qualified name of its `Kind::Inline`
-    /// definition.
     Function(String),
-    /// A name an import from outside the repository binds (`HttpMethod.GET`), as each import
-    /// that may bind it spells it where it is written: one spelling when an import binds it, the
-    /// candidates of the on-demand imports otherwise (`resolve::Outside`). Only a chain read by
-    /// `resolve::Expand::Chain` holds one; no pack writes it.
     External(Vec<String>),
-    /// Anything else.
     Unknown,
 }
 
-/// A call as written (spec #23): `receiver` is the expression a method is called on (`z` in
-/// `z.object(..)`, the call before `.optional()` in `z.string().optional()`), left out when
-/// the callee is no member. `range` is the range of that call among the file's calls, which
-/// the shared side resolves to follow the value it returns.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Invocation {
     pub callee: String,
     pub receiver: Option<Box<Value>>,
     pub args: Vec<Value>,
-    /// The arguments written with a label that is no positional one (Swift's `URL(string: s)`).
     pub kwargs: Vec<(String, Value)>,
     pub range: Range<usize>,
 }
 
-/// What a reader of evaluated values needs depends on a parameter of the enclosing function:
-/// the function is a client wrapper (see `Code::expand`).
 pub struct Depends;
 
-/// The value of the last property `key` of an object, as JavaScript reads it, through spreads:
-/// `None` when no property sets it, `Unknown` when a spread of something unknown may.
 pub fn property<'v>(
     properties: &'v [(String, Value)],
     key: &str,
@@ -1800,7 +1124,6 @@ pub fn property<'v>(
     Ok(None)
 }
 
-/// The text of `parts` when every part is literal.
 pub fn literal(parts: &[Part]) -> Option<String> {
     parts
         .iter()
@@ -1830,7 +1153,6 @@ impl SlashStrip {
         parts
     }
 
-    // Only a run reaching the unknown part needs to wait for another substitution.
     fn finish(self, parts: &mut Vec<Part>, start: usize) {
         while parts.len() > start {
             let Some(Part::Text(last)) = parts.last_mut() else {
@@ -1849,7 +1171,6 @@ impl SlashStrip {
     }
 }
 
-/// Reapply pending replacements after their receivers have been substituted.
 pub(crate) fn fold_strips(parts: Vec<Part>) -> Vec<Part> {
     if !parts.iter().any(|p| matches!(p, Part::StripStart)) {
         return parts;
@@ -1872,48 +1193,30 @@ pub(crate) fn fold_strips(parts: Vec<Part>) -> Vec<Part> {
 pub enum Part {
     StripStart,
     StripEnd(SlashStrip),
-    /// A field record lookup around the parts of its computed key.
     RecordStart {
         at: usize,
         field: String,
         property: String,
     },
     RecordEnd,
-    /// Folded alternatives of an index still unknown. A wrapper may yet supply its key.
     RecordValues {
         key: Option<String>,
         values: Vec<Vec<Part>>,
     },
     Text(String),
-    /// A name inside a string, folded like `Value::Ref`.
     Ref(String),
-    /// A read of one environment variable, such as `process.env.X`, through `||`/`??`
-    /// fallbacks and string method calls. Its value is never known.
     Env(String),
-    /// The key of a recognized environment read is a name to bind at the call site.
     EnvKey {
         name: String,
         /// When the parser only knows the spelling of the reader, the binding to verify.
         reader: Option<String>,
     },
-    /// A call embedded in a string, identified by the same span as the pack's call fact.
     Invoke {
         callee: String,
         range: Range<usize>,
         awaited: bool,
     },
-    /// A read of one environment variable with the default the source writes for it when the
-    /// variable is unset (Spring's `${X:http://api.example.com}`): the variable and the default's
-    /// parts. Its value is never known, as `Env`'s.
     EnvOr(String, Vec<Part>),
-    /// A call or a subscript with one string literal, read inside a string without the pack
-    /// knowing what it reads (C#'s `Environment.GetEnvironmentVariable("X")` and
-    /// `configuration["A:B"]`): `callee` as written (a subscript's is its receiver and `[]`),
-    /// `key` the literal, `scope` where it is written (shared by the reads of one node) and
-    /// `then` the members called on what it reads, in order (`.ToLower()`; the trims of
-    /// `System.String` leave it the read and are not kept), so the kind that
-    /// knows the library decides what it is (`Env`, `EnvOr` or `Hole`). Only the C# pack writes
-    /// it.
     Read {
         #[serde(with = "as_str")]
         scope: std::sync::Arc<str>,
@@ -1923,12 +1226,8 @@ pub enum Part {
         parameter: bool,
         then: Vec<String>,
     },
-    /// An expression inside a string that value flow stops at, with why (#801). Its value is
-    /// never known, as `Hole`'s.
     Limit(Limit),
-    /// The empty string or text starting with a literal '?'.
     QuerySuffix,
-    /// Any other expression inside a string.
     Hole,
 }
 
@@ -1941,7 +1240,6 @@ impl Part {
         }
     }
 
-    /// An environment reader has already identified its API. Its key may still need binding.
     pub(crate) fn env_key(value: &Value) -> Option<Self> {
         match value {
             Value::Str(parts) => literal(parts)
@@ -1971,8 +1269,6 @@ impl Part {
         }
     }
 
-    /// What a string holds where it embeds `value` and cannot read its text: the return value of
-    /// a call names its callee, anything else is a hole.
     pub fn unread(value: &Value) -> Part {
         match value {
             Value::Call(call) => Self::invoke(call.callee.clone(), call.range.clone(), false),
@@ -1985,7 +1281,6 @@ impl Part {
     }
 }
 
-/// Only the path before a proven optional query is common to its alternatives.
 pub(crate) fn query_alternative(left: Value, right: Value) -> Value {
     if matches!((&left, &right), (Value::Str(a), Value::Str(b)) if query_only(a) && query_only(b)) {
         Value::Str(vec![Part::QuerySuffix])
@@ -2018,7 +1313,6 @@ pub(crate) enum QueryWrite {
 }
 
 impl QueryWrite {
-    /// The assignment's effect on a single local, if its right hand side only changes the query.
     pub(crate) fn of(value: &Value, name: &str, operator: &str) -> Self {
         let Value::Str(parts) = value else {
             return Self::Other;
@@ -2040,7 +1334,6 @@ impl QueryWrite {
         }
     }
 
-    /// Combine two writes, keeping the most restrictive condition on the initializer.
     pub(crate) fn merge(self, other: Self) -> Self {
         match (self, other) {
             (Self::Other, _) | (_, Self::Other) => Self::Other,
@@ -2078,7 +1371,6 @@ pub enum Limit {
 }
 
 impl Limit {
-    /// The limit as `search` names it on an open item's line: `base from the parameter base`.
     pub fn describe(&self) -> String {
         match self {
             Limit::Returned(callee) => format!("base from the return value of {callee}"),
@@ -2089,12 +1381,6 @@ impl Limit {
     }
 }
 
-// Facts helpers the JVM packs and Swift share.
-
-/// Marks each bare call (`f()`, not in a lambda) as Java's are (`Call::by_path`): the class
-/// members around it, inherited and companion ones included, come before the names outside the
-/// class. Unless a binding of the code around it holds what it invokes: a local, a parameter, a
-/// property, a constant of its name in any scope from the call's out.
 fn bare_calls(facts: &mut Facts) {
     let locals: HashSet<&str> = facts.locals.iter().map(String::as_str).collect();
     let consts: HashSet<&str> = facts.consts.iter().map(|c| c.name.as_str()).collect();
@@ -2137,13 +1423,8 @@ fn bare_calls(facts: &mut Facts) {
     }
 }
 
-/// The head of a call on an implicit member (Swift's `.make()`): no declaration binds it, so the
-/// call resolves by name and labels, as one on a receiver of unknown type, among methods alone.
 pub const IMPLICIT_HEAD: &str = "(implicit)";
 
-/// Imports every name `source` exports (a Java or Kotlin package, a Swift module) on demand: a
-/// namespace import of it under an alias and a glob of that alias, `inside` when the names are
-/// the file's own package's.
 fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
     let alias = format!("@glob{}", facts.imports.len());
     facts.imports.push(Import {
@@ -2162,11 +1443,6 @@ fn wildcard(source: &str, inside: bool, facts: &mut Facts) {
     });
 }
 
-// Tree-sitter helpers every pack uses.
-
-/// The named children of `node`, tree-sitter extras (comments) left out: a comment inside a
-/// parameter or argument list is no parameter and no argument, and must not take a position.
-/// An `ERROR` node the grammar recovered with is an extra too, and stays (the Java pack reads one).
 pub(crate) fn named<'t>(node: Node<'t>) -> impl Iterator<Item = Node<'t>> {
     let mut cursor = node.walk();
     (node.named_children(&mut cursor))
@@ -2209,9 +1485,6 @@ mod tests {
         }
     }
 
-    /// What a pack reads of positions: each definition's parameters, each call's arity, labels
-    /// and argument counts. A comment inside a parameter or argument list changes none of it
-    /// (#613); only ranges, which a comment shifts, are left out.
     fn positions(pack: &dyn super::LanguagePack, path: &str, src: &str) -> Vec<String> {
         let facts = pack.parse(path, src.as_bytes()).unwrap();
         let defs = facts.defs.iter().map(|d| {
@@ -2226,12 +1499,9 @@ mod tests {
         defs.chain(calls).collect()
     }
 
-    /// A line comment first in a parameter list and an argument list, and a block comment between
-    /// two of them, in each pack: the facts equal those of the source without comments.
     #[test]
     fn a_comment_in_a_parameter_or_argument_list_takes_no_position() {
         use super::LanguagePack;
-        // (path, pack, source with a placeholder `#` for each comment)
         let cases: [(&str, &dyn LanguagePack, &str); 8] = [
             (
                 "x.go",
@@ -2282,7 +1552,6 @@ mod tests {
             } else {
                 comments
             };
-            // `#` stands for the first comment at each opening and the middle one after the comma.
             let mut with = String::new();
             for (i, part) in template.split('#').enumerate() {
                 with.push_str(part);
@@ -2299,19 +1568,12 @@ mod tests {
         }
     }
 
-    /// Every `&[&str]` or `[&str; N]` table a pack holds, as `file:NAME` below `src/lang`, with
-    /// its class
-    /// (`CODING_STANDARDS.md`): `syntax` is the language's grammar, `runtime` is the language's
-    /// own library that value evaluation passes through, `exception` is a library table the
-    /// pack keeps for a decided reason. A library table belongs to its kind, so a new one is a
-    /// decision to take in review: list it here with its class, or move it.
     const TABLES: &[(&str, &str)] = &[
         ("csharp.rs:TRIMS", "runtime"),
         ("go.rs:PREDECLARED", "syntax"),
         ("go/build.rs:ARCHITECTURES", "runtime"),
         ("go/build.rs:SYSTEMS", "runtime"),
         ("go/values.rs:METHODS", "exception"),
-        // `java.lang.Class`: the names the pack looks for in the bytes, escapes decoded (#775).
         ("java.rs:REFLECTIVE", "runtime"),
         ("kotlin.rs:CLOSEABLE", "runtime"),
         ("kotlin.rs:COMPARABLE", "runtime"),
@@ -2338,14 +1600,11 @@ mod tests {
         ("ts.rs:EXTENSIONS", "syntax"),
         ("ts.rs:FUNCTIONS", "syntax"),
         ("ts.rs:STRING_METHODS", "runtime"),
-        // Decided exception (#383): the pack unwraps a declared return type at parse time.
         ("ts/types.rs:INFERS", "exception"),
         ("ts/types.rs:RESPONSES", "exception"),
         ("ts/uses.rs:ELEMENT_METHODS", "runtime"),
     ];
 
-    /// The `const` and `static` items of type `&[&str]` or `[&str; N]` in the `.rs` files below
-    /// `dir`.
     fn tables(dir: &Path, root: &Path, found: &mut Vec<String>) {
         for entry in std::fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
@@ -2372,8 +1631,6 @@ mod tests {
         }
     }
 
-    /// A table in a pack is a decision: a new one fails here until it is listed with its class,
-    /// and a listed one that is gone fails until it is removed from the list.
     #[test]
     fn every_str_table_in_a_pack_is_listed_with_its_class() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lang");

@@ -1,12 +1,3 @@
-# Opt in with compose.yaml, compose.console.yaml, compose.postgres.yaml and this file, and both
-# --profile generations and --profile console:
-#   docker compose -f compose.yaml -f compose.console.yaml -f compose.postgres.yaml \
-#     -f compose.proposals.yaml --profile generations --profile console
-# It adds the proposal server (`meada workspaces mcp`, ADR 0022) as a process of its own beside the
-# console and the nodes: its pull of the generation (as the nodes do, in a volume of its own), the
-# server on an internal port, and a Caddy with TLS on 127.0.0.1:8445. It reads Postgres with the
-# read role, every session read-only. proposals.workspace.toml holds the sections to uncomment
-# before the server starts: it needs [workspaces], the GitHub grant provider and an [oidc] audience.
 x-proposals: &proposals
   image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.6.0}-cloud
   profiles: [console]
@@ -16,8 +7,6 @@ x-proposals: &proposals
     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
     VALKEY_PASSWORD: ${VALKEY_PASSWORD:?Set VALKEY_PASSWORD in .env}
     MEADA_POSTGRES_READ_URL: postgres://meada_read:${POSTGRES_READ_PASSWORD:?Set POSTGRES_READ_PASSWORD in .env}@postgres:5432/meada
-    # With [directory] in proposals.workspace.toml (the same as the console's): the token is read
-    # to start the directory module, never served.
     MEADA_SCIM_TOKEN: ${MEADA_SCIM_TOKEN:-}
   mem_limit: 512m
   cpus: 1.0

@@ -1,9 +1,3 @@
-//! The fields a declared type lists (spec #23, ADR 0009): what a consumer's cast, type
-//! argument or annotation says the response holds. Interfaces (with `extends`), type aliases,
-//! intersections, arrays and `z.infer<typeof S>` give fields; every other form adds none, and a
-//! name that is not declared in the repository (a type parameter) adds none either. A type or
-//! schema a package exports is an import the query fills (issue #175).
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::lang::{TYPE_DEPTH, Ty};
@@ -11,23 +5,16 @@ use crate::resolve::{Code, scope_of};
 use crate::shape::{Budget, Import, Shape, Source, Spent, Want, under};
 use crate::zod::Zod;
 
-/// What reading the types of one file's consumers may cost: every type examined, over all the
-/// consumers of the file. Past it, the type being read adds no fields.
 // ponytail: one budget per consumer file; real types spend a few dozen, a crafted chain of
 // aliases that each intersect the previous one twice would otherwise cost exponential time.
 const TYPES_BUDGET: usize = 1 << 14;
 
-/// Reads declared types, keeping the budget of each file, with the `Zod` that reads the schemas
-/// a `z.infer` names: an extraction reaches zod through this one, so `ZOD_BUDGET` is spent once.
 #[derive(Default)]
 pub struct Types {
     zod: Zod,
     spent: Budget<TYPES_BUDGET>,
 }
 
-/// What the type arguments of a call stand for in a type written in the function it calls: the
-/// function's type parameters, the arguments given and where they are written (a file and a
-/// scope).
 #[derive(Clone, Copy)]
 pub struct Args<'a> {
     pub names: &'a [String],
@@ -35,27 +22,18 @@ pub struct Args<'a> {
     pub at: (&'a str, &'a str),
 }
 
-/// The fields of a type.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Declared {
-    /// Each field path (`items[].id`) with whether the type marks it optional. A path two parts
-    /// of an intersection list is optional only when both mark it.
     pub fields: BTreeMap<String, bool>,
-    /// The paths of the objects with an index signature: anything may be there.
     pub open: BTreeSet<String>,
-    /// The types and schemas a package exports that the type names (issue #175), each at its
-    /// path, for the query to fill.
     pub imports: BTreeSet<Import>,
 }
 
 impl Types {
-    /// The schema reader these types share.
     pub fn zod(&mut self) -> &mut Zod {
         &mut self.zod
     }
 
-    /// The fields `ty`, written in `path` within `scope`, lists, below the root. `None` past the
-    /// file's budget.
     pub fn read<'a>(
         &mut self,
         code: &Code<'a>,
@@ -66,8 +44,6 @@ impl Types {
         self.read_with(code, path, scope, ty, None)
     }
 
-    /// The same for a type that writes the type parameters of a function, `args` standing for
-    /// them: the arguments of a call of that function.
     pub fn read_with<'a>(
         &mut self,
         code: &Code<'a>,
@@ -88,10 +64,6 @@ impl Types {
         Some(reader.out)
     }
 
-    /// The shape a consumer typed with the interface or type alias `name` of `path` reads, for
-    /// the package's index to store (issue #175): every path the type lists, declared, the
-    /// optional ones marked, and the imports it leaves to the query. `None` when `name` is no
-    /// type declaration, or past the file's budget.
     pub fn exported<'a>(&mut self, code: &Code<'a>, path: &'a str, name: &'a str) -> Option<Shape> {
         let (file, constant, ty) = code.declared_type(path, "", name)?;
         let within = scope_of(constant);
@@ -112,13 +84,10 @@ struct Reader<'c, 'a> {
     zod: &'c mut Zod,
     spent: Spent<'c, TYPES_BUDGET>,
     out: Declared,
-    /// The declarations being followed, to stop at one that leads back to itself.
     visiting: Vec<(&'a str, &'a str)>,
 }
 
 impl<'a> Reader<'_, 'a> {
-    /// Adds the fields of `ty`, written at `at` (a file and a scope), below `prefix`. `None`
-    /// once the budget is spent.
     fn walk(
         &mut self,
         at: (&'a str, &'a str),
@@ -154,14 +123,12 @@ impl<'a> Reader<'_, 'a> {
             Ty::Named(name) => {
                 let Some((file, constant, declared)) = self.code.declared_type(at.0, at.1, name)
                 else {
-                    // A type a package exports is the query's to fill.
                     if let Some(imported) = self.code.imported(at.0, at.1, name) {
                         let import = Import::new(prefix, at.0, imported, Want::Type);
                         self.out.imports.insert(import);
                     }
                     return Some(());
                 };
-                // A declaration that leads back to itself adds what it did the first time.
                 if self.visiting.contains(&(file, constant)) {
                     return Some(());
                 }
@@ -191,7 +158,6 @@ impl<'a> Reader<'_, 'a> {
                 let Some(ty) = position.and_then(|i| args.tys.get(i)) else {
                     return Some(());
                 };
-                // The argument is written in the caller: its own type parameters are not ours.
                 self.args = None;
                 let done = self.walk(args.at, ty, prefix, depth + 1);
                 self.args = Some(args);
@@ -202,7 +168,6 @@ impl<'a> Reader<'_, 'a> {
         Some(())
     }
 
-    /// Lists `path`; a field is optional only if every part that lists it says so.
     fn field(&mut self, path: &str, optional: bool) {
         let all = self.out.fields.entry(path.to_string()).or_insert(optional);
         *all &= optional;
@@ -218,8 +183,6 @@ mod tests {
     use crate::resolve::{Code, Resolver};
     use crate::shape::Want;
 
-    /// The fields the type `name`, declared in `src`, lists, as `path` or `path?`, with the
-    /// paths that are open.
     fn read(src: &str, name: &str) -> Option<(Vec<String>, Vec<String>)> {
         let ty = Ty::Named(name.to_string());
         let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
@@ -273,14 +236,12 @@ mod tests {
                 "[].tags[]"
             ]
         );
-        // Optional in one part and required in the other: required.
         assert_eq!(list("Extra"), ["extra", "id", "note"]);
         assert_eq!(
             read(src, "Index").unwrap(),
             (vec!["fixed".to_string()], vec![String::new()])
         );
         assert_eq!(list("Choice"), Vec::<String>::new());
-        // A type that is not declared here adds no fields; the others still do.
         assert_eq!(list("Missing"), ["own"]);
     }
 
@@ -330,7 +291,6 @@ mod tests {
 
     #[test]
     fn a_name_two_declarations_share_is_no_declared_type() {
-        // A namespace opens no scope: both `Row` are the file's, and which one is meant is not known.
         let src = "interface Row { a: string }\n\
                    namespace N { export interface Row { b: string } }\n\
                    interface Holder { row: Row; one: One }\n\
@@ -374,7 +334,6 @@ mod tests {
                 ("list[]", "Ext", Want::Type)
             ]
         );
-        // A type parameter of the same name hides the import.
         let src = "import type { Ext } from '@acme/types';\n\
                    interface Page<Ext> { item: Ext; other: Ext2 }\n\
                    import type { Ext2 } from '@acme/types';\n";
@@ -417,7 +376,6 @@ mod tests {
 
     #[test]
     fn a_file_past_the_budget_gives_no_fields() {
-        // Each alias intersects the previous one twice: exponential without a budget.
         let mut src = String::from("type T0 = { f: string };\n");
         for i in 1..24 {
             src += &format!("type T{i} = T{} & T{};\n", i - 1, i - 1);

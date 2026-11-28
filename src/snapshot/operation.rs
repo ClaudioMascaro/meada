@@ -17,7 +17,6 @@ use crate::msg::Msg;
 use crate::valkey::{self, Valkey};
 use crate::workspace::Manifest;
 
-/// The sections of a workspace the operations need.
 pub(super) struct Sections {
     pub(super) lock: lock::Config,
     pub(super) valkey: valkey::Config,
@@ -25,11 +24,8 @@ pub(super) struct Sections {
     pub(super) snapshot: super::Config,
 }
 
-/// `manifest`'s sections, or the error naming it when it has no `[refresh_lock]`.
 pub(super) fn sections(manifest: &Path) -> crate::Result<Sections> {
     let listed = Manifest::read(manifest)?;
-    // `[refresh_lock]` needs `[generations]`, which needs `[valkey]` and `[snapshot]`
-    // (`Manifest::read`).
     match (
         listed.refresh_lock,
         listed.valkey,
@@ -48,9 +44,6 @@ pub(super) fn sections(manifest: &Path) -> crate::Result<Sections> {
     }
 }
 
-/// Runs `op` under the refresh lock of the workspace of `sections`, its holder saying `holds`,
-/// with `[generations]`'s `keep`; the lock and the holder are released whatever `op` returned.
-/// A refusal (the lock held, or one of `op`'s own) stays an `OpError::Refused` in the error.
 pub(super) fn locked<T>(
     sections: &Sections,
     holds: &str,
@@ -68,7 +61,6 @@ pub(super) fn locked<T>(
     Ok(crate::modules::block_on(run)??)
 }
 
-/// `id` when it is a generation id, else the refusal naming the argument.
 fn generation_arg(id: &str) -> crate::Result<()> {
     match is_id(id) {
         true => Ok(()),
@@ -108,11 +100,6 @@ pub fn pointer_set(manifest: &Path, id: &str, author: &str) -> crate::Result<Str
     )
 }
 
-/// Retains and keeps a generation while the lock (`KEYS[1]`) holds the token `ARGV[1]`: 0
-/// without the lock; 1 when the kept set (`KEYS[3]`) already holds the id `ARGV[2]`, nothing
-/// changed; -1 when it already holds `ARGV[4]` ids; else, with no entry of the id in the
-/// retained list (`KEYS[2]`), `<id>:<fence>` (`ARGV[3]`) appended at its oldest end, the id
-/// added to the kept set, and 1.
 const RETAIN: &str = r"
 if redis.call('GET', KEYS[1]) ~= ARGV[1] then
   return 0
@@ -185,10 +172,6 @@ pub fn pointer_retain(manifest: &Path, id: &str, author: &str) -> crate::Result<
     )
 }
 
-/// Drops a generation while the lock (`KEYS[1]`) holds the token `ARGV[1]`: 0 without the lock,
-/// -1 when the pointer (`KEYS[2]`) names the id `ARGV[2]`, -2 when the retained list (`KEYS[3]`)
-/// has no entry of it; else every entry of it removed from the list and the id from the kept set
-/// (`KEYS[4]`), and 1.
 const DROP: &str = r"
 if redis.call('GET', KEYS[1]) ~= ARGV[1] then
   return 0
@@ -240,9 +223,6 @@ pub fn pointer_drop(manifest: &Path, id: &str, author: &str) -> crate::Result<St
     )
 }
 
-/// Raises the fence to `ARGV[2]` while the lock (`KEYS[1]`) holds the token `ARGV[1]`, never
-/// lowering it: the fence (`KEYS[2]`) it leaves, compared as decimal text; nil without the lock,
-/// an empty string if the stored counter exceeds the recovery ceiling `ARGV[3]`.
 const RAISE: &str = r"
 if redis.call('GET', KEYS[1]) ~= ARGV[1] then
   return false
@@ -281,7 +261,6 @@ pub fn fence_recover(
     let sections = sections(manifest)?;
     let config = &sections.valkey;
     let (lock, fence_key, _) = lock::keys(config);
-    // Recovery must leave one native INCR for the next locked publish.
     let max = lock::LAST_FENCE - 1;
     let usable = |value: u64| match value <= max {
         true => Ok(()),
@@ -301,7 +280,6 @@ pub fn fence_recover(
         let held = lock::acquire(&valkey, config, sections.lock.ttl, &holds, max).await?;
         let done = async {
             let mut skipped = Vec::new();
-            // Recheck under the lock: another publisher may have run since the preflight.
             let highest = recorded(&valkey, config, &mut skipped).await?.max(floor);
             usable(highest)?;
             let mut raise = cmd("EVAL");
@@ -329,9 +307,6 @@ pub fn fence_recover(
     Ok(crate::modules::block_on(run)??)
 }
 
-/// The highest fence recorded in the pointer, the workspace pointer, the retained list and the
-/// heartbeat of every live name of `{<key_prefix>}:nodes`, 0 for none. Everything is hostile: what fails a check is
-/// named in `skipped` and not counted.
 async fn recorded(
     valkey: &Valkey,
     config: &valkey::Config,
@@ -350,7 +325,6 @@ async fn recorded(
             Err(e) => skip(e),
         }
     }
-    // The workspace pointer (`meada workspace apply`) takes its fence from the same counter.
     match super::versions::current(valkey, config).await {
         Ok(found) => fences.extend(found.map(|(_, fence)| fence)),
         Err(e) => skip(e),

@@ -1,11 +1,3 @@
-//! The verified login (#561, ADR 0024): with `[accounts.github]`, a person pastes a GitHub
-//! personal access token, the console reads their login from `GET /user` on `github_app`'s fake
-//! GitHub API once, keeps the login and drops the token; session and agent tokens then carry it,
-//! and the GitHub grant joins the groups grant on the console and on a node. The permissions set
-//! is seeded by `meada github-app roles` reading `[accounts.github]`, through the local Valkey and
-//! Postgres (`oidc::github::Github`); each test skips without them. What a token reads is seen
-//! through the console's routes and the node's answers, never the module's tables.
-
 use std::fs;
 use std::time::{Duration, Instant};
 
@@ -23,15 +15,11 @@ use crate::server::Server;
 use crate::ui::playground::{CATALOG, GATEWAY, WEB, chain_console};
 use crate::ui::ui_section;
 
-/// The chain's git host, `[accounts.github] host` here.
 const HOST: &str = "example.com";
 const PASSWORD: &str = "a long github passphrase";
-/// The personal access tokens the fake GitHub knows, and the login each belongs to.
 const ANA_PAT: &str = "ghp_ana0123456789abcdef561";
 const BIA_PAT: &str = "ghp_bia0123456789abcdef561";
-/// Another token of ana's login, which bia pastes.
 const DUPLICATE_PAT: &str = "ghp_dup0123456789abcdef561";
-/// A token the fake GitHub refuses.
 const UNKNOWN_PAT: &str = "ghp_nobody0123456789abc561";
 
 fn get(console: &Server, route: &str, token: &str) -> Value {
@@ -40,7 +28,6 @@ fn get(console: &Server, route: &str, token: &str) -> Value {
     reply.json()
 }
 
-/// `token`'s session, once the GitHub grant's state is `current`.
 fn current(console: &Server, token: &str) -> Value {
     let start = Instant::now();
     loop {
@@ -53,7 +40,6 @@ fn current(console: &Server, token: &str) -> Value {
     }
 }
 
-/// The identities of the manifest view's `[[repository]]` entries.
 fn entries(console: &Server, token: &str) -> Vec<String> {
     let manifest = get(console, "manifest", token);
     (manifest["manifest"]["repository"]
@@ -73,25 +59,12 @@ fn verify(console: &Server, token: &str, pat: &str) -> crate::ui::Reply {
     )
 }
 
-/// The demo: ana pastes a personal access token, the console reads her login from the fake
-/// GitHub once and answers it with a fresh session token carrying it; her session then names the
-/// login, the host and the GitHub grant's state, and her grant is what her login's roles read
-/// (`write` on the web; `read` on the gateway is outside `roles`), bounding the manifest view;
-/// the admission view shows the GitHub grant provider's state; a fresh agent token carries the
-/// login and a node answers it on the web and refuses the catalog. A token GitHub refuses is a
-/// 422, GitHub failing a 503, neither echoing its body; another account's login is a 409
-/// `login_taken`; the body checks are 400, 413 and 422. ana removes her own login and the global
-/// operator removes bia's; the list shows each account's login. Every verification and removal is
-/// recorded, with the login and never the personal access token, which reaches the fake GitHub
-/// in `GET /user` alone and appears in no answer, record or stderr line.
 #[test]
 fn a_verified_login_grants_its_github_roles_on_the_console_and_a_node() {
     let case = "accounts_github_login";
     let Some(github) = Github::new(case) else {
         return;
     };
-    // No `operations`: account administration, agent tokens and the verified login need none,
-    // and `operations = true` before `[accounts]` is appended would refuse the index.
     let dir = chain_console(case, "", &ui_section());
     assert!(run(&dir, "index").2, "index");
     let Some(audit) = audited(&dir, case) else {
@@ -106,7 +79,6 @@ fn a_verified_login_grants_its_github_roles_on_the_console_and_a_node() {
     let file = dir.join(MANIFEST);
     let console_text = fs::read_to_string(&file).unwrap() + &audit.section + &section() + &provider;
     fs::write(&file, &console_text).unwrap();
-    // The role check reads `[accounts.github]` as it reads `[oidc.github]`.
     let job = console_text.replacen("../indexes", "../roles-indexes", 1) + &github.job(HOST);
     fs::write(dir.join("ops/roles.toml"), job).unwrap();
     github.list("chain/web", &[("Ana-Souza", "write")]);
@@ -135,7 +107,6 @@ fn a_verified_login_grants_its_github_roles_on_the_console_and_a_node() {
         assert_eq!(reply.json()["account"]["github_login"], Value::Null);
     }
     let unverified = token(&login(&console, "ana", PASSWORD));
-    // Before the verification: the GitHub grant provider's state, no login, nothing granted.
     assert_eq!(
         current(&console, &unverified),
         json!({"subject": "local:ana", "role": "viewer", "groups": [], "grant": [],
@@ -169,16 +140,13 @@ fn a_verified_login_grants_its_github_roles_on_the_console_and_a_node() {
     for hidden in [GATEWAY, CATALOG] {
         assert!(!repositories.body.contains(hidden), "{}", repositories.body);
     }
-    // The token issued before the verification reads as it did until it expires.
     assert!(get(&console, "session", &unverified).get("login").is_none());
-    // The admission view: the GitHub grant provider's state, as an identity provider's shows it.
     let admission = get(&console, "admission", &ana);
     assert_eq!(admission["accounts"]["mode"], "accounts");
     assert_eq!(admission["github"]["host"], HOST, "{admission}");
     assert_eq!(admission["github"]["grant"], "current", "{admission}");
     assert_eq!(admission["github"]["set"]["rows"], 3, "{admission}");
 
-    // An agent token carries the login, and a node answers it under the GitHub grant.
     let issued = post(
         &console,
         "account/tokens",
@@ -206,7 +174,6 @@ fn a_verified_login_grants_its_github_roles_on_the_console_and_a_node() {
     let other = ask_node(&at(CATALOG), Some(&agent), &[], trace());
     assert_eq!((other.status, other.body.as_str()), (403, "forbidden\n"));
 
-    // Refusals: GitHub's refusal, GitHub failing, another account's login, the body checks.
     let bia_unverified = token(&login(&console, "bia", PASSWORD));
     let refused = verify(&console, &bia_unverified, UNKNOWN_PAT);
     assert_eq!(refusal(&refused), (422, "github_refused".into()));
@@ -260,7 +227,6 @@ fn a_verified_login_grants_its_github_roles_on_the_console_and_a_node() {
         ]
     );
 
-    // ana removes her own login: a fresh token without it, reading nothing again.
     let removed = post(&console, "account/github/remove", Some(&ana), "");
     assert_eq!(removed.status, 200, "{}", removed.body);
     assert_eq!(removed.json()["login"], Value::Null);
@@ -268,7 +234,6 @@ fn a_verified_login_grants_its_github_roles_on_the_console_and_a_node() {
     let session = current(&console, &ana_after);
     assert!(session.get("login").is_none(), "{session}");
     assert_eq!(session["grant"], json!([]));
-    // The global operator removes bia's; a viewer may not remove another's.
     let own = act(
         &console,
         &ana_after,
@@ -279,12 +244,10 @@ fn a_verified_login_grants_its_github_roles_on_the_console_and_a_node() {
     let removed = act(&console, &admin, "bia", json!({"action": "remove_github"}));
     assert_eq!(removed.status, 200, "{}", removed.body);
     assert_eq!(removed.json()["account"]["github_login"], Value::Null);
-    // The login freed, another account may verify it.
     let again = verify(&console, &bia, DUPLICATE_PAT);
     assert_eq!(again.status, 200, "{}", again.body);
     assert_eq!(again.json()["login"], "ana-souza");
 
-    // The records: each verification and removal, the actor's login in the `login` column.
     let page = get(&console, "audit?limit=100", &admin);
     let mut found: Vec<Value> = (page["records"].as_array().unwrap().iter())
         .filter(|r| {
@@ -337,7 +300,6 @@ fn a_verified_login_grants_its_github_roles_on_the_console_and_a_node() {
         ]
     );
 
-    // The personal access tokens reached the fake GitHub in `GET /user` alone, once per attempt.
     let pats = [ANA_PAT, BIA_PAT, DUPLICATE_PAT, UNKNOWN_PAT];
     let sent: Vec<(String, String)> = github.api.with(|state| {
         (state.bearers.iter())

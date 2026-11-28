@@ -1,9 +1,3 @@
-# Opt in with compose.yaml, compose.console.yaml and this file, and both --profile generations and
-# --profile console: docker compose -f compose.yaml -f compose.console.yaml -f compose.postgres.yaml
-# (ADR 0016). It adds a Postgres service with TLS and the three recommended roles, and a one-shot
-# `meada postgres migrate` step that finishes before the services that connect (the job, the
-# console and the nodes) start. Nothing connects until you uncomment [postgres] and the sections
-# that need it in the bootstrap manifests; without this file no Postgres starts.
 services:
   postgres:
     image: postgres:15-alpine
@@ -48,8 +42,6 @@ services:
     read_only: true
     mem_limit: 128m
 
-  # The job: [postgres], [oidc] and [oidc.github] in job.workspace.toml make its refresh run
-  # `meada github-app roles` and fetch from `meada workspace show --pulled`.
   generation-indexer:
     environment:
       MEADA_POSTGRES_URL: postgres://meada_write:${POSTGRES_WRITE_PASSWORD:?Set POSTGRES_WRITE_PASSWORD in .env}@postgres:5432/meada
@@ -60,7 +52,6 @@ services:
   console:
     environment:
       MEADA_POSTGRES_URL: postgres://meada_write:${POSTGRES_WRITE_PASSWORD:?Set POSTGRES_WRITE_PASSWORD in .env}@postgres:5432/meada
-      # With [directory]: set MEADA_SCIM_TOKEN in .env (at least 32 characters).
       MEADA_SCIM_TOKEN: ${MEADA_SCIM_TOKEN:-}
     depends_on:
       postgres-migrate:

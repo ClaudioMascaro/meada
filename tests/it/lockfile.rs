@@ -1,6 +1,3 @@
-//! What each workspace member's dependencies resolve to, read from a Yarn Berry `yarn.lock`
-//! (`resolved` in `meada export`, the `lockfiles` table, `context` on a package).
-
 use crate::common;
 
 use std::fs;
@@ -22,12 +19,10 @@ fn export(repo: &Path) -> Value {
     serde_json::from_str(&export_text(repo)).unwrap()
 }
 
-/// The export as `meada export` writes it, the form an export golden holds.
 fn export_text(repo: &Path) -> String {
     Engine::open(repo).unwrap().export().unwrap()
 }
 
-/// The `resolved` rows as `(manifest, name, range, origin, version)`.
 fn resolved(export: &Value) -> Vec<(String, String, Option<String>, String, String)> {
     let text = |v: &Value| v.as_str().unwrap().to_string();
     (export["resolved"].as_array().into_iter().flatten())
@@ -107,7 +102,6 @@ fn a_lockfile_edit_refreshes_resolved_rows() {
     };
     assert_eq!(lodash(&before), "4.17.21");
     assert_eq!(lodash(&after), "4.17.22");
-    // No source file was read again.
     assert_eq!(before["files"], after["files"]);
 }
 

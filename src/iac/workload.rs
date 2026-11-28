@@ -1,5 +1,3 @@
-//! Terraform workload inputs evaluated in their root/module/instance context.
-
 mod ecs;
 
 use super::environment::{self, Entry};
@@ -9,7 +7,6 @@ use hcl_edit::expr::{Expression, ObjectKey, TraversalOperator};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// New workload code paths reject parent steps before normalization, even if still in-root.
 pub(crate) fn local_path(base: &str, written: &str) -> Option<String> {
     if written.is_empty()
         || written.starts_with(['/', '~'])
@@ -33,7 +30,6 @@ pub(super) fn literal(value: Value) -> Option<String> {
 }
 
 impl<'m> Eval<'m> {
-    /// A known resource's identity is not the ARN, URL or secret contents a provider returns.
     pub(super) fn tf_environment(
         &mut self,
         instance: usize,
@@ -80,8 +76,6 @@ impl<'m> Eval<'m> {
         let filename = &block.args.get("filename")?.expr;
         let mut found = self.value(instance, each, filename, 0);
         if !matches!(found.val, Val::Known(Value::String(_))) {
-            // Follow only this exact archive output reference to an explicit local input.
-            // The output itself, arbitrary data sources and ZIP members are never evaluated.
             let Expression::Traversal(t) = filename else {
                 return None;
             };
@@ -209,8 +203,6 @@ impl<'m> Eval<'m> {
         let mut entries = BTreeMap::new();
         let mut room = room;
         let mut put = |name: &str, found: (String, Option<String>, Option<String>)| {
-            // An unread or duplicate key can replace any literal entry. Preserve its
-            // unknown scope for HTTP too, without retaining a partial environment.
             let complete = name != "*" && !entries.contains_key(name);
             let (name, (target, value, contract)) = if complete {
                 (name, found)

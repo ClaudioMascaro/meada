@@ -1,20 +1,11 @@
-//! The version lifecycle of named workspaces (#343, ADR 0020 and 0021 contract 4), as public
-//! processes: the console (`meada ui`) saves, applies, rolls back, renames, deletes and delegates
-//! workspaces for the callers of the shared Y/A/B table (`tests/fixtures/named-workspaces.json`)
-//! over the loopback issuer, the fake GitHub API and the local Valkey, Postgres and
-//! S3-compatible store; the job pulls, checks sponsors, indexes and publishes. What a caller may
-//! do is seen through statuses, answers and the audit's records, never the module's tables.
-
 use super::*;
 
-/// The id a creation answered.
 fn id_of(reply: &Reply) -> String {
     assert!(matches!(reply.status, 200 | 201), "{}", reply.body);
     reply.json()["id"].as_str().unwrap().to_string()
 }
 
 impl Case {
-    /// The manifest text selecting the table's `shorts`, each with the serve host it names.
     fn hosted(&self, entries: &[(&str, Option<&str>)]) -> String {
         let one = |(short, host): &(&str, Option<&str>)| {
             let mut text = format!("[[repository]]\nrepo = \"{}\"\n", self.identity(short));
@@ -45,7 +36,6 @@ impl Case {
         )
     }
 
-    /// The `version` and `base` of the workspace as `caller` reads it.
     fn at(&self, caller: &str, workspace: &str) -> (String, i64) {
         let shown = self.show(caller, workspace);
         assert_eq!(shown.status, 200, "{}", shown.body);
@@ -56,9 +46,6 @@ impl Case {
         )
     }
 
-    /// Removes the role `caller` holds on `short` at the fake GitHub, runs the role check and
-    /// waits until the console reads the new set. `revoked` is every (caller, repository) pair
-    /// removed so far in the case, this one included.
     pub(super) fn revoke(&self, revoked: &[(&str, &str)]) {
         let (caller, short) = revoked.last().copied().unwrap();
         self.grant_all_but(revoked);
@@ -66,7 +53,6 @@ impl Case {
         self.await_check(caller, short, "unavailable");
     }
 
-    /// Writes the table's roles to the fake GitHub, leaving out `revoked`.
     pub(super) fn grant_all_but(&self, revoked: &[(&str, &str)]) {
         for (short, identity) in self.table["identities"].as_object().unwrap() {
             let repo = identity
@@ -91,8 +77,6 @@ impl Case {
         }
     }
 
-    /// Waits until the console reads a set in which the catalog gives `caller` the `state` for
-    /// `short`.
     pub(super) fn await_check(&self, caller: &str, short: &str, state: &str) {
         let token = self.token(caller);
         let identity = self.identity(short);
@@ -111,7 +95,6 @@ impl Case {
         }
     }
 
-    /// The audit's records of the workspace `id`, oldest first.
     fn audited(&self, id: &str) -> Vec<Value> {
         let reply = self.get("/api/v1/audit?limit=100", &self.token("root"));
         assert_eq!(reply.status, 200, "{}", reply.body);
@@ -131,10 +114,6 @@ fn code(reply: &Reply) -> String {
         .to_string()
 }
 
-/// Save, apply, rollback, rename and delegation move one workspace along its base; a stale
-/// base, a version of another workspace and an apply of the current version change nothing; the
-/// history and the versions are immutable; every operation is one audit record with its actor
-/// and its workspace.
 #[test]
 fn versions_are_saved_applied_and_rolled_back_along_the_base() {
     if let Some(case) = Case::new("ws_life") {
@@ -142,8 +121,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base() {
     }
 }
 
-/// `versions_are_saved_applied_and_rolled_back_along_the_base` with local accounts (#562): the same
-/// moves and refusals, with `local:` subjects as authors, operators and audited actors.
 #[cfg(feature = "accounts")]
 #[test]
 fn local_accounts_versions_are_saved_applied_and_rolled_back_along_the_base() {
@@ -152,10 +129,6 @@ fn local_accounts_versions_are_saved_applied_and_rolled_back_along_the_base() {
     }
 }
 
-/// A suspended local account stops operating its named workspaces at once (ADR 0024): its
-/// unexpired session token still reads the workspace, but a rename, which no eligibility check
-/// guards, is refused: written as a viewer with no group, alice neither operates nor sees it, so
-/// the write answers the one 404 an outsider gets; reactivated, the same token renames again.
 #[cfg(feature = "accounts")]
 #[test]
 fn local_accounts_a_suspended_operator_operates_no_workspace() {
@@ -190,8 +163,6 @@ fn local_accounts_a_suspended_operator_operates_no_workspace() {
     assert_eq!(renamed.status, 200, "{}", renamed.body);
 }
 
-/// The body of `versions_are_saved_applied_and_rolled_back_along_the_base` and
-/// `local_accounts_versions_are_saved_applied_and_rolled_back_along_the_base`, over `case`.
 fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
     case.refresh();
     case.ready();
@@ -200,7 +171,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
     let (v1, base) = case.at("alice", &ya);
     assert_eq!(base, 1);
 
-    // Saving stores a version and moves nothing: the answer is 201 once, 200 the same text again.
     let text = case.hosted(&[("Y", Some("y.example")), ("A", None)]);
     let saved = case.save("alice", &ya, &text, 1);
     assert_eq!(saved.status, 201, "{}", saved.body);
@@ -209,10 +179,8 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
     assert_eq!(saved.json()["base"], 1);
     assert_eq!(case.save("alice", &ya, &text, 1).status, 200);
     assert_eq!(case.at("alice", &ya), (v1.clone(), 1));
-    // Bob's workspace shares Y and is untouched.
     assert_eq!(case.at("bob", &yb).1, 1);
 
-    // The versions: newest first, the current one marked, the author named to operators only.
     let listed = case.get(
         &format!("/api/v1/workspaces/{ya}/versions"),
         &case.token("alice"),
@@ -240,7 +208,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
         peer.body
     );
 
-    // The diff of a stored version against the current one names what changed.
     let shown = case.get(
         &format!("/api/v1/workspaces/{ya}/versions/{v2}?against=current"),
         &case.token("alice"),
@@ -254,7 +221,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
     );
     assert_eq!(shown["diff"]["changed"][0]["keys"], json!(["serve"]));
     assert!(shown["text"].as_str().unwrap().contains("y.example"));
-    // A version of another workspace is unknown here; so is an unknown id.
     let other = case.show("bob", &yb).json()["version"]
         .as_str()
         .unwrap()
@@ -269,7 +235,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
         (404, "unknown_version".into())
     );
 
-    // Apply moves the base; applying the current version again changes nothing.
     let applied = case.apply("alice", &ya, &v2, 1);
     assert_eq!(applied.status, 200, "{}", applied.body);
     assert_eq!(applied.json()["action"], "apply");
@@ -281,7 +246,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
         (409, "already_current".into())
     );
 
-    // Rolling back is an apply of a version that was current: marked so in the answer.
     let back = case.apply("alice", &ya, &v1, 2);
     assert_eq!(back.status, 200, "{}", back.body);
     assert_eq!(
@@ -290,8 +254,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
     );
     assert_eq!(case.at("alice", &ya), (v1.clone(), 3));
 
-    // A stale page: the base it read is not the workspace's any more; nothing changes and the
-    // refusal names the current base.
     let stale = case.apply("alice", &ya, &v2, 2);
     assert_eq!((stale.status, code(&stale)), (409, "stale_base".into()));
     assert_eq!(stale.json()["error"]["base"], 3);
@@ -300,8 +262,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
     assert_eq!((stale.status, code(&stale)), (409, "stale_base".into()));
     assert_eq!(stale.json()["error"]["base"], 3);
 
-    // Rename changes the name and keeps the description when none is sent; the id, the routes
-    // and the versions stay.
     let rename = |caller: &str, name: &str, base: i64| {
         let body = json!({"name": name, "base": base});
         let path = format!("/api/v1/workspaces/{ya}/rename");
@@ -318,7 +278,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
     assert_eq!(rename("alice", " bad", 4).status, 422);
     assert_eq!(rename("dave", "Mine", 4).status, 403);
 
-    // The history is append only and in order; viewers do not read it.
     let history = case.get(
         &format!("/api/v1/workspaces/{ya}/history"),
         &case.token("alice"),
@@ -328,7 +287,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
         .map(|h| h["action"].as_str().unwrap().to_string())
         .collect();
     assert_eq!(actions, ["rename", "rollback", "apply", "create"]);
-    // Each entry names its actor by subject (`local:<name>` with local accounts, #562).
     let actors: Vec<String> = (history.json()["history"].as_array().unwrap().iter())
         .map(|h| h["actor"].as_str().unwrap().to_string())
         .collect();
@@ -339,7 +297,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
     );
     assert_eq!(denied.status, 403);
 
-    // Only the platform administrator delegates; the workspace keeps an operator.
     let operators = |caller: &str, body: Value| {
         let path = format!("/api/v1/workspaces/{ya}/operators");
         case.post(&path, &case.token(caller), &body)
@@ -372,7 +329,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
         json!({"remove": [case.subject("alice")], "base": 5}),
     );
     assert_eq!(dropped.status, 200, "{}", dropped.body);
-    // The creator, no longer an operator, is a viewer of its own workspace now; the delegate edits.
     let refused = case.apply("alice", &ya, &v2, 6);
     assert_eq!(
         (refused.status, code(&refused)),
@@ -382,8 +338,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
     assert_eq!(delegate.status, 200, "{}", delegate.body);
     assert_eq!(delegate.json()["action"], "rollback");
 
-    // Delete: gone for everyone, administrator included, with the one answer of an unknown id;
-    // the other workspace sharing Y is untouched, and the same triple cannot be created again.
     let unknown = case.get("/api/v1/workspaces/0123456789abcdef", &case.token("root"));
     let deleted = case.post(
         &format!("/api/v1/workspaces/{ya}/delete"),
@@ -403,7 +357,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
         (409, "workspace_deleted".into())
     );
 
-    // Every operation is one record with its actor and its workspace, refusals included.
     let records = case.audited(&ya);
     let line = |r: &Value| {
         format!(
@@ -513,8 +466,6 @@ fn versions_are_saved_applied_and_rolled_back_along_the_base_as(case: Case) {
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// Two writers that read the same base: exactly one wins, the other gets `stale_base` naming the
-/// base now, and no row of the loser is written.
 #[test]
 fn concurrent_edits_of_one_base_let_exactly_one_win() {
     let Some(case) = Case::new("ws_race") else {
@@ -532,8 +483,6 @@ fn concurrent_edits_of_one_base_let_exactly_one_win() {
         versions.push(saved.json()["version"].as_str().unwrap().to_string());
     }
     for _ in 0..4 {
-        // Two versions that are not the current one, so that neither writer is refused for
-        // anything but the race.
         let (current, base) = case.at("alice", &ya);
         let others: Vec<&String> = versions.iter().filter(|v| **v != current).collect();
         let replies: Vec<Reply> = std::thread::scope(|scope| {
@@ -551,7 +500,6 @@ fn concurrent_edits_of_one_base_let_exactly_one_win() {
         assert_eq!(seq, base + 1);
         assert_eq!(now, won[0].json()["version"].as_str().unwrap());
     }
-    // One history row per accepted change, none for the losers.
     let history = case.get(
         &format!("/api/v1/workspaces/{ya}/history"),
         &case.token("root"),
@@ -560,11 +508,6 @@ fn concurrent_edits_of_one_base_let_exactly_one_win() {
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// A creator that loses a repository keeps its workspace, reads the entries its grant reads and a
-/// count of the rest, saves without dropping what it cannot read, and may add or change nothing it
-/// is not eligible for; a revoked grant at the atomic boundary leaves everything as it was; a
-/// group peer that loses a repository no longer sees the workspace, its versions or its history
-/// at all.
 #[test]
 fn a_partial_revocation_hides_for_peers_and_never_drops_entries_for_the_operator() {
     let Some(case) = Case::new("ws_loss") else {
@@ -575,14 +518,11 @@ fn a_partial_revocation_hides_for_peers_and_never_drops_entries_for_the_operator
     let ya = id_of(&case.create("alice", "Y and A", &["Y", "A"]));
     let v1 = case.at("alice", &ya).0;
     let unknown = case.get("/api/v1/workspaces/0123456789abcdef", &case.token("root"));
-    // A version saved while the creator still held A, and one that changes Y, waiting to apply.
     let y_hosted = case.hosted(&[("Y", Some("y.example")), ("A", None)]);
     let waiting = case.save("alice", &ya, &y_hosted, 1);
     assert_eq!(waiting.status, 201, "{}", waiting.body);
     let waiting = waiting.json()["version"].as_str().unwrap().to_string();
 
-    // Alice loses A: she keeps the workspace and reads Y with a count of one hidden entry; her
-    // peers erin and dave are unaffected.
     case.revoke(&[("alice", "A")]);
     let shown = case.show("alice", &ya).json();
     assert_eq!(shown["entries"].as_array().unwrap().len(), 1, "{shown}");
@@ -598,8 +538,6 @@ fn a_partial_revocation_hides_for_peers_and_never_drops_entries_for_the_operator
         2
     );
     assert_eq!(case.listed("alice"), vec![ya.clone()]);
-    // Her version reads show the entries she reads and the count of the others, and the diff
-    // between versions names nothing she cannot read.
     let version = case.get(
         &format!("/api/v1/workspaces/{ya}/versions/{v1}"),
         &case.token("alice"),
@@ -629,8 +567,6 @@ fn a_partial_revocation_hides_for_peers_and_never_drops_entries_for_the_operator
         json!(case.identity("Y"))
     );
 
-    // She saves what she reads: the version stored keeps A in place, in order; the administrator
-    // sees both entries and the one she could not read unchanged.
     let only_y = case.hosted(&[("Y", Some("mine.example"))]);
     let saved = case.save("alice", &ya, &only_y, 1);
     assert_eq!(saved.status, 201, "{}", saved.body);
@@ -656,8 +592,6 @@ fn a_partial_revocation_hides_for_peers_and_never_drops_entries_for_the_operator
         ),
         (1, json!(1))
     );
-    // She cannot add B, which she has no role on, and the refusal counts it as hidden; naming A
-    // again changes nothing she may not read. Nothing moved.
     let before = case.at("alice", &ya);
     let with_b = case.hosted(&[("Y", Some("mine.example")), ("B", None)]);
     let refused = case.save("alice", &ya, &with_b, before.1);
@@ -675,8 +609,6 @@ fn a_partial_revocation_hides_for_peers_and_never_drops_entries_for_the_operator
     assert_eq!(case.save("alice", &ya, &forged, before.1).status, 403);
     assert_eq!(case.at("alice", &ya), before);
 
-    // A page prepared before the loss cannot apply what the grant no longer covers: the version
-    // waiting changes Y, and Y is lost too. Nothing changes.
     case.revoke(&[("alice", "A"), ("alice", "Y")]);
     let refused = case.apply("alice", &ya, &waiting, before.1);
     assert_eq!(
@@ -686,13 +618,9 @@ fn a_partial_revocation_hides_for_peers_and_never_drops_entries_for_the_operator
         refused.body
     );
     assert_eq!(case.at("alice", &ya), before);
-    // Without a role on anything she still deletes or renames what she operates, and sees
-    // the count of everything hidden.
     let shown = case.show("alice", &ya).json();
     assert_eq!(shown["entries"], json!([]));
     assert_eq!(shown["hidden"], 2);
-    // The administrator, whose management view is unfiltered, removes what nobody can read by
-    // saving the manifest whole.
     let admin = case.save(
         "root",
         &ya,
@@ -701,7 +629,6 @@ fn a_partial_revocation_hides_for_peers_and_never_drops_entries_for_the_operator
     );
     assert_eq!(admin.status, 201, "{}", admin.body);
 
-    // A peer that loses A sees an unknown id on every read of the workspace.
     let ab = id_of(&case.create("carol", "Y and A again", &["Y", "A"]));
     assert_eq!(case.show("erin", &ab).status, 200);
     case.revoke(&[("alice", "A"), ("alice", "Y"), ("erin", "A")]);
@@ -723,10 +650,6 @@ fn a_partial_revocation_hides_for_peers_and_never_drops_entries_for_the_operator
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// Two workspaces share Y and are maintained independently; removing one keeps Y in the other
-/// and in the fleet's membership, and the repository is still indexed once; a context that
-/// loses a reader's grant answers that reader nothing; once A loses its sponsor, the console and
-/// a node hide the workspace alike from a reader of Y alone (#510).
 #[test]
 fn overlapping_workspaces_live_and_end_independently_over_one_index() {
     let Some(case) = Case::new("ws_overlap") else {
@@ -738,23 +661,19 @@ fn overlapping_workspaces_live_and_end_independently_over_one_index() {
     let yb = id_of(&case.create("bob", "Y and B", &["Y", "B"]));
     let (y, a, b) = (case.identity("Y"), case.identity("A"), case.identity("B"));
 
-    // Each group edits its own context; the other does not move.
     let edit = case.hosted(&[("Y", Some("a.example")), ("A", None)]);
     let version = case.save("alice", &ya, &edit, 1).json()["version"]
         .as_str()
         .unwrap()
         .to_string();
     assert_eq!(case.apply("alice", &ya, &version, 1).status, 200);
-    // Neither operator edits the other's workspace; the answer for the hidden one is a 404.
     let unknown = case.get("/api/v1/workspaces/0123456789abcdef", &case.token("root"));
     let hidden = case.apply("bob", &ya, &version, 2);
     assert_eq!((hidden.status, &hidden.body), (404, &unknown.body));
     assert_eq!(case.at("bob", &yb).1, 1);
-    // Carol reads both and operates neither.
     assert_eq!(case.show("carol", &ya).json()["operate"], false);
     let write = case.apply("carol", &yb, &version, 1);
     assert_eq!((write.status, code(&write)), (403, "not_operator".into()));
-    // Bob selects A in his workspace? He has no role on it: refused, hidden counted.
     let with_a = case.hosted(&[("Y", None), ("B", None), ("A", None)]);
     let refused = case.save("bob", &yb, &with_a, 1);
     assert_eq!(
@@ -763,7 +682,6 @@ fn overlapping_workspaces_live_and_end_independently_over_one_index() {
     );
     assert_eq!(case.at("bob", &yb).1, 1);
 
-    // The job: Y is a member once for both contexts, indexed once.
     case.job_ok(&["workspace", "pull", "--workspace", MANIFEST]);
     case.roles();
     let shown = case.job_ok(&["workspace", "show", "--pulled", "--workspace", MANIFEST]);
@@ -796,16 +714,12 @@ fn overlapping_workspaces_live_and_end_independently_over_one_index() {
         .map(|m| m["identity"].as_str().unwrap())
         .collect();
     assert_eq!(members, [a.as_str(), b.as_str(), y.as_str()]);
-    // Alice's context records the version she applied: a context change is a new generation of
-    // the same bundles.
     let context = (document["contexts"].as_array().unwrap().iter())
         .find(|c| c["id"] == json!(ya))
         .unwrap();
     assert_eq!(context["version"], json!(version));
     assert_eq!(case.show("alice", &ya).json()["state"], "live");
 
-    // Bob removes his context: Y stays a member through alice's, B leaves the fleet, and Y is
-    // still one bundle.
     let removed = case.post(
         &format!("/api/v1/workspaces/{yb}/delete"),
         &case.token("bob"),
@@ -837,8 +751,6 @@ fn overlapping_workspaces_live_and_end_independently_over_one_index() {
         .map(|c| c["id"].as_str().unwrap())
         .collect();
     assert_eq!(ids, [ya.as_str()]);
-    // The context still answers the readers of both repositories through alice's workspace, and
-    // alice, who loses A afterwards, is bounded by her grant in every graph answer.
     let export = |caller: &str, repo: &str| {
         let path = format!(
             "/api/v1/workspaces/{ya}/repositories/{}/export",
@@ -852,13 +764,9 @@ fn overlapping_workspaces_live_and_end_independently_over_one_index() {
     let denied = export("alice", &a);
     assert_ne!(denied.status, 200, "{}", denied.body);
     assert_eq!(export("alice", &y).status, 200);
-    // The peers that never held the context cannot use the shared Y to reach it.
     let denied = export("bob", &y);
     assert_eq!(denied.status, 404, "{}", denied.body);
 
-    // A lost its only sponsor with alice's role (#510): the next generation records the context
-    // with Y alone and A excluded, and the console and a node agree on who sees it. Yoda reads Y
-    // alone: the unknown id from both, the node's 404 listing nothing of it. Erin reads both.
     case.job_ok(&["index", "--workspace", MANIFEST]);
     let last = case.job_ok(&["snapshot", "publish", "--workspace", MANIFEST]);
     let document = read(last.trim());
@@ -888,9 +796,6 @@ fn overlapping_workspaces_live_and_end_independently_over_one_index() {
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// A user the SCIM directory deleted stays blocked from every named-workspace write until it is
-/// provisioned active again, and its operator rows remain; a user never provisioned keeps normal
-/// admission. An audit that cannot record refuses the write.
 #[cfg(feature = "directory")]
 #[test]
 fn a_deleted_user_is_blocked_from_every_lifecycle_route_until_provisioned_active() {
@@ -945,10 +850,8 @@ fn a_deleted_user_is_blocked_from_every_lifecycle_route_until_provisioned_active
     blocked(case.post(&path("rename"), &token, &body(json!({"name": "Blocked"}))));
     blocked(case.post(&path("delete"), &token, &body(json!({}))));
     blocked(case.get(&format!("/api/v1/workspaces/{ya}"), &token));
-    // Nothing moved, as the administrator reads it; the user never provisioned is admitted.
     assert_eq!(case.at("root", &ya), (case.at("carol", &ya).0, 1));
     assert_eq!(case.show("carol", &ya).status, 200);
-    // Created again without `active`, the block stays; an explicit `active: true` lifts it.
     let again = scim_user("alice", false);
     blocked(case.get(&format!("/api/v1/workspaces/{ya}"), &token));
     let put = json!({"schemas": [USER], "userName": "alice", "active": true});
@@ -964,9 +867,6 @@ fn a_deleted_user_is_blocked_from_every_lifecycle_route_until_provisioned_active
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// A deleted, and separately a deactivated, SCIM user is refused with 403 `deprovisioned` on the
-/// catalog and on every named-workspace route, `operators` included, until provisioned active
-/// again; a user never provisioned keeps normal admission and nothing moves meanwhile.
 #[cfg(feature = "directory")]
 #[test]
 fn a_deprovisioned_user_is_blocked_from_operators_and_the_catalog_until_provisioned_active() {
@@ -1053,7 +953,6 @@ fn a_deprovisioned_user_is_blocked_from_operators_and_the_catalog_until_provisio
         );
     };
 
-    // Deactivated, then provisioned active again.
     let id = scim_user(true);
     assert_eq!(call(catalog).status, 200);
     let off = patch(json!([{"op": "Replace", "path": "active", "value": false}]));
@@ -1076,7 +975,6 @@ fn a_deprovisioned_user_is_blocked_from_operators_and_the_catalog_until_provisio
     assert_eq!(call(catalog).status, 200);
     assert_eq!(call(check).status, 200);
 
-    // Deleted, then created again and provisioned active.
     expect(&case.console, "DELETE", &format!("/Users/{id}"), None, 204);
     blocked();
     let again = scim_user(false);
@@ -1095,11 +993,6 @@ fn a_deprovisioned_user_is_blocked_from_operators_and_the_catalog_until_provisio
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// With the audit unable to record, every named-workspace write answers 503 `audit_unavailable`
-/// before anything is written: the workspaces, their operators, versions and history in Postgres
-/// and the documents of the snapshot store stay as they were, a rollback included, and the reads still
-/// answer. The audit table is renamed in place rather than the Postgres relay closed, since the
-/// workspaces share that Postgres and a read of theirs would fail first with `unavailable`.
 #[test]
 fn without_the_audit_no_named_workspace_write_runs_and_reads_still_answer() {
     let Some(case) = Case::new("ws_audit_down") else {
@@ -1170,7 +1063,6 @@ fn without_the_audit_no_named_workspace_write_runs_and_reads_still_answer() {
             json!({"entries": fresh, "message": "m", "base": 2}),
         ),
         (path("apply"), json!({"version": third, "base": 2})),
-        // The version that was current before the second: a rollback.
         (path("apply"), json!({"version": first, "base": 2})),
         (path("rename"), json!({"name": "Renamed", "base": 2})),
         (
@@ -1190,7 +1082,6 @@ fn without_the_audit_no_named_workspace_write_runs_and_reads_still_answer() {
         );
     }
     assert_eq!(state(), before);
-    // The reads outside the workspaces answer as the console's audit-down test expects.
     assert_eq!(case.get("/api/v1/session", &token).status, 200);
     let page = case.get("/api/v1/audit", &token);
     assert_eq!(
@@ -1198,7 +1089,6 @@ fn without_the_audit_no_named_workspace_write_runs_and_reads_still_answer() {
         (503, "audit_unavailable".into())
     );
 
-    // The audit back, the same write goes through: the refusals were the audit's alone.
     admin.run(&format!("ALTER TABLE {schema}.audit_gone RENAME TO audit"));
     let renamed = case.post(
         &path("rename"),
@@ -1209,9 +1099,6 @@ fn without_the_audit_no_named_workspace_write_runs_and_reads_still_answer() {
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// `meada workspaces` does what the console does as the platform administrator, through the same
-/// atomic boundary: a stale base is refused, every write is a `cli` audit record naming the
-/// workspace, and the console sees the result.
 #[test]
 fn the_cli_twins_act_as_the_administrator_through_the_same_boundary() {
     let Some(case) = Case::new("ws_cli") else {
@@ -1262,11 +1149,9 @@ fn the_cli_twins_act_as_the_administrator_through_the_same_boundary() {
         shown.contains(&format!("repo = \"{}\"", case.identity("Y"))),
         "{shown}"
     );
-    // The console reads what the CLI made, and the CLI has no operator row to show it to.
     assert_eq!(case.show("root", &id).status, 200);
     assert_eq!(case.show("alice", &id).json()["operate"], false);
 
-    // A save moves nothing; a stale base is refused with the current one, and changes nothing.
     let v2 = ok(&["save", &id, &hosted, "--message", "hosts", "--base", "1"])
         .trim()
         .to_string();
@@ -1300,7 +1185,6 @@ fn the_cli_twins_act_as_the_administrator_through_the_same_boundary() {
     assert_eq!(code, 1);
     assert!(stderr.contains("base 3"), "{stderr}");
 
-    // Rename, delegate, delete.
     assert_eq!(
         ok(&["rename", &id, "Renamed", "--base", "3"]).trim(),
         "base 4"
@@ -1314,7 +1198,6 @@ fn the_cli_twins_act_as_the_administrator_through_the_same_boundary() {
     assert_eq!(case.show("root", &id).status, 404);
     assert!(!ok(&["list"]).contains(&id));
 
-    // Every write is one record of the CLI's, as the global operator, naming the workspace.
     let records = case.audited(&id);
     let actions: Vec<&str> = records
         .iter()
@@ -1352,9 +1235,6 @@ fn the_cli_twins_act_as_the_administrator_through_the_same_boundary() {
     case.github.clean(&case.console.stderr(), &[]);
 }
 
-/// What the routes bound: a body past its cap, a cursor that is none, a delegation past 20
-/// operators or naming a subject past the longest, and a version of a workspace that has none.
-/// Each is refused and nothing moves.
 #[test]
 fn the_bounds_of_the_lifecycle_routes_refuse_before_anything_changes() {
     let Some(case) = Case::new("ws_bounds") else {
@@ -1365,7 +1245,6 @@ fn the_bounds_of_the_lifecycle_routes_refuse_before_anything_changes() {
     let ya = id_of(&case.create("alice", "Y and A", &["Y", "A"]));
     let version = case.at("alice", &ya).0;
     let path = |op: &str| format!("/api/v1/workspaces/{ya}/{op}");
-    // A body past its cap is a 413 before it is read.
     let big = "x".repeat(2 << 10);
     let apply = case.post(
         &path("apply"),
@@ -1379,7 +1258,6 @@ fn the_bounds_of_the_lifecycle_routes_refuse_before_anything_changes() {
         &json!({"name": big.repeat(3), "base": 1}),
     );
     assert_eq!(rename.status, 413, "{}", rename.body);
-    // A key the route does not take is a 400, and so is a cursor that is none.
     let extra = case.post(
         &path("delete"),
         &case.token("alice"),
@@ -1398,7 +1276,6 @@ fn the_bounds_of_the_lifecycle_routes_refuse_before_anything_changes() {
         &case.token("alice"),
     );
     assert_eq!(history.status, 400);
-    // Delegation: a subject past the longest and a list past 20 operators change nothing.
     let operators = |body: Value| case.post(&path("operators"), &case.token("root"), &body);
     let long =
         operators(json!({"add": [{"subject": "s".repeat(257), "login": "dave"}], "base": 1}));

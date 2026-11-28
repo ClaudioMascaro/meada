@@ -1,8 +1,3 @@
-//! The catalog's section (#341, ADR 0021 contract 1, feature `workspaces`): `[catalog]` names the
-//! repositories an administrator allows the role check to list besides the ones the workspace
-//! selects, and how many it lists at most. Coverage is a fact the job reads from GitHub and
-//! entitlement is another: nothing in this file grants a repository to anyone.
-
 use std::collections::BTreeSet;
 
 use serde::Deserialize;
@@ -13,7 +8,6 @@ use crate::msg::Msg;
 // ponytail: the most repositories `max_repositories` may allow.
 const MAX_REPOSITORIES: i64 = 5000;
 
-/// `[catalog]` as written.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct File {
@@ -21,8 +15,6 @@ pub struct File {
     max_repositories: Option<i64>,
 }
 
-/// One entry of `allow`: every repository of an owner, or one repository. Lowercase, as GitHub
-/// compares names.
 #[derive(Clone, Debug, PartialEq)]
 enum Pattern {
     Owner(String),
@@ -38,7 +30,6 @@ pub struct Config {
 }
 
 impl File {
-    /// The section checked against `host`, `[oidc.github] host`: the first problem.
     pub fn validate(self, host: &str) -> Result<Config, Problem> {
         let Some(allow) = self.allow else {
             return Err(("catalog", Msg::KeyMissing("catalog.allow").text()));
@@ -70,8 +61,6 @@ impl File {
     }
 }
 
-/// `text` as `<host>/<owner>/*` or `<host>/<owner>/<repo>`, compared exactly: lowercase, the
-/// owner of ASCII letters, digits, `-` and `_`, the repository those and `.`, never `.` or `..`.
 fn pattern(text: &str, host: &str) -> Option<Pattern> {
     let rest = text.strip_prefix(host)?.strip_prefix('/')?;
     let (owner, repo) = rest.split_once('/')?;
@@ -92,7 +81,6 @@ fn pattern(text: &str, host: &str) -> Option<Pattern> {
 }
 
 impl Config {
-    /// Whether `owner/repo` (lowercase) is allowed.
     pub fn allows(&self, owner: &str, repo: &str) -> bool {
         self.allow.iter().any(|p| match p {
             Pattern::Owner(o) => o == owner,
@@ -100,7 +88,6 @@ impl Config {
         })
     }
 
-    /// The owners some pattern names: an installation on any other owner is not listed.
     pub fn owners(&self) -> BTreeSet<&str> {
         fn owner(p: &Pattern) -> &str {
             match p {

@@ -1,7 +1,3 @@
-//! `meada decide --decider` (spec #18, ADR 0006) against the loopback stub: the configuration
-//! from the environment, the `chat` requests, `--show-request`, and the network boundary (no
-//! other command reaches the decider). Every run asserts that the key appears in no output.
-
 use crate::common;
 
 use std::fs;
@@ -12,8 +8,6 @@ use meada::engine::Engine;
 use common::stub::{Reply, Stub};
 use common::{HEALTH, TRACK, assert_golden, chain, fixture_repo, without_processes, written};
 
-/// The key every test configures. No output of any test may contain it. The `&` lets a JSON
-/// answer write it escaped (`&`), out of reach of a redaction of the raw body.
 const KEY: &str = "sk-meada&test-5f0c1e2d9a";
 
 const VARS: [&str; 4] = [
@@ -25,10 +19,6 @@ const VARS: [&str; 4] = [
 
 const PROXIES: [&str; 3] = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"];
 
-/// Runs `meada <args>` in `repo` with only the decider variables in `env` set (the inherited
-/// ones are removed) and `stdin` as input. Returns stdout, stderr and success, with the
-/// repository's path replaced by `<repo>` and `stub` (when given) by `<stub>`, after checking
-/// that the key is in neither stream.
 fn meada(
     repo: &Path,
     args: &[&str],
@@ -38,7 +28,6 @@ fn meada(
 ) -> (String, String, bool) {
     let (stdout, stderr, ok) = common::meada(repo, args, stdin, |command| {
         command.env("LANG", "en_US.UTF-8");
-        // No inherited proxy either: the test key must not travel anywhere but to the stub.
         for var in VARS.iter().chain(&PROXIES) {
             command.env_remove(var);
             command.env_remove(var.to_ascii_lowercase());
@@ -55,7 +44,6 @@ fn meada(
     (text(stdout), text(stderr), ok)
 }
 
-/// The `chat` configuration against `stub`, with the key.
 fn chat(stub: &Stub) -> Vec<(&'static str, String)> {
     vec![
         ("MEADA_DECIDER_PROTOCOL", "chat".into()),
@@ -88,8 +76,6 @@ fn show_request_prints_the_golden_chat_requests_and_sends_nothing() {
 #[test]
 fn the_excerpt_sends_the_enclosing_function_but_never_a_whole_class() {
     let (web, _, _) = chain("decider_excerpt_class");
-    // Two more ambiguous health checks: one in a class field initializer, whose caller is the
-    // class, and one in a method.
     let probe = "export class Probe {\n  ready = fetch(\"/api/health\");\n\n  check() {\n    \
                  return fetch(\"/api/health\");\n  }\n\n  secret = \"not for the model\";\n}\n";
     fs::write(web.join("src/probe.ts"), probe).unwrap();
@@ -99,7 +85,6 @@ fn the_excerpt_sends_the_enclosing_function_but_never_a_whole_class() {
     let (stdout, stderr, ok) = meada(&web, &show, &chat(&stub), "", Some(&stub));
 
     assert!(ok, "{stderr}");
-    // The field initializer's call goes alone, the method's call with the method.
     let field = r#""content": "Call:\nfetch(\"/api/health\")\n\nCandidates:"#;
     let method = r#""content": "Call:\nfetch(\"/api/health\")\n\nIn:\ncheck() {\n    return"#;
     assert!(stdout.contains(field), "{stdout}");
@@ -107,8 +92,6 @@ fn the_excerpt_sends_the_enclosing_function_but_never_a_whole_class() {
     assert!(!stdout.contains("not for the model"), "{stdout}");
 }
 
-/// A Feign method is an item at its definition: the excerpt is the method, which is all the
-/// judgment needs (spec #26).
 #[test]
 fn the_excerpt_of_a_declarative_client_method_is_the_method() {
     let routes = ["app/api/catalog/route.ts"];
@@ -123,7 +106,6 @@ fn the_excerpt_of_a_declarative_client_method_is_the_method() {
     assert!(stdout.contains(method), "{stdout}");
 }
 
-/// The `decisions` configuration against `stub`: the protocol and the model are the defaults.
 fn decisions(stub: &Stub) -> Vec<(&'static str, String)> {
     vec![
         ("MEADA_DECIDER_URL", stub.url.clone()),
@@ -141,7 +123,6 @@ fn show_request_prints_the_golden_decisions_request_and_sends_nothing() {
 
     assert!(ok, "{stderr}");
     assert_golden("chain-web.decide.show-request.decisions.txt", &stdout);
-    // With only the key set, the request would go to OpenRouter; `--show-request` sends nothing.
     let key = [("MEADA_DECIDER_KEY", KEY.to_string())];
     let (stdout, stderr, ok) = meada(&web, &show, &key, "", None);
     assert!(ok, "{stderr}");
@@ -242,7 +223,6 @@ fn chat_sends_one_request_per_item_in_item_order_with_the_key_as_a_bearer_token(
         );
         let bearer = format!("Bearer {KEY}");
         assert_eq!(request.header("authorization"), Some(bearer.as_str()));
-        // What left the machine is what `--show-request` printed.
         let body = serde_json::to_string_pretty(&request.json()).unwrap();
         assert!(shown.contains(&body), "{body}");
         assert!(body.contains(&format!("function {function}(")), "{body}");
@@ -276,7 +256,6 @@ fn the_key_is_optional_for_chat() {
 #[test]
 fn a_failed_request_is_reported_with_its_item() {
     let (web, _, _) = chain("decider_fail");
-    // The first answer echoes the key back: it must not reach any output either.
     let stub = Stub::start(vec![
         Reply::status(500, KEY),
         Reply::status(401, "unauthorized"),
@@ -345,8 +324,6 @@ fn a_missing_or_invalid_variable_is_an_error_naming_it_before_any_request() {
             "`MEADA_DECIDER_URL` must use https",
         ),
         (spaced, "`MEADA_DECIDER_KEY` is not valid"),
-        // `decisions` is the default protocol: the URL and the model have defaults, the key
-        // has none.
         (vec![], "`MEADA_DECIDER_KEY` is missing"),
     ];
 
@@ -384,7 +361,6 @@ fn an_item_with_more_than_fifty_candidates_is_skipped_in_decider_mode_only() {
         "example.com/open/generated::src/client.ts::item::fetch#0\n\
          55 candidates, more than 50; skipped in decider mode\n"
     );
-    // Human mode still offers it.
     let (stdout, _, ok) = meada(&repo, &["decide"], &[], "s\n", None);
     assert!(ok);
     assert!(stdout.contains("  55) "), "{stdout}");
@@ -404,7 +380,6 @@ fn list_prune_and_human_mode_read_no_decider_variable_and_send_nothing() {
         assert!(ok, "{stderr}");
     }
 
-    // Invalid variables do not matter where nothing reads them.
     env.push(("MEADA_DECIDER_PROTOCOL", "grpc".into()));
     for args in [list, prune] {
         let (_, stderr, ok) = meada(&web, &args, &env, "", Some(&stub));
@@ -415,8 +390,6 @@ fn list_prune_and_human_mode_read_no_decider_variable_and_send_nothing() {
     assert!(stub.requests().is_empty());
 }
 
-/// A linked `meada.decisions.toml` is refused before the first request; what sends nothing
-/// and saves nothing still reads through it.
 #[cfg(unix)]
 #[test]
 fn a_linked_decisions_file_is_refused_before_any_request() {
@@ -476,8 +449,6 @@ fn no_other_command_reaches_the_decider() {
     assert!(stub.requests().is_empty());
 }
 
-/// The MCP server, with every decider variable set, answers each of its tools and sends
-/// nothing to the decider.
 #[tokio::test]
 async fn the_mcp_server_never_reaches_the_decider() {
     use rmcp::{
@@ -532,8 +503,6 @@ fn answer(choice: &str, probability: f64) -> serde_json::Value {
 #[test]
 fn chat_answers_are_written_with_the_response_model_and_p_and_replayed_as_decided_links() {
     let (web, _, _) = chain("decider_write");
-    // The health check is the second candidate (gateway); the tracking URL the first (catalog).
-    // The response names a dated model id, which is the one recorded.
     let stub = Stub::start(vec![
         Reply::chat("local/test-model-2026", answer("2", 0.9)),
         Reply::chat("local/test-model-2026", answer("1", 0.62)),
@@ -551,7 +520,6 @@ fn chat_answers_are_written_with_the_response_model_and_p_and_replayed_as_decide
     assert_golden("chain-web.decider.chat.en.txt", &stdout);
     let file = written(&web).expect("the file is written");
     assert_golden("chain-web.decisions.chat.toml", &file);
-    // A cold index of the chain with the file gives the decided export.
     let (cold, _, _) = chain("decider_write_cold");
     fs::write(cold.join("meada.decisions.toml"), &file).unwrap();
     let export = Engine::open(&cold).unwrap().export().unwrap();
@@ -561,7 +529,6 @@ fn chat_answers_are_written_with_the_response_model_and_p_and_replayed_as_decide
     );
 }
 
-/// The `chat` answer whose message content is `content`, as the model's text.
 fn raw(content: &str) -> Reply {
     Reply::ok(serde_json::json!({
         "model": "local/test-model",
@@ -649,7 +616,6 @@ fn a_malformed_answer_fails_its_item_alone_and_the_others_are_still_written() {
             stdout[at + report.len()..].contains(reason),
             "{name}: {stdout}"
         );
-        // Nothing for the failed item; the other item's decision is written.
         let file = written(&web).unwrap_or_else(|| panic!("{name}: no file\n{stdout}"));
         assert!(!file.contains(HEALTH), "{name}: {file}");
         assert!(file.contains(TRACK), "{name}: {file}");
@@ -688,8 +654,6 @@ fn a_response_with_no_model_id_is_recorded_under_the_configured_model() {
 #[test]
 fn a_proposal_below_the_threshold_is_printed_as_a_suggestion_and_one_at_it_is_written() {
     let (web, _, _) = chain("decider_threshold");
-    // 0.5 is the default threshold: the health check sits exactly on it, the tracking URL
-    // just below.
     let stub = Stub::start(vec![
         Reply::chat("local/test-model", answer("2", 0.5)),
         Reply::chat("local/test-model", answer("1", 0.49)),
@@ -724,7 +688,6 @@ fn min_p_moves_the_threshold_and_values_outside_zero_to_one_are_errors() {
     let file = written(&web).unwrap();
     assert!(file.contains(HEALTH) && !file.contains(TRACK), "{file}");
 
-    // Out of range or not a number: an error before any request.
     let before = stub.requests().len();
     for value in ["1.1", "-0.1", "nan", "inf"] {
         args[3] = value;
@@ -768,8 +731,6 @@ fn dry_run_sends_and_prints_the_proposals_and_leaves_the_file_alone() {
 #[test]
 fn a_key_reflected_in_a_success_answer_reaches_no_output_and_no_file() {
     let (web, _, _) = chain("decider_reflect");
-    // The first answer names the key as its model id, which would be recorded; the second
-    // has it as the probability, which a parse error would quote.
     let stub = Stub::start(vec![
         Reply::chat(KEY, answer("2", 0.9)),
         Reply::ok(serde_json::json!({
@@ -778,7 +739,6 @@ fn a_key_reflected_in_a_success_answer_reaches_no_output_and_no_file() {
         })),
     ]);
 
-    // `meada` itself asserts that the key is in neither stream.
     let (stdout, _, ok) = meada(
         &web,
         &["decide", "--decider"],
@@ -810,7 +770,6 @@ fn min_p_is_validated_with_list_and_prune_too() {
     }
 }
 
-/// A `decisions` answer of type `choice`.
 fn choice(choice: &str, confidence: f64, probabilities: serde_json::Value) -> serde_json::Value {
     serde_json::json!({
         "type": "choice",
@@ -820,8 +779,6 @@ fn choice(choice: &str, confidence: f64, probabilities: serde_json::Value) -> se
     })
 }
 
-/// A `decisions` response with `answers`, served by a dated id of the default model, with every
-/// field the upstream documentation lists.
 fn verdict(answers: serde_json::Value) -> serde_json::Value {
     serde_json::json!({
         "id": "gen-dec-stub",
@@ -832,7 +789,6 @@ fn verdict(answers: serde_json::Value) -> serde_json::Value {
     })
 }
 
-/// The health check picks the gateway (`2`), the tracking URL the catalog (`1`).
 fn valid_answers() -> serde_json::Value {
     serde_json::json!({
         "item1": choice("2", 0.8, serde_json::json!({"1": 0.1, "2": 0.9})),
@@ -868,7 +824,6 @@ fn decisions_asks_every_item_in_one_request_and_records_the_returned_model() {
     );
     let names: Vec<_> = body["questions"].as_object().unwrap().keys().collect();
     assert_eq!(names, ["item1", "item2"]);
-    // A cold index of the chain with the file gives the decided export.
     let (cold, _, _) = chain("decider_decisions_cold");
     fs::write(cold.join("meada.decisions.toml"), &file).unwrap();
     let export = Engine::open(&cold).unwrap().export().unwrap();
@@ -900,7 +855,6 @@ fn a_decisions_suggestion_below_the_threshold_prints_its_confidence_too() {
 #[test]
 fn a_provider_refusal_of_the_data_retention_preferences_writes_nothing_and_is_not_retried() {
     let (web, _, _) = chain("decider_refusal");
-    // A retry would get the valid answer and write it.
     let refusal =
         r#"{"error": {"code": 404, "message": "No endpoints found matching your data policy"}}"#;
     let stub = Stub::start(vec![
@@ -936,7 +890,6 @@ fn a_key_escaped_in_an_error_message_reaches_no_output() {
     let body = format!(r#"{{"error": {{"code": 401, "message": "bad key {escaped}"}}}}"#);
     let stub = Stub::start(vec![Reply::status(401, &body)]);
 
-    // `meada` itself asserts that the key is in neither stream.
     let args = ["decide", "--decider"];
     let (stdout, _, ok) = meada(&web, &args, &decisions(&stub), "", Some(&stub));
 
@@ -950,7 +903,6 @@ fn a_key_escaped_in_an_error_message_reaches_no_output() {
 #[test]
 fn a_malformed_decisions_answer_fails_its_item_or_the_whole_response() {
     let item2 = || choice("1", 0.4, serde_json::json!({"1": 0.62, "2": 0.38}));
-    // A bad answer for the first item, beside a valid one for the second.
     let one =
         |item1: serde_json::Value| verdict(serde_json::json!({"item1": item1, "item2": item2()}));
     let mut no_confidence = choice("2", 0.8, serde_json::json!({"1": 0.1, "2": 0.9}));
@@ -966,7 +918,6 @@ fn a_malformed_decisions_answer_fails_its_item_or_the_whole_response() {
     let mut scored = choice("2", 0.8, serde_json::json!({"1": 0.1, "2": 0.9}));
     scored["type"] = "score".into();
 
-    // (name, response, reason, whether the whole response fails)
     let cases = [
         (
             "sum below one",

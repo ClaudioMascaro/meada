@@ -1,29 +1,15 @@
-//! An override file's `type` over a variable whose own block declares a set (#740). Terraform
-//! converts the default to the declared set when it decodes the block, then again to the
-//! override's type; Meada follows it (OpenTofu 1.13 and later convert it once, to the final type,
-//! and name other instances: a ceiling). Each row's expected value is what Terraform v1.17.1's
-//! `console` printed for `[for k, v in var.s : "${k}-${v}"]`; a set's names are its elements, which
-//! Meada leaves unresolved, and a configuration Terraform rejects gets no exact name.
-
 use super::*;
 
-/// A row: its label, the declaring file, the `for_each` collection, the override files and the
-/// expected answer.
 type Row<'a> = (&'a str, String, &'a str, Vec<(&'a str, &'a str)>, &'a str);
 
-/// A row given as whole files: its label, the files, the address of the resource read and the
-/// expected answer.
 type FileRow<'a> = (&'a str, Vec<(&'a str, String)>, &'a str, &'a str);
 
 const UNRESOLVED: &str = "unresolved";
 
-/// The instances of a `for_each` over `source`, named by key and value, as `queue-<key>-<value>`
-/// joined by `, `, or `unresolved` when Meada gives no exact name; `main` and the files `more`.
 fn answer(main: &str, source: &str, more: &[(&str, &str)]) -> String {
     answer_in("main.tf", main, source, more)
 }
 
-/// `answer` for a declaring file named `file`.
 fn answer_in(file: &str, main: &str, source: &str, more: &[(&str, &str)]) -> String {
     let main = format!("{main}{}", reader(source));
     let mut list = vec![(file, main.as_str())];
@@ -31,20 +17,16 @@ fn answer_in(file: &str, main: &str, source: &str, more: &[(&str, &str)]) -> Str
     exact_names(&list, "a.q")
 }
 
-/// The resource `a.q`: an instance per key of `source`, named `queue-<key>-<value>`.
 fn reader(source: &str) -> String {
     format!(
         "resource \"a\" \"q\" {{\n  for_each = {{for k, v in {source} : k => v}}\n  name = \"queue-${{each.key}}-${{each.value}}\"\n}}\n"
     )
 }
 
-/// The resource `a.q` with `for_each = <source>`, each instance named `fe-<key>`.
 fn for_each_over(source: &str) -> String {
     format!("resource \"a\" \"q\" {{\n  for_each = {source}\n  name = \"fe-${{each.key}}\"\n}}\n")
 }
 
-/// The exact names of the instances of `address` in the files `list`, joined by `, `, or
-/// `unresolved` when Meada gives no exact name.
 fn exact_names(list: &[(&str, &str)], address: &str) -> String {
     let found: Vec<String> = (names(list).into_iter())
         .filter(|n| n.starts_with(address))
@@ -163,7 +145,6 @@ fn an_override_retyping_a_declared_set_converts_the_default_as_terraform_does() 
     }
 }
 
-/// The same conversions in a child module called without the argument, its override file beside it.
 #[test]
 fn a_child_module_default_is_converted_as_terraform_does() {
     let child = format!(
@@ -184,7 +165,6 @@ fn a_child_module_default_is_converted_as_terraform_does() {
     assert_eq!(names, want);
 }
 
-/// A var file's value is converted once, to the final type, whatever the default was.
 #[test]
 fn a_var_file_value_is_converted_once_to_the_final_type() {
     let vars = ("terraform.tfvars", "s = [\"b\", \"a\", \"a\"]\n");
@@ -206,9 +186,6 @@ fn an_untyped_default_retyped_as_a_list_keeps_its_order() {
     assert_eq!(got, "queue-0-b, queue-1-a, queue-2-a");
 }
 
-/// A value that enters a variable declared `set(T)` is converted to `T`, then sorted and
-/// deduplicated as cty does, from whichever source: Terraform v1.17.1 and OpenTofu v1.13.9 agree
-/// on every row.
 #[test]
 fn a_value_entering_a_declared_set_is_converted_to_its_element_type() {
     let by = |main: &str| answer(main, "tolist(var.s)", &[]);
@@ -227,14 +204,10 @@ fn a_value_entering_a_declared_set_is_converted_to_its_element_type() {
         answer(list, "tolist(var.s)", &[("override.tf", &number)]),
         "queue-0-9, queue-1-10"
     );
-    // An element Meada cannot convert with certainty leaves the value unresolved.
     assert_eq!(by(&set("number", "[\"x\"]")), UNRESOLVED);
     assert_eq!(by(&set("set(string)", "[[\"a\"]]")), UNRESOLVED);
 }
 
-/// A value that enters a variable declared `list(T)` of a primitive `T` has its elements
-/// converted to `T`, in their order (#770): Terraform v1.17.1 and OpenTofu v1.13.9 agree on every
-/// row, refuse `x` and `yes`, and name the last row `0-9`, `1--0`.
 #[test]
 fn a_value_entering_a_declared_list_is_converted_to_its_element_type() {
     let by = |main: &str| answer(main, "var.s", &[]);
@@ -256,16 +229,11 @@ fn a_value_entering_a_declared_list_is_converted_to_its_element_type() {
     let declared = "variable \"s\" {\n  type = list(number)\n}\n";
     let given = [("terraform.tfvars", "s = [\"010\"]\n")];
     assert_eq!(answer(declared, "var.s", &given), "queue-0-10");
-    // An element Meada cannot convert with certainty leaves the value unresolved: one the type
-    // does not take, and `-0`, whose sign Meada's numbers do not keep.
     assert_eq!(by(&list("number", r#"["x"]"#)), UNRESOLVED);
     assert_eq!(by(&list("bool", r#"["yes"]"#)), UNRESOLVED);
     assert_eq!(by(&list("number", r#"["9", "-0"]"#)), UNRESOLVED);
 }
 
-/// A ceiling: Meada converts no other declared type, so `"010"` given to a primitive, a tuple, a
-/// map, an object or a list of objects keeps its spelling, where Terraform v1.17.1 and OpenTofu
-/// v1.13.9 name `10` in each.
 #[test]
 fn a_value_entering_a_type_meada_does_not_convert_keeps_its_spelling() {
     let kept = |ty: &str, default: &str, read: &str| {
@@ -287,8 +255,6 @@ fn a_value_entering_a_type_meada_does_not_convert_keeps_its_spelling() {
     }
 }
 
-/// The default, a var file's value and a module argument of a declared `set(string)` are one set,
-/// read by `tolist`, by `length` as a `count`, by `join` and by `for_each`.
 #[test]
 fn every_source_of_a_declared_set_is_sorted_and_deduplicated() {
     let value = "[\"b\", \"a\", \"a\"]";
@@ -350,8 +316,6 @@ fn every_source_of_a_declared_set_is_sorted_and_deduplicated() {
     }
 }
 
-/// An argument reaches a declared set through a `list(string)` variable of the module between: the
-/// list keeps its order and the set sorts it.
 #[test]
 fn an_argument_passed_through_a_list_variable_is_converted_by_the_declared_set() {
     let outer = "module \"m\" {\n  source = \"./m\"\n  l = [\"b\", \"a\", \"a\"]\n}\n";
@@ -375,9 +339,6 @@ fn an_argument_passed_through_a_list_variable_is_converted_by_the_declared_set()
     );
 }
 
-/// A root variable declared as a set and retyped to `any` takes a var file's value as written:
-/// the value is converted once, to `any`, so it is a tuple and `for` keys it by index. The
-/// default is still a set, converted by the declaring block first.
 #[test]
 fn a_var_file_value_of_a_set_retyped_to_any_is_converted_once() {
     let any = over("  type = any\n");
@@ -404,7 +365,6 @@ fn a_var_file_value_of_a_set_retyped_to_any_is_converted_once() {
                 );
             }
         }
-        // The same variable on its default: a set, which `for` keys by element.
         let on_default = answer_in(
             file,
             &declared("[\"x\"]"),
@@ -415,13 +375,6 @@ fn a_var_file_value_of_a_set_retyped_to_any_is_converted_once() {
     }
 }
 
-/// A default its final type refuses (`set(string)` retyped a tuple, `["x"]` under `list(number)`):
-/// Terraform v1.17.1 and OpenTofu v1.13.9 refuse the configuration whatever gives the variable
-/// its value, so a var file's value and a module argument name nothing exactly (#769). A `null`
-/// set retyped a tuple is refused by Terraform alone (OpenTofu converts it once), and Meada
-/// follows Terraform (#740). A ceiling: a default Meada cannot convert with certainty is treated
-/// the same, though both tools take `["-0"]` under `list(number)` and name `queue-0-1` and
-/// `queue-1-2` for `["1", "2"]`. A default the final type takes keeps the value's names.
 #[test]
 fn a_default_meada_cannot_convert_to_its_types_leaves_every_source_unresolved() {
     let tuple = over("  type = tuple([string, string, string])\n");
@@ -487,8 +440,6 @@ fn a_default_meada_cannot_convert_to_its_types_leaves_every_source_unresolved() 
     }
 }
 
-/// `for_each` over a tuple: Terraform v1.17.1 and OpenTofu v1.13.9 refuse it (it takes a map or a
-/// set of strings), so no name is exact (#769). The same elements as a set name each instance.
 #[test]
 fn for_each_over_a_tuple_gives_no_exact_name() {
     let each = for_each_over("var.s");
@@ -603,10 +554,6 @@ fn for_each_over_a_tuple_gives_no_exact_name() {
     }
 }
 
-/// A ceiling: a list Meada does not know as a tuple expands, though Terraform v1.17.1 and OpenTofu
-/// v1.13.9 refuse a `for_each` over a list as over a tuple (#769). Meada keeps no value's kind
-/// past a variable read whole (#717): a declared `list(string)`, a local holding a tuple and the
-/// result of `concat`, `keys` or `tolist` name `fe-a` and `fe-b`.
 #[test]
 fn a_list_meada_does_not_know_as_a_tuple_still_expands() {
     let list = "variable \"s\" {\n  type = list(string)\n  default = [\"b\", \"a\"]\n}\n";
@@ -629,9 +576,6 @@ fn a_list_meada_does_not_know_as_a_tuple_still_expands() {
     }
 }
 
-/// Whether a variable holds a set is known per root (#783): roots evaluated one after another in
-/// one repository, each declaring its own `var.s`, answer as each would alone. The root `a` is
-/// evaluated first, its resource `a.p`; the root `b` second, its resource `a.q`.
 #[test]
 fn each_root_knows_its_own_sets() {
     let root_a = |declaring: &str| {
@@ -652,7 +596,5 @@ fn each_root_knows_its_own_sets() {
         let files: Vec<(&str, &str)> = files.iter().map(|(f, s)| (*f, s.as_str())).collect();
         exact_names(&files, "a.q")
     });
-    // A set in the root before leaves the list `b` retypes it to named; a list in the root before
-    // names no instance of `b`'s set by index.
     assert_eq!(answers, ["queue-0-a, queue-1-b", UNRESOLVED]);
 }

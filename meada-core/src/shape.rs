@@ -92,14 +92,6 @@ impl Shape {
         self.guessed.extend(other.guessed.iter().cloned());
     }
 
-    /// Puts `stored`, the shape the package's index holds for the name `import` imports, at
-    /// the import's path, in the view its `want` reads: a provider's fields, open parts and
-    /// scalars, the open parts alone of a type a provider's value is typed with, or a
-    /// consumer's declared paths (optional only when every type listing a path says so, and
-    /// never when it is read). `level` is how the import resolved: through one that is not
-    /// `exact`, a provider's part is guessed and a consumer's paths are not declared, so no
-    /// drift on them is `exact`. Without a stored shape, a provider's part is open, and a
-    /// type's or a consumer's adds nothing.
     fn graft(&mut self, import: &Import, stored: Option<(&Shape, Level)>) {
         let at = import.at.as_str();
         if import.want == Want::Opens {
@@ -182,7 +174,6 @@ impl Want {
         Self::ALL.into_iter().find(|w| w.name() == name)
     }
 
-    /// Whether the view is a consumer's declared paths rather than a provider's fields.
     fn declares(self) -> bool {
         matches!(self, Want::Infer | Want::Type)
     }
@@ -352,9 +343,6 @@ impl Source {
         }
     }
 
-    /// Whether a provider's shape is declared (a document, a schema) rather than read from what
-    /// code does (object literals): drift is `exact` only against a declared one, on a consumer
-    /// path a declared type gives (`Shape::declared`).
     fn declared(&self) -> bool {
         match self {
             Source::Document(_) | Source::Zod(_) => true,
@@ -423,8 +411,6 @@ pub fn drift(provider: &Shape, consumer: &Shape) -> Option<Drift> {
                 break;
             }
             if !present(q) {
-                // A field the consumer's type marks optional may be absent: neither it nor
-                // what lies below it is drift.
                 if consumer.optional.contains(q) {
                     break;
                 }
@@ -501,14 +487,12 @@ mod tests {
         );
         assert_eq!(filled.open, set(&["item.tags[]"]));
         assert_eq!(filled.scalars, set(&["item.id"]));
-        // A consumer takes the declared paths; one it reads is certain.
         let mut consumer = reads(&["note"]);
         consumer.imports.insert(import("", Want::Type));
         let filled = fill(&consumer, (), &mut |_, _| Some(((), &stored, Level::Exact)));
         assert_eq!(filled.fields, set(&["id", "note"]));
         assert_eq!(filled.declared, set(&["id", "note"]));
         assert!(filled.optional.is_empty());
-        // Unresolved: open on a provider, nothing on a consumer.
         let none = fill(&provider, (), &mut |_, _| None);
         assert_eq!(none.open, set(&["item"]));
         assert_eq!(fill(&consumer, (), &mut |_, _| None).fields, set(&["note"]));
@@ -528,11 +512,9 @@ mod tests {
             (Level::Exact, Level::Exact),
             (Level::Inferred, Level::Inferred),
         ] {
-            // The provider's schema came through the package, the consumer's paths are local.
             let filled = fill(&provider, (), &mut |_, _| Some(((), &stored, level)));
             let found = drift(&filled, &consumer).unwrap();
             assert_eq!(found.missing["name"], expect, "provider through {level:?}");
-            // The consumer's type came through the package, the provider is a document.
             let filled = fill(&consumer, (), &mut |_, _| Some(((), &stored, level)));
             let found = drift(&local, &filled).unwrap();
             assert_eq!(found.missing["total"], expect, "consumer through {level:?}");
@@ -553,7 +535,6 @@ mod tests {
 
     #[test]
     fn imports_past_the_package_depth_limit_are_unresolved() {
-        // Package `k` keeps `f` and imports the next one's shape at `next`.
         let mut kept = document(&["f"], &[], &[]);
         kept.imports.insert(import("next", Want::Literals));
         let mut side = Shape::new(Source::Literals("src/a.ts".into()));
@@ -606,12 +587,10 @@ mod tests {
             &["[].product"],
             &["[].id", "[].items[].sku"],
         );
-        // (consumer paths, missing, not checked as (path, open path))
         type Case<'c> = (&'c [&'c str], &'c [&'c str], &'c [(&'c str, &'c str)]);
         let cases: &[Case] = &[
             (&["[]", "[].id"], &[], &[]),
             (&["[]", "[].total"], &["[].total"], &[]),
-            // The shallowest missing path is the drift; what lies below it is not listed.
             (
                 &["[]", "[].customer", "[].customer.name"],
                 &["[].customer"],
@@ -622,7 +601,6 @@ mod tests {
                 &["[].items[].qty"],
                 &[],
             ),
-            // An open part is present itself; a read below it is not checked.
             (&["[]", "[].product"], &[], &[]),
             (
                 &[
@@ -634,16 +612,12 @@ mod tests {
                 &[],
                 &[("[].product.name", "[].product")],
             ),
-            // `meta` is not an array: an element of it is missing.
             (&["meta", "meta[]"], &["meta[]"], &[]),
-            // The prefixes a consumer shape lists need not be there.
             (&["[].items[].sku"], &[], &[]),
             (&["count"], &["count"], &[]),
             (&["[].total", "count"], &["[].total", "count"], &[]),
-            // A read below a scalar leaf is checked only up to the leaf.
             (&["[]", "[].id", "[].id.length"], &[], &[]),
             (&["[].items[].sku.x.y"], &[], &[]),
-            // `length` of an array the provider returns is no field of it.
             (&["[]", "[].items", "[].items.length"], &[], &[]),
             (&["meta", "meta.length"], &["meta.length"], &[]),
             (&["length"], &[], &[]),
@@ -678,7 +652,6 @@ mod tests {
             let found = drift(&provider, &merged).unwrap();
             assert_eq!(found.missing.keys().collect::<Vec<_>>(), ["cursor"]);
         }
-        // A side that does not mention the path leaves it optional.
         let mut merged = declares.clone();
         merged.merge(&reads(&["id"]));
         assert_eq!(merged.optional, set(&["cursor"]));
@@ -692,7 +665,6 @@ mod tests {
         let found = drift(&provider, &consumer).unwrap();
         let missing: Vec<&str> = found.missing.keys().map(String::as_str).collect();
         assert_eq!(missing, ["req"]);
-        // A path the provider has is checked as ever.
         let mut consumer = reads(&["id"]);
         consumer.optional = set(&["id"]);
         assert_eq!(drift(&provider, &consumer), None);
@@ -724,13 +696,11 @@ mod tests {
         let levels: Vec<(&str, Level)> = (found.missing.iter())
             .map(|(p, l)| (p.as_str(), *l))
             .collect();
-        // A field read is inferred; a declared consumer path against a document is exact.
         assert_eq!(levels, [("name", Level::Inferred), ("total", Level::Exact)]);
         let mut read = document(&["id"], &[], &[]);
         read.source = Source::Reads("src/b.ts".into());
         let found = drift(&read, &consumer).unwrap();
         assert_eq!(found.missing["total"], Level::Inferred);
-        // A zod schema is declared like a document; the object literals of a handler are not.
         let mut zod = document(&["id"], &[], &[]);
         zod.source = Source::Zod("src/c.ts".into());
         assert_eq!(

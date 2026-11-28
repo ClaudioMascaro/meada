@@ -33,19 +33,17 @@ from prove import Http, answer, fetch, free_port, git, mcp_answers
 
 HOST = 'github.com/acme'
 W = '.github/workflows/'
-# The optional fields of a consumer row in `meada export`, as #824 named them.
 REF, WITH, SECRETS = 'ref', 'with', 'secrets'
-ABSENT = 'absent at the indexed commit'  # #820's words for the mark
-# The consumer row's field for the declared permissions, as #834 named it.
+ABSENT = 'absent at the indexed commit'
 PERMISSIONS = 'permissions'
-NOT_DECLARED, PMISMATCH = 'not declared', 'permissions mismatch'  # #820's words
-LEVELS = ('none', 'read', 'write')  # #820: the levels, in their order
-REASON = re.compile(r'@(\S+) \(indexed ([0-9a-f]{7,64})\)(.*)')  # #820, "Git ref"; the flags follow
-ORPHAN = re.compile(r'\s*orphan (ci::\S+): ')  # the orphan line of `meada status`, as every kind prints it
+NOT_DECLARED, PMISMATCH = 'not declared', 'permissions mismatch'
+LEVELS = ('none', 'read', 'write')
+REASON = re.compile(r'@(\S+) \(indexed ([0-9a-f]{7,64})\)(.*)')
+ORPHAN = re.compile(r'\s*orphan (ci::\S+): ')
 EXTERNAL = ('actions/checkout', 'actions/setup-node', 'docker/build-push-action', 'other-org/')
 CORPUS = {'ci-slsa': 'github.com/slsa-framework/slsa-github-generator', 'ci-osv-scanner': 'github.com/google/osv-scanner',
           'ci-osv-action': 'github.com/google/osv-scanner-action'}
-SOLO = '<solo>'  # the identity Meada gives a repository without `origin`, read from its export
+SOLO = '<solo>'
 
 
 def flagged(text):
@@ -83,10 +81,6 @@ LOCAL, LOCAL_ACTION = pipeline('forms', 'local.yml'), action('forms', 'local-act
 BUILD = pipeline('ref-provider', 'build.yml')
 HEAD_REF, OTHER_40, OTHER_64, SHORT = 'PROVIDER_HEAD_SHA', '0123456789abcdef' * 2 + '01234567', '0123456789abcdef' * 4, '0123456'
 
-# id: (workspace, repository, file, job or `runs` or None, step id or None, expected answer).
-# The first four are #820's table under "Further Notes" and the fifth its `trace` sentence; the rest
-# are one row per form of `uses`
-# and per "certain or absent" probe of its "Testing Decisions".
 CASES = {
     'a_publish': ('calls', 'app-a', W + 'ci.yml', 'publish', None, link(PUBLISH, 'main')),
     'b_publish_prd': ('calls', 'app-b', W + 'ci.yml', 'publish-prd', None, link(PUBLISH, 'v1')),
@@ -124,7 +118,6 @@ CASES = {
     'step_local_in_composite': ('calls', 'forms', 'local-action/action.yml', 'runs', 'step_local_in_composite', UNRESOLVED),
     'step_dollar_in_composite': ('calls', 'forms', 'local-action/action.yml', 'runs', 'step_dollar_in_composite',
                                  link(action('forms', 'local-action/nested'))),
-    # The files the CI reader owns (#828): the base gives the first three a use by the generic rule.
     'use_typed_key': ('calls', 'forms', W + 'uses.yml', 'deploy', 'use_typed_key', ('no use',)),
     'use_structured': ('calls', 'forms', W + 'uses.yml', 'deploy', 'use_structured', ('use on the CI step',)),
     'use_role_arn': ('calls', 'forms', W + 'uses.yml', 'deploy', 'use_role_arn', ('no use',)),
@@ -139,7 +132,6 @@ CASES = {
     'solo_local': ('solo', 'solo', W + 'ci.yml', 'solo_local', None,
                    ('link', f'ci::{SOLO}/{W}build.yml', f'{SOLO}::{W}build.yml::.', None)),
     'solo_remote': ('solo', 'solo', W + 'ci.yml', 'solo_remote', None, NONE),
-    # Nobody links to the peer's pipeline, and the scope seen from `solo` holds a provider and a consumer.
     'solo_peer_unused': ('solo', 'solo-peer', W + 'build.yml', None, None, ('orphan', pipeline('solo-peer', 'build.yml')[0])),
 }
 
@@ -164,7 +156,6 @@ def reusable(name, on='workflow_call'):
     return REUSABLE.replace('NAME', name).replace('ON', on)
 
 
-# workspace -> repository -> file -> text. A hub and each repository's peers are added by `seed`.
 WORKSPACES = {
     'calls': {
         'workflows': {
@@ -188,7 +179,6 @@ jobs:
             W + 'on-list.yml': reusable('on-list', '[push, workflow_call]'),
             W + 'on-map.yml': reusable('on-map', '{workflow_call: {}}'),
             W + 'plain.yml': reusable('plain', 'push'),
-            # The hand declaration of #816, an existing flow: its sides and links stay at `declared`.
             'meada.toml': '''[[resource]]
 kind = "gha-workflow"
 id = "acme/workflows/.github/workflows/publish.yml"
@@ -519,7 +509,6 @@ jobs:
     uses: acme/lonely/.github/workflows/used.yml@main
 '''},
     },
-    # A scope without consumers: its provider is no orphan line.
     'orphan-control': {'unreferenced': {W + 'unused.yml': '# case: orphan_no_scope\n# control: orphan_unused\n' + reusable('unused')}},
     'solo': {
         'solo': {W + 'build.yml': reusable('build'), W + 'ci.yml': '''name: ci
@@ -538,7 +527,6 @@ jobs:
     },
 }
 NO_ORIGIN = {'solo'}
-# #820, "Further Notes": `context` on `publish.yml` lists exactly these (repository, file, address, ref).
 PUBLISH_CONSUMERS = [
     (f'{HOST}/app-a', W + 'ci.yml', 'jobs.publish', '@main'),
     (f'{HOST}/app-b', W + 'ci.yml', 'jobs["publish-prd"]', '@v1'),
@@ -549,18 +537,15 @@ PUBLISH_CONSUMERS = [
 
 SLICES = {'f1': tuple(WORKSPACES), 'f2': ('run', 'chain'), 'f3': ('calls', 'permissions')}
 
-# Slice F2 (#820, "The `run` script and the command table" and "Programs of the workspace"). The workspace
-# `run` holds one CI job per case in `acme/steps`, named like its case, over the PyPI packages of `acme/libs`.
 LIBS, STEPS, SDK = f'{HOST}/libs', f'{HOST}/steps', f'{HOST}/core-sdk'
-# folder of `acme/libs` -> (distribution, version, its console script and the function it names)
 PACKAGES = {
     'lib': ('acme-lib', '1.4.0', {}),
     'tool': ('acme-tool', '0.3.0', {}),
-    'plain': ('acme-plain', '0.1.0', {'plain-cli': 'plain_main'}),  # no script named like the package
+    'plain': ('acme-plain', '0.1.0', {'plain-cli': 'plain_main'}),
     'sync': ('acme-sync-kit', '2.0.0', {'acme-sync': 'sync_main'}),
-    'fmt': ('acme-fmt', '1.0.0', {'acme-fmt-all': 'fmt_all_main', 'acme-fmt': 'fmt_main'}),  # `uvx` names the package: its own script
-    'suite': ('acme-fast-suite', '1.0.0', {}),  # the one package the pattern of the forms fits
-    'flavor': ('flavor', '0.1.0', {}),  # named like a variable of the forms: never matched by that name
+    'fmt': ('acme-fmt', '1.0.0', {'acme-fmt-all': 'fmt_all_main', 'acme-fmt': 'fmt_main'}),
+    'suite': ('acme-fast-suite', '1.0.0', {}),
+    'flavor': ('flavor', '0.1.0', {}),
     'dup-a': ('dup-a', '1.0.0', {'acme-dup': 'dup_a_main'}),
     'dup-b': ('dup-b', '1.0.0', {'acme-dup': 'dup_b_main'}),
 }
@@ -596,8 +581,6 @@ def libs():
     return files
 
 
-# The sides #820 gives a CI step. A consumer of a package carries the range as written; a program is the
-# level of its link and the entry points it reaches; a builder is the image it is the site of.
 def consumer(name, written=None):
     return 'consumer', package(name), written
 
@@ -614,13 +597,9 @@ def probe(control, script, *sides, **options):
     return control, script, sides, options
 
 
-KO = lambda name: {'job': {'env': {'KO_DOCKER_REPO': f'ghcr.io/acme/{name}'}}}  # where the reader of today takes it
+KO = lambda name: {'job': {'env': {'KO_DOCKER_REPO': f'ghcr.io/acme/{name}'}}}
 PWSH = {'defaults': {'run': {'shell': 'pwsh'}}}
-# case: (control, the script of its CI step or the step's own keys, the sides of the CI step, options).
-# Options: `shell` and `env` of the CI step, `job` (keys of its CI job), `before` and `after` (the package an
-# earlier or a later CI step of the job installs with `pip install`), `file` (its pipeline, `run.yml` unless named).
 PROBES = {
-    # One per row of the command table.
     'pip_install': probe('pip_download', 'pip install acme-lib', consumer('acme-lib')),
     'pip3_install': probe('pip_download', 'pip3 install "acme-lib>=1.2,<2"', consumer('acme-lib', '>=1.2,<2')),
     'python_m_pip': probe('conda_install', 'python -m pip install acme-tool==0.3.0', consumer('acme-tool', '==0.3.0')),
@@ -631,10 +610,9 @@ PROBES = {
     'docker_push': probe('docker_build', 'docker push ghcr.io/acme/pushed:1.0', image('ghcr.io/acme/pushed')),
     'buildx_push': probe('buildx_no_push', 'docker buildx build --push -t ghcr.io/acme/built:1.0 --tag ghcr.io/acme/built-alt:1.0 .',
                          image('ghcr.io/acme/built'), image('ghcr.io/acme/built-alt')),
-    'docker_push_sha': probe('docker_build', 'docker push ghcr.io/acme/tagged:${{ github.sha }}', image('ghcr.io/acme/tagged')),  # the tag is no part of the name
+    'docker_push_sha': probe('docker_build', 'docker push ghcr.io/acme/tagged:${{ github.sha }}', image('ghcr.io/acme/tagged')),
     'ko_build': probe('ko_not_bare', 'ko build --bare ./cmd/app', image('ghcr.io/acme/ko-built'), **KO('ko-built')),
     'ko_publish': probe('ko_not_bare', 'ko publish --bare ./cmd/app', image('ghcr.io/acme/ko-published'), **KO('ko-published')),
-    # The builder forms of actions, read before F2: they keep their rule and take the CI step as their site.
     'build_push_action': probe('docker_build', {'uses': 'docker/build-push-action@v6', 'with': {'push': True, 'tags': 'ghcr.io/acme/actioned:1.0'}},
                                image('ghcr.io/acme/actioned')),
     'metadata_action': probe('docker_build', {'uses': 'docker/metadata-action@v5', 'with': {'images': 'ghcr.io/acme/described'}},
@@ -642,7 +620,6 @@ PROBES = {
     'docker_build': probe('docker_push', 'docker build -t ghcr.io/acme/local:1.0 .'),
     'buildx_no_push': probe('buildx_push', 'docker buildx build -t ghcr.io/acme/unpushed:1.0 .'),
     'ko_not_bare': probe('ko_build', 'ko build ./cmd/app', **KO('ko-plain')),
-    # One per rule of the gate: units, the heredoc, where a command starts, and the text that is none.
     'two_lines': probe('heredoc', 'pip install acme-lib\npip install acme-tool', consumer('acme-lib'), consumer('acme-tool')),
     'heredoc': probe('two_lines', 'cat > notes.txt <<EOF\npip install acme-tool\nEOF\npip install acme-lib'),
     'echo': probe('pip_install', 'echo pip install acme-lib\necho "pip install acme-tool"'),
@@ -656,30 +633,24 @@ PROBES = {
     'quoted': probe('string', "pip install 'acme-tool==0.3.0'", consumer('acme-tool', '==0.3.0')),
     'then_same_line': probe('echo', 'if [ -f setup.cfg ]; then pip install acme-lib; fi', consumer('acme-lib')),
     'do_same_line': probe('echo', 'for attempt in 1 2 3; do pip install acme-tool; done', consumer('acme-tool')),
-    # The gate names `&&` and `;` alone: after `||` or a pipe, or behind another command, a command is not read.
     'or_list': probe('and_list', 'false || pip install acme-lib'),
     'pipe': probe('and_list', 'yes | pip install acme-lib'),
     'prefix': probe('pip_install', 'sudo pip install acme-lib'),
     'two_names': probe('no_provider', 'pip install acme-lib acme-tool', consumer('acme-lib'), consumer('acme-tool')),
-    # A package no repository of the workspace provides holds no side, as a dependency entry of a manifest.
     'no_provider': probe('pip_install', 'pip install acme-absent'),
     'conda_install': probe('pip_install', 'conda install acme-lib'),
     'pip_download': probe('pip_install', 'pip download acme-lib'),
-    # No shell is evaluated: an assignment is not followed, and a literal `env` gives a value.
     'assignment': probe('env_literal', 'PKG=acme-lib\npip install $PKG', ('unresolved', 'PKG')),
     'env_literal': probe('assignment', 'pip install $PKG', consumer('acme-lib'), env={'PKG': 'acme-lib'}),
     'env_expression': probe('whole_vars', 'pip install ${{ env.TOOL }}', consumer('acme-tool'), job={'env': {'TOOL': 'acme-tool'}}),
-    # The pipeline's `env` gives `WHICH`, and a nearer `env` that defines the name decides.
     'env_pipeline': probe('env_nearest', 'pip install $WHICH', consumer('acme-tool')),
     'env_nearest': probe('env_pipeline', 'pip install $WHICH', consumer('acme-lib'), env={'WHICH': 'acme-lib'}),
-    # An argument that is no requirement by name gives no side (#831).
     'requirements_file': probe('pip_install', 'pip install -r requirements.txt'),
     'editable': probe('pip_install', 'pip install -e .'),
     'wheel_path': probe('pip_install', 'pip install ./dist/acme_lib-1.4.0-py3-none-any.whl'),
     'archive_url': probe('pip_install', 'pip install https://files.example.com/acme-lib-1.4.0.tar.gz'),
     'option_value': probe('archive_url', 'pip install --index-url https://pypi.example.com/simple acme-tool', consumer('acme-tool')),
     'option_names_package': probe('two_names', 'pip install --no-binary acme-lib acme-tool', consumer('acme-tool')),
-    # The shell: the CI step's, else the `defaults.run.shell` of its CI job, else of its pipeline (#831).
     'shell_bash': probe('shell_pwsh', 'pip install acme-lib', consumer('acme-lib'), shell='bash'),
     'shell_sh': probe('shell_pwsh', 'pip install acme-tool', consumer('acme-tool'), shell='sh'),
     'shell_pwsh': probe('shell_bash', 'pip install acme-lib', shell='pwsh'),
@@ -688,10 +659,6 @@ PROBES = {
     'shell_pipeline_default': probe('shell_job_over_pipeline', 'pip install acme-lib', file='defaults.yml'),
     'shell_job_over_pipeline': probe('shell_pipeline_default', 'pip install acme-lib', consumer('acme-lib'), file='defaults.yml',
                                      job={'defaults': {'run': {'shell': 'sh'}}}),
-    # One per row of the level table. No CI job but its own installs for `level_inferred`: an install in
-    # another CI job, as in a later CI step, is no evidence (#832). An install and `uvx` or `pipx run` name the
-    # package by its name alone, so their rows read `inferred` too (ADR 0029, #850): the rows that differ only
-    # by that evidence are no control of each other any more, and each takes a control with another answer.
     'level_earlier_step': probe('level_none', 'acme-sync --all', program('inferred', 'sync'), before=['acme-sync-kit'], file='levels.yml'),
     'level_uvx': probe('level_uvx_no_script', 'uvx acme-fmt --check .', program('inferred', 'fmt'), file='levels.yml'),
     'level_pipx_run': probe('level_uvx_no_script', 'pipx run acme-fmt --check .', program('inferred', 'fmt'), file='levels.yml'),
@@ -706,12 +673,9 @@ PROBES = {
                               file='levels.yml'),
     'level_pipx_install': probe('level_none', 'pipx install acme-fmt\nacme-fmt --check .', consumer('acme-fmt'), program('inferred', 'fmt'), file='levels.yml'),
 }
-# Each unresolved form, with the variable its side names when it names one, in the three places of the gate:
-# in part of a name (a pattern one package of the workspace fits), as the whole name, inside an option's value.
 FORMS = {'secrets': ('${{ secrets.SECRET_FLAVOR }}', 'SECRET_FLAVOR'), 'vars': ('${{ vars.FLAVOR }}', 'FLAVOR'), 'github': ('${{ github.ref_name }}', None),
          'matrix': ('${{ matrix.flavor }}', None), 'variable': ('$SHELL_FLAVOR', 'SHELL_FLAVOR'), 'substitution': ('$(cat flavor.txt)', None),
          'backticks': ('`cat flavor.txt`', None)}
-# A pattern no package fits holds no side, as a name no repository provides.
 PROBES['part_nothing'] = probe('part_vars', 'pip install other-${{ vars.FLAVOR }}-kit', file='forms.yml')
 for form, (text, variable) in FORMS.items():
     more = {'file': 'forms.yml', **({'job': {'strategy': {'matrix': {'flavor': ['fast', 'slow']}}}} if form == 'matrix' else {})}
@@ -769,9 +733,6 @@ WORKSPACES['run'] = {'libs': libs(), 'steps': {**pipelines(), 'tools/install/act
 CASES.update({case: ('run', 'steps', W + options.get('file', 'run.yml'), case, case, ('run', *sides)) for case, (_, _, sides, options) in PROBES.items()})
 CASES['composite_run'] = ('run', 'steps', 'tools/install/action.yml', 'runs', 'composite_run', ('run', consumer('acme-lib')))
 CASES['composite_pwsh'] = ('run', 'steps', 'tools/install/action.yml', 'runs', 'composite_pwsh', ('run',))
-# The chain of F2 (#820, "Further Notes"), over the callers of `calls`: `acme/core-api` serves a route,
-# the console script of `acme/core-sdk` calls it with a base URL read from the environment (a link read
-# from the SDK's code, today), and `publish.yml` installs the package and runs the script.
 WORKSPACES['chain'] = {
     **{repo: {W + file: unmarked(WORKSPACES['calls'][repo][W + file])}
        for repo, file in (('app-a', 'ci.yml'), ('app-b', 'ci.yml'), ('app-c', 'ci.yml'), ('wrapper', 'release.yml'))},
@@ -834,17 +795,12 @@ def health_main():
 ''',
     },
 }
-# What a peer entry holds beside its repository and path: the variable the SDK reads its base URL from.
 PEER_KEYS = {('core-sdk', 'core-api'): 'base_url_env = ["CORE_API_URL"]\n'}
 PUBLISH_MAIN, ROUTE = f'{SDK}::core_sdk/cli.py::publish_main', (f'{HOST}/core-api::app/main.py::register_package', 'http::POST::/v1/packages')
 CASES.update({
     'chain_install': ('chain', 'workflows', W + 'publish.yml', 'publish', 'chain_install', ('run', consumer('core-sdk'))),
     'chain_run': ('chain', 'workflows', W + 'publish.yml', 'publish', 'chain_run', ('run', ('program', 'inferred', (('core-sdk', PUBLISH_MAIN),)))),
 })
-# The fork probe (#850, ADR 0029): `acme/httpie` holds a fork of a public PyPI package under its public name, and
-# `acme/deploy` installs that name and runs its console script. Both links rest on the name alone, so both are
-# `inferred` and none is `exact`. Its control is the same CI step in a workspace with no provider of the name:
-# no side. A pass or a fail of its own, outside the thresholds of the A9 yardstick (ADR 0029, "Spec A9").
 FORK, FORK_MAIN = f'{HOST}/httpie', f'{HOST}/httpie::httpie/cli.py::main'
 
 
@@ -866,18 +822,13 @@ CASES.update({
                          ('run', consumer('httpie'), ('program', 'inferred', (('httpie', FORK_MAIN),)))),
     'fork_no_provider': ('fork-control', 'deploy', W + 'fork.yml', 'smoke', 'install_and_run', ('run',)),
 })
-# The site of every console script's function: a link from a CI step to one of them starts a program.
 ENTRIES = {f'{LIBS}::{folder}/{name.replace("-", "_")}/cli.py::{function}' for folder, (name, _, scripts) in PACKAGES.items()
            for function in scripts.values()} | {PUBLISH_MAIN, f'{SDK}::core_sdk/cli.py::health_main', FORK_MAIN}
-# The provider of a package: the site of its manifest.
 MANIFESTS = ({package(name): f'{LIBS}::{folder}/pyproject.toml' for folder, (name, _, _) in PACKAGES.items()}
              | {package('core-sdk'): f'{SDK}::pyproject.toml', package('httpie'): f'{FORK}::pyproject.toml'})
 CHAIN_CALLERS = [('app-a', 'jobs.publish'), ('app-b', 'jobs["publish-prd"]'), ('app-b', 'jobs["publish-stg"]'), ('wrapper', 'jobs.release'),
                  ('app-c', 'jobs.release')]
 
-# Slice F3 (#820, "Declared permissions"). The key of a case is the block that governs its CI job as #820
-# reads it, and the flags of its link: (permission, the level a CI job of the provider declares, the
-# consumer's). The first five are the F3 columns of the table under "Further Notes".
 BOTH = {'id-token': 'write', 'contents': 'read'}
 DECLARED = {
     'a_publish': (BOTH, ()),
@@ -886,22 +837,20 @@ DECLARED = {
     'w_release': (BOTH, ()),
     'c_release': (NOT_DECLARED, ()),
     'perm_pipeline_block': ({'contents': 'read'}, (('id-token', 'write', 'none'),)),
-    'perm_job_replaces': ({'id-token': 'write'}, (('contents', 'read', 'none'),)),  # a block is closed
+    'perm_job_replaces': ({'id-token': 'write'}, (('contents', 'read', 'none'),)),
     'perm_job_enough': (BOTH, ()),
     'perm_read_all': ('read-all', (('contents', 'write', 'read'),)),
     'perm_write_all': ('write-all', ()),
     'perm_empty': ({}, (('contents', 'read', 'none'),)),
-    'perm_provider_job_block': ({'contents': 'read'}, ()),  # the provider's own job block replaces its pipeline's
-    'perm_provider_not_declared': ({'contents': 'read'}, ()),  # a provider that declares none is not compared
+    'perm_provider_job_block': ({'contents': 'read'}, ()),
+    'perm_provider_not_declared': ({'contents': 'read'}, ()),
     'perm_any_provider_job': ({'contents': 'read'}, (('packages', 'write', 'none'),)),
-    'perm_both_flags': ({'contents': 'read'}, (('id-token', 'write', 'none'),)),  # with `ref mismatch`
+    'perm_both_flags': ({'contents': 'read'}, (('id-token', 'write', 'none'),)),
     'perm_not_declared': (NOT_DECLARED, ()),
     'perm_job_alone': (BOTH, ()),
     'perm_two_flags': ({'packages': 'read'}, (('contents', 'read', 'none'), ('id-token', 'write', 'none'))),
 }
 PERMISSION_NAMES = {'id-token', 'contents', 'packages'}
-# case: (control, its pipeline in `acme/perm-consumer`, the CI job's own block or None, the pipeline it calls).
-# `blocks.yml` declares `contents: read` for the pipeline; `bare.yml` declares nothing.
 CALLERS = {
     'perm_pipeline_block': ('perm_job_enough', 'blocks.yml', None, 'token.yml@main'),
     'perm_job_replaces': ('perm_job_enough', 'blocks.yml', {'id-token': 'write'}, 'token.yml@main'),
@@ -943,7 +892,6 @@ WORKSPACES['permissions'] = {
         'act/action.yml': COMPOSITE.replace('NAME', 'act'),
     },
     'perm-consumer': {
-        # Only a link whose consumer is a CI job compares permissions: an action declares none.
         W + 'blocks.yml': callers('blocks.yml') + '''  perm_action:
     runs-on: ubuntu-latest
     steps:
@@ -975,7 +923,7 @@ def short(consumer_block, provider):
     found = set()
     for job in provider['jobs'] if consumer_block != NOT_DECLARED else ():
         block = governing(provider, job)
-        if isinstance(block, dict):  # `not declared` is not compared, and no provider of the cases writes a shorthand
+        if isinstance(block, dict):
             found |= {(name, level, held(consumer_block, name)) for name, level in block.items()
                       if LEVELS.index(level) > LEVELS.index(held(consumer_block, name))}
     return tuple(sorted(found))
@@ -1015,7 +963,6 @@ def seed(root, workspaces):
             if name not in NO_ORIGIN:
                 git('remote', 'add', 'origin', f'https://{HOST}/{name}.git', cwd=path)
             files = dict(repos.get(name, {}))
-            # A repository without `origin` has no identity a peer entry could name: nobody lists it.
             peers = ''.join(f'[[peer]]\nrepo = "{HOST}/{other}"\npath = "../{other}"\n{PEER_KEYS.get((name, other), "")}\n'
                             for other in names if other not in (name, 'hub', *NO_ORIGIN))
             files['meada.toml'] = peers + files.get('meada.toml', '')
@@ -1085,7 +1032,7 @@ def owned_files(files):
             found[file] = doc
         elif name in ('action.yml', 'action.yaml') and 'runs' in doc:
             if name == 'action.yml' or str(Path(file).with_name('action.yml')) not in files:
-                found[file] = doc  # with both names, the action is `action.yml`
+                found[file] = doc
     return found
 
 
@@ -1112,7 +1059,7 @@ def providers(workspace):
     out = set()
     for (repo, file), doc in ci_files(workspace).items():
         if 'jobs' in doc:
-            on = doc.get(True, doc.get('on'))  # YAML 1.1 reads the key `on` as a boolean
+            on = doc.get(True, doc.get('on'))
             if on == 'workflow_call' or isinstance(on, (list, dict)) and 'workflow_call' in on:
                 out.add((f'ci::{identity(repo)}/{file}', f'{identity(repo)}::{file}::.'))
         else:
@@ -1156,13 +1103,11 @@ def problems(cases, workspaces):
 
 def selftest():
     assert not problems(CASES, WORKSPACES), problems(CASES, WORKSPACES)
-    # Each defect is caught: a missing control line, and a control that expects the same answer.
     stripped = json.loads(json.dumps(WORKSPACES).replace('  # control: c_release\\n', '', 1))
     assert any('no `# control:` line' in line for line in problems(CASES, stripped))
     same = {**CASES, 'job_external': (*CASES['job_external'][:5], CASES['job_remote'][5])}
     assert any('cannot fail' in line for line in problems(same, WORKSPACES))
     assert any('no `# case:` line' in line for line in problems({**CASES, 'zz': CASES['a_publish']}, WORKSPACES))
-    # The table of #820 against this driver's own reading of the files it generates.
     read_back = sorted((site.split('::')[0], site.split('::')[1], site.split('::')[2], '@' + fields(body)[REF])
                        for site, body in map(located, CASES) if body.get('uses', '').startswith('acme/workflows/' + W + 'publish.yml@'))
     assert read_back == sorted(PUBLISH_CONSUMERS), read_back
@@ -1179,15 +1124,13 @@ def selftest():
     assert not any('plain.yml' in site or 'action.yaml::' in site and 'setup' in site or 'docker-only' in site for _, site in providers('calls'))
     assert {PUBLISH, RELEASE, LOCAL, LOCAL_ACTION, action('actions')} <= providers('calls')
     assert f'{HOST}/app-a::{W}ci.yml::jobs.build.steps[1]' in nodes('calls') and f'{HOST}/actions::action.yml::runs.steps[0]' in nodes('calls')
-    # Slice F2: each script reads back from its generated pipeline, at the CI step the table places it.
     for case, (_, script, _, options) in PROBES.items():
         site, body = located(case)
         assert site == f'{STEPS}::{W}{options.get("file", "run.yml")}::jobs.{case}.steps[{len(options.get("before", []))}]', site
         assert not isinstance(script, str) or body['run'].rstrip('\n') == script and body.get('shell') == options.get('shell'), case
     assert {f'{place}_{form}' for place in ('part', 'whole', 'option') for form in FORMS} <= set(PROBES)
-    # Past 64 CI jobs a pipeline loses the references to the rest (a ceiling of #823): no generated one comes near.
     assert all(len(doc.get('jobs', [])) <= 64 for workspace in SLICES['f2'] for doc in ci_files(workspace).values())
-    for site in ENTRIES:  # every entry point is a function the generated files define
+    for site in ENTRIES:
         repo, file, function = site.split('::')
         assert any(f'def {function}(' in files.get(file, '') for files in (WORKSPACES['run']['libs'], WORKSPACES['chain']['core-sdk'], WORKSPACES['fork']['httpie'])), site
     assert [name for name, _, _ in PACKAGES.values() if re.fullmatch('acme-.+-suite', name)] == ['acme-fast-suite'], 'one package fits the pattern'
@@ -1220,7 +1163,6 @@ def selftest():
     assert not fits(({None, package('flavor')}, set(), {(package('flavor'), f'{LIBS}::flavor/pyproject.toml', 'exact')}), want[located('whole_vars')[0]])
     assert fits((set(), set(), {(package('acme-fmt'), entry('fmt')[1], 'inferred')}), want[located('level_uvx')[0]])
     assert not fits((set(), set(), {(package('acme-fmt'), entry('fmt')[1], 'exact')}), want[located('level_uvx')[0]])
-    # The fork probe: both links `inferred`, an `exact` one on either side fails, and the control holds no side.
     fork, inferred = wanted('fork')[located('fork_install_run')[0]], (package('httpie'), f'{FORK}::pyproject.toml', 'inferred')
     assert fits(({package('httpie')}, set(), {inferred, (package('httpie'), FORK_MAIN, 'inferred')}), fork)
     assert not fits(({package('httpie')}, set(), {inferred[:2] + ('exact',), (package('httpie'), FORK_MAIN, 'inferred')}), fork)
@@ -1229,7 +1171,6 @@ def selftest():
     assert not fits((set(), set(), {(package('acme-fmt'), f'{LIBS}::fmt/acme_fmt/cli.py::fmt_all_main', 'exact')}), want[located('level_uvx')[0]])
     assert located('chain_run')[0] == f'{HOST}/workflows::{W}publish.yml::jobs.publish.steps[1]'
     assert 'case:' not in WORKSPACES['chain']['app-a'][W + 'ci.yml'] and 'publish.yml@main' in WORKSPACES['chain']['app-a'][W + 'ci.yml']
-    # Slice F3: the keys of #820 against this driver's own reading of the blocks it generated.
     for case, key in DECLARED.items():
         assert declared(case) == key, (case, declared(case))
     assert {case for case, row in CASES.items() if row[0] == 'permissions'} == {*CALLERS, 'perm_action_step'}
@@ -1239,15 +1180,13 @@ def selftest():
         heads = seed(Path(tmp), WORKSPACES)
         assert 'base_url_env = ["CORE_API_URL"]' in (Path(tmp) / 'chain/core-sdk/meada.toml').read_text()
         assert 'base_url_env' not in (Path(tmp) / 'chain/app-a/meada.toml').read_text()
-        for workspace in WORKSPACES:  # every generated pipeline and action reads as YAML with its CI jobs or steps
+        for workspace in WORKSPACES:
             for (repo, file), doc in ci_files(workspace).items():
                 assert read((Path(tmp) / workspace / repo / file).read_text().replace(heads['ref-provider'], HEAD_REF)) == doc, file
         text = (Path(tmp) / 'refs/ref-consumer' / W / 'ci.yml').read_text()
         assert f'build.yml@{heads["ref-provider"]}\n' in text and HEAD_REF not in text
         assert not (Path(tmp) / 'solo/solo/.git/refs/remotes').exists()
         assert 'path = "../app-c"' in (Path(tmp) / 'calls/hub/meada.toml').read_text()
-        # Over an export with no row and answers with no line, each slice runs to its end and fails there:
-        # a row the product does not give is a failed check, never a crash or a pass.
         for name, body in (('f1', f1), ('f2', f2), ('f3', f3)):
             run = Silent(Path(tmp) / 'silent' / name, None, None)
             body(run, heads, collections.defaultdict(dict), collections.defaultdict(str))
@@ -1275,7 +1214,6 @@ def corpus_selftest(pinned):
     """#904's sets, their run records and what `measure` counts, without Meada."""
     sets = corpus_sets()
     assert {name: len(repos) for name, repos in sets.items()} == {'p': 3, 'a': 6, 'b': 7, 'c': 10, 'f': 41, 'f-distractor': 47}, sets
-    # Meada refuses a manifest identity that is not its own lower-cased reading of the remote (pyBumpHunter).
     assert sets['f']['ci-f-pybumphunter'] == 'github.com/scikit-hep/pybumphunter', sets['f']
     assert all(identity == identity.lower() for repos in sets.values() for identity in repos.values()), sets
     records = json.loads((Path(__file__).resolve().parent / 'ci-records.json').read_text())['records']
@@ -1493,10 +1431,10 @@ def f1(run, heads, exports, statuses):
             cwd = run.folder / 'head' / 'work' / workspace / repo
             if expected[0] in ('link', 'mismatch'):
                 reasons = [row['reason'] for row in rows('links') if row['consumer'] == site and row['contract'] == expected[1]]
-                if expected[3] is None:  # a local call and a `$/` call write no ref
+                if expected[3] is None:
                     ok = len(reasons) == 1 and '@' not in reasons[0] and 'ref mismatch' not in reasons[0]
                 else:
-                    indexed = heads[expected[2].split('::')[0].rsplit('/', 1)[1]]  # the provider's commit
+                    indexed = heads[expected[2].split('::')[0].rsplit('/', 1)[1]]
                     shape = flagged(reasons[0]) if len(reasons) == 1 else None
                     ok = bool(shape) and shape[0] == expected[3] and indexed.startswith(shape[1]) and ('ref mismatch' in shape[2]) == (expected[0] == 'mismatch')
                 run.check(f'{case}: the reason of its link', ok, reasons)
@@ -1522,15 +1460,12 @@ def f1(run, heads, exports, statuses):
 
     calls = lambda side, repo: run.folder / side / 'work' / 'calls' / repo
     big = {'budget': 200000}
-    # External files, over the whole output: no side, no orphan line, no open item.
     everywhere = [*WORKSPACES['calls'], 'hub']
     named = [f'{repo}:{section}' for repo in everywhere for section, found in exports['head', 'calls', repo].items() if isinstance(found, list)
              for row in found if isinstance(row, dict) and any(name in str(row.get('contract')) for name in EXTERNAL)]
     run.check('external files name no contract in any export', not named, named)
     named = [repo for repo in [*WORKSPACES['calls'], 'hub'] if any(name in statuses['head', 'calls', repo] for name in EXTERNAL)]
     run.check('external files are in no line of `meada status`', not named, named)
-    # A legitimate open item (a `./<folder>` step with no checkout) may say `checkout` in its cause: a line
-    # counts only when it names the external file's own `uses`.
     open_items = [('search', {'query': query, 'kind': kind, **big}) for query in ('actions/checkout', 'build-push-action', 'setup-node', 'other-org', 'upload')
                   for kind in ('ambiguous', 'unresolved')]
     external_uses = ('actions/checkout@', 'actions/setup-node@', 'docker/build-push-action@', 'other-org/')
@@ -1542,12 +1477,9 @@ def f1(run, heads, exports, statuses):
     reply = run.ask('head', calls('head', 'hub'), 'external-control', [('search', {'query': 'actions/checkout', 'kind': 'value', **big})])[0]
     run.check('control: the `uses` lines of the external actions are read as config values', 'actions/checkout@v4' in reply, reply)
 
-    # The reproduction of #816 from the hub: the consumers of `publish.yml` and the chain through the wrapper.
     hub_queries = [('context', {'symbol': PUBLISH[0], **big}), ('context', {'symbol': W + 'publish.yml', **big}),
                    ('trace', {'from': PUBLISH[0], 'direction': 'up', **big}), ('trace', {'from': pipeline('workflows', 'on-string.yml')[0], 'direction': 'up', **big})]
     hub = run.ask('head', calls('head', 'hub'), 'hub', hub_queries)
-    # #820 gives the Git ref and the keys to `context` on the provider, the pipeline: its contract identifier
-    # answers with the contract's sides, the same four consumers and no more.
     for reply, label, words in zip(hub[:2], ('the contract of `publish.yml` lists the four consumers as its sides, each on one line',
                                              '`publish.yml` by its file path lists the four consumers, each on one line with its Git ref and keys'),
                                    (lambda row: (*row[:3], ' consumer '), lambda row: (*row, 'package'))):
@@ -1567,11 +1499,7 @@ def f1(run, heads, exports, statuses):
     run.check('`trace` down from `app-c` reaches `release.yml` and `publish.yml`',
               f'{HOST}/wrapper' in down and 'release.yml' in down and f'{HOST}/workflows' in down and 'publish.yml' in down, down)
 
-    # CI nodes and references, in `app-a` and `actions`.
     step_site = lambda case: located(case)[0]
-    # `app-b` and `app-c` hold a `ci.yml` too, and `app-b` a `jobs.build`: a path that several repositories
-    # of the workspace hold is ambiguous, so those three nodes are asked with their repository. The two
-    # addresses only `app-a` holds are asked by path.
     own = f'{HOST}/app-a::{W}ci.yml::'
     node_queries = [('search', {'query': 'publish', 'kind': 'ci'}), ('search', {'query': 'a_image', 'kind': 'ci'}),
                     ('search', {'query': 'docker/build-push-action', 'kind': 'ci'}), ('context', {'symbol': own + '.', **big}),
@@ -1601,19 +1529,15 @@ def f1(run, heads, exports, statuses):
     run.check('`trace` up from a nested action reaches the pipeline through the composite action that calls it',
               'runs.steps[1]' in reply and step_site('step_local_own').split('::')[2] in reply, reply)
 
-    # The files the CI reader owns (#828): only the typed-key use goes, and an `exact` use gains its CI step.
     at = lambda side, suffix: [row for row in exports[side, 'calls', 'forms'].get('uses', []) if row['at'].endswith(suffix)]
     run.check('use_typed_key: no use from a plain name under a typed key', not at('head', '.with.bucket'), at('head', '.with.bucket'))
     run.check('use_role_arn: no use from a role ARN in `with`', not at('head', 'role-to-assume"]'), at('head', 'role-to-assume"]'))
     run.check('use_structured: the use is on its CI step', [row['site'] for row in at('head', '.with.target')] == [step_site('use_structured')], at('head', '.with.target'))
     run.check('use_other_file: another file of `.github/` keeps its use', len(at('head', 'storage.bucket')) == 1, at('head', 'storage.bucket'))
 
-    # The base holds #828 since #860 merged: these rows are the base's now. `use_other_file` is the control
-    # that the key-name rule still gives a use outside a pipeline.
     for case, suffix in (('use_typed_key', '.with.bucket'), ('use_role_arn', 'role-to-assume"]'), ('use_structured', '.with.target'),
                          ('use_other_file', 'storage.bucket')):
         run.comparisons.compare(f'{case}: config use', at('base', suffix), at('head', suffix))
-    # Existing answers: the `uses` lines as config values, the hand declaration, kind `iac` and the default search.
     same = [('search', {'query': 'publish.yml', 'kind': 'value', **big}), ('search', {'query': 'publish', 'kind': 'iac'}), ('search', {'query': 'publish'}),
             ('context', {'symbol': 'resource::gha-workflow::acme/workflows/.github/workflows/publish.yml', **big})]
     before, after = (run.ask(side, calls(side, 'hub'), 'existing', same) for side in ('base', 'head'))
@@ -1706,7 +1630,6 @@ def f2(run, heads, exports, statuses):
             for side in row[5][1:]:
                 if side[0] == 'consumer' and side[2]:
                     run.check(f'{case}: the range as written, `{side[2]}`', side[2] in naming, naming)
-    # Silence, over the whole output of the `run` workspace: a CI node no case names holds no side.
     rows = lambda section: gathered(exports, 'run', section)
     want, nothing = wanted('run'), (set(), set(), set(), set())
     cases = {located(case)[0] for case, row in CASES.items() if row[0] == 'run'}
@@ -1717,7 +1640,6 @@ def f2(run, heads, exports, statuses):
     exported = {row['identity'] for row in rows('iac_nodes')}
     wrong = [site for site in sorted(want) if any(sided(rows, site)) and site not in exported]
     run.check('run: every CI step that holds a side is in `iac_nodes`', not wrong, wrong)
-    # An unresolved side names its variable, where the form holds one.
     variables = sorted({side[1] for row in CASES.values() if row[0] == 'run' for side in row[5][1:] if side[0] == 'unresolved' and side[1]})
     replies = dict(zip(variables, run.ask('head', at('run', 'steps'), 'unresolved-variables',
                                           [('search', {'query': name, 'kind': 'unresolved', **big}) for name in variables])))
@@ -1725,7 +1647,6 @@ def f2(run, heads, exports, statuses):
         for side in row[5][1:] if row[0] == 'run' else ():
             if side[0] == 'unresolved' and side[1]:
                 run.check(f'{case}: `search` kind `unresolved` for `{side[1]}` shows its CI step', address(case) in replies[side[1]], replies[side[1]])
-    # `context` on a package lists the CI steps that install it, and no CI step of a case that may not hold it.
     for name in ('acme-lib', 'acme-tool'):
         reply = run.ask('head', at('run', 'hub'), f'context-{name}', [('context', {'symbol': package(name), **big})])[0]
         listed = lambda case: any(STEPS in line and address(case) in line for line in reply.splitlines())
@@ -1733,8 +1654,6 @@ def f2(run, heads, exports, statuses):
         others = [case for case, row in CASES.items() if row[0] == 'run' and package(name) not in want[located(case)[0]][1]]
         run.check(f'`context` on `{package(name)}` lists each of the {len(installs)} CI steps that install it and none of the {len(others)} others',
                   all(map(listed, installs)) and not any(map(listed, others)), reply)
-    # The image builder forms: each builder row has its CI step as its site and is read at a key of that
-    # step. The base holds #833 since #860 merged, so the row is the base's too.
     built = lambda side, contracts: sorted((row for row in exports[side, 'run', 'steps'].get('providers', []) if row['contract'] in contracts),
                                            key=lambda row: json.dumps(row, sort_keys=True))
     for case, row in CASES.items():
@@ -1746,8 +1665,6 @@ def f2(run, heads, exports, statuses):
                   len(after) == len(contracts) and all(found['site'] == located(case)[0] and found.get('at', '').startswith(f'{row[2]}#{address(case)}.')
                                                        for found in after), after)
         run.comparisons.compare(f'{case}: image builder', before, after)
-    # The chain: the HTTP link is read from the SDK's code and equals the base, and `trace` crosses the
-    # three contracts both ways.
     links = lambda side: sorted(json.dumps(row, sort_keys=True) for row in gathered(exports, 'chain', 'links', side) if row['contract'].startswith('http::'))
     known = [row for row in map(json.loads, links('base'))
              if row['consumer'].startswith(PUBLISH_MAIN + '::') and (row['provider'], row['contract']) == ROUTE]
@@ -1788,8 +1705,6 @@ def f3(run, heads, exports, statuses):
             text = json.dumps(found[0].get(PERMISSIONS)) if len(found) == 1 else ''
             run.check(f'{case}: its consumer row carries the block that governs it, under `{PERMISSIONS}`',
                       all(name in text and level in text for name, level in block.items()), found)
-        # The provider is the pipeline's node, named with its repository: the contract identifier answers with
-        # the contract's sides, which carry no permissions.
         owner, name, path = body['uses'].split('@')[0].split('/', 2)
         provider = f'github.com/{owner}/{name}::{path}::.'
         if provider not in contexts:
@@ -1797,12 +1712,10 @@ def f3(run, heads, exports, statuses):
                                          [('context', {'symbol': provider, **big})])[0]
         lines = [line for line in contexts[provider].splitlines()
                  if f'{HOST}/{repo}' in line and re.search(re.escape(site.split('::')[2]) + r'(?![\w.\[])', line)]
-        # A provider that declares nothing may be shown so on the line: only the consumer's own words are keyed.
         shown = (len(lines) == 1 and (PMISMATCH in lines[0]) == bool(flags)
                  and (NOT_DECLARED in lines[0] if block == NOT_DECLARED else case == 'perm_provider_not_declared' or NOT_DECLARED not in lines[0])
                  and (not isinstance(block, dict) or all(name in lines[0] and level in lines[0] for name, level in block.items())))
         run.check(f'{case}: `context` on its provider shows its declared permissions and {"the flag" if flags else "no flag"}', shown, lines or contexts[provider])
-    # Only a link whose consumer is a CI job compares permissions: an action declares none.
     site = located('perm_action_step')[0]
     rows = lambda section: gathered(exports, 'permissions', section)
     found = [row for row in rows('consumers') if row['site'] == site and (row['contract'] or '').startswith('ci::')]
@@ -1821,7 +1734,6 @@ def corpus_sets():
     for name, (flows, url, _) in prove.infra().items():
         for flow in flows:
             if flow == 'ci' or flow.startswith('ci-'):
-                # Meada writes an identity in lower case (`pyBumpHunter`'s remote is `.../pybumphunter`).
                 sets.setdefault('p' if flow == 'ci' else flow[3:], {})[name] = 'github.com/' + url.removeprefix('https://github.com/').lower()
     sets['f-distractor'] = {**sets['f'], **sets.pop('distractor')}
     return sets
@@ -1862,8 +1774,6 @@ def ci_nodes(identity, root):
                            **{key: step[key] for key in ('uses', 'run', 'shell') if isinstance(step.get(key), str)}}
 
 
-# Command forms of a `run` script the yardstick's verifier counts (#904 and its phase 1), found by a text search
-# so each is countable per set beside the F2 rows of its CI step; the reading of each script is the verifier's.
 RUN_FORMS = {'pip install': r'(?<![-\w])pip3? install\b', 'python -m pip install': r'\bpython(3(\.\d+)?)? -m pip install\b',
              'uv pip install': r'\buv pip install\b', 'uv tool install': r'\buv tool install\b', 'uv tool run': r'\buv tool run\b',
              'uvx': r'(?<![-\w])uvx\b', 'uvx --from': r'(?<![-\w])uvx --from\b', 'uvx --with': r'(?<![-\w])uvx --with\b',
@@ -1962,7 +1872,7 @@ def measure(run, name, repos, roots, records):
     seconds['index, export and status'] = round(time.monotonic() - clock)
     write(folder / 'status.txt', status)
     orphans = [line for line in status.splitlines() if ORPHAN.match(line)]
-    write(folder / 'orphans.txt', ''.join(line + '\n' for line in orphans))  # as `status` prints them, no case apart
+    write(folder / 'orphans.txt', ''.join(line + '\n' for line in orphans))
     rows = {section: list({json.dumps(row, sort_keys=True): row for export in exports.values() for row in export.get(section, [])}.values())
             for section in ('consumers', 'providers', 'links')}
     nodes = [node for repo, identity in repos.items() for node in ci_nodes(identity, roots[repo])]
@@ -1980,7 +1890,7 @@ def measure(run, name, repos, roots, records):
                                    for section, found in rows.items()})
     dump(folder / 'run-records.json', {repo: records[repo] for repo in repos if repo in records})
     dump(folder / 'counts.json', {'repositories': repos, 'seconds': seconds, **counted(nodes, rows, orphans, repos.values())})
-    shutil.rmtree(folder / 'indexes', ignore_errors=True)  # about four times its sources, and the artifact leaves it out
+    shutil.rmtree(folder / 'indexes', ignore_errors=True)
     return exports
 
 
@@ -1989,8 +1899,6 @@ def corpus(run):
     workspace with #835's keys. Then each set of #904 (P, A, B, C, F, and F with the distractor) as its
     own workspace, on the head binary, saved by `measure`."""
     clock, roots = time.monotonic(), {}
-    # `clean`: a third copy no index is written in. `meada index --workspace` records a commit only for a
-    # clean checkout, and an export alone leaves its `.meada/` in the checkout it read.
     for side in (*run.bins, 'clean'):
         for name, repository in CORPUS.items():
             roots[side, name] = run.folder / side / 'work' / name
@@ -1999,7 +1907,7 @@ def corpus(run):
             else:
                 shutil.copytree(roots['head', name], roots[side, name], symlinks=True)
     exports = {}
-    for side in run.bins:  # alone first: an index written by a workspace run would not be a repository's own
+    for side in run.bins:
         for name in CORPUS:
             exports[side, name] = json.loads(run.command(side, roots[side, name], f'{name}-export', 'export'))
             run.command(side, roots[side, name], f'{name}-status', 'status')
@@ -2008,7 +1916,6 @@ def corpus(run):
         files = set(owned_files({file: (roots['head', name] / file).read_text(errors='replace') for file in tracked if file}))
         parity(run, f'corpus {name}', exports['base', name], exports['head', name], files)
         local = [row for row in exports['head', name].get('links', []) if row['contract'].startswith('ci::')]
-        # `ci-slsa` calls its own pipelines by local path: alone, it holds links.
         run.check(f'corpus {name}: alone, every CI link stays inside the repository',
                   all(row['provider'].startswith(repository + '::') for row in local) and (local or name != 'ci-slsa'), len(local))
     sets, records = corpus_sets(), json.loads((Path(__file__).resolve().parent / 'ci-records.json').read_text())
@@ -2018,11 +1925,10 @@ def corpus(run):
     links = []
     for name, export in measure(run, 'p', sets['p'], checkouts, records['records']).items():
         links += [row for row in export.get('links', []) if row['contract'].startswith('ci::') and row not in links]
-    # Every link goes to the fresh checker of #835, who reads each against the source; these four are read here.
     dump(run.folder / 'workspace' / 'ci-links.json', {'levels': {level: sum(row['level'] == level for row in links) for level in sorted({row['level'] for row in links})}, 'links': links})
     slsa, scanner, osv = CORPUS.values()
     sha = {name: git('rev-parse', 'HEAD', cwd=roots['head', name]).strip() for name in CORPUS}
-    keys = [  # consumer, contract, the Git ref it wrote, the repository whose indexed commit the reason names, `ref mismatch`
+    keys = [
         (f'{scanner}::{W}goreleaser.yml::jobs.provenance', f'ci::{slsa}/{W}generator_generic_slsa3.yml', 'v2.1.0', 'ci-slsa', False),
         (f'{scanner}::{W}prerelease-check.yml::jobs["osv-scan"]', f'ci::{osv}/{W}osv-scanner-reusable.yml', 'main', 'ci-osv-action', False),
         (f'{slsa}::{W}pre-submit.e2e.maven.yml::jobs.build', f'ci::{slsa}/{W}builder_maven_slsa3.yml', 'main', 'ci-slsa', False),
@@ -2041,12 +1947,12 @@ def corpus(run):
             continue
         began = time.monotonic()
         for repo in repos:
-            if repo not in checkouts:  # F's checkouts serve `f-distractor` too: each workspace keeps its index apart
+            if repo not in checkouts:
                 checkouts[repo] = run.folder / 'work' / repo
                 fetch(repo, checkouts[repo])
         measure(run, name, repos, checkouts, records['records'])
         seconds[f'set {name}, fetch included'] = round(time.monotonic() - began)
-        dump(  # after each set, so a run cut by its time limit still says where it stopped
+        dump(
             run.folder / 'seconds.json', {**seconds, 'total': round(time.monotonic() - clock)})
 
 

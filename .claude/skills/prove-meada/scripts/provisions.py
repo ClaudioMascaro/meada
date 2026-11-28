@@ -128,7 +128,6 @@ resource "aws_s3_bucket" "receipts" { bucket = "receipts" }
     finally:
         server.terminate()
         server.wait(timeout=30)
-    # A same-size variable edit must remove just the prod queue's links, then restore them.
     path = infra / 'envs/prod/main.tf'
     original = path.read_text()
     path.write_text(original.replace('"jobs" }', '"gone" }', 1))
@@ -140,8 +139,6 @@ resource "aws_s3_bucket" "receipts" { bucket = "receipts" }
     path.write_text(original)
     restored = export(binary, infra)
     assert restored['provisions'] == results['infra']['provisions']
-    # ADR 0026: whole-segment patterns, literal evidence, multiple distinct names. The literal
-    # part needs three letters or digits; a separator is no evidence (#711, #782).
     write(infra, 'patterns/main.tf', '''resource "aws_s3_bucket" "several" { bucket = "receipts-${terraform.workspace}" }
 resource "aws_s3_bucket" "minimum" { bucket = "abc-${terraform.workspace}" }
 resource "aws_s3_bucket" "short" { bucket = "ab-${terraform.workspace}" }

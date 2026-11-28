@@ -1,13 +1,3 @@
-//! The values cache (ADR 0027): beside the index, in Meada's own directory, what a pack parsed
-//! of each file the last contract extraction read the values of (`valued`), whole, so that a
-//! refresh reads those values back instead of parsing the file again. An entry is keyed by the
-//! file's bytes, the setting it is parsed under, its pack and the build of Meada (`key`); a
-//! parse gives the same facts for the same key, so a hit is what a parse would give. The cache
-//! holds one entry per file the index lists in `valued`, pruned on every extraction, each stored
-//! deflated, and gives the pages a pruned or smaller entry frees back to the file system. Anything
-//! wrong with it (missing, unreadable, an entry that does not inflate within `ENTRY_BYTES` or does
-//! not deserialize) is a miss: it costs a parse, never a different index.
-
 use std::cell::{OnceCell, RefCell};
 use std::collections::BTreeSet;
 use std::fs;
@@ -18,38 +8,24 @@ use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension, params};
 
 use crate::lang::{self, Facts};
 
-/// The cache's file, beside the index's.
 pub(crate) const FILE: &str = "values.db";
 
-/// The largest entry kept, as JSON: what a write serializes and a read inflates, at most. A
-/// pack's limits bound what it parses, not what that serializes to: a C# read's scope is one
-/// string shared by every read of a node in memory and written out once per read.
 // ponytail: a flat 8 MiB, five times this repository's largest entry (1.6 MB); a file past it is
 // parsed on every refresh, which only a crafted file pays.
 pub(crate) const ENTRY_BYTES: usize = 8 << 20;
 
-/// The deflate level of an entry: zlib's default (ADR 0027's 2026-11-12 amendment says why).
 const LEVEL: u8 = 6;
 
-/// One row per file: its path, the key it was parsed under (`key`) and its facts as JSON,
-/// deflated in the zlib format.
 const SCHEMA: &str = "CREATE TABLE IF NOT EXISTS entries \
     (path TEXT PRIMARY KEY, key TEXT NOT NULL, facts BLOB NOT NULL);";
 
-/// The values cache of one refresh: what it read, and what it parsed to write back.
 pub(crate) struct Values {
-    /// The cache's file, beside the index's; none for an index in memory.
     at: Option<PathBuf>,
-    /// The cache opened on the first read, `None` when it is missing or cannot be read.
     db: OnceCell<Option<Connection>>,
-    /// The entries parsed on this refresh: path, key and facts as a stored entry.
     fresh: RefCell<Vec<(String, String, Vec<u8>)>>,
 }
 
 impl Values {
-    /// The cache beside the index `index` holds open. Nothing is opened or created until a
-    /// file is read or written. An index in memory, or a build that cannot tell itself from
-    /// another (`build`), has none.
     pub(crate) fn beside(index: &Connection) -> Values {
         let at = (index.path().filter(|p| !p.is_empty()))
             .filter(|_| build().is_some())
@@ -61,13 +37,11 @@ impl Values {
         }
     }
 
-    /// The cache opened to read on first use, never created: a missing one reads as empty.
     fn db(&self) -> Option<&Connection> {
         let at = self.at.as_deref()?;
         (self.db.get_or_init(|| connect(at, false).ok())).as_ref()
     }
 
-    /// The facts stored for `path` under `key`, as its pack parsed them.
     pub(crate) fn get(&self, path: &str, key: &str) -> Option<Facts> {
         let db = self.db()?;
         let mut statement =
@@ -78,7 +52,6 @@ impl Values {
         facts_of(&blob)
     }
 
-    /// Keeps `facts`, as `path`'s pack parsed it under `key`, to write back (`keep`).
     pub(crate) fn put(&self, path: &str, key: String, facts: &Facts) {
         if self.at.is_none() {
             return;
@@ -88,16 +61,11 @@ impl Values {
         }
     }
 
-    /// Writes the entries parsed on this refresh and drops those of every file not in `read`
-    /// (the new `valued`): the cache never holds more than one entry per file the extraction
-    /// reads. A cache missing or unreadable is created again when there is an entry to write.
-    /// A write that fails leaves the cache as it was, which costs only time.
     pub(crate) fn keep(self, read: &BTreeSet<String>) {
         let Some(at) = self.at else { return };
         let fresh = self.fresh.into_inner();
         let db = match self.db.into_inner().flatten() {
             Some(db) => Some(db),
-            // Nothing read: still pruned, since `read` may have lost files.
             None if fresh.is_empty() => connect(&at, false).ok(),
             None => match connect(&at, true) {
                 Err(e) if !busy(&e) => {
@@ -127,8 +95,6 @@ impl Values {
                 )?;
             }
             tx.commit()?;
-            // The pages a pruned or smaller entry frees stay in the file until a vacuum: give
-            // them back once they are most of it.
             let pages: i64 = db.query_row("PRAGMA page_count", [], |r| r.get(0))?;
             let free: i64 = db.query_row("PRAGMA freelist_count", [], |r| r.get(0))?;
             if free * 2 > pages {
@@ -139,15 +105,9 @@ impl Values {
     }
 }
 
-/// The facts of a stored entry: `None` for a blob that is not one whole zlib stream (bytes past
-/// its end included), that inflates past `ENTRY_BYTES` (the inflation stops there, whatever the
-/// blob asks for: the cache is a file of the repository's directory, so a blob is input) or that
-/// does not deserialize.
 fn facts_of(blob: &[u8]) -> Option<Facts> {
     use miniz_oxide::inflate::TINFLStatus;
     use miniz_oxide::inflate::core::{DecompressorOxide, decompress, inflate_flags};
-    // `decompress_to_vec_zlib_with_limit`'s loop, which stops at the stream's end however much of
-    // the blob is left.
     let flags = inflate_flags::TINFL_FLAG_PARSE_ZLIB_HEADER
         | inflate_flags::TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF;
     let mut state = Box::<DecompressorOxide>::default();
@@ -171,8 +131,6 @@ fn facts_of(blob: &[u8]) -> Option<Facts> {
     serde_json::from_slice(&json).ok()
 }
 
-/// `facts` as a stored entry: JSON with its values, deflated, `None` past `ENTRY_BYTES`, which
-/// the serialization stops at rather than reach.
 fn entry(facts: &Facts) -> Option<Vec<u8>> {
     struct Capped(Vec<u8>);
     impl std::io::Write for Capped {
@@ -193,7 +151,6 @@ fn entry(facts: &Facts) -> Option<Vec<u8>> {
     Some(miniz_oxide::deflate::compress_to_vec_zlib(&out.0, LEVEL))
 }
 
-/// The cache at `at`, created when missing if `create` says so.
 fn connect(at: &Path, create: bool) -> rusqlite::Result<Connection> {
     let mut flags = OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX;
     if create {
@@ -202,12 +159,10 @@ fn connect(at: &Path, create: bool) -> rusqlite::Result<Connection> {
     let db = Connection::open_with_flags(at, flags)?;
     db.busy_timeout(super::BUSY.get())?;
     db.execute_batch(SCHEMA)?;
-    // A table of another shape (another build's) is no cache of this one.
     db.prepare("SELECT path, key, facts FROM entries LIMIT 0")?;
     Ok(db)
 }
 
-/// Whether `e` is another connection's lock held past the busy timeout: no reason to recreate.
 fn busy(e: &rusqlite::Error) -> bool {
     matches!(
         e.sqlite_error_code(),
@@ -215,9 +170,6 @@ fn busy(e: &rusqlite::Error) -> bool {
     )
 }
 
-/// The key of the facts `pack` parses of `src` under `setting`: those and the build of Meada,
-/// which is its version, the stored format's and the running executable's stat, so that two
-/// builds of one version (a working tree, an installed binary) never read each other's values.
 pub(crate) fn key(pack: usize, setting: &str, src: &[u8]) -> String {
     let mut hash = blake3::Hasher::new();
     hash.update(build().unwrap_or_default().as_bytes());
@@ -228,9 +180,6 @@ pub(crate) fn key(pack: usize, setting: &str, src: &[u8]) -> String {
     hash.finalize().to_hex().to_string()
 }
 
-/// The build of Meada running: its version, the stored format's and the executable's path,
-/// size and mtime. `None` when the executable cannot be found or read, so a build that cannot
-/// tell itself from another of its version keeps no cache.
 fn build() -> Option<&'static str> {
     static BUILD: OnceLock<Option<String>> = OnceLock::new();
     let build = BUILD.get_or_init(|| {
@@ -261,7 +210,6 @@ mod tests {
 
     use crate::lang::{self, Facts, Part, Value};
 
-    /// `n` bytes that deflate hardly at all, the same for the same `seed`.
     fn noise(seed: u64, n: usize) -> Vec<u8> {
         let mut out = vec![0; n];
         (blake3::Hasher::new().update(&seed.to_le_bytes()))
@@ -270,9 +218,6 @@ mod tests {
         out
     }
 
-    /// A blob inflates to `ENTRY_BYTES` at most: one that would inflate past it is a miss however
-    /// small it is, and so are plain JSON (an older build's entry), bytes that are no zlib stream
-    /// and a whole stream with bytes past its end.
     #[test]
     fn a_blob_that_inflates_past_its_size_limit_or_is_no_entry_is_a_miss() {
         let json = |n: usize| {
@@ -285,13 +230,10 @@ mod tests {
         let past = deflate(&json(super::ENTRY_BYTES + 1));
         assert!(past.len() < 64 << 10, "{} bytes", past.len());
         assert!(super::facts_of(&past).is_none());
-        // The entry an older build wrote: whole JSON that deserializes, only not deflated.
         let plain = serde_json::to_vec(&Facts::default()).unwrap();
         assert!(serde_json::from_slice::<Facts>(&plain).is_ok());
         assert!(super::facts_of(&plain).is_none());
         assert!(super::facts_of(&noise(7, 4096)).is_none());
-        // A whole entry, then a second stream or anything else: one stream's facts are not the
-        // blob's.
         let whole = deflate(&plain);
         assert!(super::facts_of(&whole).is_some());
         for tail in [&whole[..], &b"garbage"[..]] {
@@ -299,8 +241,6 @@ mod tests {
         }
     }
 
-    /// One `keep` that replaces every entry by one a tenth of its size leaves the file at less
-    /// than half the size it had: the pages the old entries held go back to the file system.
     #[test]
     fn entries_replaced_by_smaller_ones_give_their_pages_back() {
         let dir = std::env::temp_dir().join(format!("meada-values-{}", std::process::id()));
@@ -330,7 +270,6 @@ mod tests {
         fs::remove_dir_all(&dir).unwrap();
     }
 
-    /// An entry past `ENTRY_BYTES` is not kept (its file is parsed again instead); one within it is.
     #[test]
     fn an_entry_past_its_size_limit_is_not_kept() {
         let mut facts = Facts::default();
@@ -355,9 +294,6 @@ mod tests {
         }
     }
 
-    /// A stored entry, deflated and then inflated, deserializes to the facts its pack parsed,
-    /// values and all, for every file of every fixture: a hit is what a parse gives. Outside
-    /// `with_values` the facts serialize as the index keeps them, without the values.
     #[test]
     fn every_fixture_file_round_trips_through_an_entry_whole() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");

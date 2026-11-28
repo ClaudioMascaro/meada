@@ -1,6 +1,3 @@
-//! `meada decide` in human mode (spec #18, ADR 0006): the binary driven through scripted
-//! standard input over the chain fixture's two open items, both in `chain-web`.
-
 use crate::common;
 
 use std::fs;
@@ -13,8 +10,6 @@ use common::{
 };
 use meada::engine::Engine;
 
-/// Runs `meada decide <args>` in `repo` under `lang`, feeding it `stdin`. Returns stdout,
-/// stderr, and whether it succeeded; the repository's path is replaced by `<repo>`.
 fn decide(repo: &Path, lang: &str, args: &[&str], stdin: &str) -> (String, String, bool) {
     let args = [&["decide"], args].concat();
     common::meada(repo, &args, stdin, |c| {
@@ -26,14 +21,12 @@ fn decide(repo: &Path, lang: &str, args: &[&str], stdin: &str) -> (String, Strin
 fn picking_by_number_writes_the_canonical_file_and_the_next_query_replays_it() {
     let (web, _, _) = chain("decide_pick");
 
-    // The health check is the second candidate (gateway), the tracking URL the first (catalog).
     let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &[], "2\n1\n");
 
     assert!(ok, "{stderr}");
     assert_golden("chain-web.decide.pick.en.txt", &stdout);
     let written = file(&web).expect("the file is written");
     assert_golden("chain-web.decisions.human.toml", &written);
-    // A cold index of the chain with the file gives the decided export.
     let (cold, _, _) = chain("decide_pick_cold");
     fs::write(cold.join("meada.decisions.toml"), &written).unwrap();
     let export = Engine::open(&cold).unwrap().export().unwrap();
@@ -47,13 +40,11 @@ fn picking_by_number_writes_the_canonical_file_and_the_next_query_replays_it() {
 fn skipping_and_end_of_input_leave_the_rest_undecided() {
     let (web, _, _) = chain("decide_skip");
 
-    // `s` and an empty line skip: nothing is picked, so nothing is written.
     let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &[], "s\n\n");
     assert!(ok, "{stderr}");
     assert!(stdout.ends_with("nothing decided\n"), "{stdout}");
     assert_eq!(file(&web), None);
 
-    // Input that ends after the first answer ends the run normally, keeping that answer.
     let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &[], "2\n");
     assert!(ok, "{stderr}");
     assert!(
@@ -90,8 +81,6 @@ fn an_answer_out_of_range_asks_again() {
 #[test]
 fn a_new_decision_replaces_the_entry_of_its_call_stale_or_not() {
     let (web, _, _) = chain("decide_replace");
-    // A stale decision for the health check (no `ghost` repository provides it), and a
-    // decision for the tracking URL that stays as it is.
     let stale = "# a comment, not kept\n\
         [[decision]]\nkind = \"dynamic-url\"\n\
         call = \"example.com/chain/web::src/status.ts::track::fetch#0\"\n\
@@ -215,10 +204,8 @@ fn decided_items_are_not_open_and_a_run_without_open_items_writes_nothing() {
 #[test]
 fn item_redoes_a_decided_call_from_the_core_view_and_the_new_pick_replaces_its_entry() {
     let (web, _, _) = chain("decide_redo");
-    // Health decided for the gateway by a person, tracking for the catalog by a model.
     common::decisions(&web, "chain-web");
 
-    // The decided health check is offered with its candidates as if undecided.
     let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &["--item", HEALTH], "1\n");
     assert!(ok, "{stderr}");
     assert!(
@@ -229,7 +216,6 @@ fn item_redoes_a_decided_call_from_the_core_view_and_the_new_pick_replaces_its_e
         )),
         "{stdout}"
     );
-    // The decided tracking URL too; the person's pick replaces the model's entry.
     let (_, stderr, ok) = decide(&web, "en_US.UTF-8", &["--item", TRACK], "2\n");
     assert!(ok, "{stderr}");
     assert_eq!(
@@ -242,7 +228,6 @@ fn item_redoes_a_decided_call_from_the_core_view_and_the_new_pick_replaces_its_e
         )
     );
 
-    // Without `--item`, decided calls stay closed (`search` too, see the test below).
     let (stdout, _, ok) = decide(&web, "en_US.UTF-8", &[], "");
     assert!(ok);
     assert_eq!(stdout, "no open items\n");
@@ -264,7 +249,6 @@ fn messages_follow_lang() {
     assert_golden("chain-web.decide.pick.pt.txt", &stdout);
 }
 
-/// Names `example.com/chain/billing`, which the chain does not have, as a peer of `web`.
 fn add_missing_peer(web: &Path) {
     let toml = web.join("meada.toml");
     let mut src = fs::read_to_string(&toml).unwrap();
@@ -287,7 +271,6 @@ fn list_prints_the_stale_and_waiting_decisions_after_the_open_items() {
 #[test]
 fn list_prints_every_cause_of_a_stale_decision() {
     let (web, _, _) = chain("decide_list_unfit");
-    // Not a candidate, target gone, call gone, item not open: one entry each.
     common::decisions(&web, "chain-web-unfit");
 
     let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", &["--list"], "");
@@ -320,7 +303,6 @@ fn prune_removes_exactly_the_stale_entries_and_keeps_those_waiting() {
     assert_golden("chain-web.decide.prune.en.txt", &stdout);
     assert_golden("chain-web.decisions.pruned.toml", &file(&web).unwrap());
 
-    // Nothing is stale any more: a second run leaves the file as it is.
     let (stdout, _, ok) = decide(&web, "en_US.UTF-8", &["--prune"], "");
     assert!(ok);
     assert_eq!(stdout, "nothing to prune\n");
@@ -362,13 +344,10 @@ fn prune_does_not_combine_with_the_other_flags() {
     }
 }
 
-/// What a run that can save prints, after `meada: `, for a linked decisions file.
 #[cfg(unix)]
 const LINKED: &str = "<repo>/meada.decisions.toml: a symbolic link; \
     Meada writes this file in the repository root only";
 
-/// Moves `web`'s `meada.decisions.toml` out of the repository, beside it, and makes the name a
-/// symbolic link to it. Returns the link and its target.
 #[cfg(unix)]
 fn link_out(web: &Path) -> (PathBuf, PathBuf) {
     let link = web.join("meada.decisions.toml");
@@ -378,8 +357,6 @@ fn link_out(web: &Path) -> (PathBuf, PathBuf) {
     (link, target)
 }
 
-/// The link is still a link, its target holds `before` (`None`: there is none), and no
-/// temporary file was left beside the name.
 #[cfg(unix)]
 fn untouched(web: &Path, (link, target): &(PathBuf, PathBuf), before: Option<&[u8]>) {
     let meta = fs::symlink_metadata(link).unwrap();
@@ -392,7 +369,6 @@ fn untouched(web: &Path, (link, target): &(PathBuf, PathBuf), before: Option<&[u
 #[test]
 fn every_mode_that_can_save_refuses_a_linked_decisions_file_and_leaves_it_alone() {
     let (web, _, _) = chain("decide_linked");
-    // A stale and a waiting entry: each mode below has something to save.
     common::decisions(&web, "chain-web-stale-and-waiting");
     add_missing_peer(&web);
     let linked = link_out(&web);
@@ -404,7 +380,6 @@ fn every_mode_that_can_save_refuses_a_linked_decisions_file_and_leaves_it_alone(
         (&["--prune"], ""),
     ] {
         let (stdout, stderr, ok) = decide(&web, "en_US.UTF-8", args, stdin);
-        // Refused before the first question.
         assert!(!ok, "{args:?}");
         assert_eq!(
             (stdout.as_str(), stderr),
@@ -427,7 +402,6 @@ fn every_mode_that_can_save_refuses_a_linked_decisions_file_and_leaves_it_alone(
 #[test]
 fn the_refusal_of_a_linked_decisions_file_does_not_depend_on_what_the_run_would_save() {
     let (web, _, _) = chain("decide_linked_nothing");
-    // Every item decided and none stale: neither run would write.
     common::decisions(&web, "chain-web");
     let linked = link_out(&web);
     let before = fs::read(&linked.1).unwrap();
@@ -442,7 +416,6 @@ fn the_refusal_of_a_linked_decisions_file_does_not_depend_on_what_the_run_would_
         untouched(&web, &linked, Some(&before));
     }
 
-    // A dangling link reads as no file, so both items are open again: still refused.
     fs::remove_file(&linked.1).unwrap();
     for args in [&[][..], &["--prune"]] {
         assert_eq!(

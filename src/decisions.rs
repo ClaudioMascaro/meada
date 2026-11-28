@@ -1,8 +1,3 @@
-//! `meada.decisions.toml` (ADR 0006): a repository's resolutions of its ambiguous links and
-//! unresolved consumers. Replaying it at query time gives those items a link at the level
-//! `decided`; a decision that no longer fits is ignored. The file is an input like the source
-//! tree: indexing and replay read no model and no network.
-
 use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::fs::{self, File, OpenOptions};
@@ -77,20 +72,14 @@ impl TryFrom<Raw> for Decision {
     }
 }
 
-/// Whether `p` is a probability: a number in [0,1], so neither NaN nor infinite. The one check
-/// behind the file's `p`, a decider's answer and `--min-p`.
 pub(crate) fn probability(p: f64) -> bool {
     (0.0..=1.0).contains(&p)
 }
 
-/// `<root>/meada.decisions.toml`, or no decisions when the file does not exist.
-/// The file holds at most one entry per `call`: a repeat is a parse error naming its line.
 pub fn load(root: &Path) -> Result<Decisions> {
     load_up_to(root, None)
 }
 
-/// `load`, reading at most `max` bytes of the file, through no symbolic link, when it is set
-/// (`config::read_own_up_to`, a mirror's file).
 pub(crate) fn load_up_to(root: &Path, max: Option<u64>) -> Result<Decisions> {
     let decisions: Decisions = config::read_own_up_to(root, FILE, max)?.unwrap_or_default();
     let mut seen = HashSet::new();
@@ -98,7 +87,6 @@ pub(crate) fn load_up_to(root: &Path, max: Option<u64>) -> Result<Decisions> {
         return Ok(decisions);
     };
     let file = root.join(FILE);
-    // The repeat is the second `call = "<call>"` line.
     let line = (config::text(&file, max)?.unwrap_or_default())
         .lines()
         .enumerate()
@@ -113,9 +101,6 @@ pub(crate) fn load_up_to(root: &Path, max: Option<u64>) -> Result<Decisions> {
     .into())
 }
 
-/// The canonical text of `<root>/meada.decisions.toml` once `new` is in it: `new` replaces the
-/// entry of the same call, stale or not, and the entries are sorted by `call`. No comments and
-/// no timestamps, so the same decisions always give the same bytes.
 pub(crate) fn canonical(root: &Path, new: Vec<Decision>) -> Result<String> {
     let mut all = load(root)?.items;
     all.retain(|d| new.iter().all(|n| n.call != d.call));
@@ -123,8 +108,6 @@ pub(crate) fn canonical(root: &Path, new: Vec<Decision>) -> Result<String> {
     render(all)
 }
 
-/// The canonical text of the decisions file without its `stale` entries, with how many that
-/// removed, or `None` when none of them is in the file. Waiting entries stay.
 pub(crate) fn pruned(root: &Path, stale: &[Stale]) -> Result<Option<(String, usize)>> {
     let mut all = load(root)?.items;
     let before = all.len();
@@ -150,21 +133,14 @@ fn render(mut all: Vec<Decision>) -> Result<String> {
     Ok(toml::to_string(&Decisions { items: all })?)
 }
 
-/// Refuses a `<root>/meada.decisions.toml` that is a symbolic link, a dangling one included
-/// (`config::unlinked`), before a run that can `save` asks or sends anything: the rename would
-/// replace the link with a regular file and leave its target as it was. Meada writes the file
-/// in the repository root only (ADR 0006).
 pub(crate) fn writable(root: &Path) -> Result<()> {
     let file = root.join(FILE);
     match config::unlinked(&file) {
         Ok(None) => Err(format!("{}: {}", file.display(), Msg::DecisionsLinked.text()).into()),
-        // A missing file is created by `save`; another error is the load's or the save's.
         _ => Ok(()),
     }
 }
 
-/// A newly created staging file in the same directory as the decisions. Only this process
-/// can have created the name. Drop removes a staging file after a failed write or rename.
 struct Staged(PathBuf);
 
 impl Staged {
@@ -192,7 +168,6 @@ pub(crate) fn at_path(path: &Path, error: io::Error) -> Box<dyn std::error::Erro
     format!("{}: {error}", path.display()).into()
 }
 
-/// Check that the directory accepts a same-directory staging file before contacting the model.
 pub(crate) fn check_destination(root: &Path) -> Result<()> {
     writable(root)?;
     let (staged, file) = Staged::new(root)?;
@@ -201,7 +176,6 @@ pub(crate) fn check_destination(root: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Serializes read/merge/write operations by saving commands, including simultaneous CLI runs.
 pub(crate) fn locked<T>(root: &Path, update: impl FnOnce() -> Result<T>) -> Result<T> {
     let path = root.join(".meada/decisions.lock");
     let lock = OpenOptions::new()
@@ -215,12 +189,10 @@ pub(crate) fn locked<T>(root: &Path, update: impl FnOnce() -> Result<T>) -> Resu
     update()
 }
 
-/// Merge picks against the latest file before the atomic save.
 pub(crate) fn record(root: &Path, new: Vec<Decision>) -> Result<()> {
     locked(root, || save(root, &canonical(root, new)?))
 }
 
-/// Write a complete canonical file beside its destination before replacing the previous one.
 pub(crate) fn save(root: &Path, text: &str) -> Result<()> {
     let destination = root.join(FILE);
     let (staged, mut file) = Staged::new(root)?;
@@ -233,7 +205,6 @@ pub(crate) fn save(root: &Path, text: &str) -> Result<()> {
 }
 
 impl Decision {
-    /// A person's pick of `candidate` for `item`.
     pub(crate) fn human(item: &OpenItem, candidate: &Candidate) -> Self {
         Self {
             kind: item.decision_kind(),
@@ -244,12 +215,10 @@ impl Decision {
         }
     }
 
-    /// The `target` that picks `candidate`: its repository identity and contract.
     pub(crate) fn target(candidate: &Candidate) -> String {
         format!("{}::{}", candidate.repository, candidate.contract)
     }
 
-    /// `decided by <by> (p=<p>)`, or `decided by human`.
     pub(crate) fn reason(&self) -> String {
         match self.p {
             Some(p) => format!("decided by {} (p={p:.2})", self.by),
@@ -314,22 +283,13 @@ impl Evaluation {
     }
 }
 
-/// What a decision comes to against the current index.
 enum Fate {
-    /// Links the call to this provider through this contract.
     Applies(String, String),
     Stale(Cause),
     WrongKind(Kind),
     Waiting(String),
 }
 
-/// Evaluates `d`, a decision of the repository whose index is `export`, against `core`, the
-/// workspace's links before any decision. The checks run in this order, the first that fails
-/// decides: the call is there, the target's repository is not a missing peer (the decision
-/// waits, whatever else), its item is still open (an ambiguous link, or an unresolved
-/// consumer), the target is still served, and it is still among the item's candidates: the
-/// link's, or those `meada decide` lists for the unresolved consumer (#806). The workspace
-/// causes are read only if an unresolved item has a provider that passes the candidate rule.
 fn evaluate(
     d: &Decision,
     export: &Export,
@@ -345,8 +305,6 @@ fn evaluate(
         return Fate::Stale(Cause::CallGone);
     }
     let target = d.target.split_once("::");
-    // Without the peer the core cannot see its providers, so whether the item is open, or the
-    // target served, is unknown: the decision waits.
     if let Some(peer) = target.and_then(|(identity, _)| missing.iter().find(|m| m.repo == identity))
     {
         return Fate::Waiting(peer.repo.clone());
@@ -354,8 +312,6 @@ fn evaluate(
     let consumer =
         (export.consumers.iter()).find(|c| c.item_site() == d.call && c.contract.is_none());
     let own_kind = match (core.iter().any(|l| at(&l)), consumer.is_some()) {
-        // A call can have multiple sides. Keep the kind the decision addresses if both
-        // exist, as replay did before it reported a kind mismatch.
         (true, true) => d.kind,
         (true, false) => Kind::AmbiguousLink,
         (false, true) => Kind::DynamicUrl,
@@ -381,8 +337,6 @@ fn evaluate(
         return Fate::Stale(Cause::TargetGone);
     }
     match d.kind {
-        // A provider of the target that `meada decide` lists for the consumer: none for a
-        // consumer a kind owns.
         Kind::DynamicUrl => {
             let consumer = consumer.expect("a dynamic URL has an unresolved consumer");
             let fits = |provider| items::fits(consumer, provider);
@@ -406,8 +360,6 @@ fn evaluate(
                 Fate::Stale(Cause::NoCandidates)
             }
         }
-        // The ambiguous link to a provider of the target, by its code path or its gateway
-        // path; the decided link keeps the contract the call uses.
         Kind::AmbiguousLink => core
             .iter()
             .filter(at)
@@ -418,11 +370,6 @@ fn evaluate(
     }
 }
 
-/// Evaluates every repository's decisions against `links`, the workspace's links before
-/// decisions, and applies those that fit: each replaces the ambiguous link of its call, or
-/// adds the missing one, with a single link at the level `decided`. `exports` follow the workspace's repositories. Returns the links,
-/// sorted, and for each repository the decisions that did not apply. A stale decision or one
-/// that waits on a missing peer changes no link: the core's stands.
 pub(crate) fn replay(
     links: Vec<Link>,
     workspace: &Workspace,
@@ -438,8 +385,6 @@ pub(crate) fn replay(
     )
 }
 
-/// The same evaluation for a kind's execution projection. Raw links remain the input to
-/// open-item validation; derived environment and routing facts consume only this result.
 pub(crate) fn replay_repositories(
     mut links: Vec<Link>,
     repositories: &[crate::workspace::Repository],

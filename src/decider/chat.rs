@@ -1,8 +1,3 @@
-//! The `chat` protocol (spec #18): any OpenAI-compatible chat completions endpoint, a local
-//! model included. One `POST <url>/chat/completions` per item; the response format is a JSON
-//! schema with `choice`, one of the candidate keys, and `probability`, a number the model
-//! reports about itself.
-
 use serde::Deserialize;
 use serde_json::json;
 
@@ -46,10 +41,8 @@ pub(super) fn request(config: &Config, question: &Question) -> Request {
     }
 }
 
-/// The success body of a chat completion, as far as Meada reads it.
 #[derive(Deserialize)]
 struct Completion {
-    /// The model that answered; the configured one stands in when it is absent.
     model: Option<String>,
     choices: Vec<Choice>,
 }
@@ -64,15 +57,12 @@ struct Message {
     content: String,
 }
 
-/// What the response format asks the model for. The probability is self-reported.
 #[derive(Deserialize)]
 struct Answer {
     choice: String,
     probability: f64,
 }
 
-/// Reads the body of the answer to `question` into a validated proposal. `by` is the model id
-/// in the response, or the configured model when the response omits it.
 pub(super) fn answer(config: &Config, question: &Question, body: &str) -> Result<Proposal> {
     let unreadable =
         |e: serde_json::Error| invalid(Msg::AnswerUnreadable(&config.shown(&e.to_string())).text());

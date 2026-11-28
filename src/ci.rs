@@ -1,13 +1,3 @@
-//! The CI contract kind (ADR 0028, spec #820): `ci::<repository identity>[/<path>]` links a
-//! reusable pipeline or an action to every CI job or CI step of the workspace that calls it.
-//! Both sides sit on the IaC nodes the GitHub Actions reader stores (`iac::actions`): the
-//! provider on the file node of a pipeline with `on.workflow_call` or of an action, the consumer
-//! on the CI job or CI step whose `uses` names it. A `uses` writes no host, so the host is the
-//! consumer's own, and one whose repository is not in the workspace holds no side at all. The
-//! Git ref is an attribute of the consumer, never part of the identifier: it is shown as written
-//! and never resolved. A CI step's `./<folder>` is read in the CI runner's workspace, so it is
-//! unresolved wherever that is not known to be the file's repository (`workspace_causes`).
-
 use std::cell::OnceCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -25,32 +15,23 @@ pub struct Ci;
 
 const PREFIX: &str = "ci::";
 
-/// What a `uses` names, in the forms GitHub reads (ADR 0028). It holds no expression, so it is
-/// literal. `docker://<image>` names an image, no file of a repository: it reads as none.
 enum Uses<'a> {
-    /// `<owner>/<repo>[/<path>]@<ref>`: a file or a folder of a repository, at a Git ref.
     Peer {
         owner: &'a str,
         repo: &'a str,
         path: &'a str,
         git_ref: &'a str,
     },
-    /// `$/<path>`: of the repository of the file that writes it.
     Rooted(&'a str),
-    /// `./<path>`: of the own repository under a CI job, of the CI runner's workspace under a
-    /// CI step.
     Local(&'a str),
 }
 
 impl<'a> Uses<'a> {
     fn read(uses: &'a str) -> Option<Self> {
-        // No name GitHub takes holds a control character, and one would break an answer's line.
-        // It evaluates no expression here either: a `uses` that holds one names nothing.
         let named = !uses.contains(char::is_control) && !uses.contains("${{");
         if !named || uses.starts_with("docker://") {
             return None;
         }
-        // GitHub refuses a Git ref on this form: the call runs the commit of its own file.
         if let Some(path) = uses.strip_prefix("$/") {
             return (!path.contains('@')).then_some(Self::Rooted(path));
         }
@@ -60,7 +41,6 @@ impl<'a> Uses<'a> {
         let (target, git_ref) = uses.split_once('@')?;
         let mut parts = target.splitn(3, '/');
         let (owner, repo) = (parts.next()?, parts.next()?);
-        // No Git ref holds a space, and one would write a flag's text into a link's reason.
         let named =
             ![owner, repo, git_ref].iter().any(|part| part.is_empty()) && !git_ref.contains(' ');
         named.then_some(Self::Peer {
@@ -71,7 +51,6 @@ impl<'a> Uses<'a> {
         })
     }
 
-    /// The Git ref the call names its provider at: none for a call inside its repository.
     fn git_ref(&self) -> Option<&'a str> {
         match self {
             Self::Peer { git_ref, .. } => Some(git_ref),
@@ -80,8 +59,6 @@ impl<'a> Uses<'a> {
     }
 }
 
-/// The identifier of what sits at `path` of `repository`: a pipeline file, the folder of an
-/// action, or nothing for an action at the root.
 fn contract(repository: &str, path: &str) -> String {
     match path {
         "" => format!("{PREFIX}{repository}"),
@@ -89,10 +66,6 @@ fn contract(repository: &str, path: &str) -> String {
     }
 }
 
-/// The contract the call `uses` consumes, written in the repository `own` by a CI step or by a
-/// CI job. None for a repository outside the workspace (`known`), for a path that leaves the
-/// root, and where GitHub runs nothing: a pipeline file under a CI step, anything else under a
-/// CI job.
 fn consumed(uses: &str, step: bool, own: &str, known: &HashSet<&str>) -> Option<String> {
     let (repository, path) = match Uses::read(uses)? {
         Uses::Peer {
@@ -116,13 +89,7 @@ const REUSABLE: &str = "a checkout in a reusable pipeline is of its caller's rep
 const NO_CHECKOUT: &str = "no checkout before the CI step";
 const ELSEWHERE: &str = "a checkout before the CI step names `repository` or `path`";
 
-/// Why a CI step's `./<folder>` is unresolved, for each such CI step of `nodes` by its site.
-/// The CI runner reads the folder in its workspace, which is known to be the repository of the
-/// file only in a pipeline that is not reusable, once its CI job checked that repository out
-/// at the default path: an `actions/checkout` before the CI step, and none before it that
-/// names `repository` or `path`.
 fn workspace_causes(own: &str, nodes: &[Node]) -> HashMap<String, &'static str> {
-    // Where a CI step sits: the address of what holds it, and its index there.
     let place = |n: &'_ Node| {
         let (parent, index) = n.address.strip_suffix(']')?.rsplit_once(".steps[")?;
         (n.ty == actions::STEP).then_some((parent.len(), index.parse::<usize>().ok()?))
@@ -131,9 +98,7 @@ fn workspace_causes(own: &str, nodes: &[Node]) -> HashMap<String, &'static str> 
         let target = uses.split_once('@').map(|(target, _)| target);
         target.is_some_and(|target| target.eq_ignore_ascii_case("actions/checkout"))
     };
-    // A file whose CI steps run in the workspace of another: its cause holds for each.
     let mut callers: HashMap<&str, &'static str> = HashMap::new();
-    // By file and CI job: the first checkout at the default path, and the first elsewhere.
     let mut checkouts: HashMap<(&str, &str), [Option<usize>; 2]> = HashMap::new();
     let mut local = Vec::new();
     for n in nodes.iter().filter(|n| actions::owns(n)) {
@@ -156,7 +121,6 @@ fn workspace_causes(own: &str, nodes: &[Node]) -> HashMap<String, &'static str> 
         if uses.starts_with("./") {
             local.push((n, job, index));
         } else if checkout(uses) {
-            // GitHub reads an input's key in any case (`INPUT_REPOSITORY`).
             let names = |key: &String, input| key.eq_ignore_ascii_case(input);
             let elsewhere =
                 (facts.with.iter()).any(|key| names(key, "repository") || names(key, "path"));
@@ -185,19 +149,14 @@ const ABSENT: &str = " (absent at the indexed commit)";
 const NOT_REUSABLE: &str =
     " (absent at the indexed commit: the file is no reusable pipeline there)";
 
-/// The mark of a consumer of `contract` when no repository of the workspace provides it: its
-/// path names no provider at the indexed commit, and may name one at the Git ref, so the mark
-/// never says broken. A pipeline file that is there with no `on.workflow_call` says so.
 fn absent(exports: &[Export], contract: &str) -> Option<&'static str> {
     let rest = contract.strip_prefix(PREFIX)?;
-    // A provider's identifier starts with its own repository: no other export is read.
     let mut named = (exports.iter()).filter(|e| rest.starts_with(e.repository.as_str()));
     if (named.clone()).any(|e| e.providers.iter().any(|p| p.contract == contract)) {
         return None;
     }
     let plain = named.any(|e| {
         let path = (rest.strip_prefix(e.repository.as_str())).and_then(|at| at.strip_prefix('/'));
-        // An action's file is no pipeline: a CI step that names it names a folder not there.
         let file = |n: &Node| {
             actions::owns(n)
                 && n.address == "."
@@ -209,16 +168,11 @@ fn absent(exports: &[Export], contract: &str) -> Option<&'static str> {
     Some(if plain { NOT_REUSABLE } else { ABSENT })
 }
 
-/// The host of a repository identity, which a `uses` leaves out: none for a repository without
-/// `origin`, which names no peer.
 fn host(identity: &str) -> Option<&str> {
     let (host, _) = identity.split_once('/')?;
     (host != "local").then_some(host)
 }
 
-/// A link's reason: the Git ref as written and the provider's indexed commit, with `ref
-/// mismatch` only when the ref is a full commit id (40 or 64 hexadecimal digits) other than it.
-/// A call inside its repository writes no ref, and its reason holds none.
 fn reason(git_ref: Option<&str>, indexed: Option<&str>) -> String {
     let Some(git_ref) = git_ref else {
         return "own repository".into();
@@ -236,7 +190,6 @@ fn reason(git_ref: Option<&str>, indexed: Option<&str>) -> String {
     format!("@{git_ref} (indexed {short}){mismatch}")
 }
 
-/// A `permissions` block as an answer shows it: its word, or what it names (`{}` for none).
 fn block(permissions: &Permissions) -> String {
     match permissions {
         Permissions::All(AllPermissions::ReadAll) => "read-all".into(),
@@ -251,22 +204,14 @@ fn block(permissions: &Permissions) -> String {
     }
 }
 
-/// What the CI jobs of one pipeline declare together: the level of every permission none of
-/// them names, and each permission one names.
 type Asked<'e> = (Access, BTreeMap<&'e str, Access>);
 
-/// Each CI job of `export` a `permissions` block governs, with that block.
 fn governed(export: &Export) -> impl Iterator<Item = (&Node, &Permissions)> {
     let jobs = (export.iac.iter()).filter(|n| actions::owns(n) && n.ty == actions::JOB);
     jobs.filter_map(|n| Some((n, n.actions.as_ref()?.permissions.as_ref()?)))
 }
 
-/// What the CI jobs of one pipeline declare together, given their `blocks`: the highest level
-/// one of them gives every permission none names, and each permission one names. None when no
-/// CI job there holds a block: nothing is declared, and Meada guesses no default.
 fn asked<'e>(blocks: impl Iterator<Item = &'e Permissions>) -> Option<Asked<'e>> {
-    // One pass over the blocks: a block gives a permission it does not name its `rest`, which
-    // is `none` for a block of names.
     let mut rest = None;
     let mut named: BTreeMap<&str, Access> = BTreeMap::new();
     for block in blocks {
@@ -285,7 +230,6 @@ fn asked<'e>(blocks: impl Iterator<Item = &'e Permissions>) -> Option<Asked<'e>>
     Some((rest, named))
 }
 
-/// The line of a reusable pipeline's `context` that says what its CI jobs declare together.
 fn asked_line(export: &Export, file: &str) -> String {
     let blocks = governed(export).filter(|(job, _)| job.path == file);
     let Some((rest, named)) = asked(blocks.map(|(_, block)| block)) else {
@@ -306,8 +250,6 @@ fn asked_line(export: &Export, file: &str) -> String {
     }
 }
 
-/// The permissions the CI jobs of a called pipeline declare together (`asked`) above what the
-/// block `held` of the calling CI job holds, each with both levels.
 fn mismatch(held: &Permissions, asked: &Asked<'_>) -> Vec<String> {
     let (rest, named) = (asked.0, &asked.1);
     let own: Vec<&str> = match held {
@@ -328,8 +270,6 @@ fn mismatch(held: &Permissions, asked: &Asked<'_>) -> Vec<String> {
     above
 }
 
-/// The keys a call passes and, for a CI job, the `permissions` block that governs it, as an
-/// answer shows them after it: ` with: a, b; secrets: inherit; permissions: contents: read`.
 fn passed(node: &Node) -> String {
     let Some(facts) = &node.actions else {
         return String::new();
@@ -343,7 +283,6 @@ fn passed(node: &Node) -> String {
         Some(written::Secrets::Keys(keys)) => parts.push(format!("secrets: {}", keys.join(", "))),
         None => {}
     }
-    // Declared, never granted: a CI job with no block of its own or of its pipeline says so.
     if node.ty == actions::JOB {
         let declared = facts.permissions.as_ref().map(block);
         let declared = declared.unwrap_or_else(|| "not declared".into());
@@ -355,13 +294,10 @@ fn passed(node: &Node) -> String {
     format!(" {}", parts.join("; "))
 }
 
-/// The CI nodes of the workspace by site, each with its repository's export: built once for a
-/// pass over the links or the lines of an answer, which then scans no repository per link.
 fn sites(exports: &[Export]) -> HashMap<String, (&Export, &Node)> {
     let mut sites = HashMap::new();
     for export in exports {
         for node in export.iac.iter().filter(|n| actions::owns(n)) {
-            // The first node at a site is the one read, as a scan in order finds it.
             let site = node.identity(&export.repository);
             sites.entry(site).or_insert((export, node));
         }
@@ -369,9 +305,6 @@ fn sites(exports: &[Export]) -> HashMap<String, (&Export, &Node)> {
     sites
 }
 
-/// The links of `consumers` to the providers of their contracts, each with its reason. A node
-/// is looked up by its site and a pipeline's blocks are folded once, so the pass costs what
-/// the workspace holds, never its callers times its nodes.
 fn links<'a>(
     exports: &'a [Export],
     providers: &[(&'a Repository, &'a Provider)],
@@ -384,14 +317,11 @@ fn links<'a>(
             serving.push((repository, provider));
         }
     }
-    // The first export of an identity is the one read, as a lookup in order finds it.
     let commits: HashMap<&str, Option<&str>> = (exports.iter().rev())
         .map(|e| (e.repository.as_str(), e.commit.as_deref()))
         .collect();
     let nodes = OnceCell::new();
     let node = |site: &str| nodes.get_or_init(|| sites(exports)).get(site).copied();
-    // The blocks of every pipeline's CI jobs, by repository and file, read on the first link
-    // that compares; then what each called pipeline declares, by its site.
     let declared = OnceCell::new();
     let blocks = || {
         let mut blocks: HashMap<(&str, &str), Vec<&Permissions>> = HashMap::new();
@@ -415,8 +345,6 @@ fn links<'a>(
         ) else {
             continue;
         };
-        // Only a CI job is compared (a CI step calls an action), and a caller that declares
-        // nothing reads no block of the pipeline it calls.
         let held = node(&consumer.site)
             .filter(|(_, node)| node.ty == actions::JOB)
             .and_then(|(_, node)| node.actions.as_ref()?.permissions.as_ref());
@@ -461,7 +389,6 @@ impl ContractKind for Ci {
     fn search_word(&self) -> Search {
         Search::Own("ci")
     }
-    /// The CI nodes, not the contracts: `search` with the kind `contract` lists those.
     fn own_search(&self, exports: &[Export], _: &[Link], needle: &str) -> Vec<Hit> {
         (exports.iter())
             .flat_map(|export| actions::hits(&export.repository, &export.iac, needle))
@@ -470,7 +397,6 @@ impl ContractKind for Ci {
     fn in_default_search(&self) -> bool {
         false
     }
-    /// Where a side is, as `context` takes it: the pipeline's path, or `<path>::<address>`.
     fn place(&self, repository: &str, site: &str) -> Option<String> {
         let rest = site.strip_prefix(repository)?.strip_prefix("::")?;
         Some(rest.strip_suffix("::.").unwrap_or(rest).to_string())
@@ -484,23 +410,17 @@ impl ContractKind for Ci {
     fn reads_commit(&self) -> bool {
         true
     }
-    /// A CI job calls the pipeline it consumes: `trace` goes up from the provider to it, never
-    /// down as from a writer to its readers.
     fn calls_from_definition(&self) -> bool {
         true
     }
-    /// A CI contract is the name of the one pipeline that provides it.
     fn starts_at_provider(&self) -> bool {
         true
     }
-    /// The sides of every repository, read from its CI nodes once the workspace is known: a
-    /// call is a consumer only when the repository it names is one of the workspace.
     fn workspace_step(&self, exports: &mut [Export], repositories: &[Repository]) {
         let known: HashSet<&str> = repositories.iter().map(|r| r.identity.as_str()).collect();
         for export in exports.iter_mut() {
             let own = export.repository.as_str();
             for node in (export.iac.iter()).filter(|n| actions::owns(n) && n.address == ".") {
-                // A folder named as a pipeline file would share that file's identifier.
                 let path = match node.ty.as_str() {
                     actions::ACTION => actions::action_folder(&node.path)
                         .map(|folder| folder.trim_end_matches('/'))
@@ -518,8 +438,6 @@ impl ContractKind for Ci {
             }
             crate::index::sort_providers(&mut export.providers);
         }
-        // A folder with a `Dockerfile` and no action is a container action GitHub builds, which
-        // no reader takes: a call to it holds no side, as one to a file outside the workspace.
         let provided: HashSet<&str> = (exports.iter().flat_map(|e| &e.providers))
             .map(|p| p.contract.as_str())
             .collect();
@@ -541,13 +459,11 @@ impl ContractKind for Ci {
                     continue;
                 };
                 let site = node.identity(own);
-                // Unresolved, the folder may be another repository's: the open item stays.
                 let resolved = !causes.contains_key(&site);
                 if resolved && unread.contains(&contract) {
                     continue;
                 }
                 export.consumers.push(Consumer {
-                    // Unresolved: no contract, as a call whose URL could not be read.
                     contract: resolved.then_some(contract),
                     site,
                     via: Some(uses.to_string()),
@@ -565,17 +481,12 @@ impl ContractKind for Ci {
             crate::index::sort_consumers(&mut export.consumers);
         }
     }
-    /// The mark of a consumer no provider answers (`absent`). A provider nothing calls carries
-    /// none: `meada status` lists it, under the scope rule.
     fn side_note(&self, exports: &[Export], contract: &str, role: Role) -> &'static str {
         match role {
             Role::Consumer => absent(exports, contract).unwrap_or_default(),
             _ => "",
         }
     }
-    /// The providers of `export` that nothing calls, only when the scope holds a provider and
-    /// a consumer of the kind (ADR 0026, "Orphans"). An unresolved consumer holds no contract
-    /// and a call outside the workspace no side: neither opens the scope.
     fn scope_status(
         &self,
         _: &Repository,
@@ -627,7 +538,6 @@ impl ContractKind for Ci {
     ) -> Vec<Link> {
         links(exports, providers, std::iter::once(consumer))
     }
-    /// Every link in one pass: a workspace of many callers reads each of its nodes once.
     fn workspace_links(
         &self,
         exports: &[Export],
@@ -667,7 +577,6 @@ impl ContractKind for Ci {
                 (export.providers.iter()).filter(|p| p.site == site && ours(&p.contract));
             for provider in provided {
                 lines.push(format!("provides {}", provider.contract));
-                // What its CI jobs declare together, which each consumer's block is held against.
                 let file = node(site).filter(|(_, n)| n.ty != actions::ACTION);
                 lines.extend(file.map(|(_, file)| asked_line(export, &file.path)));
                 let calling = (links.iter())
@@ -698,9 +607,6 @@ impl ContractKind for Ci {
         }
         lines
     }
-    /// A call's Git ref and the keys it passes, on its consumer row, and the absent mark where
-    /// the rows of `out` hold no link for it: a link is written for every provider of its
-    /// contract, so none means the workspace holds none.
     fn written(&self, nodes: &[Node], out: &mut written::Export) {
         let linked: HashSet<(&str, &str)> = (out.links.iter())
             .map(|l| (l.consumer.as_str(), l.contract.as_str()))
@@ -734,7 +640,6 @@ impl ContractKind for Ci {
 mod tests {
     use super::*;
 
-    /// The contract of `uses` in `github.com/acme/app`, beside `github.com/acme/workflows`.
     fn consumed_by(uses: &str, step: bool) -> Option<String> {
         let known = HashSet::from(["github.com/acme/app", "github.com/acme/workflows"]);
         consumed(uses, step, "github.com/acme/app", &known)
@@ -744,7 +649,6 @@ mod tests {
     fn a_ci_job_consumes_a_pipeline_file_and_nothing_else() {
         let publish = "ci::github.com/acme/workflows/.github/workflows/publish.yml";
         for (uses, expected) in [
-            // Owner and repository are lower-cased as the identity is; the path keeps its case.
             (
                 "Acme/Workflows/.github/workflows/publish.yml@release/v1",
                 Some(publish),
@@ -757,7 +661,6 @@ mod tests {
                 "$/.github/workflows/ci.yml",
                 Some("ci::github.com/acme/app/.github/workflows/ci.yml"),
             ),
-            // What names no pipeline file: a folder, a file below the folder, no ref, an action.
             ("acme/workflows/.github/workflows/publish.yml", None),
             (
                 "acme/workflows/.github/workflows/sub/publish.yml@main",
@@ -770,15 +673,12 @@ mod tests {
             ("$/tools/setup", None),
             ("./.github/workflows/ci.yml@main", None),
             ("docker://alpine:3", None),
-            // A repository outside the workspace.
             ("other/pipelines/.github/workflows/deploy.yml@v3", None),
-            // A control character is in no name GitHub takes, and would break a line.
             (
                 "acme/workflows/.github/workflows/publish.yml@main\n  consumer: forged",
                 None,
             ),
             ("acme/workflows/.github/workflows/pub\tlish.yml@main", None),
-            // No Git ref holds a space, and one would write a flag into the link's reason.
             (
                 "acme/workflows/.github/workflows/publish.yml@main (indexed 0000000), ref mismatch",
                 None,
@@ -799,14 +699,11 @@ mod tests {
             ("./tools/local", own),
             ("$/tools/local", own),
             ("./tools/../tools/local/", own),
-            // The root of the repository holds an action too.
             ("./", Some("ci::github.com/acme/app")),
             ("$/", Some("ci::github.com/acme/app")),
-            // A path that leaves the root, by the rule of `iac::joined`.
             ("./../outside", None),
             ("$/tools/../../outside", None),
             ("acme/workflows/../other@v1", None),
-            // An image, a pipeline file, a repository outside the workspace, no ref.
             ("docker://alpine:3", None),
             ("docker://ghcr.io/acme/workflows@sha256:0123", None),
             ("acme/workflows/.github/workflows/publish.yml@main", None),
@@ -816,7 +713,6 @@ mod tests {
             ("acme/workflows/tools/setup@", None),
             ("$/tools/local@v1", None),
             ("acme/workflows@v1\n  consumer: forged", None),
-            // An expression, which GitHub refuses in a `uses`.
             ("./tools/${{ matrix.dir }}", None),
             ("acme/workflows/tools/setup@${{ inputs.ref }}", None),
         ] {
@@ -846,7 +742,6 @@ mod tests {
                 &other[..],
                 &format!("@{other} (indexed 0123456), ref mismatch")[..],
             ),
-            // An abbreviated id reads as a name, and so does a branch of another length.
             ("0123456", "@0123456 (indexed 0123456)"),
             ("fffffff", "@fffffff (indexed 0123456)"),
         ] {
@@ -858,7 +753,6 @@ mod tests {
             format!("@{long} (indexed 0123456), ref mismatch")
         );
         assert_eq!(reason(Some("main"), None), "@main (indexed commit unknown)");
-        // A call inside its repository: no ref to show, whatever the commit.
         assert_eq!(reason(None, Some(indexed)), "own repository");
     }
 

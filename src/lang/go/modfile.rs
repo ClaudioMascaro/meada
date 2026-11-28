@@ -1,24 +1,12 @@
-//! `go.mod` files, read as the line format they are, with no parser crate: the module path, the
-//! `require` entries and the `replace` directives (the package contracts read the first two,
-//! the imports the last). A directive is one line (`replace a => ./a`) or a block of them
-//! (`replace (` ... `)`), and `//` starts a comment.
-
-/// What one `go.mod` declares.
 #[derive(Debug, Default, PartialEq)]
 pub struct ModFile {
-    /// The `module` path.
     pub module: Option<String>,
-    /// Each `require`, as the module path and the version, as written.
     pub requires: Vec<(String, String)>,
-    /// Each `replace`, as the module path it replaces and the path or module that replaces it,
-    /// as written.
     pub replaces: Vec<(String, String)>,
 }
 
-/// The directives of `text`. A line it cannot read is skipped.
 pub fn read(text: &str) -> ModFile {
     let mut file = ModFile::default();
-    // The directive whose block the line is in.
     let mut block: Option<String> = None;
     for line in text.lines() {
         let line = line.split("//").next().unwrap_or("").trim();
@@ -59,8 +47,6 @@ pub fn read(text: &str) -> ModFile {
     file
 }
 
-/// The modules of a repository: each `go.mod`'s directory, module path and what its `replace`
-/// directives name.
 pub struct Modules {
     modules: Vec<Module>,
 }
@@ -68,16 +54,10 @@ pub struct Modules {
 struct Module {
     dir: String,
     path: Option<String>,
-    /// The module paths each `replace` replaces, with the directory of the repository that
-    /// replaces it; `None` for any other target (a module, a directory outside), which makes the
-    /// replaced module one from outside.
     replaces: Vec<(String, Option<String>)>,
 }
 
 impl Modules {
-    /// From the `go.mod` files as `(path, contents)`. One past `lang::MAX_BYTES` is invalid,
-    /// as `Go::read` (`package::go`) takes it: the index reads a config only up to one byte past
-    /// that size, so its last line may be cut.
     pub fn new(configs: &[(&str, &[u8])]) -> Self {
         let modules = (configs.iter())
             .filter(|(path, _)| path.rsplit('/').next() == Some("go.mod"))
@@ -101,23 +81,16 @@ impl Modules {
         Self { modules }
     }
 
-    /// The module that owns `dir`: the nearest `go.mod` at or above it.
     fn owner(&self, dir: &str) -> Option<&Module> {
         (self.modules.iter())
             .filter(|m| within(dir, &m.dir))
             .max_by_key(|m| m.dir.len())
     }
 
-    /// `dir` below the directory of the module that owns it, all of it when none does.
     pub fn below<'d>(&self, dir: &'d str) -> &'d str {
         self.owner(dir).map_or(dir, |m| &dir[m.dir.len()..])
     }
 
-    /// The package directory an import of `specifier` from a file of `from` names: through a
-    /// `replace` of the importing file's module (none when it replaces the module with one from
-    /// outside), else through the module path of the repository's modules, the longest that
-    /// matches (none when two modules declare it). The directory must belong to that module, not
-    /// to a module nested in it. `None` for the standard library and the modules outside.
     pub fn dir(&self, from: &str, specifier: &str) -> Option<String> {
         let own = self.owner(from)?;
         let replaced = (own.replaces.iter())
@@ -135,7 +108,6 @@ impl Modules {
                 })
                 .collect();
             let longest = matches.iter().map(|(_, _, len)| *len).max()?;
-            // Two modules that declare one path (a fork) name no directory.
             match &matches
                 .iter()
                 .filter(|m| m.2 == longest)
@@ -158,10 +130,6 @@ impl Modules {
     }
 }
 
-/// `path`, an import path or one followed by names (`github.com/redis/go-redis/v9.NewClient`),
-/// without the major version suffix of its module: the first element `vN`, N >= 2 written with
-/// no leading zero, which ends the module path (`confluent-kafka-go/v2/kafka` is
-/// `confluent-kafka-go/kafka`). A later `vN` is a directory of the module and stays.
 pub fn unversioned(path: &str) -> String {
     let mut at = 0;
     while let Some(found) = path[at..].find("/v") {
@@ -182,8 +150,6 @@ pub fn unversioned(path: &str) -> String {
     path.to_string()
 }
 
-/// What follows the module path `module` in the import path `specifier`, if it starts with it:
-/// the package directory inside the module, empty for its root.
 pub fn inside<'s>(specifier: &'s str, module: &str) -> Option<&'s str> {
     match specifier.strip_prefix(module)? {
         "" => Some(""),
@@ -191,34 +157,22 @@ pub fn inside<'s>(specifier: &'s str, module: &str) -> Option<&'s str> {
     }
 }
 
-/// Whether `dir` is `parent` or below it.
 fn within(dir: &str, parent: &str) -> bool {
     parent.is_empty()
         || dir == parent
         || dir.strip_prefix(parent).is_some_and(|r| r.starts_with('/'))
 }
 
-/// Whether a `replace` target is a local directory (`./x`, `../x`, `.`, `..`) rather than a
-/// module.
 pub fn local_target(target: &str) -> bool {
     target.starts_with("./") || target.starts_with("../") || matches!(target, "." | "..")
 }
 
-/// Whether a `replace` target that is no local directory is a module path (not an absolute
-/// path, a Windows path or a URL).
 pub fn module_target(target: &str) -> bool {
     !target.starts_with(['/', '\\', '.']) && !target.contains([':', '\\'])
 }
 
-/// Whether the `go.mod` at `manifest` of the repository `identity` is the module a `replace`
-/// target names: the repository's identity is the target's `<host>/<owner>/<repo>` prefix (the
-/// identity is lower-cased, a module path is not) and what follows the prefix is the directory of
-/// the `go.mod`, with or without the `/vN` major version element (a `v2/go.mod` holds `.../v2`,
-/// and so does a root `go.mod` that declares it). The prefix is matched first, so an identity may
-/// hold a `vN` element itself.
 pub fn held_by(target: &str, identity: &str, manifest: &str) -> bool {
     let dir = manifest.rsplit_once('/').map_or("", |(d, _)| d);
-    // Only the prefix is lower-cased: the directory after it keeps its case.
     let lower = target.to_ascii_lowercase();
     let Some(rest) = inside(&lower, identity).map(|r| &target[target.len() - r.len()..]) else {
         return false;
@@ -227,8 +181,6 @@ pub fn held_by(target: &str, identity: &str, manifest: &str) -> bool {
     rest == dir || versioned[1..].trim_start_matches('/') == dir
 }
 
-/// The repository directory a `replace` target names, relative to the `go.mod` in `dir`: only a
-/// local path (`local_target`) that stays inside the repository.
 fn local(dir: &str, target: &str) -> Option<String> {
     let folded = local_target(target).then(|| crate::repo::relative(dir, target));
     folded
@@ -268,7 +220,6 @@ mod tests {
         let id = "github.com/regen-network/protobuf";
         let held = |target: &str, manifest: &str| held_by(target, id, manifest);
         assert!(held("github.com/regen-network/protobuf", "go.mod"));
-        // A mixed-case path, as module paths are case-sensitive and identities are not.
         assert!(held("github.com/Regen-Network/protobuf", "go.mod"));
         assert!(held("github.com/regen-network/protobuf/v2", "go.mod"));
         assert!(held("github.com/regen-network/protobuf/v2", "v2/go.mod"));
@@ -276,17 +227,14 @@ mod tests {
             "github.com/regen-network/protobuf/v2/sub",
             "sub/go.mod"
         ));
-        // The identity may hold a `vN` element of its own.
         assert!(held_by(
             "github.com/acme/v2",
             "github.com/acme/v2",
             "go.mod"
         ));
-        // A subdirectory places the module inside the repository.
         assert!(held("github.com/regen-network/protobuf/sub", "sub/go.mod"));
         assert!(!held("github.com/regen-network/protobuf/sub", "go.mod"));
         assert!(!held("github.com/regen-network/protobuf", "sub/go.mod"));
-        // The directory after the prefix keeps its case.
         assert!(held(
             "github.com/Regen-Network/protobuf/SubDir",
             "SubDir/go.mod"
@@ -295,7 +243,6 @@ mod tests {
             "github.com/regen-network/protobuf/SubDir",
             "subdir/go.mod"
         ));
-        // Another repository, or a longer name: no.
         assert!(!held("github.com/regen-network/protobuf2", "go.mod"));
         assert!(!held("github.com/regen-network", "go.mod"));
         assert!(!held("github.com/other/protobuf", "go.mod"));
@@ -324,7 +271,6 @@ mod tests {
                 "confluent-kafka-go/v2/kafka.NewProducer",
                 "confluent-kafka-go/kafka.NewProducer",
             ),
-            // A `vN` after the module's is a directory of it.
             ("example.com/x/v2/sub/v3/pkg", "example.com/x/sub/v3/pkg"),
             ("IBM/sarama.NewSyncProducer", "IBM/sarama.NewSyncProducer"),
             ("example.com/v1/x.New", "example.com/v1/x.New"),
@@ -347,10 +293,8 @@ mod tests {
             - head.len()
             - "\nreplace example.com/billing => ./bil".len();
         let at = |pad: usize, line: &str| format!("{head}{}{line}", " ".repeat(pad));
-        // The index hands the reader one byte past the limit: the last line is cut.
         let cut_file = at(cut, line)[..crate::lang::MAX_BYTES + 1].to_string();
         assert!(cut_file.ends_with("./bil"));
-        // Both directories hold the module: a cut line would link to the wrong one.
         let billing: &[u8] = b"module example.com/billing\n";
         let dir = |text: &str| {
             let configs = [
@@ -395,13 +339,11 @@ mod tests {
             Some("billing/tax")
         );
         assert_eq!(dir("forks", "example.com/forks").as_deref(), Some("forks"));
-        // A nested module owns its subtree.
         assert_eq!(dir("", "example.com/shop/worker/jobs"), None);
         assert_eq!(
             dir("worker", "example.com/worker/jobs").as_deref(),
             Some("worker/jobs")
         );
-        // A replace by a module from outside makes the replaced one outside.
         let forked: &[(&str, &[u8])] = &[
             ("go.mod", b"module example.com/shop\nreplace example.com/billing v1.0.0 => example.com/fork v1.0.0\n"),
             ("billing/go.mod", b"module example.com/billing\n"),
@@ -412,9 +354,7 @@ mod tests {
             forked.dir("billing", "example.com/billing/tax").as_deref(),
             Some("billing/tax")
         );
-        // Two modules that declare one path, with no replace to pick one, name nothing.
         assert_eq!(dir("worker", "example.com/billing/tax"), None);
-        // A module of the repository is found by its path from any other.
         assert_eq!(dir("worker", "example.com/forks").as_deref(), Some("forks"));
         assert_eq!(dir("", "fmt"), None);
         assert_eq!(dir("", "example.com/shopping"), None);

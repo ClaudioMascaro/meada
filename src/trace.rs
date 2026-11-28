@@ -1,7 +1,3 @@
-//! `trace`: a chain followed from a start through calls inside repositories and links between
-//! them, down or up, across the whole workspace (ADR 0005), rendered as indented lines under
-//! the token budget and closed by the chain footer (ADR 0008).
-
 use std::collections::{HashMap, HashSet};
 
 use crate::contract::{self, Level, Link};
@@ -41,10 +37,8 @@ pub enum Start<'a> {
     Changes,
 }
 
-/// A call site, with the position of its repository in the workspace.
 type Call<'a> = (usize, &'a CallSite);
 
-/// The workspace as one graph of symbols, calls and links.
 pub(crate) struct Graph<'a> {
     workspace: &'a Workspace,
     exports: &'a [Export],
@@ -53,33 +47,18 @@ pub(crate) struct Graph<'a> {
     symbols: HashMap<&'a str, (usize, &'a Symbol)>,
     iac: HashMap<String, (usize, &'a crate::iac::Node)>,
     calls: HashMap<&'a str, Call<'a>>,
-    /// The calls each symbol (or file, for top-level calls) makes, in source order.
     callees: HashMap<&'a str, Vec<Call<'a>>>,
-    /// The calls that may reach each symbol, ambiguous ones included, in workspace and source
-    /// order.
     callers: HashMap<&'a str, Vec<Call<'a>>>,
-    /// The consumers at each call site: a client wrapper's call holds one per URL it builds.
     consumers: HashMap<&'a str, Vec<&'a Consumer>>,
-    /// `(contract, site)` of every provider.
     providers: Vec<(&'a str, &'a str)>,
-    /// The sides only a document lists (spec #21), with the document's path.
     documented: HashMap<&'a str, &'a str>,
-    /// The channel sides whose name Meada could not evaluate, by site (the producing call or
-    /// the handler): `Produces` or `Consumes`, and the contract. They are never linked, so the
-    /// chain would not otherwise show them.
     unresolved_sides: HashMap<&'a str, Vec<(Mark, &'a str)>>,
-    /// Links by consumer and by provider, each sorted as the engine sorts links. A link's
-    /// consumer is a call site, or, for a resource or a channel, the symbol that reads it or
-    /// handles it: data goes from the provider (a writer, or the call that produces) to that
-    /// consumer, so the chain crosses it the other way.
     out: HashMap<&'a str, Vec<&'a Link>>,
     into: HashMap<&'a str, Vec<&'a Link>>,
-    /// The entry points of every repository by identity, with the position of its repository.
     entry_points: HashMap<&'a str, (usize, &'a EntryPoint)>,
 }
 
 impl<'a> Graph<'a> {
-    /// A receiving operation keeps its call identity; its continuation is the owner's body.
     fn reader_call(&self, id: &str) -> Option<Call<'a>> {
         self.consumers
             .get(id)?
@@ -96,7 +75,6 @@ impl<'a> Graph<'a> {
         self.callees.get(owner).map_or(&[], Vec::as_slice)
     }
 
-    /// `exports` in workspace order, and every link between them.
     pub(crate) fn new(workspace: &'a Workspace, exports: &'a [Export], links: &'a [Link]) -> Self {
         let mut graph = Self {
             workspace,
@@ -134,8 +112,6 @@ impl<'a> Graph<'a> {
             }
             for c in &export.calls {
                 graph.calls.insert(&c.id, (n, c));
-                // A use is no call: processes and the down-walk follow calls alone, the
-                // up-walk uses too (`callers`).
                 if c.kind.is_none() {
                     graph.callees.entry(&c.caller).or_default().push((n, c));
                 }
@@ -183,8 +159,6 @@ impl<'a> Graph<'a> {
         graph
     }
 
-    /// The whole answer: the chain from `start` (`changes` holds the uncommitted changes when
-    /// it starts from them), cut to `budget`, then the footer.
     pub(crate) fn answer(
         &self,
         start: Start,
@@ -240,8 +214,6 @@ impl<'a> Graph<'a> {
         walk.finish(budget)
     }
 
-    /// Continue an IaC node through its ordinary links and downward provisioning/execution
-    /// hops, without repeating the node or adding a second footer.
     pub(crate) fn attached_rows(
         &self,
         repository: usize,
@@ -267,11 +239,8 @@ impl<'a> Graph<'a> {
             expanded: HashSet::new(),
             executed: HashSet::new(),
             held: HashSet::new(),
-            // The walk starts at the IaC node, one level above `depth`.
             limit: depth + WALK_DEPTH - 1,
         };
-        // The borrowed link endpoints carry the same identity as the IaC node. Entering
-        // it uses the ordinary kind-directed traversal; omit the already-rendered root.
         if let Some((&site, _)) = self
             .into
             .get_key_value(identity.as_str())
@@ -293,7 +262,6 @@ impl<'a> Graph<'a> {
             .filter(|l| l.provisioner == identity && l.root == node.root)
         {
             let id = link.side.as_str();
-            // The link is owned by this graph; find the same site in its borrowed exports.
             let call = self.calls.get(id).copied();
             let Some(site) = self
                 .exports
@@ -373,9 +341,6 @@ impl<'a> Graph<'a> {
         walk.rows
     }
 
-    /// The IaC nodes a link whose consumer calls its provider (`calls_on_link`, a CI call)
-    /// joins to `node`: the consumers that call it going up, the providers it calls going
-    /// down, each with its repository and the link, in the links' order (#825).
     pub(crate) fn node_calls(
         &self,
         repository: usize,
@@ -391,8 +356,6 @@ impl<'a> Graph<'a> {
             .filter(|link| calls_on_link(link))
             .filter_map(|&link| {
                 let &(n, reached) = self.iac.get(other(link))?;
-                // A link of one evaluation root joins the workload of that root only (an
-                // image, #833): one identity may sit in several roots.
                 let reached = match (link.root.as_deref(), direction) {
                     (Some(root), Direction::Down) if root != node.root => return None,
                     (Some(root), Direction::Up) => (self.exports[n].iac.iter())
@@ -407,10 +370,7 @@ impl<'a> Graph<'a> {
             .collect()
     }
 
-    /// The starts `from` names: the providers of a route, else one symbol, else one call site.
-    /// A name that fits several symbols or call sites lists them instead of guessing.
     fn find(&self, from: &str, walk: &mut Walk) -> Lookup<'a> {
-        // A process, by its entry point's identity, and only in this form.
         if let Some(identity) = from.strip_prefix("process::") {
             return match self.entry_points.get(identity) {
                 Some(&(n, entry)) => Lookup::Process(n, entry),
@@ -419,7 +379,6 @@ impl<'a> Graph<'a> {
                 )]),
             };
         }
-        // A route is a whole contract (`GET /users` names one too), or a path on any method.
         let mut sites: Vec<&str> = (contract::KINDS.iter())
             .flat_map(|kind| kind.starts(from, &self.providers))
             .collect();
@@ -494,7 +453,6 @@ impl<'a> Graph<'a> {
         }
     }
 
-    /// The symbols of the repository where Meada runs that the changes touch, in source order.
     fn changed(&self, changes: &[(String, Change)], files: &mut Files) -> Vec<&'a str> {
         let changes: HashMap<&str, &Change> =
             changes.iter().map(|(p, c)| (p.as_str(), c)).collect();
@@ -522,7 +480,6 @@ impl<'a> Graph<'a> {
         hits.into_iter().map(|(_, _, id)| id).collect()
     }
 
-    /// The position in the workspace of the repository holding the symbol or file `id`.
     fn repo(&self, id: &str) -> usize {
         if let Some(&(n, _)) = self.symbols.get(id) {
             return n;
@@ -537,13 +494,10 @@ impl<'a> Graph<'a> {
             .unwrap_or(0)
     }
 
-    /// Whether `id` is a whole repository: the side of a resource declared with no `via`.
     fn is_repo(&self, id: &str) -> bool {
         self.workspace.repos.iter().any(|m| m.identity == id)
     }
 
-    /// Whether the chain ends at `id`, reached through a link: a whole repository, or a side
-    /// only a document lists, since no code of it is indexed.
     fn ends(&self, id: &str) -> bool {
         self.is_repo(id)
             || self.documented.contains_key(id)
@@ -554,13 +508,10 @@ impl<'a> Graph<'a> {
     }
 }
 
-/// The answer's line when `from` names no symbol, route or call site.
 pub(crate) fn no_start(from: &str) -> String {
     format!("no symbol, route or call site matches `{from}`")
 }
 
-/// A key can carry declared sides, automatic uses, or both. An unqualified query keeps
-/// every visible repository's match, with each canonical key entering the trace once.
 fn config_starts<'a>(exports: &'a [Export], from: &str) -> Vec<&'a str> {
     let declared = crate::config_values::sites::found(exports, from);
     let uses = crate::iac::config_uses::found(exports, from, |e| &e.config_uses);
@@ -573,9 +524,6 @@ fn config_starts<'a>(exports: &'a [Export], from: &str) -> Vec<&'a str> {
         .collect()
 }
 
-/// Whether the execution row `x` runs `file` of its repository, whose manifests are
-/// `manifests`: a file under its path, and for a chart environment's row only a file the package
-/// at that path owns itself, as the environment lookup scopes it (a nested package's excluded).
 pub(crate) fn runs(
     x: &meada_core::export::Execution,
     manifests: &[crate::package::Manifest],
@@ -596,7 +544,6 @@ fn in_path(file: &str, directory: &str) -> bool {
             .is_some_and(|s| s.starts_with('/'))
 }
 
-/// Read the entry points that workload execution can reach before constructing the graph.
 pub(crate) fn read_executions(partial: &mut Partial, links: &[Link]) -> Result<()> {
     let executions = contract::KINDS
         .iter()
@@ -630,10 +577,6 @@ pub(crate) fn read_executions(partial: &mut Partial, links: &[Link]) -> Result<(
     Ok(())
 }
 
-/// The IaC node that provides the contract `from` names, when its kind starts a trace there
-/// (`ContractKind::starts_at_provider`) and no kind starts a trace from it by itself: a CI
-/// contract starts at its pipeline, as the node's own name does (#825). An image, which several
-/// CI steps may build, stays listed by its sides.
 pub(crate) fn provider_node(exports: &[Export], from: &str) -> Option<String> {
     if !contract::kind_of(from).is_some_and(|kind| kind.starts_at_provider()) {
         return None;
@@ -652,10 +595,6 @@ pub(crate) fn provider_node(exports: &[Export], from: &str) -> Option<String> {
     })
 }
 
-/// The nodes `start` names, as `Graph::find` and `Graph::changed` find them, read into
-/// `partial` with every row `find` looks up (#396): the providers a kind starts from, else the
-/// symbols the name fits, else the call sites it fits. Empty when it names none, or several
-/// (the answer lists them, and nothing is walked), or a process `direction` up.
 pub(crate) fn starts(
     partial: &mut Partial,
     start: Start,
@@ -670,8 +609,6 @@ pub(crate) fn starts(
             let mut ids: Vec<String> = found.iter().map(|s| s.id.clone()).collect();
             partial.add_symbols(0, found);
             if matches!(start, Start::Changes) {
-                // A file is the caller of its top-level calls, which an `import` line rebinds:
-                // the file ids of what still exists, with the calls they make.
                 let identity = &partial.exports[0].repository;
                 let files: Vec<String> = (changes.unwrap_or_default().iter())
                     .filter(|(_, c)| !matches!(c, Change::Deleted))
@@ -743,15 +680,6 @@ pub(crate) fn starts(
     })
 }
 
-/// Reads into `partial` every code row a walk `direction` from `starts` may read (#396), and
-/// returns the nodes reached. From each node: its own rows (a symbol, or a call site named by
-/// its identity), then down the calls it makes, the targets and candidates of each and what
-/// the links at those calls and at the node lead to, or up its call site's caller, the calls
-/// whose target is the node (or, with `candidates`, that list it among theirs) and what the
-/// links at the node lead to; until nothing new is reached. That is every edge `Walk::enter`
-/// and `Graph::edges` may follow and some they do not (an overload set, a link of another
-/// contract), so a `Graph` over `partial` answers from the reached nodes as the one over every
-/// row does. `links` are the workspace's.
 pub(crate) fn read(
     partial: &mut Partial,
     links: &[Link],
@@ -762,10 +690,6 @@ pub(crate) fn read(
     reading(partial, links, starts, direction, candidates, false)
 }
 
-/// Reads into `partial` what the affected walk (`affected::fan`) may follow from `starts`:
-/// `read` up with candidates, plus, from each node, the consumers of the data links the calls
-/// it makes provide (a write goes on to its readers) and the definitions a call that reaches it
-/// decorates. Executions and IaC nodes are contract rows the partial already holds.
 pub(crate) fn read_affected(
     partial: &mut Partial,
     links: &[Link],
@@ -774,7 +698,6 @@ pub(crate) fn read_affected(
     reading(partial, links, starts, Direction::Up, true, true).map(drop)
 }
 
-/// `read`, and with `affected` the steps `read_affected` adds.
 fn reading(
     partial: &mut Partial,
     links: &[Link],
@@ -796,7 +719,6 @@ fn reading(
         by_consumer.entry(&l.consumer).or_default().push(l);
         by_provider.entry(&l.provider).or_default().push(l);
     }
-    // The far end of each link at `id`, either way: a link is crossed both ways, by its kind.
     let across = |id: &str, next: &mut Vec<String>| {
         let out = by_consumer.get(id).into_iter().flatten();
         next.extend(out.map(|l| l.provider.clone()));
@@ -824,7 +746,6 @@ fn reading(
                     }
                 }
                 let mut calls = sites;
-                // The down-walk follows calls alone, as `Graph` does; a row started from is read.
                 let callees = partial.callees(None, &new)?;
                 calls.extend(callees.into_iter().filter(|(_, c)| c.kind.is_none()));
                 for (_, c) in &calls {
@@ -833,7 +754,6 @@ fn reading(
                 }
             }
             Direction::Up => {
-                // Provisioning sides at producing calls belong to their enclosing symbol.
                 for (_, call) in partial.callees(None, &new)? {
                     next.extend(
                         by_consumer
@@ -854,7 +774,6 @@ fn reading(
                 }
                 let mut calls = sites;
                 calls.extend(partial.callers(None, &new, candidates)?);
-                // Going up, a file's row reaches the symbol holding it (`held`).
                 for (_, c) in calls {
                     if affected {
                         next.extend(c.decorates);
@@ -869,16 +788,10 @@ fn reading(
     Ok(reached)
 }
 
-/// The node a row reaches going up: its holder, the symbol whose span holds a row its file
-/// makes (`CallSite::holder`), else its caller. Processes and the down-walk keep the caller.
 fn held(c: &CallSite) -> &str {
     c.holder.as_deref().unwrap_or(&c.caller)
 }
 
-/// Reads into `partial` what `Graph::processes_of(id)` reads (#396): the nodes upstream of
-/// `id` through the edges a process follows (calls by their target, links), with the calls of
-/// those that are no symbol (a file making top-level calls), whose edges come from their calls
-/// alone. `links` are the workspace's.
 pub(crate) fn read_processes(partial: &mut Partial, links: &[Link], id: &str) -> Result<()> {
     let reached = read(partial, links, vec![id.to_string()], Direction::Up, false)?;
     let symbols: HashSet<&str> = (partial.exports.iter())
@@ -892,41 +805,26 @@ pub(crate) fn read_processes(partial: &mut Partial, links: &[Link], id: &str) ->
     Ok(())
 }
 
-/// Whether the consumer of `link` calls its provider, so the provider is not a writer that goes
-/// on to a reader.
 fn calls_on_link(link: &Link) -> bool {
     contract::calls_from_definition(Some(&link.contract))
 }
 
-/// What a `from` names.
 enum Lookup<'a> {
-    /// Symbols, or files serving a route, to start from.
     Nodes(Vec<&'a str>),
     Call(Call<'a>),
-    /// The process of an entry point of the repository at that position.
     Process(usize, &'a EntryPoint),
-    /// No start: the answer says why.
     Answer(Vec<String>),
 }
 
-/// A depth-first walk of the graph that writes the chain as it goes.
 struct Walk<'g, 'a> {
     graph: &'g Graph<'a>,
     direction: Direction,
     files: Vec<Files<'a>>,
     rows: Vec<Row>,
-    /// The nodes from the start down to the one being followed: meeting one again closes a
-    /// cycle.
     ancestors: Vec<&'a str>,
-    /// Nodes already followed once; the chain shows them again but does not repeat what
-    /// follows them.
     expanded: HashSet<&'a str>,
-    /// The workloads and roots whose `runs code` line the answer wrote (#744): a workload that
-    /// runs several of the nodes reached, or several paths of one, is written once.
     executed: HashSet<(String, String)>,
-    /// The IaC nodes already followed upward from a CI step that runs a program (#832).
     held: HashSet<String>,
-    /// The depth where a branch stops, `WALK_DEPTH` below where the walk starts.
     limit: usize,
 }
 
@@ -936,7 +834,6 @@ impl<'a> Walk<'_, 'a> {
         self.enter(id, 0, Row::call(text, n, None));
     }
 
-    /// A call site as the start: the call, then what it reaches or where it sits.
     fn root_call(&mut self, call: Call<'a>) {
         let text = format!("{} {}", self.site(call), callee(&call.1.id));
         if self.direction == Direction::Down && self.graph.reader_call(&call.1.id).is_some() {
@@ -955,9 +852,6 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// Writes the line reaching `id`, then follows `id` unless that closes a cycle, repeats a
-    /// node already followed or is at the depth limit, where `id` is not counted as followed: a
-    /// shorter path that meets it later follows it.
     fn enter(&mut self, id: &'a str, depth: usize, mut row: Row) {
         let seen = match () {
             _ if self.ancestors.contains(&id) => " (cycle)",
@@ -981,19 +875,16 @@ impl<'a> Walk<'_, 'a> {
             );
             self.unresolved_sides(id, depth + 1, n, &place);
         }
-        // Each node reached once per line it hangs from, however many calls reach it.
         let mut shown = HashSet::new();
         match self.direction {
             Direction::Down => {
                 for &call in graph.callees_at(id) {
                     self.call_down(call, depth + 1, &mut shown);
                 }
-                // A method of a declarative client is a consumer with no call of its own.
                 if graph.symbols.contains_key(id) && graph.consumers.contains_key(id) {
                     let (n, place) = (graph.repo(id), self.place(id));
                     self.consumers_down(id, n, &place, depth + 1, true, &mut shown);
                 }
-                // A CI step that runs a console script starts its program (#832).
                 if graph.iac.contains_key(id) {
                     for link in (graph.out.get(id).into_iter().flatten())
                         .filter(|l| calls_on_link(l) && graph.symbols.contains_key(&*l.provider))
@@ -1003,8 +894,6 @@ impl<'a> Walk<'_, 'a> {
                         }
                     }
                 }
-                // A writer goes on to the readers of what it writes; a repository-level reader
-                // ends the branch.
                 for link in (graph.into.get(id).into_iter().flatten()).filter(|l| !calls_on_link(l))
                 {
                     let reader = link.consumer.as_str();
@@ -1038,7 +927,6 @@ impl<'a> Walk<'_, 'a> {
                         self.writer_up(link, depth + 1, &mut shown);
                     }
                 }
-                // Calls and uses alike; a row a file makes goes to the symbol holding it.
                 for &call @ (n, c) in graph.callers.get(id).into_iter().flatten() {
                     let from = held(c);
                     if !shown.insert((from, false)) {
@@ -1051,7 +939,6 @@ impl<'a> Walk<'_, 'a> {
                 }
                 for link in graph.into.get(id).into_iter().flatten() {
                     let Some(&call @ (n, c)) = graph.calls.get(link.consumer.as_str()) else {
-                        // A method of a declarative client consumes the route.
                         let method = link.consumer.as_str();
                         if graph.symbols.contains_key(method)
                             && calls_on_link(link)
@@ -1059,8 +946,6 @@ impl<'a> Walk<'_, 'a> {
                         {
                             self.reach(method, depth + 1, link);
                         }
-                        // A CI step runs the program (#832). The walk from an IaC node
-                        // follows that node's own callers (`iac::trace`).
                         if let Some(&(n, node)) = graph.iac.get(method)
                             && graph.symbols.contains_key(id)
                             && calls_on_link(link)
@@ -1085,9 +970,6 @@ impl<'a> Walk<'_, 'a> {
                     let text = format!("{} {} {}", arrow(link), self.site(call), self.holder(call));
                     self.enter(from, depth + 1, Row::link(text, n, link));
                 }
-                // A reader goes back to the writers of what it reads, and a channel handler to
-                // the calls that produce what it handles, then to their callers; a
-                // repository-level writer ends the branch.
                 for link in (graph.out.get(id).into_iter().flatten()).filter(|l| !calls_on_link(l))
                 {
                     self.writer_up(link, depth + 1, &mut shown);
@@ -1097,10 +979,6 @@ impl<'a> Walk<'_, 'a> {
         self.ancestors.pop();
     }
 
-    /// Upstream of a CI step that runs a program (#832): the step, then the nodes that hold it
-    /// (its CI job, its pipeline) and the CI jobs that call that pipeline, as the walk from an
-    /// IaC node writes them going up (`iac::trace`), calls before references. `path` holds
-    /// the nodes from the step to the one being followed.
     fn holders_up(
         &mut self,
         n: usize,
@@ -1159,7 +1037,6 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// Upstream of a contract side is every root that provisions it.
     fn provisioners_up(&mut self, site: &str, depth: usize) {
         let graph = self.graph;
         for link in graph
@@ -1182,7 +1059,6 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// A code symbol is upstream of the workload that runs its repository or code directory.
     fn executors_up(&mut self, id: &str, depth: usize) {
         let graph = self.graph;
         let Some(&(n, symbol)) = graph.symbols.get(id) else {
@@ -1219,10 +1095,6 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// What one call reaches: its targets in its repository, and, when it consumes a
-    /// contract, the providers it links to, or that it is unresolved or links to none.
-    /// `shown` holds the nodes already written under the same line, with whether a link
-    /// reached them.
     fn call_down(
         &mut self,
         call @ (n, c): Call<'a>,
@@ -1240,7 +1112,6 @@ impl<'a> Walk<'_, 'a> {
             }
             let mut text = self.node(&s.id).1;
             if set.len() > 1 {
-                // Overloads of one method are one guess: a leaf, as an ambiguous step is.
                 let (name, n) = (render::overload_name(&s.id), set.len());
                 text.truncate(text.len() - label(&s.id).len());
                 text += &format!("{name} {}", render::overloads(n, false));
@@ -1252,7 +1123,6 @@ impl<'a> Walk<'_, 'a> {
         let place = self.site(call);
         self.consumers_down(&c.id, n, &place, depth, false, shown);
         self.unresolved_sides(&c.id, depth, n, &place);
-        // A call that produces to a channel goes on to the handlers of its consumers.
         for link in graph.into.get(c.id.as_str()).into_iter().flatten() {
             let handler = link.consumer.as_str();
             if shown.insert((handler, true)) {
@@ -1261,10 +1131,6 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// What the consumers at `site` (in repository `n`, written `place`) reach: the providers
-    /// they link to, or a line saying one is unresolved or links to none. At a definition (a
-    /// method of a declarative client, which has no call) only the consumers whose kind calls
-    /// on from one (`ContractKind::calls_from_definition`) count.
     fn consumers_down(
         &mut self,
         site: &'a str,
@@ -1291,8 +1157,6 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// Writes the line `link` reaches `id` by, then follows `id`, unless the chain ends there
-    /// (`Graph::ends`): that line closes the branch.
     fn reach(&mut self, id: &'a str, depth: usize, link: &Link) {
         let (m, text) = self.node(id);
         let row = Row::link(format!("{} {text}", arrow(link)), m, link);
@@ -1302,7 +1166,6 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// The unresolved channel sides at `site`, one row each: they link to nothing, and say so.
     fn unresolved_sides(&mut self, site: &str, depth: usize, repo: usize, place: &str) {
         let sides = self.graph.unresolved_sides.get(site).into_iter().flatten();
         for &(side, contract) in sides {
@@ -1311,17 +1174,12 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// Writes `row`, indented `depth` levels.
     fn push(&mut self, depth: usize, mut row: Row) {
         row.text.insert_str(0, &"  ".repeat(depth));
         row.text += &std::mem::take(&mut row.end);
         self.rows.push(row);
     }
 
-    /// `<repository> <path>:<line> <name>` at a symbol's definition; a file (the caller of
-    /// top-level calls, or a route file serving with no function of its own) is
-    /// `<repository> <path> (top level)`, and a route only a document lists
-    /// `<repository> <document> GET /users/{} (documented only)`.
     fn node(&mut self, id: &str) -> (usize, String) {
         let graph = self.graph;
         let n = graph.repo(id);
@@ -1365,13 +1223,11 @@ impl<'a> Walk<'_, 'a> {
         (n, text)
     }
 
-    /// `<repository> <path>:<line>` of a call site.
     fn site(&mut self, (n, c): Call) -> String {
         let at = self.files[n].at(&c.span.path, c.span.start);
         format!("{} {at}", self.graph.workspace.repos[n].identity)
     }
 
-    /// The name of the symbol a row going up reaches (`held`), `(top level)` outside any.
     fn holder(&self, call @ (_, c): Call<'a>) -> &'a str {
         match c.holder.as_deref() {
             Some(holder) => label(holder),
@@ -1379,7 +1235,6 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// The name of the symbol making a call, `(top level)` outside any.
     fn caller(&self, (_, c): Call) -> &'a str {
         match self.graph.symbols.get(c.caller.as_str()) {
             Some((_, s)) => label(&s.id),
@@ -1387,7 +1242,6 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// The chain as `meada_core::trace::Chain` answers it, with the missing peers.
     fn finish(self, budget: Option<usize>) -> String {
         let missing = (self.graph.workspace.missing.iter())
             .map(Missing::text)
@@ -1410,16 +1264,12 @@ enum Via<'a> {
     Link(&'a Link),
 }
 
-/// How deep a walk (a `trace`, a process) follows one branch below where it starts before it
-/// stops and says so.
 // ponytail: a fixed depth keeps the recursion off the stack limit however long a call chain is;
 // a walk with its own stack lifts it.
 const WALK_DEPTH: usize = 256;
 
-/// One step of a process: the structured list `trace` renders and the export carries.
 pub(crate) struct Step<'a> {
     depth: usize,
-    /// The position of the repository holding `node`.
     repo: usize,
     via: Via<'a>,
     /// The level of the call or link that reached it.
@@ -1458,40 +1308,35 @@ impl<'a> Step<'a> {
     }
 }
 
-/// What a step of a process goes on to.
 enum Edge<'a> {
-    /// An unresolved channel side at `site`, `Produces` or `Consumes` `contract`.
     Side {
         site: &'a str,
         repo: usize,
         mark: Mark,
         contract: &'a str,
     },
-    /// A call to the symbol `to`.
-    Call { to: &'a str, level: Option<Level> },
-    /// An ambiguous call or link: a guess, so one step listing `candidates`, not followed.
-    /// `at` is the call site.
+    Call {
+        to: &'a str,
+        level: Option<Level>,
+    },
     Guess {
         at: &'a str,
         repo: usize,
         level: Option<Level>,
         candidates: Vec<&'a str>,
     },
-    /// A consumer at `at` that nothing serves: `contract` is `None` when Meada could not read it.
     Dead {
         at: &'a str,
         repo: usize,
         contract: Option<&'a str>,
     },
-    /// A link followed to its far end `to`.
-    Link { to: &'a str, link: &'a Link },
+    Link {
+        to: &'a str,
+        link: &'a Link,
+    },
 }
 
 impl<'a> Graph<'a> {
-    /// The edges the symbol or file `id` expands into, in order: its unresolved channel sides,
-    /// then each outgoing call in source order of its call site (then identity) with what it
-    /// reaches, then, for a writer or producer, the readers of what it writes. The one place
-    /// that says which edges a step has.
     fn edges(&self, id: &'a str) -> Vec<Edge<'a>> {
         let mut edges = Vec::new();
         self.sides_at(id, self.repo(id), &mut edges);
@@ -1499,12 +1344,9 @@ impl<'a> Graph<'a> {
         for &call in self.callees_at(id) {
             self.call_edges(call, &mut shown, &mut edges);
         }
-        // A method of a declarative client is a consumer with no call of its own.
         if self.symbols.contains_key(id) {
             self.consumer_edges(id, self.repo(id), true, &mut shown, &mut edges);
         }
-        // A writer goes on to the readers of what it writes; a repository-level reader ends
-        // the branch.
         for link in (self.into.get(id).into_iter().flatten()).filter(|l| !calls_on_link(l)) {
             let reader = link.consumer.as_str();
             let reaches = self.ends(reader)
@@ -1517,8 +1359,6 @@ impl<'a> Graph<'a> {
         edges
     }
 
-    /// What one call reaches, as `Walk::call_down` finds it, but an ambiguous call or link is
-    /// one guess.
     fn call_edges(
         &self,
         (n, c): Call<'a>,
@@ -1544,7 +1384,6 @@ impl<'a> Graph<'a> {
         }
         self.consumer_edges(&c.id, n, false, shown, edges);
         self.sides_at(&c.id, n, edges);
-        // A call that produces to a channel goes on to the handlers of its consumers.
         for link in self.into.get(c.id.as_str()).into_iter().flatten() {
             let handler = link.consumer.as_str();
             if shown.insert((handler, true)) {
@@ -1553,8 +1392,6 @@ impl<'a> Graph<'a> {
         }
     }
 
-    /// What the consumers at `site` reach, as `Walk::consumers_down` finds it, but an ambiguous
-    /// link is one guess.
     fn consumer_edges(
         &self,
         site: &'a str,
@@ -1596,10 +1433,6 @@ impl<'a> Graph<'a> {
         }
     }
 
-    /// The consumers at `site`, each with the links it has: those on its contract, and for an
-    /// unresolved one those of a decision, on a contract no other consumer of the site has. At
-    /// a definition (a method of a declarative client, which has no call) only the consumers
-    /// whose kind calls on from one (`ContractKind::calls_from_definition`) count.
     fn consumer_links(
         &self,
         site: &str,
@@ -1631,7 +1464,6 @@ impl<'a> Graph<'a> {
             .collect()
     }
 
-    /// The unresolved channel sides at `site`, one edge each.
     fn sides_at(&self, site: &'a str, repo: usize, edges: &mut Vec<Edge<'a>>) {
         for &(mark, contract) in self.unresolved_sides.get(site).into_iter().flatten() {
             edges.push(Edge::Side {
@@ -1643,17 +1475,7 @@ impl<'a> Graph<'a> {
         }
     }
 
-    /// The entry points whose process reaches the symbol `id`, sorted by identity, each with the
-    /// position of its repository. Found by walking upstream: the walk inverts `edges`, the one
-    /// set of edge rules, so it crosses exactly the calls and links a process expands (decided
-    /// links included, ambiguous calls and links not) and membership agrees with the process
-    /// tree, but for chains deeper than `WALK_DEPTH`, which only this walk ignores: a node
-    /// past depth 256 is no step of the tree, and the limit can hide a node shallower than
-    /// that, through `Seen`. E reaches X at depth 255, so X expands and each of its callees, Y
-    /// among them, is a `depth-limit` step at 256 whose own callee Z is no step; a later direct
-    /// E to X shows X as seen, so Y is not expanded there either, yet `processes_of(Z)` lists E.
     pub(crate) fn processes_of(&self, id: &'a str) -> Vec<(usize, &'a EntryPoint)> {
-        // What reaches each node through one edge.
         let mut up: HashMap<&str, Vec<&str>> = HashMap::new();
         let nodes: HashSet<&str> = (self.symbols.keys().chain(self.callees.keys()))
             .copied()
@@ -1696,10 +1518,6 @@ impl<'a> Graph<'a> {
         found
     }
 
-    /// The steps of the process `entry` starts, depth first: a step's children are its
-    /// `edges`. The walk follows what `trace` down follows, but an ambiguous call or link is
-    /// one step that is not expanded, and a symbol is expanded once
-    /// per process, at its first occurrence.
     pub(crate) fn process(&self, entry: &'a EntryPoint) -> Vec<Step<'a>> {
         let mut descent = Descent {
             graph: self,
@@ -1711,7 +1529,6 @@ impl<'a> Graph<'a> {
         descent.steps
     }
 
-    /// `entry`'s process as the export carries it.
     pub(crate) fn export_process(&self, entry: &'a EntryPoint) -> Process {
         let steps = self.process(entry).into_iter().map(|s| {
             let via = match s.via {
@@ -1740,19 +1557,14 @@ impl<'a> Graph<'a> {
     }
 }
 
-/// The depth-first walk of one process.
 struct Descent<'g, 'a> {
     graph: &'g Graph<'a>,
     steps: Vec<Step<'a>>,
-    /// The nodes from the entry point down to the one being followed.
     ancestors: Vec<&'a str>,
-    /// Nodes already followed once.
     expanded: HashSet<&'a str>,
 }
 
 impl<'a> Descent<'_, 'a> {
-    /// Writes the step at `id`, then follows `id` unless that closes a cycle, repeats a node
-    /// already followed or is `WALK_DEPTH` deep.
     fn enter(&mut self, id: &'a str, depth: usize, via: Via<'a>, level: Option<Level>) {
         let graph = self.graph;
         let mut step = Step::new(depth, graph.repo(id), via, level, id);
@@ -1775,7 +1587,6 @@ impl<'a> Descent<'_, 'a> {
         self.ancestors.pop();
     }
 
-    /// The step or steps `edge` makes at `depth`.
     fn follow(&mut self, edge: Edge<'a>, depth: usize) {
         match edge {
             Edge::Side {
@@ -1809,7 +1620,6 @@ impl<'a> Descent<'_, 'a> {
         }
     }
 
-    /// The step `link` reaches `id` by, then `id` followed, unless the chain ends there.
     fn reach(&mut self, id: &'a str, depth: usize, link: &'a Link) {
         let level = Some(link.level);
         match self.graph.ends(id) {
@@ -1823,8 +1633,6 @@ impl<'a> Descent<'_, 'a> {
 }
 
 impl<'a> Walk<'_, 'a> {
-    /// The process of `entry`, whose repository is at `n`: its label first, then its steps as
-    /// the chain shows them.
     fn process(&mut self, n: usize, entry: &'a EntryPoint) {
         self.push(0, Row::call(format!("process {}", entry.label), n, None));
         for step in self.graph.process(entry) {
@@ -1832,7 +1640,6 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// `<repository> <path>:<line>` of the call site or symbol a note is about.
     fn place(&mut self, id: &str) -> String {
         let graph = self.graph;
         match (graph.calls.get(id), graph.symbols.get(id)) {
@@ -1845,7 +1652,6 @@ impl<'a> Walk<'_, 'a> {
         }
     }
 
-    /// Writes `step` in the chain's line grammar.
     fn show(&mut self, step: &Step<'a>) {
         let contract = step.contract.unwrap_or_default();
         let row = match step.mark {
@@ -1921,8 +1727,6 @@ mod tests {
     use crate::index::Span;
     use crate::workspace::Repository;
 
-    /// A workspace of one repository `r` whose file `a.ts` defines `names` and makes `calls`,
-    /// `(caller, callee)` by name in source order, each exact.
     fn repository(names: &[String], calls: &[(String, String)]) -> (Workspace, [Export; 1]) {
         let id = |name: &str| format!("r::a.ts::{name}");
         let span = || {
@@ -1992,7 +1796,6 @@ mod tests {
 
     #[test]
     fn a_trace_follows_a_node_met_at_the_depth_limit_where_a_shorter_path_meets_it_again() {
-        // `f0` calls `g1`, whose chain meets `x` at the limit, then calls `x` itself.
         let g = |n: usize| format!("g{n}");
         let mut names: Vec<String> = (1..WALK_DEPTH).map(g).collect();
         names.extend(["f0", "x", "y"].map(String::from));
@@ -2010,19 +1813,13 @@ mod tests {
             Some(usize::MAX / 8),
         );
 
-        // Nothing hangs from `x` at the limit; one level down it is followed.
         let limit = format!("{}r a.ts x (depth limit)\n", "  ".repeat(WALK_DEPTH));
         let tail = format!("{limit}  r a.ts x\n    r a.ts y\nchain: ");
         assert!(answer.contains(&tail), "{answer}");
     }
 
-    /// A trace places each line it writes at a cost that does not grow with the file holding it
-    /// (#745): every function of a tree of `n` sits in one file and is reached, so the work of
-    /// `n` and of `8n` functions keeps the ratio of the lines written. Placing a line by counting
-    /// the file's newlines from its start makes it the square.
     #[test]
     fn a_trace_of_many_functions_in_one_file_grows_with_the_functions_reached() {
-        // Each function on a line of its own, its call sites on that line.
         const WIDTH: usize = 80;
         let dir = std::env::temp_dir().join(format!("meada-trace-745-{}", std::process::id()));
         let tree = |n: usize| {
@@ -2055,11 +1852,9 @@ mod tests {
         let run = |graph: &Graph| {
             let started = std::time::Instant::now();
             let answer = graph.answer(Start::From("f0"), None, Direction::Down, None);
-            // The lines are placed: the walk read the file.
             assert!(answer.contains("a.ts:"), "{answer}");
             started.elapsed()
         };
-        // The least of interleaved runs keeps the machine's speed and load out of the ratio.
         let (mut at_small, mut at_large) = (std::time::Duration::MAX, std::time::Duration::MAX);
         for _ in 0..5 {
             at_small = at_small.min(run(&small));

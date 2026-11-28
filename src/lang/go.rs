@@ -1,9 +1,3 @@
-//! The Go language pack (spec #25). It reads `.go` files and the `go.mod` files of a repository
-//! with no Go toolchain: an import names a package directory through the module path of the
-//! `go.mod` that owns it (`modfile.rs`), the files of one package share their top-level scope
-//! (`Layout::shared`), build constraints are evaluated for one fixed target (`build.rs`), and a
-//! package under `testdata` or an `_` directory is read when a package read imports it (`layout`).
-
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 use std::rc::Rc;
@@ -17,10 +11,6 @@ use super::{
 use crate::resolve::Code;
 use crate::{Result, parent, qualify};
 
-/// What `name`, written in `scope` of `path`, names in a package outside the repository when the
-/// head of the name is the import itself (`http.Get`, `kafka.NewReader`), spelled as the imports
-/// name it. `Code::outside` filtered on `direct`: a method of a typed local (`c.Get` with
-/// `c *http.Client`) is not a function of the package.
 pub(crate) fn package_call<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -36,21 +26,12 @@ pub mod modfile;
 mod values;
 use values::Keep;
 
-/// How many segments of a member chain a callee keeps, and how many wrappers (`*`, `[T]`,
-/// parentheses) a receiver's type is read through; a longer one is its node kind, or names no
-/// type.
 // ponytail: real chains hold a handful of segments; the limit keeps a crafted one cheap.
 const PATH_DEPTH: usize = 256;
 
-/// How many function literals may nest in one another as definitions of their own. Names are
-/// qualified by the literals around them and each call resolves its names up that chain, so
-/// unbounded nesting costs cubic time. Past the limit a literal is no definition: its
-/// parameters and calls belong to the one around it.
 // ponytail: real code nests a few levels; 128 is the depth the other packs allow.
 const DEFINITION_DEPTH: usize = 128;
 
-/// The types the language declares in its universe block: a use of one is no reference, also
-/// where the package declares a type of the same name (`type error struct{}`).
 const PREDECLARED: [&str; 22] = [
     "any",
     "bool",
@@ -108,20 +89,16 @@ impl LanguagePack for Go {
             .filter(|(_, f)| !f.unbuilt)
             .map(|(p, f)| (*p, *f))
             .collect();
-        // The files of one directory that declare one package share a scope.
         let mut packages: BTreeMap<(&str, &str), Vec<String>> = BTreeMap::new();
         for (path, facts) in &built {
             let key = (dir(path), facts.package.as_str());
             packages.entry(key).or_default().push(path.to_string());
         }
-        // The files of each package directory but the tests, which no other package imports.
         let mut importable: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
         for path in built.keys().filter(|p| !p.ends_with("_test.go")) {
             importable.entry(dir(path)).or_default().push(path);
         }
         let modules = modfile::Modules::new(configs);
-        // `./...` of each module, and what those files import, in turn: Go builds a package under
-        // `testdata` or an `_` directory only when a package it builds imports it.
         let mut members: BTreeSet<&str> = (built.keys().copied())
             .filter(|p| build::listed(modules.below(dir(p))))
             .collect();
@@ -138,8 +115,6 @@ impl LanguagePack for Go {
                 }
             }
         }
-        // What an import of a directory names: its first file, which stands for the package
-        // (`Layout::shared`).
         let importable: BTreeMap<String, String> = (importable.into_iter())
             .map(|(d, p)| (d.to_string(), p[0].to_string()))
             .collect();
@@ -160,68 +135,38 @@ impl LanguagePack for Go {
     }
 }
 
-/// The directory of a repository-relative path, empty at the root.
 fn dir(path: &str) -> &str {
     path.rsplit_once('/').map_or("", |(d, _)| d)
 }
 
-/// What the walk of a declaration's body records.
 struct Walk<'s> {
     src: &'s [u8],
     facts: Facts,
     write_bytes: usize,
-    /// The locals recorded so far, so each is listed once.
     locals: BTreeSet<String>,
-    /// Every binding of a name in a scope, with the class the source writes for it (`None` when
-    /// it writes none) and the bytes it holds for, when that is less than the whole scope (a
-    /// `:=` or `var`, from its end to the end of its block). A name all its bindings give one
-    /// class is a receiver (`finish`).
     bound: BTreeMap<(String, String), Vec<Binding>>,
-    /// The type parameters of the type declarations, as `Type.Param`: they hide a name in the
-    /// declaration alone, not in the methods.
     type_scoped: BTreeSet<String>,
-    /// The plain names a statement of a function's own block binds to one value (`r :=
-    /// gin.Default()`), by scope: constants when nothing else binds or assigns the name.
     held: Vec<(String, String, Value)>,
-    /// First-result projections, kept apart from ordinary scalar constants.
     first_results: Vec<FirstResult>,
-    /// The names assigned again, with the scope the assignment is written in and what it does
-    /// to a name bound to an environment read (`keeps_env`).
     assigned: Vec<(String, String, Keep)>,
-    /// The single value each `return` of a definition gives.
     returns: HashMap<String, Vec<Value>>,
-    /// The functions (by node id) whose body a `defer` already had read (`deferred_write`).
     deferring: HashSet<usize>,
-    /// The standard-library packages whose calls and constants the values fold.
     std: values::Std,
-    /// The package-level `var`s, which hold their value only if nothing assigns them.
     vars: BTreeSet<String>,
-    /// The field names written through a selector (`cfg.Base = ..`, `cfg.Base++`, `&cfg.Base`),
-    /// whichever package the selector reaches.
     selected: BTreeSet<String>,
-    /// The scopes that write through a dereference (`*p = ..`, `*p.Topic = ..`), with every
-    /// scope around them.
     derefs: HashSet<String>,
-    /// The second name of each `v, ok := os.LookupEnv(..)`, by the scope and the first name.
     lookups: HashMap<(String, String), String>,
-    /// The type parameters of the top-level declaration being read: a use of one is no
-    /// reference.
     type_params: BTreeSet<String>,
-    /// The `(scope, name)` of each type reference recorded, so each is recorded once.
     referenced: HashSet<(String, String)>,
 }
 
-/// A binding of a name: the class the source writes for it, and where it holds.
 type Binding = (Option<Class>, Option<Range<usize>>);
 
 impl Walk<'_> {
-    /// A name bound in `scope` to a value of no class the source writes.
     fn local(&mut self, scope: &str, name: &str) {
         self.bind_as(scope, name, None, true, None);
     }
 
-    /// A name bound in `scope`, holding `class` when the source writes it. A `local` hides the
-    /// outer names it spells; a parameter or a field is no local.
     fn bind_as(
         &mut self,
         scope: &str,
@@ -239,8 +184,6 @@ impl Walk<'_> {
         (self.bound.entry((scope.into(), name.into())).or_default()).push((class, region));
     }
 
-    /// The names a parameter list binds, with the type each writes: parameters (`local` false,
-    /// which `Def::params` lists), or the receiver and the named results of a function.
     fn typed_params(&mut self, scope: &str, list: Option<Node>, local: bool) {
         for (names, param) in declarations(list) {
             let ty = param.child_by_field_name("type");
@@ -252,9 +195,6 @@ impl Walk<'_> {
         }
     }
 
-    /// The names a `var` or `:=` binds, each with the class its type or its value writes: the
-    /// type, else the value at its place (`a, b := T{}, U{}`), else, of one call giving several
-    /// values, the first.
     fn assigned(
         &mut self,
         scope: &str,
@@ -278,7 +218,6 @@ impl Walk<'_> {
         }
     }
 
-    /// Notes that `scope` writes through a dereference when one of `targets` is `*p`.
     fn dereference(&mut self, scope: &str, targets: &[Node]) {
         let src = self.src;
         let deref = |t: &&Node| {
@@ -293,9 +232,6 @@ impl Walk<'_> {
         }
     }
 
-    /// Records the writes to `targets`: a name assigned again in `scope`, and the field name of
-    /// a selector, which any package may write (`config.Base = ..`). `*p = ..` replaces every
-    /// field of what `p` points at, so `p` holds no one value either.
     fn write(&mut self, scope: &str, targets: &[Node], keeps: Keep, range: Range<usize>) {
         for target in targets {
             let name = match target.kind() {
@@ -349,7 +285,6 @@ impl Walk<'_> {
         }
     }
 
-    /// Whether `scope`, or a scope around or inside it, writes through a dereference.
     fn writes_through(&self, scope: &str) -> bool {
         let mut at = scope;
         while !at.is_empty() {
@@ -361,7 +296,6 @@ impl Walk<'_> {
         false
     }
 
-    /// Whether a binding of the file hides the builtin `name` (`len`).
     // ponytail: a package-level one another file of the package declares is not seen here.
     fn hides(&self, name: &str) -> bool {
         (self.bound.keys()).any(|(_, n)| n == name)
@@ -369,21 +303,13 @@ impl Walk<'_> {
             || (self.facts.consts.iter()).any(|c| c.name == name)
     }
 
-    /// Makes the names held by one binding constants, and gives each definition what it
-    /// returns. A name bound again anywhere in its function, or assigned in it or in a literal
-    /// inside it, holds no one value.
     fn finish_values(&mut self) {
         let mut assigned = HashSet::new();
-        // The names assigned that no scope of the file binds: a variable another file of the
-        // package declares.
         let mut elsewhere = BTreeSet::new();
-        // The names bound to an environment read: an assignment that keeps the read leaves them
-        // constants.
         let env: HashSet<String> = (self.held.iter())
             .filter(|(_, _, value)| values::is_env(value))
             .map(|(scope, name, _)| qualify(scope, name))
             .collect();
-        // The binding a name written in a scope refers to: the innermost scope that binds it.
         let bound = &self.bound;
         let binder = |scope: &str, name: &str| {
             let mut at = scope;
@@ -397,13 +323,10 @@ impl Walk<'_> {
                 at = crate::parent(at);
             }
         };
-        // The fallbacks of names bound to a read: the binding, the name, the scope, the default
-        // and its guard.
         let mut defaults = Vec::new();
         let mut query_writes = HashMap::new();
         for (scope, name, keeps) in std::mem::take(&mut self.assigned) {
             let found = binder(&scope, &name).map(|at| qualify(&at, &name));
-            // The address of a topic: a write only when the scope writes through a pointer.
             if matches!(keeps, Keep::Pointer) && !self.writes_through(&scope) {
                 continue;
             }
@@ -427,8 +350,6 @@ impl Walk<'_> {
                 (None, _) => {}
             }
         }
-        // A guard holds when no binding of the file hides `len`, and when `ok` is the second
-        // result of the `os.LookupEnv` that bound the read, bound once and never assigned.
         let hides_len = self.hides("len");
         let guarded = |found: &str, name: &str, scope: &str, guard: &values::Guard| {
             let Some(ok) = &guard.ok else {
@@ -450,15 +371,11 @@ impl Walk<'_> {
         let defaults: Vec<(String, String, Value)> = (kept.into_iter())
             .map(|(found, _, scope, value, _)| (found, scope, value))
             .collect();
-        // A `var` assigned again holds no one value. One assigned in another file is declared
-        // there and here (as a constant of no value), so the package binds the name to neither.
         for constant in &mut self.facts.consts {
             if self.vars.contains(&constant.name) && assigned.contains(&constant.name) {
                 constant.value = Value::Unknown;
             }
         }
-        // The markers `Resolver::redeclared` reads: a package variable, and a field written
-        // through a selector, which makes a variable of that name no constant in any package.
         let marks = (self.vars.iter()).map(|v| format!("{v}.var"));
         let marks = marks.chain(self.selected.iter().map(|f| format!(".{f}")));
         for name in marks {
@@ -506,8 +423,6 @@ impl Walk<'_> {
                 self.facts.first_results.push(first);
             }
         }
-        // A fallback leaves the name its read only when the default is plain, which the
-        // constants of the file now tell.
         if !defaults.is_empty() {
             let table: HashMap<&str, &Value> = (self.facts.consts.iter())
                 .filter(|c| !self.vars.contains(&c.name))
@@ -520,7 +435,6 @@ impl Walk<'_> {
             self.facts.consts.retain(|c| !rejected.contains(&c.name));
             constants.retain(|c| !rejected.contains(c));
         }
-        // A constant is a name that holds its value, not a local hiding what it is bound to.
         self.facts.locals.retain(|l| !constants.contains(l));
         let mut returns = std::mem::take(&mut self.returns);
         for def in &mut self.facts.defs {
@@ -540,7 +454,6 @@ impl Walk<'_> {
         }
     }
 
-    /// The identifiers of an expression list on the left of `:=`, or of a name field.
     fn bind(&mut self, scope: &str, node: Node) {
         let src = self.src;
         match node.kind() {
@@ -553,7 +466,6 @@ impl Walk<'_> {
         }
     }
 
-    /// The names a parameter list binds, of no class the source writes.
     fn bind_params(&mut self, scope: &str, list: Option<Node>) {
         for (names, _) in declarations(list) {
             for name in names {
@@ -562,23 +474,18 @@ impl Walk<'_> {
         }
     }
 
-    /// The type parameters a generic function declares (`[T any]`).
     fn bind_type_params(&mut self, scope: &str, node: Node) {
         for name in type_params(node) {
             self.local(scope, text(name, self.src));
         }
     }
 
-    /// The type parameters a type declaration declares: names within the declaration alone.
     fn bind_type_scope(&mut self, ty: &str, node: Node) {
         for name in type_params(node) {
             self.type_scoped.insert(qualify(ty, text(name, self.src)));
         }
     }
 
-    /// Records the type `node` names (a `type_identifier` or a `qualified_type`), written in
-    /// `scope`, as a reference of kind `Type`, once per scope and name. A predeclared type, a
-    /// type parameter of the declaration being read and a type declaration's own name are none.
     fn type_use(&mut self, scope: &str, node: Node) {
         let src = self.src;
         let name = match node.kind() {
@@ -609,15 +516,10 @@ impl Walk<'_> {
         }
     }
 
-    /// Starts a top-level spec: its uses (scope "") are held by the spec's own definition, so
-    /// a name another spec of the file already used gives this one its row too.
     fn new_top_spec(&mut self) {
         self.referenced.retain(|(scope, _)| !scope.is_empty());
     }
 
-    /// Records every type use under `node` (`type_use`), written in `scope`: a parameter list,
-    /// a result, a type declaration's type. An explicit stack, so a type nested however deep
-    /// costs its size.
     fn type_uses(&mut self, scope: &str, node: Option<Node>) {
         let mut stack: Vec<Node> = node.into_iter().collect();
         while let Some(n) = stack.pop() {
@@ -632,12 +534,8 @@ impl Walk<'_> {
         }
     }
 
-    /// Records the calls and the bindings under `node`, which belong to `scope`. A function
-    /// literal is a `Kind::Inline` definition (`@<offset>` under `scope`) that the index names
-    /// or folds into the one around it: its parameters bind in it, and its calls are its own.
     fn body(&mut self, scope: &str, node: Node) {
         let src = self.src;
-        // Explicit stack instead of recursion: generated code can nest deeper than the stack.
         let mut stack: Vec<(Node, Rc<str>, usize)> = vec![(node, scope.into(), 0)];
         while let Some((node, scope, depth)) = stack.pop() {
             let mut inner_scope = Rc::clone(&scope);
@@ -682,7 +580,6 @@ impl Walk<'_> {
                         self.bind(scope, left);
                     }
                 }
-                // `r = gin.New()`, `for r = range rs`: the name is assigned again.
                 "assignment_statement" | "range_clause" | "receive_statement" => {
                     if let Some(left) = node.child_by_field_name("left") {
                         let targets: Vec<Node> = named(left).chain([left]).collect();
@@ -718,7 +615,6 @@ impl Walk<'_> {
                         self.hold(scope, &names(node), right, depth);
                     }
                 }
-                // `&p`: the name may be written through the pointer, so it holds no one value.
                 // ponytail: except as the `Topic` of a `TopicPartition` literal (confluent-kafka-go's
                 // `*string`), unless the function writes through a dereference; no alias analysis.
                 "composite_literal" => {
@@ -745,7 +641,6 @@ impl Walk<'_> {
                         self.bind(scope, alias);
                     }
                 }
-                // A type written in a body: a `var`'s, a literal's, an assertion's, `new(T)`.
                 "type_identifier" | "qualified_type" => {
                     self.type_use(scope, node);
                     continue;
@@ -754,7 +649,6 @@ impl Walk<'_> {
                     let name = self.inline(scope, node);
                     (inner_scope, inner_depth) = (name.into(), depth + 1);
                 }
-                // Too deep to be a definition: it lends its names to the one around it.
                 "func_literal" => {
                     self.bind_params(scope, node.child_by_field_name("parameters"));
                     self.bind_params(scope, result_list(node));
@@ -767,11 +661,6 @@ impl Walk<'_> {
         }
     }
 
-    /// Whether the `defer_statement` `node` may write the one named result of the function around
-    /// it: it runs after `return` has set the result, so the value the function returns may be its
-    /// own (Go spec, "Defer statements"; #948). The deferred call itself may be a method of the
-    /// result (`defer u.fix()`); the rest is the body's (`body_writes_result`), read once per
-    /// function.
     fn deferred_write(&mut self, node: Node) -> bool {
         let src = self.src;
         let Some((function, result)) = one_named_result(node) else {
@@ -786,9 +675,6 @@ impl Walk<'_> {
         self.deferring.insert(function.id()) && body_writes_result(function, name, src)
     }
 
-    /// Turns the names whose every binding writes one class into receivers, and drops the written
-    /// results and receivers whose type a local hides: the shared side reads a type among types
-    /// and modules, so a local type of the same name (or a type parameter) would be missed.
     fn finish(&mut self) {
         let type_scoped = std::mem::take(&mut self.type_scoped);
         let hides = |locals: &BTreeSet<String>, scope: &str, class: &Class| {
@@ -810,9 +696,6 @@ impl Walk<'_> {
                 scope = parent(scope);
             }
         };
-        // The method calls by the name they start at, with their scope and place, in order of
-        // scope: a name held for part of its scope is a receiver only if every call it starts
-        // in the scope (or in a literal in it) is inside that part.
         let mut called: HashMap<&str, Vec<(&str, usize)>> = HashMap::new();
         for call in &self.facts.calls {
             if let Some((head, _)) = call.callee.split_once('.')
@@ -833,7 +716,6 @@ impl Walk<'_> {
                 continue;
             }
             if events.iter().all(|e| e.1.is_some()) {
-                // The farthest end reached by the regions starting at or before each place.
                 let mut held: Vec<(usize, usize)> = (events.iter())
                     .filter_map(|e| e.1.as_ref().map(|r| (r.start, r.end)))
                     .collect();
@@ -849,7 +731,6 @@ impl Walk<'_> {
                     let at = held.partition_point(|h| h.0 <= place);
                     at > 0 && held[at - 1].1 > place
                 };
-                // The calls of the scope and of the literals in it come together in order.
                 let calls = called.get(name.as_str()).map_or(&[][..], Vec::as_slice);
                 let from = calls.partition_point(|c| c.0 < scope.as_str());
                 let own = |at: &str| {
@@ -876,12 +757,6 @@ impl Walk<'_> {
         }
     }
 
-    /// Records what the literal `body` of the type `ty` (`None`: written without it inside
-    /// another literal, `[]T{{..}}`), written in `scope`, sets each field to, for
-    /// `Code::field_values`: a marker constant `{field}` holding `New(type, [value])`, `{*}` for
-    /// the fields a struct sets by position, and the type `?` when it is not read. The literals
-    /// written without their type inside a slice, an array or a map are of its element, key or
-    /// value type; inside any other literal, of a type not read.
     fn literal<'t>(
         &mut self,
         scope: &str,
@@ -903,7 +778,6 @@ impl Walk<'_> {
             return;
         }
         let child = |n: Option<Node<'t>>, name| n.and_then(|n| n.child_by_field_name(name));
-        // The literals written without their type inside this one, with the type each is of.
         let mut inside: Vec<(Option<Node<'t>>, Node<'t>)> = Vec::new();
         let elided = |n: Option<Node<'t>>| -> Option<Node<'t>> {
             (n.and_then(|n| named(n).next())).filter(|n| n.kind() == "literal_value")
@@ -913,7 +787,6 @@ impl Walk<'_> {
                 (None, child(ty, "element"))
             }
             Some("map_type") => (child(ty, "key"), child(ty, "value")),
-            // An anonymous struct: its fields are no named type's.
             Some("struct_type") => return,
             _ => {
                 let name = ty.and_then(|t| type_name(t, src));
@@ -961,8 +834,6 @@ impl Walk<'_> {
         }
     }
 
-    /// Holds the value of `right` for the name `left` binds, when one name is bound to one
-    /// value.
     fn hold(&mut self, scope: &str, left: &[Node], right: Option<Node>, depth: usize) {
         let src = self.src;
         let left: Vec<Node> = match left {
@@ -975,7 +846,6 @@ impl Walk<'_> {
                 _ => vec![r],
             })
             .collect();
-        // `v, ok := os.LookupEnv("X")`: the first result is the read, the other the name `ok`.
         let lookup = match (&left[..], &right[..]) {
             ([name, ok], [call]) => {
                 let read = values::lookup_env(*call, src, &self.std, scope, depth);
@@ -1015,16 +885,12 @@ impl Walk<'_> {
         }
     }
 
-    /// Records the type uses of the signature of the function `node`, written in `scope`: its
-    /// type parameters' constraints, its parameters and its results.
     fn signature_types(&mut self, scope: &str, node: Node) {
         for field in ["type_parameters", "parameters", "result"] {
             self.type_uses(scope, node.child_by_field_name(field));
         }
     }
 
-    /// The `Kind::Inline` definition of the function `node` (a literal, or a blank `func _`)
-    /// written in `scope`, with its parameters, and the names its results bind: its name.
     fn inline(&mut self, scope: &str, node: Node) -> String {
         let name = qualify(scope, &format!("@{}", node.start_byte()));
         let list = node.child_by_field_name("parameters");
@@ -1037,9 +903,6 @@ impl Walk<'_> {
     }
 }
 
-/// Whether the declaration `node` is a statement of a function's own body, not of a block
-/// inside it: a name it binds is visible in the rest of the function, whatever else the function
-/// does.
 fn in_body(node: Node) -> bool {
     let mut at = node.parent();
     while let Some(parent) = at.filter(|p| matches!(p.kind(), "var_spec_list" | "var_declaration"))
@@ -1058,7 +921,6 @@ fn in_body(node: Node) -> bool {
     })
 }
 
-/// Whether the `&name` `node` is the value of the `Topic:` field of a `TopicPartition` literal.
 fn is_topic_pointer(node: Node, src: &[u8]) -> bool {
     let keyed = (node.parent())
         .and_then(|element| element.parent())
@@ -1070,20 +932,16 @@ fn is_topic_pointer(node: Node, src: &[u8]) -> bool {
         && ty.is_some_and(|ty| text(ty, src).ends_with("TopicPartition"))
 }
 
-/// The `name` fields of a declaration (`a, b int`, `x, y = 1, 2`).
 fn names(node: Node) -> Vec<Node> {
     let mut cursor = node.walk();
     node.children_by_field_name("name", &mut cursor).collect()
 }
 
-/// The names of the type parameters a declaration lists.
 fn type_params(node: Node) -> Vec<Node> {
     let list = node.child_by_field_name("type_parameters");
     (list.into_iter().flat_map(named)).flat_map(names).collect()
 }
 
-/// What a `:=` or a `var` in `node` holds for: from the end of the statement (its own value
-/// still sees the outer name) to the end of the block, clause or statement that encloses it.
 fn region(node: Node) -> (usize, usize) {
     let mut at = node.parent();
     while let Some(parent) = at {
@@ -1109,7 +967,6 @@ fn region(node: Node) -> (usize, usize) {
     (node.end_byte(), usize::MAX)
 }
 
-/// The identifiers of the left side of a `:=`.
 fn identifiers(node: Node) -> Vec<Node> {
     match node.kind() {
         "identifier" => vec![node],
@@ -1117,9 +974,6 @@ fn identifiers(node: Node) -> Vec<Node> {
     }
 }
 
-/// The type a type expression names, through a pointer, type arguments and parentheses
-/// (`Store` for `*Store` and `Store[T]`), qualified by its package (`shapes.Circle`). A
-/// slice, a map, a function or any other type literal names none.
 fn type_name(node: Node, src: &[u8]) -> Option<String> {
     let mut ty = node;
     for _ in 0..PATH_DEPTH {
@@ -1138,8 +992,6 @@ fn type_name(node: Node, src: &[u8]) -> Option<String> {
     None
 }
 
-/// The class an expression gives, as far as it writes it: a composite literal (`T{}`, `&T{}`)
-/// is a `T`; a call is whatever the function it names returns (`Class::Called`).
 fn value_class(node: Node, src: &[u8]) -> Option<Class> {
     let (mut node, mut address) = (node, false);
     for _ in 0..PATH_DEPTH {
@@ -1165,7 +1017,6 @@ fn value_class(node: Node, src: &[u8]) -> Option<Class> {
     None
 }
 
-/// The class a function's first result writes (`*Store` of `(*Store, error)`).
 fn result_class(node: Node, src: &[u8]) -> Option<Class> {
     let result = node.child_by_field_name("result")?;
     let ty = match result.kind() {
@@ -1178,14 +1029,11 @@ fn result_class(node: Node, src: &[u8]) -> Option<Class> {
     type_name(ty, src).map(Class::Type)
 }
 
-/// A function's named results, when it names them.
 fn result_list(node: Node) -> Option<Node> {
     node.child_by_field_name("result")
         .filter(|r| r.kind() == "parameter_list")
 }
 
-/// The function around `node` and its one named result, if it names exactly one: several
-/// results keep no return value to fold.
 fn one_named_result(node: Node) -> Option<(Node, Node)> {
     let function = std::iter::successors(node.parent(), |n| n.parent()).find(|n| {
         matches!(
@@ -1202,8 +1050,6 @@ fn one_named_result(node: Node) -> Option<(Node, Node)> {
     }
 }
 
-/// Whether `call` (a `call_expression`) calls a method of `name` (`u.fix()`): a pointer
-/// receiver may write it.
 fn calls_method_of(call: Node, name: &str, src: &[u8]) -> bool {
     (call.child_by_field_name("function"))
         .filter(|f| f.kind() == "selector_expression")
@@ -1211,8 +1057,6 @@ fn calls_method_of(call: Node, name: &str, src: &[u8]) -> bool {
         .is_some_and(|o| is_name(written_base(o), name, src))
 }
 
-/// The name a write to `node` writes: through a field, an element, a pointee or an address
-/// (`u.Host`, `m[k]`, `*p`, `&u.Host`) and parentheses.
 fn written_base(mut node: Node) -> Node {
     for _ in 0..PATH_DEPTH {
         let next = match node.kind() {
@@ -1230,16 +1074,10 @@ fn written_base(mut node: Node) -> Node {
     node
 }
 
-/// Whether `node` is the identifier `name`.
 fn is_name(node: Node, name: &str, src: &[u8]) -> bool {
     node.kind() == "identifier" && text(node, src) == name
 }
 
-/// Whether the body of `function` lets a deferred call write `name`, its named result: a
-/// function literal in it assigns, increments, decrements or calls a method of it or of a field,
-/// element or pointee of it (`written_base`), or the body takes its address (`&base`,
-/// `&u.Host`). A name a literal declares again counts as the result, and so does a literal that
-/// is never deferred (the safe side).
 fn body_writes_result(function: Node, name: &str, src: &[u8]) -> bool {
     let mut stack: Vec<(Node, bool)> = function
         .child_by_field_name("body")
@@ -1303,7 +1141,6 @@ fn def(name: String, kind: Kind, range: Range<usize>, params: Vec<Param>) -> Def
     }
 }
 
-/// The parameters of a parameter list in order; an unnamed or blank one has an empty name.
 fn params(list: Option<Node>, src: &[u8]) -> Vec<Param> {
     let param = |name: &str| Param {
         name: if name == "_" {
@@ -1327,10 +1164,6 @@ fn params(list: Option<Node>, src: &[u8]) -> Vec<Param> {
     out
 }
 
-/// The declarations of a parameter list in order, each with the names it binds. Go writes the
-/// names of a list all or none, so in a list that writes some, a nameless declaration of one bare
-/// type name is a name of the next declaration that writes its own: tree-sitter-go parses a group
-/// of ten names or more (`p0, ..., p9 string`) as nameless `p0` and the group of the last nine.
 fn declarations(list: Option<Node>) -> Vec<(Vec<Node>, Node)> {
     let all: Vec<Node> = list.into_iter().flat_map(named).collect();
     let writes_names = all.iter().any(|d| !names(*d).is_empty());
@@ -1348,13 +1181,10 @@ fn declarations(list: Option<Node>) -> Vec<(Vec<Node>, Node)> {
             }
         }
     }
-    // Nameless after the last names written: no group to join (Go refuses the list).
     out.extend(pending.into_iter().map(|(_, d)| (Vec::new(), d)));
     out
 }
 
-/// The normalized call expression: `a.b.c` for identifier and selector chains, `(<node kind>)`
-/// for any other head.
 fn callee(node: Node, src: &[u8]) -> String {
     let mut parts = Vec::new();
     let mut at = node;
@@ -1384,9 +1214,6 @@ fn callee(node: Node, src: &[u8]) -> String {
     parts.join(".")
 }
 
-/// The type a method's receiver names, through pointers, type arguments and parentheses
-/// (`Store` for `*Store`, `Store[T]` and `(*Store)`), and the type parameters its type
-/// arguments name (`T`), which the method binds.
 fn receiver_type<'s>(receiver: Node, src: &'s [u8]) -> Option<(&'s str, Vec<&'s str>)> {
     let declaration = named(receiver).next()?;
     let mut ty = declaration.child_by_field_name("type")?;
@@ -1411,10 +1238,6 @@ fn receiver_type<'s>(receiver: Node, src: &'s [u8]) -> Option<(&'s str, Vec<&'s 
     None
 }
 
-/// The name an import binds when it names none: the package name the Go tools assume for the
-/// path, its last element (the one before a major version `vN`), without a `go-` prefix and up
-/// to the first character no identifier holds (`gopkg.in/yaml.v3` is `yaml`, `kafka-go` is
-/// `kafka`).
 fn assumed_name(path: &str) -> &str {
     let mut elements = path.rsplit('/');
     let last = elements.next().unwrap_or(path);
@@ -1432,7 +1255,6 @@ fn assumed_name(path: &str) -> &str {
     &base[..end]
 }
 
-/// Whether Go exports the name: it starts with an upper-case letter.
 fn exported(name: &str) -> bool {
     name.chars().next().is_some_and(char::is_uppercase)
 }
@@ -1450,9 +1272,7 @@ fn imports(node: Node, src: &[u8], facts: &mut Facts) {
         let source = text(path, src);
         let source = source.get(1..source.len().saturating_sub(1)).unwrap_or("");
         let (local, name) = match spec.child_by_field_name("name") {
-            // A blank import binds no name.
             Some(n) if n.kind() == "blank_identifier" => continue,
-            // A dot import: the package's exports join the file scope.
             Some(n) if n.kind() == "dot" => (String::new(), Imported::All),
             Some(n) => (text(n, src).to_string(), Imported::Namespace),
             None => (assumed_name(source).to_string(), Imported::Namespace),
@@ -1465,10 +1285,6 @@ fn imports(node: Node, src: &[u8], facts: &mut Facts) {
     }
 }
 
-/// Leaves a name two imports of the file give unknown: a plain import binds the name assumed
-/// from its path (`assumed_name`), which may not be its package's, so neither is sure to bind
-/// it. They become one import of the name from the empty specifier, which names nothing of the
-/// repository: a call through it links to nothing.
 fn unbind_clashes(imports: &mut Vec<Import>) {
     let mut count: HashMap<String, usize> = HashMap::new();
     for import in imports.iter().filter(|i| !i.local.is_empty()) {
@@ -1519,12 +1335,9 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         type_params: BTreeSet::new(),
         referenced: HashSet::new(),
     };
-    // Imports come before every other declaration, and the values read the names they give.
     for node in named(tree.root_node()).filter(|n| n.kind() == "import_declaration") {
         imports(node, src, &mut walk.facts);
     }
-    // A cgo file (`import "C"`): the target builds without cgo, so it is left out like a file
-    // its constraints exclude.
     if walk.facts.imports.iter().any(|i| i.source == "C") {
         return Ok(Facts {
             unbuilt: true,
@@ -1546,7 +1359,6 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     continue;
                 };
                 let body = node.child_by_field_name("body");
-                // A blank function names no symbol: it folds into the file, as a literal does.
                 walk.type_params = (type_params(node).into_iter())
                     .map(|n| text(n, src).to_string())
                     .collect();
@@ -1556,7 +1368,6 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     body.into_iter().for_each(|b| walk.body(&inline, b));
                     continue;
                 }
-                // Each `init` (the one name a file may declare twice) is a symbol of its own.
                 let n = inits.entry(name).or_insert(0);
                 *n += 1;
                 let name = match *n {
@@ -1568,7 +1379,6 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                 let mut function = def(name.clone(), Kind::Function, range, params(list, src));
                 function.result = result_class(node, src);
                 walk.facts.defs.push(function);
-                // `func main` of package `main` starts a program.
                 if name == "main" && walk.facts.package == "main" {
                     walk.facts.programs.push(name.clone());
                 }
@@ -1683,8 +1493,6 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
                     walk.new_top_spec();
                     walk.type_uses("", ty);
                     walk.assigned("", &names(spec), ty, value, None);
-                    // Each name holds the value written at its place, when the names and the
-                    // values pair up. A `var` holds it only if nothing assigns it (`finish_values`).
                     let given: Vec<Node> = value.into_iter().flat_map(named).collect();
                     let listed = names(spec);
                     let paired = given.len() == listed.len();
@@ -1717,9 +1525,7 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
             _ => walk.body("", node),
         }
     }
-    // The values read `bound`, which `finish` takes.
     walk.finish_values();
-    // Before `finish`, which takes the bindings `hides` reads.
     let [free_len, free_cap] = ["len", "cap"].map(|name| !walk.hides(name));
     walk.finish();
     let mut facts = walk.facts;
@@ -1731,15 +1537,11 @@ fn parse(path: &str, src: &[u8]) -> Result<Facts> {
         })
         .collect();
     facts.loops = super::outermost(tree.root_node(), &["for_statement"]);
-    // A local kept as a constant is named `function.name`. A parameter is counted in its
-    // function too: a wrapper that writes it twice sends what its caller passes (#774).
     let held = (facts.consts.iter()).filter_map(|c| c.name.rsplit_once('.'));
     let params = (facts.defs.iter()).flat_map(|d| {
         let named = d.params.iter().filter(|p| !p.name.is_empty());
         named.map(move |p| (d.name.as_str(), p.name.as_str()))
     });
-    // `len(x)` and `cap(x)` read the value and change nothing (#774), where no binding of the file
-    // hides them (the SDK reader checks the package's other files, `sdk::hiding_builtins`).
     let read = |name: Node| {
         let args = name.parent().filter(|a| a.kind() == "argument_list");
         let call = (args.filter(|a| a.named_child_count() == 1)).and_then(|a| a.parent());
@@ -1765,7 +1567,6 @@ mod tests {
         parse("x.go", src.as_bytes()).unwrap()
     }
 
-    /// The `(scope, name)` of each type reference of `src` (all of kind `Type`), sorted.
     fn type_refs(src: &str) -> Vec<(String, String)> {
         let facts = facts(src);
         assert!(facts.references.iter().all(|r| r.kind == Use::Type));
@@ -1827,8 +1628,6 @@ mod tests {
             ("Local.Method", "Local"),
             ("Local.Method", "svc.Req"),
         ]);
-        // A conversion is an expression the grammar reads as a call (`Local(x)`, a call row of
-        // its own) or, parenthesized, as a dereference (`(*Local)(nil)`): no type reference.
         expected.push((closure, "svc.Req".into()));
         expected.sort();
         assert_eq!(type_refs(src), expected);
@@ -1880,10 +1679,6 @@ mod tests {
         assert_eq!(nested(values::VALUE_DEPTH + 10), (false, true));
     }
 
-    /// Each expected value is what `go list ./...`, `go build` and `go test` (go1.27.3) give for
-    /// the module, but the blank import's: a package under `testdata` or an `_` or `.` directory
-    /// below its module's root is built when a built file imports it (a test's too), in turn, and
-    /// never its tests.
     #[test]
     fn a_package_under_testdata_or_an_underscore_directory_is_read_when_a_built_one_imports_it() {
         let members = |extra: &[(&'static str, &'static str)]| {
@@ -1892,7 +1687,6 @@ mod tests {
                 ("main.go", "package main\n"),
                 ("testdata.go", "package main\n"),
                 ("a_testdata.go", "package main\n"),
-                // Left out for the target, so its import builds nothing.
                 (
                     "main_windows.go",
                     "package main\n\nimport \"example.com/m/sub/_u\"\n",
@@ -1909,7 +1703,6 @@ mod tests {
                 ("_fixtures/f.go", "package fixtures\n"),
                 ("sub/_u/a.go", "package u\n"),
                 (".hidden/a.go", "package hidden\n"),
-                // Below its own module's root, nothing is left out.
                 ("testdata/mod/go.mod", "module example.com/mod\n"),
                 ("testdata/mod/a.go", "package mod\n"),
                 ("_tools/go.mod", "module example.com/tools\n"),
@@ -1947,7 +1740,6 @@ mod tests {
             "x/testdata/y/a.go",
         ];
         let expected = listed.iter().chain(&imported).map(|p| p.to_string());
-        // The pack keeps no blank import: `_gen` stays out, though Go builds it.
         assert_eq!(
             members(&[("main.go", main), ("main_test.go", test)]),
             expected.collect()
@@ -2000,7 +1792,6 @@ mod tests {
         assert_eq!(scope.matches('@').count(), DEFINITION_DEPTH);
     }
 
-    /// The receivers as `scope name = class`, sorted.
     fn receivers(src: &str) -> Vec<String> {
         let mut found: Vec<String> = (facts(src).receivers.into_iter())
             .map(|r| match r.class {
@@ -2045,9 +1836,6 @@ mod tests {
         assert!(receivers(src).is_empty());
     }
 
-    /// `Facts::mentioned`: the identifiers of a function that spell a local it keeps as a
-    /// constant or one of its parameters, a function literal inside it included. A package
-    /// variable and a blank parameter get no count.
     #[test]
     fn the_locals_kept_and_the_parameters_are_counted_where_their_function_writes_them() {
         let facts = facts(
@@ -2070,16 +1858,12 @@ mod tests {
         let held = |body: &str| receivers(&src(body));
         assert_eq!(held("\ta := S{}\n\ta.M()"), ["f a = S"]);
         assert_eq!(held("\ta := S{}\n\tg(func() { a.M() })"), ["f a = S"]);
-        // Before the binding, after the block that holds it, or in its own value.
         assert!(held("\ta.M()\n\ta := S{}").is_empty());
         assert!(held("\tg(func() { a.M() })\n\ta := S{}").is_empty());
         assert!(held("\t{\n\t\ta := S{}\n\t\ta.M()\n\t}\n\ta.M()").is_empty());
         assert!(held("\ta := a.N()").is_empty());
     }
 
-    /// tree-sitter-go parses a group of ten names or more as one nameless declaration per name
-    /// but the last nine, typed by the name itself; the pack gives the group its names back, in
-    /// parameters and named results alike. A list that writes no names keeps its types.
     #[test]
     fn a_group_of_ten_names_or_more_keeps_its_first_names() {
         let group = |p: &str, n: usize| (0..n).map(|k| format!("{p}{k}")).collect::<Vec<_>>();
@@ -2128,7 +1912,6 @@ mod tests {
                 .collect()
         };
         assert_eq!(params("package x\n\nfunc f(A, B) {}\n"), ["", ""]);
-        // Go refuses a nameless type after the last name: it joins no group.
         assert_eq!(params("package x\n\nfunc f(a int, B) {}\n"), ["a", ""]);
     }
 
@@ -2197,14 +1980,11 @@ mod tests {
         let consts = |body: &str| -> Vec<String> {
             let src = format!("package x\n\nfunc f() {{ {body} }}\n");
             let names = facts(&src).consts.into_iter().map(|c| c.name);
-            // The markers of the fields literals set are no constants.
             names.filter(|n| !n.ends_with('}')).collect()
         };
         assert_eq!(consts("r := mk()"), ["f.r"]);
         assert_eq!(consts("var r = mk()"), ["f.r"]);
         assert_eq!(consts("r := mk(); r.Use()"), ["f.r"]);
-        // Assigned again, in the function or in a literal in it, bound again in a block, in an
-        // initializer, in a loop, or bound with others: no one value.
         for body in [
             "r := mk(); r = other()",
             "r := mk(); func() { r = other() }()",
@@ -2222,8 +2002,6 @@ mod tests {
         ] {
             assert_eq!(consts(body), Vec::<String>::new(), "{body}");
         }
-        // The address of a name as the `Topic` of a `TopicPartition` keeps it a constant, unless
-        // the function writes through a dereference; any other literal does not.
         let kept = "r := \"x\"; _ = kafka.TopicPartition{Topic: &r}";
         assert_eq!(consts(kept), ["f.r"]);
         for body in [
@@ -2235,7 +2013,6 @@ mod tests {
         ] {
             assert!(!consts(body).contains(&"f.r".to_string()), "{body}");
         }
-        // A literal's own statement binds in the literal.
         let inner = consts("func() { q := mk(); _ = q }()");
         assert_eq!(inner.len(), 1);
         assert!(inner[0].starts_with("f.@") && inner[0].ends_with(".q"));
@@ -2265,7 +2042,6 @@ mod tests {
                 .unwrap();
             f.return_values.iter().any(|v| matches!(v, Value::Unknown))
         };
-        // The deferred function runs after `return` sets `base` and writes it again (#948).
         let ret = r#"return os.Getenv("U") }"#;
         assert!(unknown(&format!(
             r#"func f() (base string) {{ defer func() {{ base = "x" }}(); {ret}"#
@@ -2282,12 +2058,9 @@ mod tests {
         assert!(unknown(&format!(
             r#"func f() (base string) {{ defer (func() {{ base = "x" }})(); {ret}"#
         )));
-        // Its address handed to the deferred call lets that call write it.
         assert!(unknown(&format!(
             "func f() (base string) {{ defer fill(&base); {ret}"
         )));
-        // A deferred local bound to a literal that writes it, its address taken anywhere in the
-        // function, and a deferred method of it (a pointer receiver may write it).
         assert!(unknown(&format!(
             r#"func f() (base string) {{ restore := func() {{ base = "x" }}; defer restore(); {ret}"#
         )));
@@ -2300,7 +2073,6 @@ mod tests {
         assert!(unknown(
             "func f() (u URL) { defer u.fix(); return parse() }"
         ));
-        // A write to a field, an element or the pointee of the result writes the result too.
         assert!(unknown(
             r#"func f() (u URL) { defer func() { u.Host = "y" }(); return parse() }"#
         ));
@@ -2316,15 +2088,12 @@ mod tests {
         assert!(unknown(
             "func f() (u URL) { defer fill(&u.Host); return parse() }"
         ));
-        // Another name's address, or a method of another value, leaves the returns alone.
         assert!(!unknown(&format!(
             "func f() (base string) {{ x := 1; p := &x; defer set(p); {ret}"
         )));
         assert!(!unknown(&format!(
             "func f() (base string) {{ defer mu.Unlock(); {ret}"
         )));
-        // An empty deferred function, one writing only its own names, a named function deferred,
-        // unnamed results and several results (no return value is kept) leave the returns alone.
         assert!(!unknown(
             "func f() (n int, err error) { defer func() { err = e }(); return 1, nil }"
         ));

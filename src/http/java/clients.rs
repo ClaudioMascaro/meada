@@ -1,22 +1,3 @@
-//! Java HTTP consumers (spec #26): RestTemplate, WebClient, `java.net.http` and OkHttp. A
-//! consumer is a call on a client the source shows is the library's: a RestTemplate method on a
-//! name written as a `RestTemplate` (`Code::origins` with `Follow::Declarations`); the `.uri(..)`
-//! of a WebClient request (`get()`, `method(HttpMethod.X)`) made on a name written as a
-//! `WebClient` or made by `WebClient.create` or `WebClient.builder()`; and the `build()` of a
-//! builder chain that starts at `HttpRequest.newBuilder()` or `new Request.Builder()`, each name
-//! read through `Code::outside` (an on-demand import's one candidate included).
-//!
-//! The call is read whole (`Expand::Chain`), so its builder chain and arguments fold where a
-//! wrapper's callers pass them, and an enum member (`HttpMethod.GET`) arrives as a
-//! `Value::External` spelled by the imports of the file that writes it: a type of the repository
-//! or another package's by that name is no Spring method. A WebClient's base is read off the
-//! client the folded chain is made on (`WebClient.create(base)`, `builder().baseUrl(base)`,
-//! through constants and `final` fields), so a client a wrapper takes as a parameter has the base
-//! each caller passes; one not read has an unknown base. The URL folds `+`, constants,
-//! `URI.create(..)` and `String.format`; the root's `fetches` reads it. A base a Spring
-//! `@Value("${key}")` field or constructor parameter holds comes from the module's
-//! configuration (`jvm::spring::inject`, through `Code::expand_with`), and
-//! `System.getenv("X")` is the variable `X`.
 // ponytail: a builder held in a local is not read (a WebClient's base is, as are constants and
 // `final` fields and chains written in place); a local the file assigns holds no one value, and
 // a read kept in a local and passed through a string method on another line is not followed.
@@ -32,7 +13,6 @@ use crate::names::{one, spellings, typed};
 use crate::resolve::{Code, Expand, Expanded, FLUENT_CHAIN, Injected, method as member};
 
 const REST_TEMPLATE: &str = "org.springframework.web.client.RestTemplate";
-/// The methods of a RestTemplate that send one method; `exchange` names it.
 const REST_METHODS: &[(&str, &str)] = &[
     ("getForObject", "GET"),
     ("getForEntity", "GET"),
@@ -43,7 +23,6 @@ const REST_METHODS: &[(&str, &str)] = &[
     ("delete", "DELETE"),
 ];
 const WEB_CLIENT: &str = "org.springframework.web.reactive.function.client.WebClient";
-/// The methods of a WebClient that start a request of one method; `method` names it.
 const WEB_METHODS: &[(&str, &str)] = &[
     ("get", "GET"),
     ("head", "HEAD"),
@@ -55,7 +34,6 @@ const WEB_METHODS: &[(&str, &str)] = &[
 ];
 const HTTP_METHOD: &str = "org.springframework.http.HttpMethod.";
 const NEW_BUILDER: &str = "java.net.http.HttpRequest.newBuilder";
-/// The methods of an `HttpRequest.Builder` that set one method; `method` names it.
 const JDK_METHODS: &[(&str, &str)] = &[
     ("GET", "GET"),
     ("HEAD", "HEAD"),
@@ -64,7 +42,6 @@ const JDK_METHODS: &[(&str, &str)] = &[
     ("DELETE", "DELETE"),
 ];
 const OK_BUILDER: &str = "okhttp3.Request.Builder";
-/// The methods of an OkHttp `Request.Builder` that set one method; `method` names it.
 const OK_METHODS: &[(&str, &str)] = &[
     ("get", "GET"),
     ("head", "HEAD"),
@@ -74,14 +51,9 @@ const OK_METHODS: &[(&str, &str)] = &[
     ("delete", "DELETE"),
 ];
 
-/// The client a call sends on, as far as the call site tells.
 enum Client {
-    /// A RestTemplate method sending this method; `None` for `exchange`.
     Rest(Option<&'static str>),
-    /// A WebClient request; the base is read off the client its folded chain is made on.
     Web,
-    /// The builder chain of an `HttpRequest` or an OkHttp `Request`: where it starts (the URL
-    /// `newBuilder(uri)` may give) and the methods that set the method.
     Builder {
         start: &'static str,
         setter: &'static str,
@@ -89,9 +61,7 @@ enum Client {
     },
 }
 
-/// Java HTTP consumers: see the module.
 pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
-    // Read the first time an annotation is injected: a repository without one parses none.
     let configs = std::cell::OnceCell::new();
     let inject = |code: &Code<'a>, path: &'a str, on: Injected<'a>| {
         let configs = configs.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
@@ -131,9 +101,6 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
     found
 }
 
-/// The client the call at `index` of `path` (among the file's `calls` as the index keeps
-/// them) sends on. What the kept facts rule out is ruled out before the call's values are read:
-/// `Code::call` parses the file again on a refresh.
 fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -> Option<Client> {
     let stored = &calls[index];
     let member = member(&stored.callee);
@@ -142,7 +109,6 @@ fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -
         let (receiver, _) = stored.callee.rsplit_once('.')?;
         let typed = typed(code, path, &stored.scope, receiver);
         if one(&typed, |t| t == REST_TEMPLATE).is_none() {
-            // No type written (Kotlin infers it): the `RestTemplate()` call that made it.
             let receiver = code.receiver(path, index).filter(|_| typed.is_empty())?;
             made(
                 code,
@@ -157,7 +123,6 @@ fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -
     }
     match member {
         "uri" => {
-            // The kept facts tell the call it is made on only when the pack gives `Call::on`.
             if let Some(on) = stored.on {
                 let starts = self::member(&calls.get(on)?.callee);
                 if starts != "method" && !WEB_METHODS.iter().any(|(m, _)| *m == starts) {
@@ -175,7 +140,6 @@ fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -
             web_client(code, path, &stored.scope, client).then_some(Client::Web)
         }
         "build" => {
-            // The chain's start as the kept facts tell: `newBuilder`, or a method of a `new`.
             let mut start = stored;
             for _ in 0..FLUENT_CHAIN {
                 match start.on.and_then(|on| calls.get(on)) {
@@ -183,7 +147,6 @@ fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -
                     None => break,
                 }
             }
-            // A Kotlin chain (`(call_expression).build`) starts at any call: it is read below.
             if self::member(&start.callee) != "newBuilder"
                 && !start.callee.starts_with("(expression).")
                 && !stored.callee.starts_with("(call_expression).")
@@ -209,7 +172,6 @@ fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -
                     setter: "url",
                     methods: OK_METHODS,
                 }),
-                // Kotlin calls the constructor: the chain starts at the call itself.
                 _ if started(&call.callee, OK_BUILDER) => Some(Client::Builder {
                     start: "Builder",
                     setter: "url",
@@ -222,7 +184,6 @@ fn client<'a>(code: &Code<'a>, path: &'a str, calls: &'a [Call], index: usize) -
     }
 }
 
-/// The URL and the method of `call`, read whole by `Expand::Chain`, on `client`.
 fn sends(client: &Client, call: &Invocation, held: Option<&Value>) -> (Value, Value) {
     let text = |m: &str| Value::Str(vec![Part::Text(m.to_string())]);
     match client {
@@ -243,7 +204,6 @@ fn sends(client: &Client, call: &Invocation, held: Option<&Value>) -> (Value, Va
                     .map_or(Value::Unknown, |(_, m)| text(m)),
             };
             match request.receiver.as_deref() {
-                // A client a wrapper's caller passes: its base is read at each caller.
                 Some(Value::Ref(name)) => (Value::Ref(name.clone()), method),
                 client => (
                     based(base(held.or(client)).as_deref(), &url(call.args.first())),
@@ -256,7 +216,6 @@ fn sends(client: &Client, call: &Invocation, held: Option<&Value>) -> (Value, Va
             setter,
             methods,
         } => {
-            // Outermost first: the last call that sets a part is the one that holds.
             let (mut url, mut method) = (None, None);
             let mut reached = false;
             let mut at = Some(call);
@@ -284,8 +243,6 @@ fn sends(client: &Client, call: &Invocation, held: Option<&Value>) -> (Value, Va
                     }
                 };
             }
-            // `GET` when the whole chain was read and names none; a chain folded short of its
-            // start (past a depth or a budget) may name one further down.
             let absent = match reached {
                 true => text("GET"),
                 false => Value::Unknown,
@@ -295,9 +252,6 @@ fn sends(client: &Client, call: &Invocation, held: Option<&Value>) -> (Value, Va
     }
 }
 
-/// The base URL of a folded WebClient: what `WebClient.create(base)` gives, or the outermost
-/// `baseUrl(base)` of a `WebClient.builder()` chain ending in `build()`; `None` without one,
-/// unknown for a client made any other way or not read.
 fn base(client: Option<&Value>) -> Option<Vec<Part>> {
     let hole = Some(crate::http::client_base());
     let Some(Value::Call(top)) = client else {
@@ -313,7 +267,6 @@ fn base(client: Option<&Value>) -> Option<Vec<Part>> {
     let given = |call: &Invocation| match call.args.first() {
         None | Some(Value::Undefined) => None,
         Some(Value::Str(parts)) => Some(parts.clone()),
-        // A wrapper's parameter: read at each caller.
         Some(Value::Ref(name)) => Some(vec![Part::Ref(name.clone())]),
         Some(_) => Some(crate::http::client_base()),
     };
@@ -327,7 +280,6 @@ fn base(client: Option<&Value>) -> Option<Vec<Part>> {
     }
 }
 
-/// The URL a folded argument gives: through `URI.create(..)` and `String.format(..)`.
 fn url(value: Option<&Value>) -> Value {
     let Some(value) = value else {
         return Value::Unknown;
@@ -335,7 +287,6 @@ fn url(value: Option<&Value>) -> Value {
     let Value::Call(call) = value else {
         return value.clone();
     };
-    // Whether the call is made on the class `class`.
     let of = |class: &str| matches!(call.receiver.as_deref(), Some(Value::External(s)) if one(s, |s| s == class).is_some());
     if of("java.net.URI") && member(&call.callee) == "create" {
         return url(call.args.first());
@@ -346,9 +297,6 @@ fn url(value: Option<&Value>) -> Value {
     Value::Unknown
 }
 
-/// `String.format` with these arguments, the format first: each `%s` or `%d` the next
-/// argument (a string's parts, a parameter as it is, anything else a hole), `%%` a `%`.
-/// Unknown for any other conversion, and for a format that is no string.
 fn format(args: &[Value]) -> Value {
     let parts = match args.first() {
         Some(Value::Str(parts)) => parts,
@@ -388,8 +336,6 @@ fn format(args: &[Value]) -> Value {
     Value::Str(out)
 }
 
-/// The method a folded `HttpMethod.X` gives: Spring's member as text, a parameter as it is
-/// (the call is a wrapper's), anything else unknown.
 fn spring_method(value: Option<&Value>) -> Value {
     fn member(s: &str) -> Option<&str> {
         member_of(s, HTTP_METHOD)
@@ -404,8 +350,6 @@ fn spring_method(value: Option<&Value>) -> Value {
     }
 }
 
-/// Whether the call at `index` of `path` is the constructor `RestTemplate(..)`: Kotlin writes no
-/// `new`.
 fn constructs<'a>(code: &Code<'a>, path: &'a str, index: usize) -> bool {
     let call = &code.files()[path].calls[index];
     one(&spellings(code, path, &call.scope, &call.callee), |s| {
@@ -414,14 +358,10 @@ fn constructs<'a>(code: &Code<'a>, path: &'a str, index: usize) -> bool {
     .is_some()
 }
 
-/// Whether `client` (a name, or a call made in place) is a WebClient: written as one, or made
-/// by a `WebClient.create` or `WebClient.builder()` it traces back to.
 fn web_client<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, client: &'a Value) -> bool {
     made(code, (path, scope), client, WEB_CLIENT, makes)
 }
 
-/// Whether the call at `index` of `path` makes a WebClient: `WebClient.create(..)`, or a
-/// `WebClient.builder()` chain ending in `build()`.
 fn makes<'a>(code: &Code<'a>, path: &'a str, index: usize) -> bool {
     let Some(chain) = code.chain(path, index) else {
         return false;
@@ -444,7 +384,6 @@ mod tests {
     use crate::resolve::{EVAL_DEPTH, Resolver};
     use std::collections::BTreeMap;
 
-    /// A consumer as `(contract, via, method)`, the method only for an unresolved one.
     type Sent = (Option<String>, Option<String>, Option<String>);
 
     const IMPORTS: &str = "import org.springframework.web.client.RestTemplate;\n\
@@ -454,12 +393,10 @@ mod tests {
         import java.net.http.HttpRequest;\n\
         import okhttp3.Request;\n";
 
-    /// The consumers of the class body `body` in `a/C.java`, with other files of the repository.
     fn sent_with(imports: &str, body: &str, others: &[(&str, &str)]) -> Vec<Sent> {
         sent_in("a/C.java", imports, body, others, &[])
     }
 
-    /// `sent_with`, the class at `path`, with the config files `configs` (path and content).
     fn sent_in(
         path: &str,
         imports: &str,
@@ -498,7 +435,6 @@ mod tests {
         sent_with(IMPORTS, body, &[])
     }
 
-    /// The contracts of the consumers of `body`.
     fn contracts(body: &str) -> Vec<String> {
         sent(body).into_iter().filter_map(|(c, ..)| c).collect()
     }
@@ -507,7 +443,6 @@ mod tests {
         (Some(contract.into()), None, None)
     }
 
-    /// An unresolved consumer of `method`.
     fn open(method: Option<&str>) -> Sent {
         (None, None, method.map(String::from))
     }
@@ -578,7 +513,6 @@ mod tests {
             exchange(&wild, "", "HttpMethod.POST"),
             [to("http::POST::/x")]
         );
-        // Hidden by a type of the file, another package's, not a member, or not a name at all.
         let unknown = [open(None)];
         assert_eq!(
             exchange(IMPORTS, "enum HttpMethod { GET }", "HttpMethod.GET"),
@@ -587,7 +521,6 @@ mod tests {
         assert_eq!(exchange(&other, "", "HttpMethod.GET"), unknown);
         assert_eq!(exchange(IMPORTS, "", "HttpMethod.SPELL"), unknown);
         assert_eq!(exchange(IMPORTS, "", "null"), unknown);
-        // Another on-demand import whose package is not Spring's leaves Spring's the one candidate.
         let both = format!("{wild}import org.acme.*;\n");
         assert_eq!(
             exchange(&both, "", "HttpMethod.POST"),
@@ -637,7 +570,6 @@ mod tests {
              rest.getForObject(String.format(\"/%x\", 1), String.class);\n}}"
         );
         assert_eq!(sent(&body), [open(Some("GET")), open(Some("GET"))]);
-        // `String` of the package hides `java.lang.String`.
         let body = format!("{REST}void f() {{ rest.delete(String.format(\"/%s\", 1)); }}");
         assert_eq!(sent_with(IMPORTS, &body, &others), [open(Some("DELETE"))]);
     }
@@ -685,7 +617,6 @@ mod tests {
                 (Some("http::GET::/w".into()), host.clone(), None),
             ]
         );
-        // A wildcard of the repository that brings its own `RestTemplate` may be the one.
         let others = [(
             "b/RestTemplate.java",
             "package b; public class RestTemplate {}",
@@ -718,7 +649,6 @@ mod tests {
 
     #[test]
     fn a_final_web_client_field_takes_the_base_of_its_one_value() {
-        // An initializer, one constructor assignment, two of them, and a constructor parameter.
         let body = "private final WebClient f = WebClient.create(\"http://f.example.com\");\n\
              private final WebClient g;\n\
              private final WebClient h;\n\
@@ -779,7 +709,6 @@ mod tests {
 
     #[test]
     fn a_chain_folded_short_of_its_start_names_no_method() {
-        // Past the pack's value depth the chain's start is unknown: no `GET` by default.
         let headers = ".header(\"k\", \"v\")".repeat(80);
         let body = format!(
             "void f() {{ HttpRequest.newBuilder(){headers}.uri(URI.create(\"/a\")).build(); }}"
@@ -805,7 +734,6 @@ mod tests {
                 "http::PUT::/c",
             ]
         );
-        // A builder of the repository by the same name builds no request.
         let others = [(
             "a/Request.java",
             "package a; class Request { static class Builder {} }",
@@ -864,7 +792,6 @@ mod tests {
     const MODULE: &str = "api/src/main/java/a/C.java";
     const CONFIG: &str = "api/src/main/resources/application.properties";
 
-    /// The consumers of `body` in the module `api/`, whose `application.properties` is `config`.
     fn injected(body: &str, config: &str, others: &[(&str, &str)]) -> Vec<Sent> {
         let imports = format!("{IMPORTS}{SPRING}");
         sent_in(MODULE, &imports, body, others, &[(CONFIG, config)])
@@ -922,7 +849,6 @@ mod tests {
              rest.getForObject(named + \"/n\", String.class);\n\
              rest.getForObject(shared + \"/s\", String.class);\n}}"
         );
-        // Spring injects no `static` field.
         assert_eq!(
             injected(&body, CONFIGURED, &[]),
             [
@@ -933,7 +859,6 @@ mod tests {
                 via("http::GET::/n", "host:lit.example.com"),
             ]
         );
-        // Another `Value` annotation, and a module without the key's configuration.
         let other = format!(
             "{REST}@Value(\"${{lit.url}}\") String lit;\nvoid f() {{ rest.getForObject(lit + \"/o\", String.class); }}"
         );
@@ -975,13 +900,10 @@ mod tests {
             ),
             ("api/src/main/java/a/Called.java", called.as_str()),
         ];
-        // `C` calls `Called`, with a URL and with one it cannot read: Spring's value stands in
-        // for neither, and the fields do not follow the callers. Nothing calls `Injected`.
         let body = "void make(String any) {\n\
              new Called(\"http://given.example.com\");\n\
              new Called(any);\n}";
         let found = injected(body, CONFIGURED, &others);
-        // A consumer in a wrapper that callers climb still reads the injected base.
         let wrapped = format!(
             "{REST}private final WebClient web;\n\
              C(@Value(\"${{lit.url}}\") String url) {{ this.web = WebClient.create(url); }}\n\
@@ -1003,8 +925,6 @@ mod tests {
         );
     }
 
-    /// A local declared once with an initializer holds its value, as an inline read does; one the
-    /// file assigns, or a field of its class shares the name of, holds no one value.
     #[test]
     fn a_local_holding_an_environment_read_carries_it_as_the_base() {
         let body = format!(
@@ -1022,12 +942,10 @@ mod tests {
                 via("http::GET::/b", "env:WEB_URL"),
             ]
         );
-        // A `var` local too.
         let var = body
             .replace("String base", "var base")
             .replace("URI url", "var url");
         assert_eq!(sent(&var), sent(&body));
-        // Known bindings in sibling scopes cannot reassign this method's local.
         for other in [
             "void h(String base) { base = null; }",
             "void h(String o) { String base = \"x\"; base = o; }",
@@ -1035,7 +953,6 @@ mod tests {
         ] {
             assert_eq!(sent(&format!("{body}\n{other}")), sent(&body), "{other}");
         }
-        // An unbound bare write still carries unknown assignment knowledge.
         let assigned = format!("{body}\nvoid h(String o) {{ base = o; }}");
         assert_eq!(
             sent(&assigned),
@@ -1053,7 +970,6 @@ mod tests {
              rest.getForObject(base + \"/a\", String.class);\n}}"
         );
         assert_eq!(sent(&again), [open(Some("GET"))]);
-        // A lambda parameter or a `catch` parameter of its name hides the bound too.
         for other in [
             "xs.forEach(base -> use(base));",
             "try { x(); } catch (E base) {}",
@@ -1066,8 +982,6 @@ mod tests {
         }
     }
 
-    /// A chain of locals each holding the one before is followed up to the value flow's depth,
-    /// and no further: a hostile file of them is read in bounded time.
     #[test]
     fn a_chain_of_value_locals_is_bounded() {
         let chain = |locals: usize| {
@@ -1103,7 +1017,6 @@ mod tests {
              rest.getForObject(java.lang.System.getenv(\"WEB_URL\") + \"/b\", String.class);\n\
              rest.getForObject(System.getenv(name()) + \"/c\", String.class);\n}}"
         );
-        // A read Meada cannot name is an unknown base.
         assert_eq!(
             sent(&body),
             [
@@ -1120,7 +1033,6 @@ mod tests {
         let imports = format!("{IMPORTS}import org.acme.System;\n");
         assert_eq!(sent_with(&imports, &body, &[]), hidden);
         assert_eq!(sent(&format!("{body}\nstatic class System {{}}")), hidden);
-        // Importing `java.lang.System` itself hides nothing.
         let imports = format!("{IMPORTS}import java.lang.System;\n");
         assert_eq!(sent_with(&imports, &body, &[]), sent(&body));
     }
@@ -1136,7 +1048,6 @@ mod tests {
                  void f() {{ web.get().uri(\"/{name}\").retrieve(); }}\n}}\n"
             )
         };
-        // `this(..)`, `super(..)` and a `new` inside an anonymous class pass their own URL.
         let delegated = client(
             "Delegated",
             "Delegated() { this(\"http://localhost:8080\"); }",

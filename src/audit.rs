@@ -217,7 +217,6 @@ impl Audit {
                     .await;
                 done.map(|_| ()).map_err(|e| opened.scrub(e))
             };
-            // One statement of its own: the update.
             let _ = crate::modules::within(config.bound(1), update, Msg::PostgresTimeout);
         }
         let _ = (pending, outcome, message, owners);
@@ -248,7 +247,6 @@ impl Audit {
     }
 }
 
-/// Inserts one record; its id.
 #[cfg(feature = "postgres")]
 fn insert(
     config: &crate::postgres::Config,
@@ -286,7 +284,6 @@ fn insert(
             .await;
         Ok(row.map_err(|e| opened.scrub(e))?.get::<_, i64>(0))
     };
-    // One statement of its own: the insert.
     crate::modules::within(config.bound(1), run, Msg::PostgresTimeout)
 }
 
@@ -294,7 +291,6 @@ fn insert(
 fn page(config: &crate::postgres::Config, before: Option<i64>, limit: i64) -> Result<Page, String> {
     let run = async {
         let opened = crate::postgres::connected(config).await?;
-        // One row past the page tells whether another follows.
         let sql = format!(
             "SELECT id, to_char(\"time\" AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'), \
              via, subject, login, role, owners::text, action, arguments::text, outcome, message \
@@ -305,7 +301,6 @@ fn page(config: &crate::postgres::Config, before: Option<i64>, limit: i64) -> Re
         let rows = (opened.client).query(&sql, &[&before, &(limit + 1)]).await;
         rows.map_err(|e| opened.scrub(e))
     };
-    // One statement of its own: the page.
     let rows = crate::modules::within(config.bound(1), run, Msg::PostgresTimeout)?;
     let more = rows.len() as i64 > limit;
     let rows = &rows[..rows.len().min(limit as usize)];
@@ -321,7 +316,6 @@ fn page(config: &crate::postgres::Config, before: Option<i64>, limit: i64) -> Re
     })
 }
 
-/// A row as the API answers it, or `None` when any column fails its check.
 #[cfg(feature = "postgres")]
 fn record(row: &tokio_postgres::Row) -> Option<Value> {
     let text = |i: usize| row.try_get::<_, Option<String>>(i).ok();
@@ -356,7 +350,6 @@ fn record(row: &tokio_postgres::Row) -> Option<Value> {
         "surface",
         "hours",
         "token_id",
-        // The verified login a verification stores (#561).
         "login",
     ];
     if !(arguments.iter()).all(|(k, v)| known.contains(&k.as_str()) && v.is_string()) {
@@ -385,8 +378,6 @@ pub fn cli<T, E: std::fmt::Display + Into<Box<dyn std::error::Error>>>(
     accepted: impl FnOnce(&T) -> String,
     refused: impl FnOnce(&E) -> bool,
 ) -> crate::Result<T> {
-    // A manifest that does not read is refused by `op`, which reads it whole (`Manifest::read`,
-    // `[postgres]` included), before it writes anything.
     let audit = Audit::of(manifest).unwrap_or_default();
     let (Some(arguments), true) = (arguments, audit.on()) else {
         return op().map_err(Into::into);

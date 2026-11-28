@@ -1,9 +1,3 @@
-//! The GitHub grant in the console (#332, ADR 0016): the team fixture of `team` (real Valkey and
-//! store, the `oidc` module's loopback issuer) with `[oidc.github]` and `[postgres]`, its
-//! permissions set seeded by `meada github-app roles` against `github_app`'s fake GitHub API
-//! (`oidc::github::Github`), and `MEADA_PERMISSIONS_POLL_MS` crossing `max_age_seconds` in
-//! seconds. What a token reads is seen through the console's routes, never the module's tables.
-
 use std::collections::BTreeSet;
 use std::fs;
 use std::time::{Duration, Instant};
@@ -17,11 +11,9 @@ use crate::server::Server;
 use crate::snapshot::KEY_ID;
 use crate::ui::{Reply, send_body};
 
-/// The team identities' git host, `[oidc.github] host` here.
 pub(super) const HOST: &str = "e.test";
 const MAX_AGE: u64 = 8;
 
-/// The console of `ops/console.toml`, polling every `POLL_MS`.
 pub(super) fn console(dir: &std::path::Path) -> Server {
     Server::start_command(
         dir,
@@ -52,7 +44,6 @@ pub(super) fn post(console: &Server, route: &str, token: &str, body: Value) -> R
     )
 }
 
-/// Waits until `token`'s session has `github_grant` = `state`; that session.
 fn session_until(console: &Server, token: &str, state: &str) -> Value {
     let start = Instant::now();
     loop {
@@ -65,7 +56,6 @@ fn session_until(console: &Server, token: &str, state: &str) -> Value {
     }
 }
 
-/// Waits until `token`'s session has `grant` = `expected`; that session.
 fn grant_until(console: &Server, token: &str, expected: Value) -> Value {
     let start = Instant::now();
     loop {
@@ -78,7 +68,6 @@ fn grant_until(console: &Server, token: &str, expected: Value) -> Value {
     }
 }
 
-/// Every team identity `text` names.
 fn named(text: &str) -> BTreeSet<String> {
     let team = format!("{HOST}/team/");
     (text.match_indices(&team))
@@ -90,8 +79,6 @@ fn named(text: &str) -> BTreeSet<String> {
         .collect()
 }
 
-/// `ops/roles.toml`, the job's manifest, and the console's manifest, both with `[oidc.github]`
-/// over `github`'s schema (migrated); the console, started.
 fn with_github(team: &Team, github: &Github) -> Server {
     let dir = &team.fleet.dir;
     let roles = "[\"write\"]";
@@ -110,13 +97,6 @@ fn with_github(team: &Team, github: &Github) -> Server {
     console(dir)
 }
 
-/// The session reads the union and says whose login it is and whether the GitHub part is
-/// current: `unread` before a set, then `current` with the GitHub identities in `grant` and every
-/// bounded view, a group owning an entry only GitHub grants making a team operator; then
-/// `expired`, a viewer reading its claims grant alone. The token check splits a pasted token's
-/// identities by side, sorted, with no request to the issuer or GitHub; the admission view shows
-/// the set's id, `finished`, age, `max_age_seconds` and the counts the job wrote; an audited write
-/// records the subject's login. stderr names no token, login or URL.
 #[test]
 fn the_console_reads_the_union_and_shows_the_github_grant() {
     let Some(team) = team("ui_github", true) else {
@@ -175,7 +155,6 @@ fn the_console_reads_the_union_and_shows_the_github_grant() {
         assert!(named(&body).is_subset(&only_docs), "{route}: {body}");
     }
 
-    // The token check: from the console's cache, with no request to the issuer or GitHub.
     let root = team.token("root", &[], true);
     let (logged, requests) = (
         team.issuer.log.lock().unwrap().len(),
@@ -231,7 +210,6 @@ fn the_console_reads_the_union_and_shows_the_github_grant() {
                "set": {"repositories": 2, "rows": 3, "exclusions": 0}})
     );
 
-    // An audited write records the subject's login.
     let mut operator = team.claims("root");
     operator["operator"] = json!(true);
     operator[LOGIN_CLAIM] = json!("Root-Op");
@@ -260,13 +238,6 @@ fn the_console_reads_the_union_and_shows_the_github_grant() {
     assert!(!stderr.to_lowercase().contains("root-op"), "{stderr}");
 }
 
-/// A permissions set committed by a refresh that then fails at its index (#316): the pointer
-/// keeps the last generation and a node holds it, the set grants while it is current, and no
-/// later refresh renews it: the session reads the GitHub grant `current` with the set's rows,
-/// then `expired` past `max_age_seconds`, a viewer with its claims grant alone. Only a role
-/// check restores the grant, and a later set that no longer lists the login, from a refresh
-/// that fails at its index too, is `current` and grants the login nothing: the failure restores
-/// no access. stderr names no token, login or URL.
 #[test]
 fn a_set_committed_before_a_failed_refresh_still_expires_and_a_later_set_revokes() {
     use crate::manifest::MANIFEST;
@@ -286,7 +257,6 @@ fn a_set_committed_before_a_failed_refresh_still_expires_and_a_later_set_revokes
     claims[LOGIN_CLAIM] = json!("Ana-Souza");
     let ana = team.sign(&claims);
 
-    // The last complete generation, held by a node.
     let g1 = locked_publish(dir);
     let (node, _) = team.fleet.node("node");
     assert_eq!(team.fleet.pull(&node), g1);
@@ -296,8 +266,6 @@ fn a_set_committed_before_a_failed_refresh_still_expires_and_a_later_set_revokes
         assert_eq!(team.fleet.pull(&node), g1);
         assert_eq!(probe(dir, &node), (held.clone(), String::new(), Some(0)));
     };
-    // The refresh of the job: the role check, then the index, then the publish. The chain's
-    // index cannot be written, as a file stands where its directory was.
     let indexes = dir.join("indexes/example.com/chain/web");
     assert!(indexes.is_dir());
     fs::remove_dir_all(&indexes).unwrap();
@@ -315,7 +283,6 @@ fn a_set_committed_before_a_failed_refresh_still_expires_and_a_later_set_revokes
         assert!(stdout.starts_with("permissions set "), "{stdout}");
     };
 
-    // The set the refresh committed before it failed grants as any current set does.
     github.list("team/docs", &[("ana-souza", "write")]);
     let committed = Instant::now();
     refresh();
@@ -323,7 +290,6 @@ fn a_set_committed_before_a_failed_refresh_still_expires_and_a_later_set_revokes
     assert_eq!(session["grant"], json!([DOCS]), "{session}");
     unchanged();
 
-    // No refresh follows: the set expires on its age alone, the failed one renewed nothing.
     let session = session_until(&console, &ana, "expired");
     assert!(committed.elapsed() >= Duration::from_secs(MAX_AGE) - Duration::from_millis(100));
     assert_eq!(session["grant"], json!([]), "{session}");
@@ -332,16 +298,12 @@ fn a_set_committed_before_a_failed_refresh_still_expires_and_a_later_set_revokes
     assert!(named(&workspace).is_empty(), "{workspace}");
     unchanged();
 
-    // A role check lists the login again, its refresh failing as well: the grant is back, from
-    // the new set alone.
     github.list("team/docs", &[("ana-souza", "write")]);
     refresh();
     let session = session_until(&console, &ana, "current");
     assert_eq!(session["grant"], json!([DOCS]), "{session}");
     unchanged();
 
-    // A later set without the login, while that one is current: nothing, and the failed
-    // refresh restores nothing.
     github.list("team/docs", &[("bia_acme", "write")]);
     refresh();
     let session = grant_until(&console, &ana, json!([]));

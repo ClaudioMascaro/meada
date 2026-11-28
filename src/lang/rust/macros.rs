@@ -1,14 +1,3 @@
-//! Item macros (#398): a `macro_rules!` of the repository whose first arm takes items
-//! (`$($x:item)*`) and writes each one back behind outer attributes only
-//! (`$( #[cfg(feature = "rt")] $x )*`). A braced invocation of one in a module is read as the
-//! module's items (or the associated items of an `impl` or a trait), under the `cfg` attributes
-//! the arm writes on each. Any other macro, and the bodies of the definitions themselves, stay
-//! unread.
-//!
-//! A definition is found by name from the call site, among every file of the repository
-//! (`LanguagePack::extend`): a name qualifies only when all its definitions do, with the same
-//! attributes. A file's setting carries the ones it invokes, so `parse` reads one file alone.
-
 use std::collections::{BTreeMap, HashMap};
 
 use tree_sitter::{Node, Parser, Range, Tree};
@@ -17,29 +6,18 @@ use super::field;
 use crate::Result;
 use crate::lang::{Facts, children, named, text};
 
-/// How many item macros deep a body is read; a deeper invocation is skipped, as any other macro.
 // ponytail: tokio nests three (`cfg_macros! { cfg_rt! { cfg_not_rt_multi_thread! { .. } } }`);
 // each level parses its body again, so the limit bounds how often one byte is parsed.
 pub(super) const ITEM_MACRO_DEPTH: usize = 8;
 
-/// How many bytes the attributes one arm writes may take, as tokens; a definition whose
-/// attributes take more is no item macro. Each file that invokes it stores them in its setting.
 // ponytail: real arms write one `cfg` and one `cfg_attr` of a few dozen bytes; a crafted
 // predicate of a megabyte must not be copied into the setting of every file that invokes it.
 pub(super) const ATTRIBUTE_BYTES: usize = 1024;
 
-/// The item macros a file's setting carries (`lang::extra`), by name: the predicate of each
-/// `cfg` attribute the arm writes on every item, as tokens.
 pub(super) type Table<'s> = HashMap<&'s str, Vec<&'s str>>;
 
-/// The braced bodies of the item macros a file invokes in a module, an `impl` or a trait, each
-/// parsed on its own over the file's bytes (so spans are the file's), by the start of the
-/// invocation. A body that does not parse as items is none.
 pub(super) type Bodies = Vec<(usize, Tree)>;
 
-/// Reads what `LanguagePack::extend` needs of a file, whatever its setting: the `macro_rules!`
-/// it defines (`Facts::macro_rules`) and the macros it invokes with braces (`Facts::invokes`),
-/// inside macro tokens too. One pass over the tree.
 pub(super) fn record(root: Node, src: &[u8], facts: &mut Facts) {
     let mut cursor = root.walk();
     loop {
@@ -67,7 +45,6 @@ pub(super) fn record(root: Node, src: &[u8], facts: &mut Facts) {
                         continue;
                     }
                     match text(*name, src) {
-                        // A definition written in tokens is one this module cannot read.
                         "macro_rules" if next.kind() == "identifier" => {
                             put(facts, text(*next, src), None)
                         }
@@ -91,12 +68,10 @@ pub(super) fn record(root: Node, src: &[u8], facts: &mut Facts) {
     }
 }
 
-/// Adds one definition of `name` to the file's.
 fn put(facts: &mut Facts, name: &str, found: Option<Vec<String>>) {
     agree(&mut facts.macro_rules, name.to_string(), found);
 }
 
-/// Adds one definition of `name` to `defined`: two that disagree are no item macro.
 fn agree<K: Ord, V: PartialEq>(defined: &mut BTreeMap<K, Option<V>>, name: K, found: Option<V>) {
     match defined.get(&name) {
         Some(known) if *known != found => {
@@ -109,9 +84,6 @@ fn agree<K: Ord, V: PartialEq>(defined: &mut BTreeMap<K, Option<V>>, name: K, fo
     }
 }
 
-/// The name an invocation's macro qualifies under: `m` of `m!` and of `crate::m!`. Any other
-/// path (`other::m!`, `self::m!`, `super::m!`, `crate::a::m!`) is none: it may name a macro of
-/// another crate or module.
 pub(super) fn invoked_name<'s>(path: Node, src: &'s [u8]) -> Option<&'s str> {
     match path.kind() {
         "identifier" => Some(text(path, src)),
@@ -124,7 +96,6 @@ pub(super) fn invoked_name<'s>(path: Node, src: &'s [u8]) -> Option<&'s str> {
     }
 }
 
-/// The name a macro path ends with: `m` of `m!` and of `a::m!`.
 fn last_name<'s>(path: Node, src: &'s [u8]) -> Option<&'s str> {
     match path.kind() {
         "identifier" => Some(text(path, src)),
@@ -133,18 +104,14 @@ fn last_name<'s>(path: Node, src: &'s [u8]) -> Option<&'s str> {
     }
 }
 
-/// Whether a token tree opens with `delimiter`.
 fn opens(tree: Node, delimiter: &str) -> bool {
     tree.child(0).is_some_and(|c| c.kind() == delimiter)
 }
 
-/// The token tree of an invocation written with braces.
 fn braced(invocation: Node) -> Option<Node> {
     named(invocation).find(|n| n.kind() == "token_tree" && opens(*n, "{"))
 }
 
-/// The outer attributes the first arm of a `macro_rules!` writes on each item, when it is
-/// `$($x:item)*` and writes back only `$( #[..] .. $x )*`; `None` for any other definition.
 fn passes(definition: Node, src: &[u8]) -> Option<Vec<String>> {
     let rule = named(definition).find(|n| n.kind() == "macro_rule")?;
     let matcher = only(field(rule, "left")?, "token_repetition_pattern")?;
@@ -188,14 +155,11 @@ fn passes(definition: Node, src: &[u8]) -> Option<Vec<String>> {
     (bytes <= ATTRIBUTE_BYTES).then_some(attributes)
 }
 
-/// Whether a repetition writes a separator between its `)` and its operator, which the grammar
-/// leaves out of the tree (`$($i:item),*`).
 fn separated(close: Node, operator: Node, src: &[u8]) -> bool {
     let between = &src[close.end_byte()..operator.start_byte()];
     !between.iter().all(u8::is_ascii_whitespace)
 }
 
-/// The one node of `kind` between a token tree's delimiters, and nothing else.
 fn only<'t>(tree: Node<'t>, kind: &str) -> Option<Node<'t>> {
     let parts: Vec<Node> = children(tree).collect();
     match parts[..] {
@@ -204,14 +168,9 @@ fn only<'t>(tree: Node<'t>, kind: &str) -> Option<Node<'t>> {
     }
 }
 
-/// An attribute's `[..]` as its tokens joined by spaces, without the brackets: `cfg ( feature =
-/// "rt" )`. `None` for one the items would be read wrong under: `#[path]` or a `#[cfg_attr]`
-/// that may write one, a metavariable (the arm rewrites the attribute) or a control character (it
-/// would break the setting's lines).
 fn attribute(tree: Node, src: &[u8]) -> Option<String> {
     let mut tokens = Vec::new();
     let mut stack: Vec<Node> = children(tree).collect();
-    // Without the brackets themselves.
     if stack.len() < 2 {
         return None;
     }
@@ -241,16 +200,12 @@ fn attribute(tree: Node, src: &[u8]) -> Option<String> {
     Some(tokens.join(" "))
 }
 
-/// The predicate of a `cfg` attribute as `attribute` spells it: `( feature = "rt" )`.
 fn predicate(attribute: &str) -> Option<&str> {
     attribute
         .strip_prefix("cfg ")
         .filter(|p| p.starts_with('('))
 }
 
-/// What each file's setting carries of the item macros it invokes (`LanguagePack::extend`): a
-/// line per macro, by name, with the predicate of each `cfg` attribute its arm writes after a
-/// tab. A name qualifies when every file that defines it agrees on the same attributes.
 pub(super) fn extend(files: &BTreeMap<&str, &Facts>) -> BTreeMap<String, String> {
     let mut defined: BTreeMap<&str, Option<&[String]>> = BTreeMap::new();
     for (name, found) in files.values().flat_map(|f| &f.macro_rules) {
@@ -275,7 +230,6 @@ pub(super) fn extend(files: &BTreeMap<&str, &Facts>) -> BTreeMap<String, String>
     out
 }
 
-/// The item macros a setting's extra lines name (`extend`).
 pub(super) fn table(extra: &str) -> Table<'_> {
     (extra.lines())
         .filter_map(|line| {
@@ -285,9 +239,6 @@ pub(super) fn table(extra: &str) -> Table<'_> {
         .collect()
 }
 
-/// The bodies of the item macros of `table` that the file at `root` invokes in a module, an
-/// `impl` or a trait, those written in such bodies too, `ITEM_MACRO_DEPTH` deep. Each body is
-/// parsed again; one that does not parse as items is left out, as is an empty one.
 pub(super) fn bodies(root: Node, src: &[u8], table: &Table) -> Result<Bodies> {
     let mut out = Vec::new();
     if table.is_empty() {
@@ -317,9 +268,6 @@ pub(super) fn bodies(root: Node, src: &[u8], table: &Table) -> Result<Bodies> {
     Ok(out)
 }
 
-/// The invocations of `table`'s macros written with braces among the items of the file or the
-/// body at `root`, and of the modules written in place in it, and among the associated items of
-/// an `impl` or a trait: each one's start and the range between its braces.
 fn invoked(root: Node, src: &[u8], table: &Table) -> Vec<(usize, Range)> {
     let mut out = Vec::new();
     let mut containers = vec![root];
@@ -366,8 +314,6 @@ mod tests {
 
     const CFG_RT: &str = "macro_rules! cfg_rt { ($($i:item)*) => { $($i)* } }\n";
 
-    /// Each file of `sources` parsed under `base` and what `extend` adds from all of them, each
-    /// first parsed alone, as the index settles them.
     fn indexed(sources: &[(&str, &str)], base: &str) -> BTreeMap<String, Facts> {
         let alone: BTreeMap<&str, Facts> = (sources.iter())
             .map(|(path, src)| (*path, Rust.parse_with(path, src.as_bytes(), base).unwrap()))
@@ -410,7 +356,6 @@ mod tests {
         assert_eq!(mods(&facts), ["mod rt"]);
         let call = facts.calls.iter().find(|c| c.callee == "spawn").unwrap();
         assert_eq!(call.scope, "caller");
-        // Spans are the file's own.
         let spawn = &facts.defs[0];
         assert_eq!(&src[spawn.range.clone()], "pub fn spawn() {}");
         assert!(facts.star.takes("spawn") && facts.star.takes("rt"));
@@ -427,20 +372,17 @@ mod tests {
             "",
         );
         assert_eq!(names(&found["src/lib.rs"]), ["spawn"]);
-        // `cfg_net` is defined nowhere: a macro of another crate.
         assert!(found["src/other.rs"].defs.is_empty());
     }
 
     #[test]
     fn a_macro_that_does_not_pass_items_through_leaves_its_body_out() {
         let shapes = [
-            // Another matcher, a separator, another repetition, another first arm.
             "macro_rules! m { ($($t:tt)*) => { $($t)* } }",
             "macro_rules! m { ($($i:item),*) => { $($i)* } }",
             "macro_rules! m { ($($i:item)+) => { $($i)* } }",
             "macro_rules! m { () => {}; ($($i:item)*) => { $($i)* } }",
             "macro_rules! m { ($($i:expr)*) => { $($i)* } }",
-            // A transcriber that wraps, rewrites or adds to the items.
             "macro_rules! m { ($($i:item)*) => { mod w { $($i)* } } }",
             "macro_rules! m { ($($i:item)*) => { $($i)* fn more() {} } }",
             "macro_rules! m { ($($i:item)*) => { $( #[path = \"x.rs\"] $i )* } }",
@@ -449,7 +391,6 @@ mod tests {
             "macro_rules! m { ($($i:item)*) => { $($i)+ } }",
             "macro_rules! m { ($($i:item)*) => { $( pub $i )* } }",
             "macro_rules! m { ($($i:item)*) => { $($j)* } }",
-            // Two definitions that disagree, one of them in another macro's tokens.
             "macro_rules! m { ($($i:item)*) => { $($i)* } }\nmacro_rules! m { ($($i:item)*) => { $( #[cfg(unix)] $i )* } }",
             "macro_rules! m { ($($i:item)*) => { $($i)* } }\nother! { macro_rules! m { () => {} } }",
         ];
@@ -461,8 +402,6 @@ mod tests {
             assert!(facts.defs.is_empty(), "{shape}: {:?}", names(&facts));
             assert!(mods(&facts).is_empty(), "{shape}");
         }
-        // Parentheses, a path that may be another crate's or module's, and a body that is no
-        // list of items.
         for call in [
             "m!(pub fn hidden() {});",
             "other::m! { pub fn hidden() {} }",
@@ -520,7 +459,6 @@ mod tests {
             .map(|c| c.scope.as_str())
             .collect();
         assert_eq!(scopes, ["Rt.start", "Drive.run"]);
-        // The arm's predicates and the features decide, as at a module's level.
         let facts = one(&src, "off");
         assert!(names(&facts).contains(&"Rt.gated"));
     }
@@ -550,7 +488,6 @@ mod tests {
             "{CFG_RT}#[cfg(test)]\ncfg_rt! {{ mod checks; fn helper() {{}} }}\n#[cfg(windows)]\ncfg_rt! {{ pub fn win() {{}} }}\n#[cfg(not(test))]\ncfg_rt! {{ pub fn real() {{}} mod built; }}\n"
         );
         let facts = one(&src, "");
-        // A test build compiles `checks`, as it would a `#[cfg(test)] mod checks;`.
         assert_eq!(names(&facts), ["checks", "real", "built"]);
         let not_test = format!("{CFG_RT}#[cfg(not(test))]\ncfg_rt! {{ #[cfg(test)] mod unit; }}\n");
         assert!(mods(&one(&not_test, "")).is_empty());
@@ -615,7 +552,6 @@ mod tests {
             names(&found["a/src/lib.rs"]).len()
         };
         let unix = gated("cfg(unix)");
-        // The same attributes, written with other spaces.
         assert_eq!(read(&unix, &gated("cfg( unix )")), 1);
         assert_eq!(read(&unix, &gated("cfg(windows)")), 0);
         assert_eq!(
@@ -641,8 +577,6 @@ mod tests {
 
     #[test]
     fn nested_item_macros_are_read_in_linear_time() {
-        // Every level holds `per` functions of its own, and each level's body is parsed again for
-        // the next: the bytes parsed are the depth times the file's, not more.
         let per = 400;
         let mut src = CFG_RT.to_string();
         for level in 0..ITEM_MACRO_DEPTH {
@@ -656,7 +590,6 @@ mod tests {
         let facts = one(&src, "");
         let took = start.elapsed();
         assert_eq!(facts.defs.len(), ITEM_MACRO_DEPTH * per);
-        // About 0.6 s in a local debug build, under a thirtieth of the bound.
         assert!(took.as_secs() < 20, "{took:?}");
     }
 
@@ -664,7 +597,6 @@ mod tests {
     fn a_module_written_in_place_reads_its_item_macros_too() {
         let src = format!("{CFG_RT}pub mod inner {{ cfg_rt! {{ pub fn spawn() {{}} }} }}\n");
         assert_eq!(names(&one(&src, "")), ["inner", "inner.spawn"]);
-        // A function body is no module.
         let src = format!("{CFG_RT}fn outer() {{ cfg_rt! {{ fn spawn() {{}} }} }}\n");
         assert_eq!(names(&one(&src, "")), ["outer"]);
     }

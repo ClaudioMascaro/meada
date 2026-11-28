@@ -1,9 +1,3 @@
-//! A team operator's additions under the GitHub grant provider (#333, ADR 0016): the team fixture
-//! of `team` (real Valkey and store, the `oidc` module's loopback issuer) with `[oidc.github]` and
-//! `[postgres]`, so every write is audited, and the role check `meada github-app roles` run over
-//! the store's version against `github_app`'s fake GitHub API (`oidc::github::Github`). What is
-//! stored and marked is seen through the console's routes, never the module's tables.
-
 use std::fs;
 use std::time::{Duration, Instant};
 
@@ -16,16 +10,10 @@ use crate::server::Server;
 use crate::snapshot::KEY_ID;
 use crate::ui::Reply;
 
-/// A repository of the GitHub grant provider's host no team's claims grant reads.
 const FRESH: &str = "e.test/team/fresh";
 
-/// The `added_by_time` line of an entry the global operator attributes by hand (#454): a time
-/// after any permissions set a test writes.
 const AFTER_LINE: &str = "added_by_time = \"2999-01-01T00:00:00Z\"\n";
 
-/// The team fixture with `[oidc.github]` on `HOST` (role `write`) over a schema of its own, a
-/// console reading it, and `ops/roles.toml`: the console's manifest with an `index_dir` of its
-/// own and the App block, the role check's.
 struct Case {
     team: Team,
     github: Github,
@@ -36,7 +24,6 @@ fn case(name: &'static str) -> Option<Case> {
     enable(name, team(name, true)?)
 }
 
-/// `[oidc.github]` enabled over `team`'s fleet: `case`'s console and role check.
 fn enable(name: &'static str, team: Team) -> Option<Case> {
     let github = Github::new(name)?;
     let dir = &team.fleet.dir;
@@ -55,8 +42,6 @@ fn enable(name: &'static str, team: Team) -> Option<Case> {
 }
 
 impl Case {
-    /// A token of `subject` in `groups`, with `login` in `[oidc.github] login_claim`, the global
-    /// operator with `operator`.
     fn token(&self, subject: &str, groups: &[&str], login: Option<&str>, operator: bool) -> String {
         let mut claims = self.team.claims(subject);
         claims["groups"] = json!(groups);
@@ -74,7 +59,6 @@ impl Case {
         post(&self.console, "workspace/versions", token, body)
     }
 
-    /// A save that is accepted: the id it stored.
     fn saved(&self, token: &str, text: &str) -> String {
         let reply = self.save(token, text);
         assert_eq!(reply.status, 200, "{}", reply.body);
@@ -90,7 +74,6 @@ impl Case {
         )
     }
 
-    /// The entries of the version `id`, as `token` reads them, by identity.
     fn entry(&self, token: &str, id: &str, repo: &str) -> Value {
         let version = get(&self.console, &format!("workspace/versions/{id}"), token);
         let found = (version["repositories"].as_array().unwrap().iter())
@@ -99,14 +82,12 @@ impl Case {
         found.unwrap_or_else(|| panic!("{repo} in {version}"))
     }
 
-    /// The current version's id and the number of versions stored.
     fn state(&self, operator: &str) -> (Value, usize) {
         let versions = get(&self.console, "workspace/versions", operator);
         let count = versions["versions"].as_array().unwrap().len();
         (versions["current"]["id"].clone(), count)
     }
 
-    /// `meada <args>` in the fleet's directory, as the job runs it.
     fn job(&self, args: &[&str]) -> (String, String) {
         let env = [
             ("MEADA_TEST_S3_KEY", KEY_ID),
@@ -120,7 +101,6 @@ impl Case {
     }
 }
 
-/// The text of the entries `team-billing` reads, as it would submit them unchanged.
 fn seen() -> String {
     let seen: Vec<_> = (ENTRIES.iter())
         .filter(|(repo, _)| [BILLING, LEDGER, SHARED, JOINT].contains(repo))
@@ -129,14 +109,12 @@ fn seen() -> String {
     entries(&seen)
 }
 
-/// `text` with an entry for `repo` owned by `team-billing`, `extra` lines after its owner.
 fn with(text: &str, repo: &str, extra: &str) -> String {
     format!(
         "{text}[[repository]]\nrepo = \"{repo}\"\npath = \"../v\"\nowner = \"team-billing\"\n{extra}"
     )
 }
 
-/// `entry` with its `added_by_time` (#454) checked as a time the console wrote and taken out.
 fn untimed(mut entry: Value) -> Value {
     let time = entry["added_by_time"]
         .as_str()
@@ -150,7 +128,6 @@ fn untimed(mut entry: Value) -> Value {
     entry
 }
 
-/// A 403 `entries_refused`: its refused entries and hidden count.
 fn refusals(reply: &Reply) -> (Value, Value) {
     assert_eq!(reply.status, 403, "{}", reply.body);
     let error = &reply.json()["error"];
@@ -158,11 +135,6 @@ fn refusals(reply: &Reply) -> (Value, Value) {
     (error["refused"].clone(), error["hidden"].clone())
 }
 
-/// A team operator's addition on the GitHub grant provider's host outside its grant is stored
-/// with `added_by` set from its login over a forged value; without a login it is
-/// `unattributed`; an edit of `added_by` is `added_by_change`; an identity the workspace already
-/// holds outside its grant is `outside_grant`, named as submitted, with or without a login. A refusal writes nothing and
-/// the audit records it; stderr carries no token and no login.
 #[test]
 fn a_team_operator_s_addition_on_the_host_is_attributed_from_its_login() {
     let Some(case) = case("ui_additions") else {
@@ -213,7 +185,6 @@ fn a_team_operator_s_addition_on_the_host_is_attributed_from_its_login() {
         fresh,
         json!({"repo": FRESH, "path": "../v", "owner": "team-billing", "added_by": "ana-souza"})
     );
-    // The entries outside its grant are kept as they are.
     assert_eq!(case.entry(&root, &saved, VAULT)["owner"], "team-billing");
 
     let records = get(&case.console, "audit", &root)["records"].clone();
@@ -248,12 +219,6 @@ fn a_team_operator_s_addition_on_the_host_is_attributed_from_its_login() {
     assert!(!stderr.contains("mallory"), "{stderr}");
 }
 
-/// #454: while no GitHub grant provider is configured, a team operator sets an `added_by` on its
-/// team's entry and adds another entry with one (both kept as submitted, with no
-/// `added_by_time`), and the version is applied. Once `[oidc.github]` is enabled, the role check
-/// reports both `unattributed` and excludes them although their `added_by` holds an accepted
-/// role. An addition the provider attributes after that first permissions set is checked by its
-/// roles as before: eligible, no exclusion of its own.
 #[test]
 fn an_added_by_written_before_the_provider_s_first_set_is_unattributed() {
     let Some(team) = team("ui_additions_before", true) else {
@@ -300,7 +265,6 @@ fn an_added_by_written_before_the_provider_s_first_set_is_unattributed() {
     }
     case.github.clean(&stderr, &[]);
 
-    // Past the second the first set started in, an addition the provider attributes.
     std::thread::sleep(Duration::from_millis(1100));
     let ana = case.token("ana", &["team-billing"], Some("Ana-Souza"), false);
     let after = case.saved(&ana, &with(&forged, FRESH, ""));
@@ -315,10 +279,6 @@ fn an_added_by_written_before_the_provider_s_first_set_is_unattributed() {
     case.github.clean(&stderr, &[]);
 }
 
-/// The global operator's saves keep `added_by` as written, setting, replacing and clearing it,
-/// its own additions carrying none; a team operator's apply of a stored version whose addition
-/// on the host, inside its grant, lacks `added_by` is `unattributed` under the lock, and goes
-/// through once the addition has one.
 #[test]
 fn the_global_operator_keeps_added_by_as_written_and_an_apply_needs_it() {
     let Some(case) = case("ui_additions_operator") else {
@@ -368,11 +328,6 @@ fn the_global_operator_keeps_added_by_as_written_and_an_apply_needs_it() {
     assert_eq!(case.state(&root).0, json!(signed));
 }
 
-/// After a role check that excludes an addition (its `added_by` holds no accepted role),
-/// `workspace` and `versions/<id>` of the version it checked mark the entry `excluded: true` for
-/// the global operator and for a viewer whose GitHub grant reads it; another version holding the
-/// same entry carries no mark, nor any other entry, and a subject that does not read the entry
-/// never sees it.
 #[test]
 fn an_excluded_addition_is_marked_in_the_views_of_the_version_checked() {
     let Some(case) = case("ui_additions_excluded") else {
@@ -424,7 +379,6 @@ fn an_excluded_addition_is_marked_in_the_views_of_the_version_checked() {
     assert!(marked(&version["repositories"]).is_empty(), "{version}");
     assert_eq!(case.entry(&root, &other, FRESH)["added_by"], "ana-souza");
 
-    // A viewer reading the entry through GitHub sees the mark; one that does not, no entry.
     let start = Instant::now();
     while get(&case.console, "session", &bia)["github_grant"] != "current" {
         assert!(start.elapsed() < Duration::from_secs(20));
@@ -449,14 +403,6 @@ fn an_excluded_addition_is_marked_in_the_views_of_the_version_checked() {
     case.github.clean(&case.console.stderr(), &[root, bia, ana]);
 }
 
-/// Local accounts (#561): a console with `[accounts]`, `[accounts.groups]` granting `team-billing`
-/// what `[oidc.groups]` grants it here, and `[accounts.github]` on `HOST`, over the team fixture's
-/// store. A local viewer of `team-billing` is a team operator; before it verifies a login its
-/// addition on the host is `unattributed`, after it the addition is stored with `added_by` set
-/// from the verified login over a forged value, and the audit's `login` column carries it. The
-/// role check reads `[accounts.github]`: once it excludes the addition, the global operator and a
-/// local viewer whose verified login reads the entry see the mark. No stderr line carries a token,
-/// a login or a personal access token.
 #[cfg(feature = "accounts")]
 #[test]
 fn a_local_team_operator_s_addition_is_attributed_from_its_verified_login() {
@@ -536,7 +482,6 @@ fn a_local_team_operator_s_addition_is_attributed_from_its_verified_login() {
     };
     let versions = |token: &str| get(&console, "workspace/versions", token);
 
-    // Before a verified login: the team operator's addition on the host is unattributed.
     let anon = signed_in("ana", PASSWORD);
     assert_eq!(
         get(&console, "session", &anon)["teams"],
@@ -555,7 +500,6 @@ fn a_local_team_operator_s_addition_is_attributed_from_its_verified_login() {
     );
     assert_eq!(versions(&root), before);
 
-    // After it: attributed from the verified login, the forged value ignored.
     let ana = verify(&anon, ANA_PAT);
     let session = get(&console, "session", &ana);
     assert_eq!(
@@ -596,7 +540,6 @@ fn a_local_team_operator_s_addition_is_attributed_from_its_verified_login() {
         ]
     );
 
-    // The role check reads `[accounts.github]` and excludes the addition: the marks.
     let applied = post(
         &console,
         "workspace/apply",

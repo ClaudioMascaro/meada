@@ -22,7 +22,6 @@ function endpoint(value: unknown, issuer: URL): string {
   return url.href;
 }
 
-/** A public OIDC client. The sole persistent state is the pending redirect's PKCE pair. */
 export class Auth {
   #token?: string;
   #login?: Promise<void>;

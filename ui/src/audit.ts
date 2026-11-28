@@ -7,12 +7,10 @@ export interface AuditRecord {
 }
 export interface AuditPage { records: AuditRecord[]; next: number | null }
 
-/** The route of the page after `before` (the newest without it). */
 export function auditRoute(before?: number): string {
   return before === undefined ? 'audit' : `audit?${new URLSearchParams({ before: String(before) })}`;
 }
 
-/** Each record as the page shows it, every field as text. */
 export function auditModel(page: AuditPage, t: AuditCopy) {
   return page.records.map(record => ({
     id: record.id,

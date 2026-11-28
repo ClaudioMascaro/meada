@@ -69,7 +69,6 @@ pub struct File {
     ca_file: Option<String>,
 }
 
-/// Where the store's credentials come from: one source, the one the section names.
 #[derive(Deserialize, Default, Clone, Copy, Debug, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 enum Source {
@@ -214,17 +213,11 @@ impl File {
     }
 }
 
-/// Whether `name` is a node name: lowercase letters, digits, `.` and `-`, 1 to 63 characters.
 pub(crate) fn is_node_name(name: &str) -> bool {
     (1..=63).contains(&name.len())
         && (name.bytes()).all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'.' | b'-'))
 }
 
-/// Why `url` is no store endpoint: an `https` URL, or `http` when the host is loopback
-/// (`localhost`, `127.0.0.0/8`, `::1`), with no user, password, path, query or fragment. When it
-/// is one, whether a bucket can go in front of its host (virtual-hosted style): an `https`
-/// endpoint named by a domain other than `localhost`. `<bucket>.localhost` may go to DNS, an IP
-/// takes no subdomain, and a plain `http` endpoint is loopback, so path style.
 fn endpoint(url: &str) -> std::result::Result<bool, String> {
     let Ok(parsed) = reqwest::Url::parse(url) else {
         return Err(Msg::SnapshotEndpointInvalid.text());
@@ -257,8 +250,6 @@ impl Config {
     }
 }
 
-// The ids of ADR 0012, their shape, the fence and the entries' canonical blocks are
-// `meada_core::ids`'s.
 pub use meada_core::ids::{bundle_id, entry_blocks, fence, generation_id, is_id};
 
 /// A generation document (`generations/<id>.json`), never rewritten once stored.
@@ -327,9 +318,7 @@ pub struct Entry {
     pub blake3: String,
 }
 
-/// A repository ready to publish.
 struct Bundle {
-    /// Only named workspaces select it (#342).
     member: bool,
     identity: String,
     head: String,
@@ -337,9 +326,6 @@ struct Bundle {
     blocks: serde_json::Value,
     mirror: PathBuf,
     index: PathBuf,
-    /// The index opened by `index::open_read`, its read transaction held until the bundle is
-    /// uploaded: a `meada index` commit waits for it (up to its busy timeout), so both passes
-    /// over the tar read the index the freshness check read.
     _read: rusqlite::Connection,
 }
 
@@ -354,7 +340,6 @@ pub fn publish(manifest: &Path) -> Result<String> {
     let Some(config) = listed.snapshot.clone() else {
         return Err(Msg::SnapshotNoSection(&shown).text().into());
     };
-    // With `[refresh_lock]`, only under `meada snapshot lock`: its token and fence.
     #[cfg(feature = "refresh-lock")]
     let held = match listed.refresh_lock {
         Some(_) => Some(lock::from_env()?),
@@ -397,7 +382,6 @@ pub fn publish(manifest: &Path) -> Result<String> {
                 problems.push(problem);
                 continue;
             }
-            // `open_read`'s errors already name the repository.
             Err(e) => {
                 let e = e.to_string();
                 problems.push(match e.starts_with(&format!("{repo_id}: ")) {
@@ -428,7 +412,6 @@ pub fn publish(manifest: &Path) -> Result<String> {
             _read: read,
         });
     }
-    // One problem per line; the CLI prefixes each.
     if !problems.is_empty() {
         return Err(problems.join("\n").into());
     }
@@ -438,7 +421,6 @@ pub fn publish(manifest: &Path) -> Result<String> {
             .map(|b| (b.identity.as_str(), bundle_of(&b.key)))
             .collect()
     };
-    // The named workspaces (#342): one recorded context each, whose digest the id hashes.
     let contexts = recorded_contexts(&listed);
     let digests: Vec<(&str, String)> = contexts
         .iter()
@@ -452,7 +434,6 @@ pub fn publish(manifest: &Path) -> Result<String> {
         #[cfg(feature = "refresh-lock")]
         held,
     };
-    // The pulled workspace version with `source = "store"`; never part of an id.
     #[cfg(feature = "generation-pointer")]
     let workspace = listed.version.clone();
     #[cfg(not(feature = "generation-pointer"))]
@@ -462,9 +443,6 @@ pub fn publish(manifest: &Path) -> Result<String> {
     Ok(generation)
 }
 
-/// The contexts `listed` records (#342): its named workspaces, sorted by id, with the entries
-/// the role check left in and their blocks as the workspace version holds them, and the
-/// identities it excluded (#510). Empty without `[workspaces]`.
 fn recorded_contexts(listed: &Manifest) -> Vec<Context> {
     #[cfg(feature = "workspaces")]
     {
@@ -491,26 +469,18 @@ fn recorded_contexts(listed: &Manifest) -> Vec<Context> {
     }
 }
 
-/// The bundle id of a bundle key, `<...>/<bundle id>.tar`.
 pub(crate) fn bundle_of(key: &str) -> &str {
     let name = key.rsplit('/').next().unwrap_or(key);
     name.strip_suffix(".tar").unwrap_or(name)
 }
 
-/// Where `publish` writes the pointer: the store's `current`, or with `[generations]` the keys
-/// of the generation pointer in Valkey (`generations::point`).
 struct Pointer {
     #[cfg(feature = "generation-pointer")]
     generations: Option<(generations::Config, crate::valkey::Config)>,
-    /// The refresh lock's token and fence (`[refresh_lock]`): checked before each upload and
-    /// handed to the pointer script.
     #[cfg(feature = "refresh-lock")]
     held: Option<lock::Held>,
 }
 
-/// Stores the generation `generation` of `bundles`, its document naming the workspace version
-/// `workspace` when one produced it, then points `pointer` at it. A document already stored is
-/// verified and kept as it is, with the version that first produced it.
 async fn store_generation(
     config: &Config,
     generation: &str,
@@ -520,21 +490,17 @@ async fn store_generation(
     #[cfg_attr(not(feature = "generation-pointer"), expect(unused_variables))] pointer: Pointer,
 ) -> std::result::Result<(), String> {
     let store = Store::connect(config)?;
-    // Before any upload: a Valkey that cannot be reached costs no transfer.
     #[cfg(feature = "generation-pointer")]
     let valkey = match &pointer.generations {
         Some((_, valkey)) => Some(crate::valkey::Valkey::connect(valkey).await?),
         None => None,
     };
-    // With the refresh lock: an error unless the lock still holds this job's token, checked
-    // before each upload, so a job that lost it uploads nothing more.
     #[cfg(feature = "refresh-lock")]
     let guard = async || match (&pointer.held, &valkey, &pointer.generations) {
         (Some(held), Some(valkey), Some((_, config))) => {
             lock::holds(valkey, config, &held.token).await
         }
         (None, ..) => Ok(()),
-        // `Manifest::read` refuses `[refresh_lock]` without `[generations]`: never fail open.
         (Some(_), ..) => Err(Msg::NeedsSections {
             section: "refresh_lock",
             needed: &["generations"],
@@ -606,8 +572,6 @@ async fn store_generation(
     Ok(())
 }
 
-/// A stored generation document checked: it is the generation `generation` of `bundles`, and
-/// every bundle it lists is stored with the size and hash it records.
 async fn verify(
     store: &Store,
     key: &str,
@@ -638,7 +602,6 @@ async fn verify(
     Ok(())
 }
 
-/// Counts and hashes what goes through it.
 struct Counted<W> {
     inner: W,
     hash: blake3::Hasher,
@@ -658,7 +621,6 @@ impl<W: Write> Write for Counted<W> {
     }
 }
 
-/// Sends what is written to it in chunks of `store::PART` bytes.
 struct Chunks {
     tx: tokio::sync::mpsc::Sender<Vec<u8>>,
     buf: Vec<u8>,
@@ -689,8 +651,6 @@ impl Write for Chunks {
     }
 }
 
-/// The bundle's tar written to `out`: `index.db`, then the mirror under `mirror/` in path
-/// order, symbolic links as links. Its size and BLAKE3 hash.
 fn write_bundle<W: Write>(mirror: &Path, index: &Path, out: W) -> io::Result<Stored> {
     let counted = Counted {
         inner: out,
@@ -723,8 +683,6 @@ fn append_tree<W: Write>(tar: &mut tar::Builder<W>, dir: &Path, name: &Path) -> 
     Ok(())
 }
 
-/// Uploads `bundle`'s tar with the size and hash a first pass over it measured; a second pass
-/// streams it. A mirror or an index that changed between the passes aborts the upload.
 async fn upload(store: &Store, bundle: &Bundle) -> std::result::Result<(), String> {
     let (mirror, index) = (bundle.mirror.clone(), bundle.index.clone());
     let measure = tokio::task::spawn_blocking(move || write_bundle(&mirror, &index, io::sink()));
@@ -893,7 +851,6 @@ mod tests {
             assert_eq!(found, key, "{toml}");
             assert!(!message.contains("pw"), "{message}");
         }
-        // Loopback may stay plain, in any of its forms.
         for host in [
             "localhost:9000",
             "127.0.0.1",
@@ -908,7 +865,6 @@ mod tests {
                 "{host}"
             );
         }
-        // The bucket cannot go in front of an IP or `localhost` either.
         for endpoint in [
             "https://10.0.0.1",
             "https://[::1]:9000",

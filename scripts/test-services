@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Starts the services of CI's `cloud` job (.github/workflows/ci.yml) on loopback and prints the
-# exports that make the service tests run. tests/it/test_services.rs keeps the two in step.
-#   scripts/test-services up     start (or reuse) the containers, wait, print the exports
-#   scripts/test-services down   remove them
 set -euo pipefail
 
 VALKEY_IMAGE=valkey/valkey:7.2-alpine
@@ -18,7 +14,6 @@ POSTGRES_TLS_PORT=5433
 
 NAMES="meada-test-valkey meada-test-s3 meada-test-postgres meada-test-postgres-tls"
 
-# Docker Hub rate limits pulls: retry the same tag from the ECR mirrors and tag it as asked.
 pull() {
   docker image inspect "$1" >/dev/null 2>&1 && return 0
   docker pull "$1" >/dev/null 2>&1 && return 0
@@ -37,7 +32,6 @@ pull() {
   return 1
 }
 
-# start <name> <image> <docker run args...>: reuses a running container of the same image.
 start() {
   local name=$1 image=$2 run=() cmd=()
   shift 2
@@ -48,16 +42,12 @@ start() {
   fi
   docker rm -f "$name" >/dev/null 2>&1 || true
   pull "$image"
-  # The `+` forms keep an empty array legal under `set -u` on bash before 4.4 (macOS).
   docker run -d --name "$name" ${run[@]+"${run[@]}"} "$image" ${cmd[@]+"${cmd[@]}"} >/dev/null
 }
 
-# The second Postgres, over TLS (#483), as CI's step "Postgres over TLS" makes it.
 tls_postgres() {
   local dir="${TMPDIR:-/tmp}/meada-test-postgres-tls" as_root=
   [ "$(id -u)" = 0 ] || as_root=sudo
-  # The certificates last two days: past the next hour they are made again, and the server
-  # restarted on them.
   if ! openssl x509 -checkend 3600 -noout -in "$dir/server.pem" >/dev/null 2>&1; then
     docker rm -f meada-test-postgres-tls >/dev/null 2>&1 || true
     $as_root rm -rf "$dir" && mkdir -p "$dir"
@@ -99,7 +89,6 @@ case "${1:-}" in
     tls_postgres
     wait_for valkey docker exec meada-test-valkey valkey-cli ping
     wait_for s3 curl -s -o /dev/null "http://127.0.0.1:$S3_PORT/"
-    # initdb restarts the server once, so ask over TCP, which only the final server answers.
     wait_for postgres docker exec meada-test-postgres pg_isready -h 127.0.0.1 -U postgres
     wait_for postgres-tls docker exec meada-test-postgres-tls pg_isready -h 127.0.0.1 -U postgres
     echo "export MEADA_TEST_VALKEY_URL=redis://127.0.0.1:$VALKEY_PORT"

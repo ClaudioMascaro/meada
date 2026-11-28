@@ -11,12 +11,6 @@ import { applyBody, findingText, historyRoute, versionRoute, versionsRoute } fro
 import type { HistoryList, HistoryRow, Refusal, VersionDocument, VersionList, VersionRow, WorkspaceDetail, Written } from './named';
 import { namedCopy } from './named-i18n';
 
-/**
- * The versions of a named workspace (#503): the list, one version's entries and its diff against the
- * current one, the history for an operator, and applying a listed version. Everything shown is what
- * the routes answer; the page decides nothing, and an apply is sent at the base the page read, which
- * the server checks again at the transaction.
- */
 export function WorkspaceVersions({ api, locale, detail, onApplied, onStale }: {
   api: Api; locale: Language; detail: WorkspaceDetail; onApplied: (outcome: Outcome) => void; onStale: () => void;
 }) {
@@ -37,7 +31,6 @@ export function WorkspaceVersions({ api, locale, detail, onApplied, onStale }: {
   const [failure, setFailure] = useState<string>();
   const [refusal, setRefusal] = useState<Refusal>();
   const id = detail.id;
-  // Only the newest `show` answers: a slower, older read never replaces it.
   const latest = useRef(0);
   useEffect(() => {
     const controller = new AbortController();
@@ -50,7 +43,6 @@ export function WorkspaceVersions({ api, locale, detail, onApplied, onStale }: {
       .catch(error => { if (!controller.signal.aborted) setProblem(error); });
     return () => controller.abort();
   }, [api, id, after, attempt, detail.base]);
-  // The workspace moved (the editor saved, or this page applied): what was read is of the old base.
   useEffect(() => { latest.current += 1; setAfter(undefined); setShown(undefined); setHistory(undefined); setHistoryNext(null); }, [detail.base]);
 
   function reload() { latest.current += 1; setAfter(undefined); setAttempt(value => value + 1); setShown(undefined); setHistory(undefined); setHistoryNext(null); setProblem(undefined); }
@@ -68,7 +60,6 @@ export function WorkspaceVersions({ api, locale, detail, onApplied, onStale }: {
   }
   async function readHistory(from?: number) {
     setProblem(undefined);
-    // A read that the base moved past (or a reload) is dropped, like a late `show`.
     const mine = latest.current;
     try {
       const value = await api.request<HistoryList>(historyRoute(id, from));
