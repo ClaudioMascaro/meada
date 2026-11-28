@@ -1,5 +1,3 @@
-//! Kafka topics from app-config reach the private producer through each exact caller of its wrapper.
-
 use std::path::{Path, PathBuf};
 
 use meada::engine::Engine;
@@ -8,12 +6,9 @@ use serde_json::Value;
 use crate::common::fixture_repo;
 
 const APPROVED: &str = "channel::kafka::orders.approved";
-/// What approvals' `listenShipped` consumes beside it.
 const SHIPPED: &str = "channel::kafka::orders.shipped";
-/// Approvals' consumers: the `run` handler of its client.
 const APPROVALS: &str = "::plugins/approvals/src/KafkaClient.ts::";
 
-/// The `kafkajs-plugins` fixture, copied for `case`.
 fn fixture(case: &str) -> PathBuf {
     fixture_repo(
         case,
@@ -28,7 +23,6 @@ fn export(case: &str, change: impl FnOnce(&Path)) -> Value {
     serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap()
 }
 
-/// The channel contracts of the `role` (`providers` or `consumers`) sides whose site holds `at`.
 fn sides(export: &Value, role: &str, at: &str) -> Vec<String> {
     let mut found: Vec<String> = (export[role].as_array().unwrap().iter())
         .filter(|s| s["site"].as_str().unwrap().contains(at))
@@ -44,7 +38,6 @@ const METHOD: &str =
     "::plugins/orders/src/KafkaClient.ts::KafkaClient.publishApproved::this.send#0";
 const ROUTE: &str = "::plugins/orders/src/publish.ts::publishFromRoute::client.send#0";
 
-/// Sorted link levels for one provider site and topic.
 fn levels(export: &Value, contract: &str, provider: &str) -> Vec<String> {
     let mut found: Vec<String> = (export["links"].as_array().unwrap().iter())
         .filter(|l| {
@@ -56,7 +49,6 @@ fn levels(export: &Value, contract: &str, provider: &str) -> Vec<String> {
     found
 }
 
-/// The private producer receives the topic from both the method and the typed route caller.
 #[test]
 fn a_kafkajs_client_in_a_class_field_makes_sides() {
     let export = export("kafkajs_sides", |_| {});
@@ -66,8 +58,6 @@ fn a_kafkajs_client_in_a_class_field_makes_sides() {
     assert_eq!(sides(&export, "consumers", APPROVALS), [APPROVED, SHIPPED]);
 }
 
-/// Orders' consumer is set in `connect`, not in the constructor; no call gives its `subscribe` a
-/// topic, so its side has none.
 #[test]
 fn a_consumer_field_set_in_a_method_is_a_client() {
     let export = export("kafkajs_method_field", |_| {});
@@ -86,7 +76,6 @@ fn a_hash_private_field_is_a_client() {
     assert_eq!(consumers, [APPROVED, SHIPPED]);
 }
 
-/// A single app-config value yields an exact link at each exact caller of send.
 #[test]
 fn a_topic_from_app_config_is_exact() {
     let export = export("kafkajs_app_config", |_| {});
@@ -95,7 +84,6 @@ fn a_topic_from_app_config_is_exact() {
     }
 }
 
-/// Both exact callers of send contribute a separate inferred link for each configured topic.
 #[test]
 fn two_app_config_values_give_one_inferred_side_each() {
     let export = export("kafkajs_two_values", |repo| {
@@ -122,7 +110,6 @@ fn a_topic_from_a_runtime_input_has_no_name() {
     assert_eq!(action, ["channel::kafka"]);
 }
 
-/// The route constructs the local client, so its call of send carries the topic to the producer.
 #[test]
 fn a_shared_name_wrapper_lifts_the_topic_from_its_typed_caller() {
     let export = export("kafkajs_shared_name", |_| {});

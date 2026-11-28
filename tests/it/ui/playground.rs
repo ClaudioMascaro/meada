@@ -1,9 +1,3 @@
-//! The playground (`POST /api/v1/query`) and the exports (`GET
-//! /api/v1/repositories/<identity>/export`) of the console (#305), over the chain fixture: from
-//! the indexes under `index_dir` without `[snapshot]`, and from the generations a `meada snapshot
-//! pull` keeps in the console's own `local_dir` with it. Every answer equals the chain goldens a
-//! node and `meada export` are held to.
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -18,12 +12,9 @@ pub(super) const WEB: &str = "example.com/chain/web";
 pub(super) const GATEWAY: &str = "example.com/chain/gateway";
 pub(super) const CATALOG: &str = "example.com/chain/catalog";
 
-/// The text of a node's tool error for `trace` with `changes: uncommitted`.
 const NO_WORKING_TREE: &str =
     "server mode has no working tree to diff: run Meada locally for `changes: uncommitted`";
 
-/// The chain's mirrors in `<case>/`, listed by `ops/meada.workspace.toml` with `head` and `[ui]`
-/// after them, and the front end in `<case>/ui`; not indexed. Returns the case directory.
 pub(super) fn chain_console(case: &str, head: &str, ui: &str) -> PathBuf {
     let dir = chain_manifest(case);
     let _ = fs::remove_dir_all(dir.join("ui"));
@@ -32,7 +23,6 @@ pub(super) fn chain_console(case: &str, head: &str, ui: &str) -> PathBuf {
     dir
 }
 
-/// As `chain_console`, over the CI reproduction of #816 (`ci_served::listed`).
 pub(super) fn ci_console(case: &str, head: &str, ui: &str) -> PathBuf {
     let dir = crate::ci_served::listed(case, &crate::ci_served::LISTED);
     let _ = fs::remove_dir_all(dir.join("ui"));
@@ -46,7 +36,6 @@ fn append(file: &Path, text: &str) {
     fs::write(file, toml).unwrap();
 }
 
-/// `POST /api/v1/query` with `body`, from the console's own origin and with `headers`.
 pub(super) fn query(console: &Server, body: &Value, headers: &[(&str, &str)]) -> Reply {
     let mut headers = headers.to_vec();
     headers.push(("Origin", PUBLIC));
@@ -59,8 +48,6 @@ pub(super) fn query(console: &Server, body: &Value, headers: &[(&str, &str)]) ->
     )
 }
 
-/// The three tools' calls compared with the chain goldens: the repository, the tool, its
-/// arguments and the golden.
 pub(super) const CALLS: [(&str, &str, &str, &str); 3] = [
     (
         WEB,
@@ -82,15 +69,11 @@ pub(super) const CALLS: [(&str, &str, &str, &str); 3] = [
     ),
 ];
 
-/// The body of a query of `tool` with `arguments` (JSON text) about `repository`.
 pub(super) fn body(repository: &str, tool: &str, arguments: &str) -> Value {
     let arguments: Value = serde_json::from_str(arguments).unwrap();
     json!({"repository": repository, "tool": tool, "arguments": arguments})
 }
 
-/// `search`, `context` and `trace` through the playground, and each repository's export, equal
-/// the chain goldens, asked at `generation` (the current one when `None`); each answer names
-/// `answered`. `headers` go with every request.
 pub(super) fn answer_the_goldens(
     console: &Server,
     generation: Option<&str>,
@@ -121,16 +104,12 @@ pub(super) fn answer_the_goldens(
     }
 }
 
-/// The error a reply carries: its status, code and message.
 pub(super) fn refusal(reply: &Reply) -> (u16, String, String) {
     let error = &reply.json()["error"];
     let text = |key: &str| error[key].as_str().unwrap_or_default().to_string();
     (reply.status, text("code"), text("message"))
 }
 
-/// Without `[snapshot]`: started before `meada index --workspace`, the two routes name it and
-/// every other view answers; after it, with no restart, the playground and the exports equal the
-/// chain goldens with `generation` null, and `index_dir` is byte-identical after them.
 #[test]
 fn answers_from_index_dir_as_a_node_and_meada_export_do() {
     let dir = chain_console("ui_playground_listed", "", &ui_section());
@@ -155,8 +134,6 @@ fn answers_from_index_dir_as_a_node_and_meada_export_do() {
     assert_eq!(contents(&dir.join("indexes")), before, "index_dir changed");
 }
 
-/// Infrastructure fixtures cross the real console API, including a local alert link that the
-/// generic cross-repository view intentionally omits. Every exported row matches its golden.
 #[test]
 fn infrastructure_graph_fixtures_are_served_through_the_console_api() {
     use crate::common::{assert_golden_but_indexed_commit, fixture_repo};
@@ -223,10 +200,6 @@ fn infrastructure_graph_fixtures_are_served_through_the_console_api() {
     }
 }
 
-/// The CI kind through the console (#829, ADR 0028), over the reproduction of #816: each export
-/// the graph draws is `meada export`'s bytes and the golden of #824, and the query page answers
-/// `context`, `search` and `trace` as the goldens of the stdio answers have them, the kind `ci`
-/// of `search` included.
 #[test]
 fn the_ci_kind_is_served_through_the_console_api() {
     use crate::ci_served::{APP_A, APP_C, CONTRACT, JOB, PUBLISH, WORKFLOWS};
@@ -274,10 +247,6 @@ fn the_ci_kind_is_served_through_the_console_api() {
     assert!(found.lines().any(|line| line == job), "{found}");
 }
 
-/// What every console refuses: `trace` with `changes: uncommitted` with the node's text, an
-/// unknown repository and an unheld generation with a 404, a body over the cap with a 413, a
-/// malformed body or an unknown tool with a fixed 400, and a query without the console's own
-/// `Origin` with a 403.
 pub(super) fn refuses_what_it_does_not_answer(console: &Server, headers: &[(&str, &str)]) {
     let uncommitted = query(
         console,
@@ -355,11 +324,6 @@ pub(super) fn refuses_what_it_does_not_answer(console: &Server, headers: &[(&str
     assert_eq!(reply.status, 403);
 }
 
-/// With `[snapshot]`: started before any pull, the two routes name `meada snapshot pull` and
-/// every other view answers; after an init pull, with no restart, they equal the chain goldens
-/// with `generation` the current id; after the next pull swaps, the next query answers the new
-/// generation, a retained older one answers when named, and `local_dir` is byte-identical after
-/// every query and export. Skips without the store, as every cloud module's tests.
 #[cfg(feature = "snapshot")]
 #[test]
 fn answers_from_the_generations_its_own_pull_holds() {
@@ -374,7 +338,6 @@ fn answers_from_the_generations_its_own_pull_holds() {
     let (first, stderr, code) = publish(&dir, MANIFEST);
     assert_eq!(code, Some(0), "{stderr}");
     let first = first.trim().to_string();
-    // The console's bootstrap manifest is a node's, with `[ui]`; its front end beside it.
     let (manifest, local) = named_node(&dir, "console", &endpoint, &name);
     let ui = format!("dir = \"ui\"\npublic_url = \"{PUBLIC}\"\n");
     append(&dir.join(&manifest), &format!("\n[ui]\n{ui}"));
@@ -401,7 +364,6 @@ fn answers_from_the_generations_its_own_pull_holds() {
     refuses_what_it_does_not_answer(&console, &[]);
     assert_eq!(contents(&local), before, "local_dir changed");
 
-    // The next generation, swapped in by the next pull: the next query answers it.
     next_commit(&dir, "chain-web", "second");
     let (second, stderr, code) = publish(&dir, MANIFEST);
     assert_eq!(code, Some(0), "{stderr}");
@@ -423,7 +385,6 @@ fn answers_from_the_generations_its_own_pull_holds() {
         !answer["text"].as_str().unwrap().contains("src/status.ts"),
         "{answer}"
     );
-    // The retained one answers the goldens when named.
     answer_the_goldens(&console, Some(&first), Some(&first), &[]);
 
     let mut held = [first.clone(), second.clone()];

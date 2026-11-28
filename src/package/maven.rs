@@ -1,17 +1,3 @@
-//! Maven and Gradle share the Maven artifact ecosystem. Build readers are grammar-independent.
-//!
-//! An import reaches a provider's sources by package declaration, not by a path: the call's
-//! class (`imports`, a type a single-type or on-demand import brings, written or declared as a
-//! receiver's type) is looked up under the name the provider's `exports` rows give its public
-//! types, in the files of the depended-on artifact that are not test sources (`tested`), and the
-//! method is picked by name and argument count among the overloads of the class's family (the
-//! provider's `families` rows, as Java merges them), a constructor among the class's own. The
-//! chain of such an import is `name(arity)`. A Kotlin import names a package as well: the
-//! chain then picks a top-level function of that package by name and argument count, a class
-//! (its constructor), or, written `.name(arity)` after a receiver, an extension function (`Chain`).
-//! An argument count fits a function's parameters, or the counts its `flexible` row gives when
-//! a default parameter or a vararg lets a call leave arguments out (`Classes::fits`).
-
 use std::collections::{HashMap, HashSet};
 
 use super::{
@@ -23,27 +9,14 @@ use crate::jvm;
 use crate::lang::Call;
 use crate::resolve::{Code, Follow, Form, Of, Outside};
 
-/// A class's ancestors past it, as the `families` rows give them (`Ancestry::ancestors`).
 type Ancestors<'e> = &'e [Option<(String, String)>];
 
-/// The public classes and the methods of a provider's Java, Kotlin or C# sources, built the first
-/// time an import asks.
 pub struct Classes<'e> {
-    /// The files declaring a type, as `(file, qualified name)`, by qualified name.
     types: HashMap<&'e str, Vec<(&'e str, &'e str)>>,
-    /// The ids of the methods and constructors, by their id up to the parameter list.
     methods: HashMap<&'e str, Vec<&'e str>>,
-    /// The ancestors of the public classes with a base, by `(file, qualified name)`
-    /// (`Ancestry::ancestors`: `None` for a family not known).
     families: HashMap<(&'e str, &'e str), Option<Ancestors<'e>>>,
-    /// The names the Kotlin files export, by file: a top-level declaration is the one exported
-    /// both as written (`Money.format`) and with its package (`dev.kt.core.Money.format`).
     published: HashMap<&'e str, HashSet<&'e str>>,
-    /// The functions and classes of Kotlin files by simple name, as `(qualified name, file,
-    /// id)`.
     named: HashMap<&'e str, Vec<(&'e str, &'e str, &'e str)>>,
-    /// The argument counts of the functions that take more than one (`Flexible`), as `(least,
-    /// most)`, by `<file>::<qualified name>(<parameters>)`.
     flexible: HashMap<String, (usize, Option<usize>)>,
 }
 
@@ -57,8 +30,6 @@ impl<'e> Classes<'e> {
             .map(|(_, r)| r)
         {
             for e in rows {
-                // The row under the qualified name itself; the simple and relative aliases name
-                // other things in another package.
                 if let (Some(name), Some(file), Some(target)) =
                     (e.name.as_deref(), e.file.as_deref(), e.target.as_deref())
                     && name == target
@@ -80,7 +51,6 @@ impl<'e> Classes<'e> {
             .collect();
         let mut named: HashMap<&str, Vec<(&str, &str, &str)>> = HashMap::new();
         for &id in at.symbols.iter().filter(|id| id.contains(".kt::")) {
-            // `<repository>::<file>.kt::<qualified name>[(<parameters>)]`
             if let Some(end) = id.find(".kt::").map(|i| i + ".kt".len())
                 && let Some(start) = id[..end].find("::").map(|i| i + 2)
             {
@@ -94,7 +64,6 @@ impl<'e> Classes<'e> {
         }
         named.values_mut().for_each(|all| all.sort());
         let mut methods: HashMap<&str, Vec<&str>> = HashMap::new();
-        // `<repository>::<file>::<name>[(<parameters>)]`: a source file of an ecosystem.
         for &id in at
             .symbols
             .iter()
@@ -122,10 +91,6 @@ impl<'e> Classes<'e> {
     }
 }
 
-/// An import's chain as `Maven::imports` writes it: `name(arity)` for a member, with
-/// `Companion.` before it for a call on the class's name (a companion's or an object's member),
-/// or `.name(arity)` for an extension function, followed by `@Receiver` when the type of its
-/// receiver is known.
 struct Chain<'a> {
     call: (&'a str, Option<usize>),
     extension: bool,
@@ -149,7 +114,6 @@ fn chain(written: &str) -> Chain<'_> {
     }
 }
 
-/// The method `name` and the argument count of a chain `name(arity)`.
 fn call(chain: &str) -> (&str, Option<usize>) {
     match chain.strip_suffix(')').and_then(|c| c.split_once('(')) {
         Some((name, arity)) => (name, arity.parse().ok()),
@@ -158,20 +122,14 @@ fn call(chain: &str) -> (&str, Option<usize>) {
 }
 
 impl Classes<'_> {
-    /// Whether a call with `arity` arguments fits the symbol `id`: as many as its parameters, or
-    /// at least all but the last when that one is variadic (Java), or as the function's
-    /// `flexible` counts say (a default parameter, a Kotlin vararg). Any call fits when its
-    /// count is unknown.
     fn fits(&self, id: &str, arity: Option<usize>) -> bool {
         let (Some(arity), Some(open)) = (arity, id.find('(')) else {
             return true;
         };
-        // `<repository>::` first, then the file and the name the `flexible` rows give.
         let own = id.split_once("::").map(|(_, rest)| rest);
         if let Some(&(least, most)) = own.and_then(|rest| self.flexible.get(rest)) {
             return least <= arity && most.is_none_or(|most| arity <= most);
         }
-        // Up to the `)`: a method named after its class carries `#method` past it.
         let params = id[open + 1..]
             .split_once(')')
             .map_or("", |(params, _)| params);
@@ -195,9 +153,6 @@ impl Classes<'_> {
     }
 }
 
-/// Whether `file` is a test source of the artifact at `manifest`, or of another source set than
-/// its `main`: under a root that `Summary::test_roots` lists and no deeper `main` one. A file
-/// outside every root is not, and resolves by its package declaration.
 fn tested(manifest: &Manifest, file: &str) -> bool {
     let relative = match bare_directory(&manifest.path) {
         "" => Some(file),
@@ -213,9 +168,6 @@ fn tested(manifest: &Manifest, file: &str) -> bool {
     root.is_some_and(|root| summary.test_roots.contains(root))
 }
 
-/// The files declaring the class `class` that the artifact at `manifest` owns and that are no
-/// test sources, as `(file, qualified name)`. A file counts for the ecosystem that imports its
-/// extension only: a C# file under a `pom.xml` is no Maven class.
 fn declaring<'e>(at: &Provided<'e>, manifest: &Manifest, class: &str) -> Vec<(&'e str, &'e str)> {
     let classes = at.classes.get_or_init(|| Classes::new(at));
     (classes.types.get(class).into_iter().flatten())
@@ -228,11 +180,6 @@ fn declaring<'e>(at: &Provided<'e>, manifest: &Manifest, class: &str) -> Vec<(&'
         .collect()
 }
 
-/// The symbols named `name` that the package `package` holds at its top level, in the files the
-/// artifact at `manifest` owns that are no test sources: its functions and, as the class
-/// itself, its classes (by the capital of their name), or with `extension` its extension
-/// functions, whatever their receiver. A declaration is top-level and public when its file
-/// exports it as written and with the package (`Classes::published`).
 fn top_level<'e>(
     at: &Provided<'e>,
     manifest: &Manifest,
@@ -258,15 +205,6 @@ fn top_level<'e>(
         .collect()
 }
 
-/// The ids of the methods named `method` that fit `arity` in the class `class` that `file` of
-/// the provider `at` of `repository` declares, sorted, and whether an ancestor of the class is
-/// opaque. Java merges overloads across the family: each signature comes from the first class of
-/// the family that declares it (an override hides the base's), and an opaque ancestor, or a
-/// family not known, may declare a better one (CODING_STANDARDS, "Opaque outside"). A
-/// constructor (`method` is the class's own name) is the class's alone, never a method of that
-/// name (`#method`). A Kotlin class's companion holds what a call on the class's name (`on_class`)
-/// reaches first, and what an instance's call reaches last; an extension function declared beside
-/// its class is no member of it.
 fn methods(
     at: &Provided,
     repository: &str,
@@ -292,15 +230,12 @@ fn methods(
             continue;
         };
         let key = format!("{repository}::{file}::{class}.{method}");
-        // A Kotlin class's unnamed companion holds what its name calls (`Money.of(1)`).
         let companion = (n == 0 && file.ends_with(".kt") && !constructs)
             .then(|| format!("{repository}::{file}::{class}.Companion.{method}"));
-        // A call on the class's name is the companion's before the class's own (an object's).
         let keys = match on_class {
             true => [companion.as_ref(), Some(&key)],
             false => [Some(&key), companion.as_ref()],
         };
-        // An extension function declared beside its class is no member of it.
         let published = classes.published.get(file);
         let extension = published.is_some_and(|p| p.contains(format!("{class}.{method}").as_str()));
         for key in keys.into_iter().flatten().filter(|_| !extension) {
@@ -316,14 +251,9 @@ fn methods(
     (ids, opaque)
 }
 
-/// The longest chain of modules of one repository `Maven::entries` follows.
 // ponytail: real builds nest a few modules deep; this bounds the walk over a hostile one.
 const MODULE_DEPTH: usize = 32;
 
-/// A pom's computed dependencies take the literal the properties of the pom, then of the
-/// `<parent>` poms of the repository, give a `${..}` of their group or artifact. A parent is the
-/// one pom named so; two or none leave the chain there. Maven reads a value the parent gives in
-/// the child, so `${project.groupId}` is the child's.
 fn parent_properties(manifests: &mut [Manifest]) {
     let pom = |m: &Manifest| m.path.rsplit('/').next() == Some("pom.xml");
     let mut named: HashMap<&str, Vec<usize>> = HashMap::new();
@@ -383,17 +313,10 @@ fn parent_properties(manifests: &mut [Manifest]) {
     }
 }
 
-/// Whether `name` is a file of declarations a Gradle build reads values from, no build of its
-/// own: `gradle.properties` or a version catalog.
 fn declarations(name: &str) -> bool {
     name == "gradle.properties" || name.ends_with(".versions.toml")
 }
 
-/// A Gradle build's dependencies take the literal `gradle.properties` (the repository's, the
-/// settings file's and the module's, the later winning) give a `${..}` of their coordinate or
-/// version, and a catalog accessor (`libs.models`) the coordinate its version catalog gives it:
-/// `gradle/libs.versions.toml` under the settings file's directory, or the file the settings
-/// file's `from(files(..))` names. An accessor the catalog lacks declares nothing.
 fn gradle_holes(manifests: &mut [Manifest]) {
     let name = |m: &Manifest| m.path.rsplit('/').next().unwrap_or("").to_string();
     let at = |dir: &str, rel: &str| match dir {
@@ -423,7 +346,6 @@ fn gradle_holes(manifests: &mut [Manifest]) {
             continue;
         }
         let dir = bare_directory(&m.path);
-        // The settings file of the project: the deepest one in a directory holding the build.
         let root = (settings.iter())
             .filter(|(root, _)| {
                 root.is_empty() || dir == *root || dir.starts_with(&format!("{root}/"))
@@ -462,7 +384,6 @@ fn gradle_holes(manifests: &mut [Manifest]) {
                 .as_deref()
                 .and_then(|v| v.strip_prefix(jvm::gradle::CATALOG))
             {
-                // `group:artifact`, then the version when the catalog gives one.
                 let Some(found) = catalog(accessor) else {
                     continue;
                 };
@@ -485,7 +406,6 @@ fn gradle_holes(manifests: &mut [Manifest]) {
                     jvm::maven::fill(a, &lookup, &mut budget),
                 );
                 if let Some((name, computed)) = jvm::maven::named(&g, &a) {
-                    // No literal fragment left: the coordinate fits every provider, so it names none.
                     if name == "*:*" {
                         continue;
                     }
@@ -494,7 +414,6 @@ fn gradle_holes(manifests: &mut [Manifest]) {
                     entry.template = computed.then_some((g, a));
                 }
             }
-            // The version, when `gradle.properties` gives all it holds.
             let range = e.range.as_deref().map(jvm::gradle::braced);
             let range = range.map(|r| jvm::maven::fill(&r, &lookup, &mut budget));
             entry.range = range.filter(|r| !r.contains('$')).or(entry.range);
@@ -533,7 +452,6 @@ impl Ecosystem for Maven {
             _ => jvm::gradle::read(path, src),
         }
     }
-    /// Values a build reads bound no package.
     fn owns(&self, manifest: &Manifest) -> bool {
         !manifest.path.rsplit('/').next().is_some_and(declarations)
     }
@@ -543,13 +461,9 @@ impl Ecosystem for Maven {
     fn uncertainty(&self, via: Option<&str>) -> Option<(&'static str, Level)> {
         (via == Some("computed")).then_some(("computed coordinate", Level::Ambiguous))
     }
-    /// A constructor or a method of the class itself, by its id: the class's id, a dot, then a
-    /// signature (`example.models.Order.total()`, a companion's `Money.Companion.of(Int)`); a
-    /// nested class's member is not.
     fn member_of(&self, target: &str, class: &str) -> bool {
         (target.strip_prefix(class))
             .and_then(|rest| rest.strip_prefix('.'))
-            // A Kotlin companion's member is called on the class's name.
             .map(|rest| rest.strip_prefix("Companion.").unwrap_or(rest))
             .and_then(|rest| rest.split_once('('))
             .is_some_and(|(name, _)| !name.is_empty() && !name.contains('.'))
@@ -563,9 +477,6 @@ impl Ecosystem for Maven {
     fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
         imports(code, path, call, &["java.", "kotlin."])
     }
-    /// Every artifact the manifests holding the file depend on, then those each module of the
-    /// repository a dependency names passes on (`Entry::private`), through the ones that pass on,
-    /// nearest first, once each (the nearer entry wins); the import's class stands for the subpath.
     fn entries<'e>(
         &self,
         exports: &'e [Export],
@@ -714,14 +625,6 @@ impl Ecosystem for Maven {
     }
 }
 
-/// The class and the method a call names through an import, as `(class, name(arity))`: a
-/// type the call's head names (`Order.of(1)`, `new Order(1)`, an on-demand import's), else
-/// the type the source writes for its receiver (`order.total()`). A class under one of the ecosystem's `platform` prefixes (the JDK's) is none. Kotlin
-/// adds the top-level function or class a bare name imports (`greet(..)`: the package, then
-/// the name), and for a call on a receiver of no class of the repository the extension
-/// function its name imports, as `(package, .name(arity))` and, when the type the source
-/// writes for the receiver is one class, `@` and that class after it. A call on a class's
-/// name (`Money.of(1)`) says so in its chain (`Companion.of(1)`).
 pub(super) fn imports<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -729,9 +632,7 @@ pub(super) fn imports<'a>(
     platform: &[&str],
 ) -> Vec<(String, String)> {
     let callee = call.callee.as_str();
-    // `(class, method, receiver)`: the receiver is the `@` an extension's chain ends with.
     let mut found: Vec<(String, String, String)> = Vec::new();
-    // A call on a class's name (`Money.of(1)`) is its companion's (or its object's).
     let on_class = jvm::names::kotlin(path)
         && !call.constructs
         && (callee.rsplit_once('.'))
@@ -741,14 +642,11 @@ pub(super) fn imports<'a>(
         true => format!("Companion.{method}"),
         false => method.to_string(),
     };
-    // The type the source writes for the receiver comes first: a local named like a package
-    // (`order.total()`) is no type the on-demand imports bring.
     let mut typed = Vec::new();
     if let (false, Some((receiver, method))) = (call.constructs, callee.rsplit_once('.')) {
         let origins = code.origins(path, &call.scope, Of::Name(receiver), Follow::Declarations);
         let origin = (origins.into_iter().next())
             .filter(|o| o.form == Form::Type && o.routes.iter().all(|r| r.steps.is_empty()))
-            // A type of the repository is no answer here: the lookup below runs as before.
             .filter(|o| o.outside.is_some());
         typed = (origin.and_then(|o| o.outside)).map_or_else(Vec::new, Outside::spellings);
         found.extend(
@@ -760,7 +658,6 @@ pub(super) fn imports<'a>(
     if found.is_empty() {
         let outside = code.outside(path, &call.scope, callee, false);
         for name in outside.map_or_else(Vec::new, Outside::spellings) {
-            // A constructor is named after its class.
             let split = match call.constructs {
                 true => name.rsplit('.').next().map(|m| (name.as_str(), m)),
                 false => name.rsplit_once('.'),
@@ -773,9 +670,6 @@ pub(super) fn imports<'a>(
             && !class.contains('(')
             && !platform.iter().any(|p| class.starts_with(p))
     });
-    // An extension function is called on a receiver, and imported by its name alone. It
-    // names the receiver's type when that is the one the source writes, for a member of the
-    // type would hide it.
     if let (true, Some((_, name))) = (
         jvm::names::kotlin(path) && (found.is_empty() || !typed.is_empty()),
         callee.rsplit_once('.'),
@@ -802,8 +696,6 @@ pub(super) fn imports<'a>(
         .collect()
 }
 
-/// The providers of the entry's package that the entry may name: the ones its `reaches` lets
-/// through (a `path` source pins one project), as `(repository, manifest)` indexes.
 fn reachable(
     eco: &dyn Ecosystem,
     exports: &[Export],
@@ -820,14 +712,6 @@ fn reachable(
         .collect()
 }
 
-/// The class `specifier` is, by its package declaration, in each provider of each artifact
-/// the file depends on (`entries`, `declaring`), and the method or constructor its chain
-/// names there (`methods`): `exact` when one provider declares the class and one target
-/// fits, `ambiguous` when several providers declare the class (whichever declare the
-/// method) or several targets fit, `inferred` for one target beside an opaque ancestor;
-/// `how` is the import's reason (`import package`).
-///
-/// The dependency's `reaches` decides which providers an entry may name.
 pub(super) fn resolutions<'e>(
     (eco, how): (&dyn Ecosystem, How),
     exports: &'e [Export],
@@ -843,8 +727,6 @@ pub(super) fn resolutions<'e>(
         on_class,
         receiver,
     } = self::chain(chain);
-    // A member of the receiver's type hides an extension of the same name (Kotlin picks it).
-    // A type a provider declares, whose family is all known, has no other member.
     let mut members_known = false;
     if let Some(class) = receiver {
         let (mut hidden, mut declared, mut opaque) = (false, false, false);
@@ -881,7 +763,6 @@ pub(super) fn resolutions<'e>(
                 opaque |= beside;
             }
             let mut found = !declared.is_empty();
-            // A package holds functions, classes (their constructors) and extensions.
             if !found {
                 let classes = at.classes.get_or_init(|| Classes::new(at));
                 for id in top_level(at, manifest, (specifier, wanted.0), extension) {
@@ -897,8 +778,6 @@ pub(super) fn resolutions<'e>(
             reached.insert((m, i));
             targets.sort();
             targets.dedup();
-            // An extension of the receiver's own type, the package's class, is the one Kotlin
-            // picks when the type's members are all known and none is named so.
             let own = (receiver.filter(|_| members_known))
                 .map(|class| format!("::{class}.{}(", wanted.0));
             let exact: Vec<String> = (targets.iter())
@@ -908,8 +787,6 @@ pub(super) fn resolutions<'e>(
             if let [one] = &exact[..] {
                 targets = vec![one.clone()];
             }
-            // An extension may be shadowed by a member of a receiver's type that is not
-            // read (Kotlin picks the member).
             let shadowed = extension && exact.len() != 1;
             let level = match (targets.len(), opaque || shadowed) {
                 (0, _) => continue,
@@ -938,9 +815,6 @@ pub(super) fn resolutions<'e>(
     out
 }
 
-/// Whether a provider of an artifact the file depends on declares what the import names: the
-/// class `specifier` (`declaring`), whatever method it declares, or what the package
-/// `specifier` holds under the chain's name (`top_level`).
 pub(super) fn declares<'e>(
     eco: &dyn Ecosystem,
     exports: &'e [Export],
@@ -955,8 +829,6 @@ pub(super) fn declares<'e>(
         receiver,
         ..
     } = self::chain(chain);
-    // The receiver's type tells which extension applies, and the link is a name match:
-    // none of them rules the others out.
     if receiver.is_some() {
         return false;
     }
@@ -973,8 +845,6 @@ pub(super) fn declares<'e>(
 mod tests {
     use super::*;
 
-    /// The `(name, via)` of the dependencies of `app/pom.xml` after `inherit`, given the poms of
-    /// the repository as `(path, source)`.
     fn inherited(poms: &[(&str, &str)]) -> Vec<(String, Option<String>)> {
         let mut manifests: Vec<_> = (poms.iter())
             .map(|(path, src)| Manifest {
@@ -1027,20 +897,16 @@ mod tests {
         let root = pom("", "root", "<shared.group>example</shared.group>", "");
         let [a, m, r] = ["app", "mid", "root"].map(|id| format!("{id}/pom.xml"));
         let all = [(&a, &app), (&m, &mid), (&r, &root)].map(|(p, s)| (p.as_str(), s.as_str()));
-        // Two levels up, the nearest declaration first.
         assert_eq!(inherited(&all), [("example:models".to_string(), None)]);
-        // The child's own property wins over the parent's.
         let own = pom(&parent("mid"), "app", "<suffix>ore</suffix>", hole);
         let all = [(a.as_str(), own.as_str()), (&m, &mid), (&r, &root)];
         assert_eq!(inherited(&all), [("example:more".to_string(), None)]);
-        // A parent missing from the repository, or named by two poms, gives nothing.
         let computed = |name: &str| [(name.to_string(), Some("computed".to_string()))];
         let missing = [(a.as_str(), app.as_str()), (&r, &root)];
         assert_eq!(inherited(&missing), computed("*:m*"));
         let twin = ("twin/pom.xml", mid.as_str());
         let twice = [(a.as_str(), app.as_str()), (&m, &mid), twin, (&r, &root)];
         assert_eq!(inherited(&twice), computed("*:m*"));
-        // A cycle of parents ends where it began.
         let loop_a = pom(&parent("app"), "mid", "", "");
         let looped = [(a.as_str(), app.as_str()), (&m, loop_a.as_str())];
         assert_eq!(inherited(&looped), computed("*:m*"));
@@ -1070,24 +936,19 @@ mod tests {
         let fits = |id: &str, n| bare.fits(&format!("r::a/B.java::p.B.{id}"), Some(n));
         assert!(fits("m()", 0) && !fits("m()", 1));
         assert!(fits("m(int)", 1) && !fits("m(int)", 2));
-        // A comma inside type arguments or an array separates nothing.
         assert!(
             fits("m(Map<String,List<int[]>>,int)", 2) && !fits("m(Map<String,List<int[]>>,int)", 3)
         );
-        // A variadic parameter takes any number from none.
         assert!(fits("m(String,Object...)", 1) && fits("m(String,Object...)", 5));
         assert!(!fits("m(String,Object...)", 0));
         assert!(bare.fits("r::a/B.java::p.B.m(int)", None));
-        // A default parameter or a Kotlin vararg: the counts the function was indexed with.
         let kotlin = |id: &str, n| bare.fits(&format!("r::a/B.kt::p.B.{id}"), Some(n));
         assert!(
             kotlin("pick(Int,Int)", 1) && kotlin("pick(Int,Int)", 2) && !kotlin("pick(Int,Int)", 3)
         );
         assert!(!kotlin("pick(Int,Int)", 0));
         assert!(kotlin("many(vararg String)", 0) && kotlin("many(vararg String)", 9));
-        // Another function of the same name, with no row, takes its parameters' count.
         assert!(kotlin("pick(String)", 1) && !kotlin("pick(String)", 2));
-        // A method named after its class carries a mark past its parameters.
         assert!(fits("B(int)#method", 1) && !fits("B(int)#method", 0));
     }
 
@@ -1096,9 +957,7 @@ mod tests {
         let class = "r::a/Order.java::a.Order";
         let member = |rest: &str| Maven.member_of(&format!("{class}{rest}"), class);
         assert!(member(".total()") && member(".Order(int)") && member(".Order(int)#method"));
-        // A Kotlin companion's member is called on the class's name.
         assert!(member(".Companion.of(Int)") && !member(".Companion") && !member(".Other.of(Int)"));
-        // A nested class, its member, another class with the same start, the class itself.
         assert!(!member(".Line") && !member(".Line.total()") && !member("s.total()"));
         assert!(!member("") && !member(".(int)"));
     }
@@ -1124,7 +983,6 @@ mod tests {
         );
         assert!(tested(&m, "models/src/test/java/a/B.java"));
         assert!(!tested(&m, "models/src/main/java/a/B.java"));
-        // Outside every root, or beside a root of the same prefix, or in another module.
         assert!(!tested(&m, "models/other/a/B.java"));
         assert!(!tested(&m, "models/src/test/javax/B.java"));
         assert!(!tested(&m, "other/src/test/java/a/B.java"));
@@ -1133,8 +991,6 @@ mod tests {
         assert!(!tested(&root, "models/src/main/java/a/B.java"));
     }
 
-    /// The names of the entries `Maven::entries` gives a file of module `app`, in a repository
-    /// whose modules are `poms`, as `(module, pom.xml dependencies)`.
     fn entries(poms: &[(&str, &str)]) -> Vec<String> {
         let exports = exports(poms);
         let providers = Providers::new(&exports);
@@ -1145,7 +1001,6 @@ mod tests {
         .collect()
     }
 
-    /// The export of a repository whose modules are `poms`, as `(module, pom.xml dependencies)`.
     fn exports(poms: &[(&str, &str)]) -> [Export; 1] {
         let manifests = (poms.iter())
             .map(|(module, deps)| {
@@ -1180,14 +1035,12 @@ mod tests {
         .concat();
         let found = entries(&[("app", &app), ("lib", &lib), ("y", &dep("z", ""))]);
         assert_eq!(found, ["g:lib", "g:x1", "g:y", "g:z"]);
-        // A module reached only through a `test` dependency passes nothing on.
         let found = entries(&[("app", &dep("lib", "<scope>test</scope>")), ("lib", &lib)]);
         assert_eq!(found, ["g:lib"]);
     }
 
     #[test]
     fn a_module_cycle_and_a_chain_past_the_depth_bound_are_walked_in_linear_time() {
-        // A chain from app that closes into a cycle back to app stops at the depth bound.
         let names: Vec<String> = (0..100).map(|i| format!("m{i}")).collect();
         let deps: Vec<String> = (0..names.len())
             .map(|i| dep(names.get(i + 1).map_or("app", |n| n.as_str()), ""))
@@ -1203,10 +1056,6 @@ mod tests {
         assert_eq!(entries(&poms).len(), MODULE_DEPTH + 1);
         let found = entries(&[("app", &dep("a", "")), ("a", &dep("app", ""))]);
         assert_eq!(found, ["g:a", "g:app"]);
-        // App reaches every module of a ring through four hubs (a pom past `lang::MAX_BYTES` reads
-        // as nothing), so one level of the walk holds them all and the next finds each already
-        // walked. Only the walk is timed: each module walked once takes about 0.26 s here (under a
-        // thirtieth of the bound); a walk that rescans what it walked (`walked` as a `Vec`), 12 s.
         const HUBS: usize = 4;
         const RING: usize = HUBS * 10_000;
         let names: Vec<String> = (0..RING).map(|i| format!("w{i}")).collect();

@@ -1,21 +1,3 @@
-//! Serverless Framework service files as IaC nodes (#654, ADR 0025): each function of a
-//! `serverless.yml`, `serverless.yaml` or `serverless.json` with a `service` is a node
-//! `functions.<name>` of type `Serverless::Function`, with its handler and events recorded, and
-//! the `resources` section (`resources.Resources`) is read as CloudFormation nodes
-//! (`cloudformation::nodes`). The file is one evaluation unit, rooted at its path.
-//!
-//! A function's physical name is its `name`, else `<service>-<stage>-<function>`, the stage being
-//! `provider.stage` or `dev`, overridable by `--stage` (`opt:stage`), which Serverless names such a
-//! function after first. Variables are resolved over the file alone: `${self:a.b}` is the
-//! value at that path (itself expanded), and `${opt:name, default}` is its default with the name
-//! marked overridable, since a deployer passes `--name`. Alternatives (`${self:x, 'y'}`) are tried
-//! in order. Every other source (`env`, `ssm`, `sls`, `aws`, `cf`, `file(...)`, ...) is an
-//! unresolved part: a `*` in a name, `${source:...}` in a recorded text. A `${...}` with no source
-//! (`${Queue.Arn}`) or a `::` (`${AWS::Region}`) is CloudFormation's and stays in the text.
-//!
-//! Each function references the resources its body names through `Ref`, `Fn::GetAtt`, `Fn::Sub`
-//! (an event's `arn`, an environment entry), each `exact` with its `via`.
-
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use serde_json::{Map, Value, json};
@@ -26,48 +8,33 @@ use super::{NODES_MAX, Node, Overridable, REFERENCES_MAX, ROOT_STORED_MAX, Refer
 use crate::config_values;
 use crate::document::events::{self, Step, Syntax};
 
-/// The type of a function's node.
 const FUNCTION: &str = "Serverless::Function";
 
-/// How deep a variable's value may name another (`${self:a}` whose value holds `${self:b}`); a
-/// deeper one is unresolved.
 // ponytail: a stage or a prefix defined once and reused goes two or three levels; 8 bounds a chain.
 const VARIABLE_DEPTH_MAX: usize = 8;
 
-/// How many `self:` values may be followed from one another before the stack is cut. A value
-/// met there is not expanded, and each value within `VARIABLE_DEPTH_MAX` above it is kept only
-/// for a reach at its own depth or deeper: met nearer the top, it is expanded again, so its answer
-/// never depends on where it was met first.
 // ponytail: a chain of real values is a few deep (`VARIABLE_DEPTH_MAX`); a built one hundreds of
 // levels deep must not run the stack out, so the walk stops here, and a value is expanded at most
 // once per depth it is met at (`STACK_MAX + 1` times).
 const STACK_MAX: usize = 64;
 
-/// How many bytes the expansions of one file may produce; past it, a variable is unresolved.
 // ponytail: a service's variables give a few kilobytes; a file of references to one long value
 // must not copy it without bound, so the budget is that of the file's stored rows.
 const VARIABLE_BYTES_MAX: usize = ROOT_STORED_MAX;
 
-/// How many events of a function are recorded; the rest are left out.
 // ponytail: a function has a handful of events; 64 bounds one built to fill the index.
 const EVENTS_MAX: usize = 64;
 
-/// The file names of a service.
 const NAMES: [&str; 3] = ["serverless.yml", "serverless.yaml", "serverless.json"];
 
-/// Whether the file at `path` is named like a service file.
 pub(crate) fn is_file(path: &str) -> bool {
     NAMES.contains(&path.rsplit('/').next().unwrap_or(path))
 }
 
-/// Whether the file `path` with bytes `src` is read for a service: named like one and saying
-/// `service`.
 pub(crate) fn wanted(path: &str, src: &[u8]) -> bool {
     is_file(path) && src.windows(7).any(|w| w == b"service")
 }
 
-/// Whether `doc` is a service: a mapping with a `service` and a `provider`, `functions` or
-/// `resources`.
 fn is_service(doc: &Value) -> bool {
     let Value::Object(map) = doc else {
         return false;
@@ -78,24 +45,17 @@ fn is_service(doc: &Value) -> bool {
             .any(|k| map.contains_key(*k))
 }
 
-/// A piece of an expanded text.
 #[derive(Clone, Debug, PartialEq)]
 enum Seg {
     Lit(String),
-    /// An `opt:` variable with the default it falls to: the expression, the default's text and
-    /// the line it is written on.
     Opt {
         expr: String,
         default: String,
         line: usize,
     },
-    /// A variable no source of the file gives: the expression.
     Unknown(String),
 }
 
-/// Whether the inside of a `${...}` is a Serverless variable: `source:...` with one colon after a
-/// source name or call (`self`, `opt`, `file(./x.yml)`), not CloudFormation's `AWS::Region`,
-/// `!Literal` or `Resource.Attribute`.
 fn is_variable(inner: &str) -> bool {
     let Some((head, rest)) = inner.split_once(':') else {
         return false;
@@ -107,7 +67,6 @@ fn is_variable(inner: &str) -> bool {
             .all(|c| c.is_alphanumeric() || "_-()./~".contains(c))
 }
 
-/// `inner` cut at the commas that are not inside quotes, parentheses or braces.
 fn alternatives(inner: &str) -> Vec<&str> {
     let (mut out, mut start, mut depth, mut quote) = (Vec::new(), 0, 0i32, None::<char>);
     for (i, c) in inner.char_indices() {
@@ -128,7 +87,6 @@ fn alternatives(inner: &str) -> Vec<&str> {
     out
 }
 
-/// Merges neighbouring literals; a text longer than `PHYSICAL_NAME_MAX` is one unresolved part.
 fn finish(segs: Vec<Seg>) -> Vec<Seg> {
     let mut out: Vec<Seg> = Vec::new();
     let mut size = 0;
@@ -148,7 +106,6 @@ fn finish(segs: Vec<Seg>) -> Vec<Seg> {
     out
 }
 
-/// Gives each `opt:` default of `segs` that has no line yet `line`.
 fn fill_lines(segs: &mut [Seg], line: usize) {
     for seg in segs {
         if let Seg::Opt { line: l, .. } = seg
@@ -159,9 +116,6 @@ fn fill_lines(segs: &mut [Seg], line: usize) {
     }
 }
 
-/// `segs`, the value a variable falls to once an `opt:` may override it: literals only become one
-/// `Opt` default of `expr`; literals and defaults stay as they are, with `expr` beside them as an
-/// `Opt` of no text (overridable too); anything unresolved makes the whole unresolved.
 fn overridable(segs: Vec<Seg>, expr: &str, line: usize) -> Vec<Seg> {
     match &segs[..] {
         [Seg::Lit(default)] => vec![Seg::Opt {
@@ -182,10 +136,6 @@ fn overridable(segs: Vec<Seg>, expr: &str, line: usize) -> Vec<Seg> {
     }
 }
 
-/// The stage of a function's default name, `stage` as the file gives it: Serverless names such a
-/// function after `--stage` first, then `provider.stage`, then `dev` (`setFunctionNames` of its
-/// `Service`), whatever the stage holds, so the name is overridable by `opt:stage`, at `line`. A
-/// stage that already goes through an `opt:stage`, or has an unresolved part, stays as it is.
 // ponytail: a stage with an unresolved part (`${env:STAGE}`) makes the name a pattern, `*` where
 // `--stage` goes too, so `opt:stage` is not listed beside it; list it if a reason needs it.
 fn stage_of_default_name(stage: &[Seg], line: usize) -> Vec<Seg> {
@@ -200,7 +150,6 @@ fn stage_of_default_name(stage: &[Seg], line: usize) -> Vec<Seg> {
     overridable(finish(stage.to_vec()), "opt:stage", line)
 }
 
-/// The bytes a piece counts for against `PHYSICAL_NAME_MAX` and `VARIABLE_BYTES_MAX`.
 fn seg_len(seg: &Seg) -> usize {
     match seg {
         Seg::Lit(s) | Seg::Unknown(s) => s.len(),
@@ -208,47 +157,27 @@ fn seg_len(seg: &Seg) -> usize {
     }
 }
 
-/// What one alternative of a variable gives.
 enum Alt {
-    /// A value, resolved or not.
     Value(Vec<Seg>),
-    /// No value at that source: the next alternative is tried.
     Absent,
-    /// An `opt:`, which a deployer may pass: the next alternative gives its default.
     Opt,
 }
 
-/// A memoized `self:` value.
 struct Memo {
     segs: Vec<Seg>,
-    /// 1 plus the height of the tallest `self:` value it uses.
     height: usize,
-    /// The shallowest stack depth the entry holds at.
     from: usize,
 }
 
-/// The expression of the variables of a file, over its document.
 struct Vars<'d> {
     doc: &'d Value,
-    /// The line of each string scalar that holds a `${`, by key path.
     lines: &'d HashMap<String, usize>,
-    /// What each `self:` path expanded to. A height is a property of the value, not of where it
-    /// was reached: an entry holds at any depth (0) unless the expansion met the stack cut and
-    /// stayed within `VARIABLE_DEPTH_MAX`, when it holds from the depth it was expanded at
-    /// (there its height is only a lower bound).
     memo: HashMap<String, Memo>,
-    /// The paths being expanded, with the stack depth each is expanded at.
     busy: HashMap<String, usize>,
-    /// The height of the tallest `self:` value the current expansion used.
     reach: usize,
-    /// Whether the current expansion used a value whose answer depends on the stack cut.
     cut: bool,
-    /// The shallowest depth of a busy path the current expansion met again (`usize::MAX` for
-    /// none): each value from there down is in a cycle.
     cycle: usize,
-    /// How many `self:` values are being expanded inside one another.
     stack: usize,
-    /// The bytes the file's expansions may still produce (`VARIABLE_BYTES_MAX`).
     room: usize,
 }
 
@@ -267,8 +196,6 @@ impl Vars<'_> {
         }
     }
 
-    /// The line of the string scalar at `at`, or of the nearest enclosing one (a tagged node's
-    /// scalars sit at the path of the tag).
     fn line_at(&self, at: &[Step]) -> usize {
         (0..=at.len())
             .rev()
@@ -276,7 +203,6 @@ impl Vars<'_> {
             .unwrap_or(1)
     }
 
-    /// The value at the dotted path `path` of the document, with its steps.
     fn lookup(&self, path: &str) -> Option<(&Value, Vec<Step>)> {
         let (mut v, mut steps) = (self.doc, Vec::new());
         for key in path.split('.') {
@@ -296,7 +222,6 @@ impl Vars<'_> {
         (!v.is_null()).then_some((v, steps))
     }
 
-    /// `text` with its Serverless variables expanded.
     fn expand(&mut self, text: &str, depth: usize) -> Vec<Seg> {
         let mut segs = Vec::new();
         let mut size = 0;
@@ -304,7 +229,6 @@ impl Vars<'_> {
         while let Some(open) = rest.find("${") {
             segs.push(Seg::Lit(rest[..open].to_string()));
             let after = &rest[open + 2..];
-            // The matching brace, counting the ones a nested variable opens.
             let mut level = 1usize;
             let close = after.char_indices().find(|&(_, c)| {
                 match c {
@@ -332,7 +256,6 @@ impl Vars<'_> {
             }
             size += segs[from..].iter().map(seg_len).sum::<usize>();
             if size > PHYSICAL_NAME_MAX {
-                // `finish` would give the same: the rest is not expanded.
                 return vec![Seg::Unknown("...".into())];
             }
             rest = &after[end + 1..];
@@ -341,9 +264,6 @@ impl Vars<'_> {
         finish(segs)
     }
 
-    /// The value of the variable `inner`: its alternatives tried in order. An alternative with a
-    /// variable inside (`self:custom.${opt:stage}`) has it expanded first into one source,
-    /// never cut again at a comma; a key an `opt:` default chose is overridable with that `opt:`.
     fn resolve(&mut self, inner: &str, depth: usize) -> Vec<Seg> {
         let mut opted = false;
         let mut keyed: Vec<(String, usize)> = Vec::new();
@@ -384,7 +304,6 @@ impl Vars<'_> {
         let Some(mut value) = value else {
             return vec![Seg::Unknown(inner.to_string())];
         };
-        // The override a deployer passes is each `opt:` inside, at its line, then the outer one.
         for (expr, line) in keyed {
             value = overridable(value, &expr, line);
         }
@@ -394,7 +313,6 @@ impl Vars<'_> {
         value
     }
 
-    /// What the one source `alt` of the variable `inner` gives.
     fn alternative(&mut self, alt: &str, inner: &str) -> Alt {
         let unknown = || vec![Seg::Unknown(inner.to_string())];
         let quoted = alt.len() >= 2
@@ -416,9 +334,6 @@ impl Vars<'_> {
         }
     }
 
-    /// The expansion of the value at `path`: `None` when the document has none, `Some(None)` when
-    /// it is no text (a mapping, a list) or names itself. `provider.stage` left out is `dev`, as
-    /// Serverless reads it.
     fn value_of(&mut self, path: &str) -> Option<Option<Vec<Seg>>> {
         if let Some(m) = self.memo.get(path)
             && self.stack >= m.from
@@ -427,7 +342,6 @@ impl Vars<'_> {
             self.cut |= m.from > 0;
             return Some(Some(m.segs.clone()));
         }
-        // Only a string is copied out of the document: a mapping is never cloned.
         let (text, steps) = {
             let Some((v, steps)) = self.lookup(path) else {
                 return (path == "provider.stage").then(|| Some(vec![Seg::Lit("dev".into())]));
@@ -438,14 +352,11 @@ impl Vars<'_> {
             }
         };
         if let Some(&at) = self.busy.get(path) {
-            // A cycle: each value from `at` down is in it, and unresolved wherever it is met.
             self.cycle = self.cycle.min(at);
             return Some(None);
         }
         let depth = self.stack;
         if depth >= STACK_MAX {
-            // Not expanded: its height is at least 1, and what uses it is no answer of its own
-            // until it is taller than `VARIABLE_DEPTH_MAX` whatever this value holds.
             self.reach = self.reach.max(1);
             self.cut = true;
             return Some(Some(vec![Seg::Unknown(path.to_string())]));
@@ -461,13 +372,11 @@ impl Vars<'_> {
         let height = self.reach.saturating_add(1);
         self.reach = outer.max(height);
         let in_cycle = self.cycle <= depth;
-        // The value above is in the cycle only when it closes higher than this one.
         self.cycle = outer_cycle.min(if self.cycle < depth {
             self.cycle
         } else {
             usize::MAX
         });
-        // A lower bound past the limit is unresolved however far the cut value goes.
         let certain = in_cycle || !self.cut || height > VARIABLE_DEPTH_MAX;
         self.cut = outer_cut || !certain;
         if in_cycle || height > VARIABLE_DEPTH_MAX {
@@ -484,7 +393,6 @@ impl Vars<'_> {
         Some(Some(segs))
     }
 
-    /// `expand` for a string scalar at `at`: each `opt:` default gets the line of the scalar.
     fn string(&mut self, text: &str, at: &[Step]) -> Vec<Seg> {
         let line = self.line_at(at);
         let mut segs = self.expand(text, 0);
@@ -493,7 +401,6 @@ impl Vars<'_> {
     }
 }
 
-/// A recorded text of `segs`: an `opt:` default in place, an unresolved variable as `${expr}`.
 fn text_of(segs: &[Seg]) -> Resolved {
     let mut out = Resolved {
         text: String::new(),
@@ -512,8 +419,6 @@ fn text_of(segs: &[Seg]) -> Resolved {
     out
 }
 
-/// A physical name of `segs`: each unresolved variable a `*`, with whether one was and the
-/// `opt:` defaults it went through.
 fn name_of(segs: &[Seg], path: &str) -> (String, bool, BTreeSet<Overridable>) {
     let (mut text, mut pattern, mut through) = (String::new(), false, BTreeSet::new());
     for seg in segs {
@@ -541,14 +446,11 @@ fn name_of(segs: &[Seg], path: &str) -> (String, bool, BTreeSet<Overridable>) {
     (text, pattern, through)
 }
 
-/// The resources section's synthetic template parameters: one per `opt:` default met.
 #[derive(Default)]
 struct Synthetic {
-    /// The parameter name of each (expression, default, line).
     names: BTreeMap<(String, String, usize), String>,
     params: Map<String, Value>,
     lines: BTreeMap<String, usize>,
-    /// The expression each parameter stands for.
     shown: BTreeMap<String, String>,
 }
 
@@ -570,11 +472,6 @@ impl Synthetic {
     }
 }
 
-/// `v` with its Serverless variables expanded for the CloudFormation reader: a string that
-/// resolves wholly is that text; one with an `opt:` default becomes a `Ref` to a parameter that
-/// holds it and one with an unresolved part an `Fn::ImportValue`, joined with the literal text
-/// (or, inside an `Fn::Sub`, a `${...}` variable of the same two kinds). `sub` is whether `v` is
-/// an `Fn::Sub`'s template.
 fn substitute(
     vars: &mut Vars,
     synthetic: &mut Synthetic,
@@ -640,8 +537,6 @@ fn substitute(
     }
 }
 
-/// The text a value of an event takes: a string or number expanded, a `Fn::GetAtt` as
-/// `Resource.Attribute`, a `Ref` as the name, anything else unresolved.
 fn event_value(vars: &mut Vars, v: &Value, at: &[Step]) -> Option<Resolved> {
     match v {
         Value::String(s) => Some(text_of(&vars.string(s, at))),
@@ -666,7 +561,6 @@ fn event_value(vars: &mut Vars, v: &Value, at: &[Step]) -> Option<Resolved> {
                 overridable: false,
             }),
         },
-        // A list (the rates of one `schedule`): its items, each read the same way.
         Value::Array(items) => {
             let mut at = at.to_vec();
             let parts: Vec<Resolved> = (items.iter().enumerate())
@@ -691,7 +585,6 @@ fn event_value(vars: &mut Vars, v: &Value, at: &[Step]) -> Option<Resolved> {
     }
 }
 
-/// An HTTP event's `method` in capitals and its `path` from the root, as written otherwise.
 fn http_part(key: &str, mut part: Resolved) -> Resolved {
     if key == "method" && !part.text.contains("${") {
         part.text = part.text.to_uppercase();
@@ -702,7 +595,6 @@ fn http_part(key: &str, mut part: Resolved) -> Resolved {
     part
 }
 
-/// An event as recorded: its type, then what identifies it, `http GET /users`, `sqs Jobs.Arn`.
 fn event_text(vars: &mut Vars, event: &Value, at: &mut Vec<Step>) -> Option<Resolved> {
     let (kind, body) = match event {
         Value::Object(map) => match map.iter().collect::<Vec<_>>()[..] {
@@ -716,7 +608,6 @@ fn event_text(vars: &mut Vars, event: &Value, at: &mut Vec<Step>) -> Option<Reso
     let http = kind == "http" || kind == "httpApi";
     match body {
         Value::String(s) if http && s.split_once(' ').is_some() => {
-            // `GET /users`: the method and the path.
             let (method, path) = s.split_once(' ').unwrap_or_default();
             parts.push(http_part("method", text_of(&vars.string(method, at))));
             parts.push(http_part("path", text_of(&vars.string(path.trim(), at))));
@@ -762,13 +653,11 @@ fn event_text(vars: &mut Vars, event: &Value, at: &mut Vec<Step>) -> Option<Reso
     Some(out)
 }
 
-/// HTTP fields keep known string expansions and reject unresolved segments.
 fn http_string(vars: &mut Vars, text: &str, at: &[Step]) -> Option<Resolved> {
     let segments = vars.string(text, at);
     (!segments.iter().any(|seg| matches!(seg, Seg::Unknown(_)))).then(|| text_of(&segments))
 }
 
-/// Keep method and path distinct. Generic Ref labels and unknown `*` sentinels are not fields.
 fn http_route(
     vars: &mut Vars,
     event: &Value,
@@ -818,8 +707,6 @@ fn http_route(
     })
 }
 
-/// Provider entries precede function entries; even an unread override replaces the default.
-/// Resource references wait for the same CloudFormation evaluation used for resource nodes.
 fn environment<'a>(
     vars: &mut Vars,
     doc: &'a Value,
@@ -899,7 +786,6 @@ fn environment<'a>(
                 }
             };
             at.pop();
-            // Reserve the bounded physical name before a reference's typed projection is copied.
             let projection = reference.map_or(0, |_| PHYSICAL_NAME_MAX + 64);
             let bytes = key.len()
                 + name.len()
@@ -931,15 +817,10 @@ fn environment<'a>(
     (entries.into_values().collect(), targets, reserved)
 }
 
-/// The IaC nodes and references of the file `src` at `path`: none unless it is a service. The file
-/// is its own root, labelled by `path`.
 pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
-    // The first and last line of the scalars under each function and each resource, and the line
-    // of each string that holds a variable.
     let mut spans: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     let mut resource_spans: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     let mut lines: HashMap<String, usize> = HashMap::new();
-    // The line of `provider.stage`, where a default name's `--stage` stands.
     let mut stage_line = None;
     let documents = events::read_keyed(Syntax::of(path), src, true, |scalar| {
         if scalar.document != 0 {
@@ -978,7 +859,6 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
     let text = String::from_utf8_lossy(src);
     let file_lines: Vec<&str> = text.lines().collect();
 
-    // The resources section as a template, its variables expanded.
     let mut synthetic = Synthetic::default();
     let declared = doc["resources"]["Resources"].as_object();
     let mut at = vec![Step::Key("resources".into()), Step::Key("Resources".into())];
@@ -998,7 +878,6 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
         .map(|(id, _)| id.clone())
         .collect();
 
-    // The functions.
     let service = match &doc["service"] {
         Value::Object(m) => m.get("name").cloned().unwrap_or(Value::Null),
         other => other.clone(),
@@ -1052,7 +931,6 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
                 None => {
                     let mut all = service_segs.clone();
                     all.push(Seg::Lit("-".into()));
-                    // `--stage` stands at `provider.stage`, or at the function with none.
                     all.extend(stage_of_default_name(
                         &stage_segs,
                         stage_line.unwrap_or(line),
@@ -1143,7 +1021,6 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
         }
     }
 
-    // The resources, read as a template.
     let template = json!({"Parameters": synthetic.params, "Resources": resources});
     let resource_key_line = compose::KeyLines::new(&file_lines, "resources", &key_lines);
     let unit = cloudformation::Unit {
@@ -1179,7 +1056,6 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
         }
     }
     for mut node in resource_nodes {
-        // A synthetic parameter shows as the expression it stands for.
         for o in &mut node.overridable {
             if let Some(expr) = synthetic.shown.get(&o.variable) {
                 o.variable = expr.clone();
@@ -1190,7 +1066,6 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
         nodes.push(node);
     }
     references.extend(resource_references);
-    // A function may name a resource the node ceiling or the byte room left out.
     let stored: HashSet<&str> = nodes.iter().map(|n| n.address.as_str()).collect();
     references.retain(|r| stored.contains(r.target.as_str()));
     (nodes, references)
@@ -1204,8 +1079,6 @@ mod tests {
         evaluate("serverless.yml", text.as_bytes())
     }
 
-    /// The name and pattern flag of the function `f` of a service with `extra` before its
-    /// functions.
     fn name(extra: &str, function: &str) -> (Option<String>, bool) {
         let text = format!(
             "service: svc\nprovider:\n  name: aws\n{extra}\nfunctions:\n  f:\n    handler: h.f\n{function}"
@@ -1243,7 +1116,6 @@ mod tests {
         assert!(wanted("a/serverless.yaml", ok.as_bytes()));
         assert!(!wanted("a/other.yml", ok.as_bytes()));
         assert!(!wanted("a/serverless.yml", b"stage: x"));
-        // The service may be a mapping with a name, and a function the file leaves open a node.
         let named = "service:\n  name: m\nfunctions:\n  f: ${file(f.yml)}\n";
         let (nodes, _) = unit(named);
         assert_eq!(nodes[0].name.as_deref(), Some("m-dev-f"));
@@ -1265,11 +1137,9 @@ mod tests {
         assert_eq!(named("${self:custom.n}"), known("7"));
         assert_eq!(named("${self:service}"), known("svc"));
         assert_eq!(named("${self:provider.name}"), known("aws"));
-        // A path the file lacks falls to the next alternative, and with none is unresolved.
         assert_eq!(named("${self:custom.missing, 'z'}"), known("z"));
         assert_eq!(named("${self:custom.missing}"), pattern("*"));
         assert_eq!(named("${self:custom}"), pattern("*"));
-        // A variable inside a variable is expanded first.
         assert_eq!(named("${self:custom.${self:custom.a, 'a'}}"), pattern("*"));
         let nested = name(
             "custom:\n  A: hit\n  k: A",
@@ -1291,13 +1161,11 @@ mod tests {
             (o.variable.as_str(), o.line, o.tfvars),
             ("opt:stage, 'qa'", 3, false)
         );
-        // With no default, an `opt:` alone is unresolved; a later alternative is its default.
         assert_eq!(named("${opt:stage}"), pattern("*"));
         assert_eq!(named("${opt:stage, self:custom.a}"), known("A"));
         assert_eq!(named("${opt:stage, dev}"), known("dev"));
         let (nodes, _) = unit("service: s\nfunctions:\n  f:\n    name: ${opt:n, 'x'}\n");
         assert_eq!(nodes[0].overridable.len(), 1);
-        // A literal and a `self:` value are no override.
         let (nodes, _) = unit("service: s\nfunctions:\n  f:\n    name: ${self:service}\n");
         assert!(nodes[0].overridable.is_empty());
     }
@@ -1310,12 +1178,10 @@ mod tests {
             let n = nodes.iter().find(|n| n.address == a).unwrap();
             (n.name.clone(), n.pattern, n.overridable.len())
         };
-        // The outer `opt:` and the one in its fallback are both overrides of the name.
         assert_eq!(by("functions.a"), (Some("dev".into()), false, 2));
         assert_eq!(by("functions.b"), (Some("t-dev".into()), false, 1));
         assert_eq!(by("functions.c"), (Some("t-prod".into()), false, 1));
         assert_eq!(by("functions.d"), (Some("*".into()), true, 0));
-        // A mapping is no text: unresolved, whatever follows.
         assert_eq!(by("functions.e"), (Some("*".into()), true, 0));
     }
 
@@ -1329,7 +1195,6 @@ mod tests {
         custom += "  c12: end\n";
         let start = std::time::Instant::now();
         let got = name(&custom, "    name: ${self:custom.c0}\n");
-        // Every path past the depth limit is an unresolved part: a pattern of stars.
         assert!(
             got.1 && got.0.as_ref().is_some_and(|n| n.starts_with('*')),
             "{got:?}"
@@ -1356,7 +1221,6 @@ mod tests {
             assert_eq!(name("functions.fok").as_deref(), Some("fine"));
             assert_eq!(name("functions.fc0").as_deref(), Some("*"));
         }
-        // A value that sits above a chain of its own height resolves wherever it is first met.
         let text = "service: s\ncustom:\n  a: ${self:custom.b}\n  b: ${self:custom.c}\n  c: x\nfunctions:\n  f1:\n    name: ${self:custom.b}\n  f2:\n    name: ${self:custom.a}\n";
         let (nodes, _) = unit(text);
         assert!(nodes.iter().all(|n| n.name.as_deref() == Some("x")));
@@ -1371,12 +1235,10 @@ mod tests {
         custom += "  c64: end\n";
         let low =
             "  low57:\n    name: ${self:custom.c57}\n  low63:\n    name: ${self:custom.c63}\n";
-        // Functions are evaluated in name order: `aa` before the others, `zz` after them.
         for top in ["aa", "zz"] {
             let functions = format!("  {top}:\n    name: ${{self:custom.c0}}\n{low}");
             let (nodes, _) = unit(&format!("service: s\n{custom}functions:\n{functions}"));
             let name = |a: &str| nodes.iter().find(|n| n.address == a).unwrap().name.clone();
-            // c57 is 8 high and c63 2: both resolve; c0 is 65 high.
             assert_eq!(name("functions.low57").as_deref(), Some("end"));
             assert_eq!(name("functions.low63").as_deref(), Some("end"));
             assert_eq!(name(&format!("functions.{top}")).as_deref(), Some("*"));
@@ -1461,7 +1323,6 @@ mod tests {
                 .map(|o| (o.variable.clone(), o.line, o.tfvars))
                 .collect()
         };
-        // A literal stage: `--stage` comes first in the name, at `provider.stage`'s line.
         let (nodes, _) = unit(
             "service: s\nprovider:\n  stage: prod\nfunctions:\n  f:\n    handler: h\n  g:\n    name: s-${self:provider.stage}-g\n",
         );
@@ -1469,15 +1330,11 @@ mod tests {
         let f = by("functions.f");
         assert_eq!((f.name.as_deref(), f.pattern), (Some("s-prod-f"), false));
         assert_eq!(listed(f), [("opt:stage".to_string(), 3, false)]);
-        // `${self:provider.stage}` reads the file, never `--stage`: a name that writes it is none.
         let g = by("functions.g");
         assert_eq!((g.name.as_deref(), listed(g)), (Some("s-prod-g"), vec![]));
-        // No stage in the file: `dev`, at the function's line.
         let (nodes, _) = unit("service: s\nfunctions:\n  f:\n    handler: h\n");
         assert_eq!(nodes[0].name.as_deref(), Some("s-dev-f"));
         assert_eq!(listed(&nodes[0]), [("opt:stage".to_string(), 3, false)]);
-        // A stage another `opt:` gives is overridable by both; one `opt:stage` gives names that
-        // one alone; an unresolved one has none.
         let (nodes, _) = unit(
             "service: s\nprovider:\n  stage: ${opt:env, 'qa'}\nfunctions:\n  f:\n    handler: h\n",
         );
@@ -1513,10 +1370,8 @@ mod tests {
         let texts: Vec<Resolved> = (0..4)
             .map(|_| text_of(&vars.expand("${self:custom.big}", 0)))
             .collect();
-        // 100 bytes each: the third leaves 50 short and the fourth meets no room.
         assert!(texts[..3].iter().all(|t| t.text == "x".repeat(100)));
         assert_eq!(texts[3].text, "${self:custom.big}");
-        // A text grown past `PHYSICAL_NAME_MAX` stops expanding at once.
         let mut vars = Vars::new(&doc, &lines);
         let long = vec!["${self:custom.big}"; 1000].join("");
         assert_eq!(vars.expand(&long, 0), [Seg::Unknown("...".into())]);
@@ -1552,7 +1407,6 @@ mod tests {
             custom += &format!("  c{i}: ${{self:custom.c{}}}\n", i + 1);
         }
         custom += "  c8: end\n";
-        // `deep` reaches c7 at the limit and gets nothing; `shallow` reaches it at once.
         let text = format!(
             "service: s\n{custom}functions:\n  deep:\n    name: ${{self:custom.c0}}\n  near:\n    name: ${{self:custom.shallow}}\n"
         );
@@ -1573,7 +1427,6 @@ mod tests {
         assert_eq!(named("${file(./x.yml):key}"), pattern("*"));
         assert_eq!(named("${opt:s, env:X, 'd'}"), pattern("*"));
         assert_eq!(named("${self:custom.a}${env:X}"), pattern("A*"));
-        // CloudFormation's own `${...}` is no Serverless variable.
         assert_eq!(named("${AWS::Region}-q"), known("${AWS::Region}-q"));
         assert_eq!(named("${Queue.Arn}"), known("${Queue.Arn}"));
         assert_eq!(named("open-${unclosed"), known("open-${unclosed"));
@@ -1621,7 +1474,6 @@ mod tests {
         assert_eq!(text.map(|t| t.len()), Some(PHYSICAL_NAME_MAX - 2 + 2));
     }
 
-    /// The events and handler of the function `f` of a service that holds `events`.
     fn recorded(events: &str) -> (Option<Resolved>, Vec<String>) {
         let text = format!(
             "service: s\nprovider:\n  stage: ${{opt:stage, 'dev'}}\nfunctions:\n  f:\n    handler: ${{env:H}}.run\n    events:\n{events}"
@@ -1749,7 +1601,6 @@ mod tests {
         for i in 0..NODES_MAX {
             text += &format!("    R{i}:\n      Type: AWS::SQS::Queue\n");
         }
-        // A function naming the last resource, which the ceiling leaves out.
         let last = format!("R{}", NODES_MAX - 1);
         let text = text.replace(
             "  f0:\n    handler: h\n",

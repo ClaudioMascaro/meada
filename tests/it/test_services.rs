@@ -1,13 +1,9 @@
-//! `scripts/test-services` mirrors the services of CI's `cloud` job: images, ports, credentials
-//! and the `MEADA_TEST_*` exports change together or this fails.
-
 use std::fs;
 
 fn read(path: &str) -> String {
     fs::read_to_string(format!("{}/{path}", env!("CARGO_MANIFEST_DIR"))).unwrap()
 }
 
-/// The value of `NAME=value` in the script's variable block.
 fn var(script: &str, name: &str) -> String {
     let prefix = format!("{name}=");
     let line = script.lines().find_map(|l| l.strip_prefix(prefix.as_str()));
@@ -47,7 +43,6 @@ fn the_script_mirrors_the_cloud_job() {
         );
     }
 
-    // Each export the script prints, with its variables expanded, is a line of the job's env.
     let expand = |s: &str| {
         let mut s = s.to_string();
         for (k, v) in [
@@ -72,7 +67,6 @@ fn the_script_mirrors_the_cloud_job() {
     assert_eq!(exports.len(), 6, "{keys:?}");
     for export in exports {
         let (key, value) = export.split_once('=').unwrap();
-        // The CA path is made by CI's step at run time, not set in the job's env.
         if key == "MEADA_TEST_POSTGRES_TLS_CA" {
             continue;
         }

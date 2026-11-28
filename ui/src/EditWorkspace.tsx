@@ -18,24 +18,14 @@ import { namedCopy } from './named-i18n';
 import { authorizationOf, changedOf, diffOf, parseEntries, rolesOf } from './named-core';
 import type { CatalogView } from './useCatalog';
 
-/** What the person reviewed: nothing else is sent when they confirm. */
 interface Frozen { text: string; message: string; save: string; base: number; changes: string[] }
 
-/** The outcome of an applied change, for the page to show once the editor is rebuilt on the new base. */
 export interface Outcome { findings: string[] }
 
-/** The entries an operator reads, as the JSON `namedEntriesJson` gives them. */
 function entriesOf(detail: WorkspaceDetail): Entry[] {
   return detail.entries.map(entry => ({ repo: entry.repo, ...entry.blocks }) as Entry);
 }
 
-/**
- * The guided editor of a workspace the session operates (#345), over the text editor of #344. The
- * form and the text are two views of one document: the canonical text `meada-core` writes. Every
- * check is the core's (WebAssembly) or the server's, which decides again at the transaction, at the
- * base the page read; this component holds the draft, shows the diff and sends only the payload
- * that was reviewed.
- */
 export function EditWorkspace({ api, locale, session, detail, savedView, catalog, maxEntries, onChanged, onReload, onLost }: {
   api: Api; locale: Language; session: Session; detail: WorkspaceDetail; savedView?: EffectiveView; catalog: CatalogView; maxEntries: number;
   onChanged: (outcome: Outcome) => void; onReload: () => void; onLost: (notice: string) => void;
@@ -71,13 +61,11 @@ export function EditWorkspace({ api, locale, session, detail, savedView, catalog
   if (ready) {
     try { next = parseEntries(current, maxEntries); } catch (error) { invalid = String(error); }
   }
-  // The diff, the entries to recheck and the eligibility are the core's: the same functions the server runs.
   const diff = next ? diffOf(before, next) : undefined;
   const touched = next ? changedOf(before, next) : [];
   const authorization = ready && touched.length > 0
     ? authorizationOf(touched, catalog.eligible, session.grant ?? '*')
     : { allowed: true, named: [], hidden: 0 };
-  // A check that could not decide (`pending`) can be asked again.
   const unverified = touched.filter(identity => !catalog.eligible.has(identity) && (catalog.checked.get(identity) ?? 'pending') === 'pending');
 
   function edit(value: string) {
@@ -117,7 +105,6 @@ export function EditWorkspace({ api, locale, session, detail, savedView, catalog
     } catch (error) {
       setStoredOnly(stored);
       if (error instanceof ApiError && error.code === 'entries_refused') {
-        // The grant changed under the page: the refusal is shown as the server worded it and the roles are read again.
         setRefusal({ refused: (error.body.refused as { identity: string }[] | undefined) ?? [], hidden: Number(error.body.hidden ?? 0) });
         setFrozen(undefined); catalog.reload();
       } else if (error instanceof ApiError && error.code === 'stale_base') {

@@ -1,11 +1,3 @@
-//! The channel kind's TypeScript and JavaScript forms (spec #20): the message libraries of the
-//! pack. A form is a method called on a client whose origin is the library's own factory,
-//! imported from the library's package: a `send` on anything else is no producer. The origin is
-//! the one question, `Code::origins` with `Follow::Constants`: only `const` bindings are
-//! followed, so a client passed in as a parameter or returned by a function has none (certain or
-//! absent). `factory` rebuilds the spelling each form table matches (`new Kafka().producer()`)
-//! from the origin's form, outside name and steps.
-
 use std::collections::BTreeMap;
 
 use super::message::{
@@ -29,12 +21,10 @@ const NATS_CONNECTION: &str = "connect()";
 const BULLMQ: &str = "bullmq";
 const BULLMQ_QUEUE: &str = "new Queue()";
 const IOREDIS: &str = "ioredis";
-// A default import takes the name it is given; the client is also exported as `Redis`.
 const IOREDIS_CLIENT: [&str; 2] = ["new default()", "new Redis()"];
 const NODE_REDIS: &str = "redis";
 const NODE_REDIS_CLIENT: &str = "createClient()";
 const AMQPLIB: &str = "amqplib";
-/// What a channel of amqplib is, from the default import, a namespace or a named `connect`.
 const AMQP_CHANNELS: [&str; 4] = [
     "default.connect().createChannel()",
     "default.connect().createConfirmChannel()",
@@ -42,10 +32,8 @@ const AMQP_CHANNELS: [&str; 4] = [
     "connect().createConfirmChannel()",
 ];
 
-/// What a form reads of a call's arguments: the channel names, see `names`.
 type Read<'a> = &'a dyn Fn(&[Value]) -> Option<Vec<Option<String>>>;
 
-/// SDK commands sent through their matching AWS client.
 pub(super) fn aws(code: &Code) -> Vec<crate::contract::Found> {
     if !code.pack().extensions().contains(&"js") {
         return Vec::new();
@@ -98,12 +86,9 @@ pub(super) fn messages(code: &Code, indexed: &Indexed) -> Vec<Message> {
                 .or_insert(client);
         }
     }
-    // Parsed the first time a kafkajs topic is a read of it.
     let config = AppConfig::new(indexed);
     let mut out = Vec::new();
-    // kafkajs subscriptions, each with the consumer binding it is made on.
     let mut subscriptions = Vec::new();
-    // The handler `run` gives each kafkajs consumer binding; the first `run` counts.
     let mut handlers = BTreeMap::new();
     for (&path, facts) in code.files() {
         for (n, call) in facts.calls.iter().enumerate() {
@@ -115,7 +100,6 @@ pub(super) fn messages(code: &Code, indexed: &Indexed) -> Vec<Message> {
                 out.extend(declared_sides(code, path, n, client, &config));
                 continue;
             }
-            // A library form is a method of a client, or a class or function called itself.
             let chain = match method {
                 "send" | "subscribe" | "run" | "publish" | "add" | "xadd" | "xAdd"
                 | "xreadgroup" | "xReadGroup" | "sendToQueue" | "consume" | "bindQueue"
@@ -142,8 +126,6 @@ pub(super) fn messages(code: &Code, indexed: &Indexed) -> Vec<Message> {
                 let read = |a: &[Value], _: &_| read(a).map(|names| (names, None, None));
                 producers(broker, code.expand(Expand::Call(path, n), &read))
             };
-            // The handler of the call itself (its `option` of argument `arg`), else the
-            // function the call is in.
             let consume = |broker, read: Read, handler: Option<Handler>| {
                 (code
                     .expand(Expand::Call(path, n), &|a, _| read(a))
@@ -205,9 +187,6 @@ pub(super) fn messages(code: &Code, indexed: &Indexed) -> Vec<Message> {
                     let handler = handler(code, path, n, 1, &["callback"]);
                     out.extend(consume("nats", &first, handler));
                 }
-                // The queue is named where the binding is made, not at the `add`: the `add` is
-                // the producer, or, when the name is a parameter of the function that makes
-                // the binding, each call site of that wrapper.
                 // ponytail: a `Queue` with no `const` binding (`new Queue(name).add(...)`, a
                 // class field, a parameter) and `addBulk` are not recognized.
                 (BULLMQ, BULLMQ_QUEUE, "add") => {
@@ -276,7 +255,6 @@ pub(super) fn messages(code: &Code, indexed: &Indexed) -> Vec<Message> {
             ..
         } in code.expand(Expand::Call(path, n), &read)
         {
-            // With no `run` handler Meada can read, the function that subscribes handles.
             // ponytail: a handler passed through a wrapper's parameter is not followed.
             let handler = binding.and_then(|b| handlers.get(&b)).cloned();
             let handler = handler.unwrap_or_else(|| enclosing(code, site, at));
@@ -295,15 +273,10 @@ pub(super) fn messages(code: &Code, indexed: &Indexed) -> Vec<Message> {
     out
 }
 
-/// The names, the variable an unresolved one is read from and the cap of its sides (`topics`),
-/// at each site an expansion found.
 type Found<'a> = Vec<Expanded<'a, Named>>;
 
-/// What a form reads of a call's arguments: the channel names, the variable an unresolved one is
-/// read from, and the weakest level a link of the sides may take.
 type Named = (Vec<Option<String>>, Option<String>, Option<Level>);
 
-/// Read a declared call's topic argument or object field at each exact caller.
 fn declared_sides<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -341,7 +314,6 @@ fn declared_sides<'a>(
     sides
 }
 
-/// A producer per name read at each site an expansion found.
 fn producers(broker: &'static str, found: Found) -> Vec<Message> {
     (found.into_iter())
         .flat_map(
@@ -365,7 +337,6 @@ fn producers(broker: &'static str, found: Found) -> Vec<Message> {
         .collect()
 }
 
-/// The function the call `at` of `path` is in, as the handler of what it consumes.
 fn enclosing(code: &Code, path: &str, at: usize) -> Handler {
     Handler::Def {
         path: path.into(),
@@ -373,8 +344,6 @@ fn enclosing(code: &Code, path: &str, at: usize) -> Handler {
     }
 }
 
-/// The handler the options object that argument `arg` of the call gives under the first of
-/// `keys` it sets: a function written in place or a definition of the repository.
 fn handler<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -392,8 +361,6 @@ fn handler<'a>(
     function(code, path, scope, handler)
 }
 
-/// The handler argument `arg` of the call is: a function written in place or a definition of
-/// the repository.
 fn function_arg<'a>(code: &Code<'a>, path: &'a str, n: usize, arg: usize) -> Option<Handler> {
     let scope = &code.files()[path].calls[n].scope;
     function(code, path, scope, code.args(path, n)?.get(arg)?)
@@ -418,9 +385,6 @@ fn function<'a>(
     }
 }
 
-/// The channel names the options object a call takes first gives under the first of `keys`
-/// it sets, a list giving several. `None` when one depends on a parameter (a client wrapper);
-/// a name that is not a literal string is unresolved (`None` in the list).
 fn names(args: &[Value], keys: &[&str]) -> Option<Vec<Option<String>>> {
     let Some(options) = options(args)? else {
         return Some(vec![None]);
@@ -439,7 +403,6 @@ fn names(args: &[Value], keys: &[&str]) -> Option<Vec<Option<String>>> {
     }
 }
 
-/// `names`, with the variable the first of `keys` the options set is read from.
 fn names_env(args: &[Value], keys: &[&str]) -> Option<(Vec<Option<String>>, Option<String>)> {
     let found = names(args, keys)?;
     let given = (options(args).flatten())
@@ -447,11 +410,6 @@ fn names_env(args: &[Value], keys: &[&str]) -> Option<(Vec<Option<String>>, Opti
     Some((found, given.and_then(env_of)))
 }
 
-/// `names_env` of a kafkajs call, whose topic may be a read of Backstage's configuration alone
-/// (`config.getString('a.b')`, `getOptionalString`): the read names each value the
-/// `app-config*.yaml` files give its key that is a channel name. With several values, the
-/// configuration picks one at run time, so each side is capped at `inferred`; with none that is
-/// a name, the side is unresolved.
 // ponytail: a `${VAR}` value is not mapped to its variable as HTTP's `decided` does, and a read
 // inside a list of topics is not looked up.
 fn topics(config: &AppConfig, args: &[Value], keys: &[&str]) -> Option<Named> {
@@ -485,7 +443,6 @@ fn configured_topic(
     )
 }
 
-/// The key a value reads of Backstage's configuration when it is that read alone.
 fn config_key(value: &Value) -> Option<&str> {
     match value {
         Value::Str(parts) => match &parts[..] {
@@ -496,8 +453,6 @@ fn config_key(value: &Value) -> Option<&str> {
     }
 }
 
-/// The options object a call takes first: `None` when it is a parameter (a client wrapper),
-/// `Some(None)` when it is not an object.
 fn options(args: &[Value]) -> Option<Option<&[(String, Value)]>> {
     match args.first() {
         Some(Value::Object(properties)) => Some(Some(properties)),
@@ -506,14 +461,10 @@ fn options(args: &[Value]) -> Option<Option<&[(String, Value)]>> {
     }
 }
 
-/// The channel name a call gives as its first argument: a NATS subject, the queue of a BullMQ
-/// `Queue` or `Worker`, the key of a Redis `xadd`, an amqplib queue.
 fn first(args: &[Value]) -> Option<Vec<Option<String>>> {
     Some(vec![name(args.first().unwrap_or(&Value::Undefined))?])
 }
 
-/// The SQS queue the URL under `key` of the options object a call takes first names: the last
-/// segment of the URL, whatever precedes it (an account and a region are often dynamic).
 fn queue(args: &[Value], key: &str) -> Option<Vec<Option<String>>> {
     let Some(options) = options(args)? else {
         return Some(vec![None]);
@@ -521,8 +472,6 @@ fn queue(args: &[Value], key: &str) -> Option<Vec<Option<String>>> {
     Some(vec![queue_name(property(options, key).ok()?)?])
 }
 
-/// The streams an ioredis `xreadgroup` reads: the arguments after `STREAMS` that name them,
-/// the first half; the ids that close the list are the other half.
 fn after_streams(args: &[Value]) -> Option<Vec<Option<String>>> {
     let keyword = |v: &Value| match v {
         Value::Str(parts) => literal(parts).is_some_and(|s| s.eq_ignore_ascii_case("STREAMS")),
@@ -535,8 +484,6 @@ fn after_streams(args: &[Value]) -> Option<Vec<Option<String>>> {
     rest[..rest.len() / 2].iter().map(name).collect()
 }
 
-/// The streams a node-redis `xReadGroup` reads: the `key` of its third argument, an object or
-/// a list of them.
 fn keys(args: &[Value]) -> Option<Vec<Option<String>>> {
     let key = |value: &Value| match value {
         Value::Object(properties) => {
@@ -552,13 +499,10 @@ fn keys(args: &[Value]) -> Option<Vec<Option<String>>> {
     }
 }
 
-/// The queue, exchange, routing key or pattern argument `at` of an amqplib call: `None` when it
-/// depends on a parameter, `Some(None)` when it is not a literal string.
 fn arg_name(args: &[Value], at: usize) -> Option<Option<String>> {
     args.get(at).map_or(Some(None), name)
 }
 
-/// SQS keeps the variable separately from the unresolved queue name, through exact expansions.
 fn sqs<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -615,17 +559,14 @@ mod tests {
     use crate::lang::ts::TsJs;
     use crate::resolve::Resolver;
 
-    /// The messages of the TypeScript file `src` as lines.
     fn lines(src: &str) -> Vec<String> {
         configured(src, &[])
     }
 
-    /// `lines`, with the configuration files `configs`.
     fn configured(src: &str, configs: &[(&str, &[u8])]) -> Vec<String> {
         crate::channel::message::lines(configured_messages(src, configs))
     }
 
-    /// The messages of the TypeScript file `src`, with the configuration files `configs`.
     fn configured_messages(src: &str, configs: &[(&str, &[u8])]) -> Vec<Message> {
         let facts = TsJs.parse("x.ts", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("x.ts", &facts)]);
@@ -644,10 +585,6 @@ mod tests {
         messages(&code, &indexed)
     }
 
-    /// A kafkajs topic that is a Backstage configuration read alone names each value the
-    /// `app-config*.yaml` files give its key that is a channel name. Several values cap each side
-    /// at `inferred`, whether or not each is a name; a key no file holds, or whose one value is no
-    /// name, leaves the side unresolved.
     #[test]
     fn a_kafkajs_topic_read_from_app_config_names_each_value_of_its_key() {
         let send = |f: &str, key: &str| {
@@ -685,7 +622,6 @@ mod tests {
                 (named("orders.shipped"), inferred),
             ]
         );
-        // With no configuration file, the read names nothing.
         let unconfigured = configured(&src, &[]);
         assert!(
             unconfigured
@@ -695,8 +631,6 @@ mod tests {
         );
     }
 
-    /// An include no root followed, or a root dropped, may give the key another value: its one value
-    /// is `inferred`.
     #[test]
     fn an_app_config_include_not_followed_caps_the_topic() {
         let src = "import { Kafka } from 'kafkajs';\nconst kafka = new Kafka({ brokers: [] });\n\
@@ -719,7 +653,6 @@ mod tests {
             ("app-config.production.yaml", production),
         ];
         assert_eq!(found(&configs), [(created.clone(), Some(Level::Inferred))]);
-        // A root that does not parse is dropped, and may hold another value too.
         let broken: &[u8] = b"t: [\n";
         let configs = [
             ("app-config.yaml", base),
@@ -728,9 +661,6 @@ mod tests {
         assert_eq!(found(&configs), [(created, Some(Level::Inferred))]);
     }
 
-    /// A private field is a client when every value its class writes it comes from one factory,
-    /// through another field (`this.kafka.producer()`) in an initializer too; fields made from
-    /// each other, or from a producer and a consumer, are none.
     #[test]
     fn a_private_field_is_the_one_client_its_class_writes_it() {
         let src = r#"import { Kafka } from 'kafkajs';
@@ -774,8 +704,6 @@ function other(p: Other) {
   p.send({ topic: 'nope' });
 }
 "#;
-        // The `run` handler is the inline arrow, named by its offset: both subscriptions point
-        // at it.
         let at = src.find("async () =>").unwrap();
         assert_eq!(
             lines(src),

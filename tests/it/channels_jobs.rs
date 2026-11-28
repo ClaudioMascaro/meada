@@ -1,7 +1,3 @@
-//! BullMQ jobs and Redis streams as channels (spec #20): `add` on a `Queue` to the processor
-//! of the `Worker` of the same name, `xadd` to the function that reads the stream with
-//! `xreadgroup`, in the ioredis and node-redis styles.
-
 use crate::common;
 
 use std::path::PathBuf;
@@ -10,7 +6,6 @@ use common::{assert_golden, fixture_repo, without_processes};
 use meada::engine::Engine;
 use serde_json::Value;
 
-/// The jobs fixtures as siblings in one case directory; returns the producer side.
 fn jobs(case: &str) -> PathBuf {
     fixture_repo(
         case,
@@ -52,25 +47,21 @@ fn bullmq_jobs_and_redis_streams_link_by_name() {
         (consumer, provider, "exact".to_string(), reason.to_string())
     };
     let mut expected = vec![
-        // The queue name of `new Queue(QUEUE)` is a constant; the processor is a definition.
         link(
             "worker::src/bullmq.ts::sendEmail",
             "api::src/bullmq.ts::sendWelcome::emails.add#0",
             "channel::bullmq::emails",
         ),
-        // A wrapper whose `new Queue(name)` takes its parameter: its call site produces.
         link(
             "worker::src/bullmq.ts::sendEmail",
             "api::src/bullmq.ts::sendInvoice::enqueue#0",
             "channel::bullmq::emails",
         ),
-        // A processor written in place.
         link(
             "worker::src/bullmq.ts::startReports.bullmq reports",
             "api::src/bullmq.ts::requestReport::reports.add#0",
             "channel::bullmq::reports",
         ),
-        // ioredis: both streams named after STREAMS, not the ids that follow them.
         link(
             "worker::src/ioredis.ts::readOrders",
             "api::src/ioredis.ts::appendOrder::redis.xadd#0",
@@ -81,7 +72,6 @@ fn bullmq_jobs_and_redis_streams_link_by_name() {
             "api::src/ioredis.ts::appendRefund::redis.xadd#0",
             "channel::redis::refunds",
         ),
-        // node-redis: one key, and a list of keys.
         link(
             "worker::src/noderedis.ts::readShipments",
             "api::src/noderedis.ts::appendShipment::client.xAdd#0",
@@ -100,7 +90,6 @@ fn bullmq_jobs_and_redis_streams_link_by_name() {
     ];
     expected.sort();
     assert_eq!(links, expected);
-    // `Set.add` is no producer.
     assert_eq!(json["providers"].as_array().unwrap().len(), 6);
     assert_golden("channels-jobs-api.export.json", &without_processes(&export));
 }

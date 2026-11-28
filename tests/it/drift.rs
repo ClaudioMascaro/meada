@@ -1,6 +1,3 @@
-//! Shape drift (spec #23): the field paths a consumer reads from the parsed response, against
-//! the shape of the route it links to, over the drift chain (`common::drift_chain`).
-
 use crate::common;
 
 use common::{assert_golden, decisions, drift_chain, without_processes};
@@ -69,9 +66,6 @@ fn context_on_a_route_names_the_shape_source_and_the_drift_of_its_consumers() {
     let (web, _, _) = drift_chain("drift_context");
     let engine = Engine::open(&web).unwrap();
 
-    // A document (its consumers with drift, with reads not checked, and with neither, which are
-    // listed too), a zod schema and returned literals; and a route whose consumer only has reads
-    // not checked.
     let routes = [
         ("orders", "http::GET::/api/orders"),
         ("comments", "http::GET::/api/comments"),
@@ -89,7 +83,6 @@ fn search_drift_lists_each_missing_path_with_its_consumer_and_level() {
     let (web, _, _) = drift_chain("drift_search");
     let engine = Engine::open(&web).unwrap();
 
-    // The query matches the route path or the field path.
     let mut answers = Vec::new();
     for query in ["/api/stock", "total", "nickname", "nothing-like-this"] {
         answers.push(engine.search(query, Some("drift"), None).unwrap());
@@ -188,7 +181,6 @@ fn a_decided_link_has_drift_and_an_ambiguous_one_none() {
     decisions(&web, "chain-drift-web");
     let engine = Engine::open(&web).unwrap();
 
-    // `rate` reaches `GET /api/reviews` through a decision; `ping` fits two `GET /api/ping`.
     let mut answers = Vec::new();
     for route in ["GET /api/reviews", "GET /api/ping"] {
         let start = Start::From(route);
@@ -210,7 +202,6 @@ fn trace_down_from_a_consumer_ends_its_link_line_with_the_missing_paths() {
     assert_golden("chain-drift.trace-down.txt", &answer);
 }
 
-/// The gateway's `listOrders` sends a body parsed with a zod schema.
 fn parse_the_orders(gateway: &std::path::Path) {
     let path = gateway.join("src/orders.ts");
     let src = std::fs::read_to_string(&path).unwrap();
@@ -231,7 +222,6 @@ fn a_document_wins_over_a_zod_schema() {
     let documented = Engine::open(&gateway).unwrap().export().unwrap();
     assert!(documented.contains(&format!("{route}          \"document\": \"openapi.yaml\"")));
 
-    // Without the documents, the schema is the source.
     let (_, gateway, _) = drift_chain("drift_zod_order_no_documents");
     parse_the_orders(&gateway);
     for document in [

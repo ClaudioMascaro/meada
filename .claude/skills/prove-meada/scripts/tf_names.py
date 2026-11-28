@@ -13,7 +13,6 @@ import json
 import re
 
 EVAL_DEPTH = 32
-# ADR 0025's pure functions (#650 adds `jsonencode`): a call to any other is unresolved.
 PURE = {"format", "formatlist", "join", "split", "lower", "upper", "title", "trim", "trimprefix",
         "trimsuffix", "trimspace", "chomp", "replace", "substr", "concat", "coalesce", "element",
         "keys", "values", "lookup", "merge", "length", "toset", "tolist", "tomap", "tostring",
@@ -25,8 +24,6 @@ class Unchecked(Exception):
     """A form this oracle does not evaluate."""
 
 
-# A value: ("known", python value), ("pattern", text) or ("unknown", None), with `through`, a
-# frozenset of (path, line, "var.<x>", tfvars).
 UNKNOWN = ("unknown", None, frozenset())
 
 
@@ -281,7 +278,7 @@ class Names:
         if re.fullmatch(rf"{IDENT}(\.{IDENT}|\[[^\[\]]*\])+", e):
             if e.split(".")[0] in ("var", "local", "each", "count", "module"):
                 raise Unchecked(f"a traversal {e[:40]!r}")
-            return UNKNOWN  # a data source, a resource attribute, terraform.workspace, path.*
+            return UNKNOWN
         raise Unchecked(f"an expression {e[:40]!r}")
 
     def call(self, at, each, f, args, depth):
@@ -348,7 +345,7 @@ class Names:
         """(name, pattern, through) of a block's `name`, or "unchecked"."""
         if block.get("name_unchecked"):
             return "unchecked"
-        if block.get("name_raw") is None:  # a module call has none unless its source is a registry one (#782)
+        if block.get("name_raw") is None:
             return None, False, ()
         try:
             kind, v, through = self.raw(at, each, block["name_raw"], 0)

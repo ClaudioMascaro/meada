@@ -1,10 +1,3 @@
-//! Resources: shared things a repository reads or writes, such as a database table or bucket.
-//! Declarations in `meada.toml` (#19, #641) name symbols, IaC addresses or config key paths,
-//! else the repository as a whole, and
-//! link writers to readers in other repositories at `declared`. AWS SDK forms (#659) supply
-//! code sides through their client origins and name arguments; literal SDK writers and readers
-//! link at `exact`, in the same repository too. Both use `resource::<kind>::<id>` contracts.
-
 use std::collections::HashSet;
 
 use crate::config;
@@ -21,27 +14,22 @@ use crate::workspace::Repository;
 
 pub struct Resource;
 
-/// Both reader families establish SDK origins, through stored provenance or an operation.
 fn sdk_use(cap: Option<Level>, via: Option<&str>, operation: Option<&str>) -> bool {
     via == Some("sdk:aws")
         || operation.is_some()
         || crate::contract::environment_cap(cap, via).is_some()
 }
 
-/// The start of every resource contract identifier.
 const PREFIX: &str = "resource::";
 
-/// The contract identifier of `resource`: `resource::<kind>::<id>`.
 fn contract(resource: &config::Resource) -> String {
     format!("{PREFIX}{}::{}", resource.kind, resource.id)
 }
 
-/// The site a `via` entry of `repo` names.
 fn site(repo: &Repository, via: &str) -> String {
     format!("{}::{via}", repo.identity)
 }
 
-/// The exact symbols and IaC nodes a declaration names in its own repository.
 fn resolved(repo: &Repository, export: &Export, via: &str) -> Vec<String> {
     let symbol = site(repo, via);
     if export.symbols.iter().any(|s| s.id == symbol) {
@@ -61,7 +49,6 @@ fn resolved(repo: &Repository, export: &Export, via: &str) -> Vec<String> {
     if nodes.len() == 1 {
         return nodes;
     }
-    // An address shared by different source blocks needs its file qualifier.
     if !nodes.is_empty() {
         return Vec::new();
     }
@@ -76,7 +63,6 @@ fn resolved(repo: &Repository, export: &Export, via: &str) -> Vec<String> {
     Vec::new()
 }
 
-/// Every existing location named by the resource, once in identity order.
 fn matched(repo: &Repository, export: &Export, resource: &config::Resource) -> Vec<String> {
     let mut sites: Vec<_> = resource
         .via
@@ -88,7 +74,6 @@ fn matched(repo: &Repository, export: &Export, resource: &config::Resource) -> V
     sites
 }
 
-/// The sides of `resource`: its matched locations, else the repository as a whole.
 fn sites(repo: &Repository, export: &Export, resource: &config::Resource) -> Vec<String> {
     match matched(repo, export, resource) {
         sites if sites.is_empty() => vec![repo.identity.clone()],
@@ -96,9 +81,6 @@ fn sites(repo: &Repository, export: &Export, resource: &config::Resource) -> Vec
     }
 }
 
-/// The status lines of `repo` (whose index content is `export`) about its resources: each
-/// `via` that names no location, the fallback to the repository as a whole, and each resource
-/// no link of the workspace (`links`) reaches.
 fn report(repo: &Repository, export: &Export, links: &[Link]) -> Vec<String> {
     let mut lines = Vec::new();
     let mut seen = HashSet::new();
@@ -251,7 +233,6 @@ impl ContractKind for Resource {
                 }
             }
         }
-        // The index's orders; several entries may name the same side.
         let providers = &mut export.providers;
         crate::index::sort_providers(providers);
         providers.dedup_by(|a, b| {
@@ -280,7 +261,6 @@ impl ContractKind for Resource {
         via::context(exports, links, site)
     }
 
-    /// The `via` symbols of every resource the repository declares (`matched`).
     fn symbols_read(&self, repo: &Repository, _export: &Export) -> Option<Vec<String>> {
         let resources = repo.config.resources.iter();
         Some(
@@ -295,7 +275,6 @@ impl ContractKind for Resource {
         report(repository, export, links)
     }
 
-    /// The reader `consumer` links to every writer of its resource held by another repository.
     fn link(
         &self,
         consumer: &Consumer,

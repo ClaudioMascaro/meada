@@ -1,9 +1,3 @@
-//! Directionless config uses (ADR 0026, #661), derived from non-secret, uncut stored strings.
-//! Only a structured cloud identifier or a final typed key gives evidence of a contract, and a
-//! final typed key gives none in a document the reader of a contract kind recognizes as its own.
-//! An identifier in the resource list of an IAM policy statement is a policy grant instead, and a
-//! value under a keyword of a JSON Schema document gives no side (ADR 0026, "Orphan sides").
-
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Bound;
 
@@ -16,7 +10,6 @@ use crate::Result;
 use crate::config_values::sites::parts_without_selectors;
 use crate::document::events::{Step, Syntax};
 
-/// Internal key identity and evidence; the public use keeps a repository-level site.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Side {
     pub contract: String,
@@ -25,8 +18,6 @@ pub(crate) struct Side {
     pub key: String,
     pub line: usize,
     pub level: Level,
-    /// In a file the CI reader owns, the CI node that holds the key (ADR 0028): the site the
-    /// export writes. `None` elsewhere: the repository.
     pub holder: Option<String>,
 }
 
@@ -53,9 +44,6 @@ impl Side {
     }
 }
 
-/// A value of a file the CI reader owns, as static evaluation reads it (ADR 0028,
-/// "Expressions"): a `${{ env.X }}` is the literal `env` gives for `X`, and any other
-/// expression an unresolved part, `*`. An expression left open stays as written.
 fn evaluated<'v>(value: &str, env: impl Fn(&str) -> Option<&'v str>) -> String {
     let (mut out, mut rest) = (String::new(), value);
     while let Some((before, after)) = rest.split_once("${{") {
@@ -64,7 +52,6 @@ fn evaluated<'v>(value: &str, env: impl Fn(&str) -> Option<&'v str>) -> String {
         };
         let plain = |name: &&str| name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_');
         let name = inner.trim().strip_prefix("env.").filter(plain);
-        // A literal that holds an expression or an asterisk of its own gives no name.
         let literal = (name.and_then(&env)).filter(|v| !v.contains("${{") && !v.contains('*'));
         out += before;
         out += literal.unwrap_or("*");
@@ -73,9 +60,6 @@ fn evaluated<'v>(value: &str, env: impl Fn(&str) -> Option<&'v str>) -> String {
     out + rest
 }
 
-/// The resource list of an IAM policy statement: `Resource` or `NotResource` of an entry of
-/// `Statement`, wherever the key path is, and `resources` or `not_resources` of a `statement`
-/// block of an `aws_iam_policy_document`.
 fn policy_resource(steps: &[Step]) -> bool {
     let keys: Vec<&str> = (steps.iter())
         .filter_map(|step| match step {
@@ -96,8 +80,6 @@ fn policy_resource(steps: &[Step]) -> bool {
     )
 }
 
-/// Under a JSON Schema keyword whose value documents a shape, read from the document's root:
-/// the key after `properties` or its kin names a property, whatever its name.
 fn schema_keyword(steps: &[Step]) -> bool {
     let mut name = false;
     for step in steps {
@@ -115,10 +97,6 @@ fn schema_keyword(steps: &[Step]) -> bool {
     false
 }
 
-/// The JSON Schema documents, by file: those whose root holds `$schema`, as a document index
-/// (`None` for a file of one document). A JSON file is one document, so a leading index there is
-/// an item of its root array; in YAML it is a document of a stream, or an item of a root sequence,
-/// which writes its keys the same way (ADR 0025).
 fn schemas(db: &Connection) -> Result<HashMap<String, Vec<Option<usize>>>> {
     let mut query =
         db.prepare("SELECT path, key FROM config_values WHERE key LIKE '%[\"$schema\"]'")?;
@@ -142,11 +120,6 @@ fn schemas(db: &Connection) -> Result<HashMap<String, Vec<Option<usize>>>> {
     Ok(schemas)
 }
 
-/// The documents the reader of a contract kind recognizes as its own, by file, which the key-name
-/// rule does not read: the first document of a file the document reader read (its summary names a
-/// format; it reads no later document of a stream, and a file it ignored is none of its own), and
-/// each document of a configuration file that is no IaC source and that the alert reader takes a
-/// rule, a route or a receiver from (`alert::documents`).
 fn owned(db: &Connection) -> Result<HashMap<String, Vec<Option<usize>>>> {
     let mut owned = HashMap::<_, Vec<_>>::new();
     let mut query = db.prepare("SELECT path, summary FROM documents")?;
@@ -177,11 +150,7 @@ fn owned(db: &Connection) -> Result<HashMap<String, Vec<Option<usize>>>> {
     Ok(owned)
 }
 
-/// The key-name rule (#661): a value under a final typed key names a contract at `inferred`,
-/// through an Azure or Google Cloud alias, or as a plain name under `queue`, `topic`, `bucket` or
-/// `table`.
 fn key_name(key: &str, value: &str) -> Option<(String, Level)> {
-    // Whether the key path ends with the step `name`: alone, after a `.`, or quoted.
     let last = |name: &str| {
         key == name || key.ends_with(&format!(".{name}")) || key.ends_with(&format!("[\"{name}\"]"))
     };
@@ -229,22 +198,12 @@ fn key_name(key: &str, value: &str) -> Option<(String, Level)> {
         })
 }
 
-/// The config use sides of a repository, its policy grants, then the `run` scripts of its CI
-/// steps as the gate of the command table reads them (ADR 0028): all come from the stored
-/// strings, so a script past the value length ceiling is not read.
 pub(crate) fn read(
     db: &Connection,
     repository: &str,
 ) -> Result<(Vec<Side>, Vec<Side>, Vec<Script>)> {
-    // A creation's defining name is its provisioner, not a second side using itself.
-    // Other config attributes in the same IaC file can still name resources they use.
     let mut definitions = std::collections::HashSet::new();
-    // The files a kind's reader recognizes whole, by their content (ADR 0026, #800): the
-    // key-name rule reads none of them. Here, the pipelines and actions of the CI reader
-    // (ADR 0028), each with the addresses of its CI jobs and CI steps and whether it is a
-    // pipeline.
     let mut ci_files = HashMap::<String, (HashSet<String>, bool)>::new();
-    // The `env` keys of a CI job or a CI step that hold no config value and define their name.
     let mut others = Vec::new();
     for node in super::nodes(db)? {
         if super::actions::owns(&node) {
@@ -281,8 +240,6 @@ pub(crate) fn read(
         ))
     })?;
     let rows = rows.collect::<rusqlite::Result<Vec<_>>>()?;
-    // What a `${{ env.X }}` of an owned file reads: each key of that file, with its value when
-    // it is a literal string. A key that holds anything else still defines its name.
     if !ci_files.is_empty() {
         let mut query = db.prepare(
             "SELECT path, key FROM config_values \
@@ -298,10 +255,6 @@ pub(crate) fn read(
     for (path, key) in others.iter().filter(|row| ci_files.contains_key(&row.0)) {
         entries.entry(path).or_default().insert(key, None);
     }
-    // The names the `run` scripts of each owned file may write to the environment file
-    // (`GITHUB_ENV`, `github.env`): one of them reaches the CI steps after it, so no literal
-    // `env` gives it. `None` for a file where a script writes names it does not show: there
-    // no literal `env` gives any name.
     let mut written = HashMap::<&str, Option<HashSet<&str>>>::new();
     for (path, key, value, _) in rows.iter().filter(|row| ci_files.contains_key(&row.0)) {
         let Some(shown) = (key.ends_with(".run").then(|| run::environment_file(value))).flatten()
@@ -323,40 +276,30 @@ pub(crate) fn read(
         if definitions.contains(&(path.clone(), key.clone())) {
             continue;
         }
-        // Whether `documents` (by index in a stream, `None` for a whole file) hold this row; a key
-        // with no leading index is in the only document of its file, the first.
         let document = crate::config_values::leading_index(key).unwrap_or(0);
         let holds = |documents: &Vec<Option<usize>>| {
             documents.contains(&None) || documents.contains(&Some(document))
         };
-        // The CI nodes that hold the key, the nearest first: a CI step, then its CI job.
-        // An address is the key up to a `.` or a `[`: each such cut is looked up, never each node.
         let holders = ci_files.get(path).map(|(nodes, _)| {
             let cuts = key.match_indices(['.', '[']).map(|(at, _)| &key[..at]);
             let mut holders: Vec<&str> = cuts.filter(|cut| nodes.contains(*cut)).collect();
             holders.reverse();
             holders
         });
-        // A name a script of the file may write to the environment file holds no literal.
         let rebound = |name: &str| match written.get(path.as_str()) {
             Some(names) => names.as_ref().is_none_or(|names| names.contains(name)),
             None => false,
         };
-        // The `env` of the CI step, of its CI job, then of the pipeline (an action's file holds
-        // none at its root).
         let scopes = |holders: &[&str], key: &str| -> Vec<String> {
             let pipeline = ci_files[path].1.then(|| key.to_string());
             let scopes = holders.iter().map(|node| format!("{node}.{key}"));
             scopes.chain(pipeline).collect()
         };
-        // A CI step is the one node whose address ends in an index.
         let step = holders.as_ref().and_then(|holders| holders.first());
         if let (Some(holders), Some(step)) = (&holders, step.filter(|step| step.ends_with(']')))
             && key.strip_prefix(*step) == Some(".run")
         {
             let file = &entries[path.as_str()];
-            // The shell: the CI step's, else `defaults.run.shell` of its CI job, then of the
-            // pipeline. `bash`, `sh` or none declared is read; any other shell is not.
             let mut shells = vec![format!("{step}.shell")];
             shells.extend(scopes(&holders[1..], "defaults.run.shell"));
             let shell = shells.iter().find_map(|key| file.get(key.as_str()));
@@ -374,16 +317,13 @@ pub(crate) fn read(
             }
         }
         let text = match &holders {
-            // A written asterisk is no unresolved part: such a value is read as before.
             Some(holders) if value.contains("${{") && !value.contains('*') => {
-                // Never the `env` the key itself is written in.
                 let scopes = scopes(holders, "env.");
                 evaluated(value, |name| {
                     let outer = scopes
                         .iter()
                         .filter(|scope| !key.starts_with(scope.as_str()));
                     let file = entries.get(path.as_str())?;
-                    // The nearest `env` that defines the name decides, literal or not.
                     let mut found = outer.filter_map(|scope| given(file, scope, name));
                     found.next().flatten().filter(|_| !rebound(name))
                 })
@@ -391,8 +331,6 @@ pub(crate) fn read(
             _ => value.clone(),
         };
         let pattern = text != *value && text.contains('*');
-        // The object key after a bucket is opaque; punctuation there cannot change the
-        // resource identity. Validate the structured resource name, not that suffix.
         let named = types::identified(&text)
             .filter(|contract| {
                 contract.rsplit_once("::").is_some_and(|(_, name)| {
@@ -400,13 +338,10 @@ pub(crate) fn read(
                         && !name
                             .bytes()
                             .any(|b| b.is_ascii_whitespace() || b"${}?#".contains(&b))
-                        // An unresolved part makes the name a pattern (ADR 0026, "Patterns").
                         && (!name.contains('*') || pattern && super::pattern::supported(name))
                 })
             })
             .map(|c| (c, Level::Exact))
-            // A key of `with` belongs to the action's vocabulary, not to the cloud's, and a
-            // document the reader of a contract kind recognizes means what that reader says.
             .or_else(|| {
                 let owned = holders.is_some() || recognized.get(path).is_some_and(holds);
                 (!owned).then(|| key_name(key, value)).flatten()
@@ -445,22 +380,16 @@ pub(crate) fn read(
     Ok((uses, grants, scripts))
 }
 
-/// What the `env` map at `scope` (a key path that ends in `.`) gives `name` among the keys of
-/// its file: `None` when the map does not define the name, and inside it the literal string, or
-/// `None` when the map defines the name with anything else.
 fn given<'v>(
     file: &BTreeMap<&str, Option<&'v str>>,
     scope: &str,
     name: &str,
 ) -> Option<Option<&'v str>> {
-    // Whether a key of the file starts with `prefix`.
     let holds = |prefix: String| {
         let from = (Bound::Included(prefix.as_str()), Bound::Unbounded);
         let mut next = file.range::<str, _>(from);
         next.next().is_some_and(|(k, _)| k.starts_with(&prefix))
     };
-    // An `env` written as one expression may define any name, and so may one that merges
-    // another map in (`<<`), which the reader does not expand.
     let map = scope.trim_end_matches('.');
     if file.contains_key(map) || holds(format!("{map}[\"<<\"]")) {
         return Some(None);
@@ -469,12 +398,9 @@ fn given<'v>(
     if let Some(value) = file.get(key.as_str()) {
         return Some(*value);
     }
-    // A list or a map under the name.
     (holds(format!("{key}.")) || holds(format!("{key}["))).then_some(None)
 }
 
-/// The sides `of` each export holds (its uses, or its policy grants) at a key: its full
-/// identity or its repository-relative locator.
 pub(crate) fn found<'e>(
     exports: &'e [crate::index::Export],
     name: &str,

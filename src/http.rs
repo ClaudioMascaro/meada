@@ -1,6 +1,3 @@
-//! The HTTP contract kind: routes served by providers and the `fetch` calls that consume them.
-//! A contract is `http::<METHOD>::<normalized path>`.
-
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::config::gateway_path;
@@ -33,21 +30,16 @@ pub(crate) use ts::{INCLUDE_DEPTH, INCLUDES, IncludeReason, config_inputs};
 
 pub use meada_core::http::{PARAM, normalize_path};
 
-/// The method of a provider that serves every method: `http::ANY::<path>`.
 const ANY: &str = "ANY";
 
 pub struct Http;
 
-/// The contract identifier of `method` on `path`.
 pub fn contract(method: &str, path: &str) -> String {
     format!("http::{}::{}", method.to_uppercase(), normalize_path(path))
 }
 
 const METHODS: &[&str] = &["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"];
 
-/// What one `fetch` call gives: its contract (`None` when the URL or the method cannot be read),
-/// how it names the provider's repository, and, for an unresolved one, what could still be
-/// read: its method (`None` when unknown) and the literal fragments of its path.
 #[derive(Default)]
 struct Read {
     contract: Option<String>,
@@ -58,7 +50,6 @@ struct Read {
     bare_env: bool,
 }
 
-/// What `fetch(url, init)` reads, or `None` when the URL or the method depends on a parameter.
 fn fetch(args: &[Value]) -> Option<Read> {
     let mut read = locate(args)?;
     if read.contract.is_none() {
@@ -73,11 +64,6 @@ fn fetch(args: &[Value]) -> Option<Read> {
     Some(read)
 }
 
-/// `fetch`, with a URL whose base is an environment read with a default (`Part::EnvOr`, Spring's
-/// `${X:http://api.example.com}`) read both ways: through the variable, as `Part::Env`, and,
-/// when the default names a host, through the default by that host. The two readings are
-/// twins marked in their `via` (`env:X|host:api.example.com` and `host:api.example.com|default`)
-/// until `Http::workspace_step` keeps the one that applies (`DEFAULT`).
 fn fetches(args: &[Value]) -> Option<Vec<Read>> {
     let Some(Value::Str(parts)) = args.first() else {
         return Some(vec![fetch(args)?]);
@@ -92,7 +78,6 @@ fn fetches(args: &[Value]) -> Option<Vec<Read>> {
         args
     };
     let mut through = fetch(&with(vec![Part::Env(var.clone())]))?;
-    // `${X:http://h/}` + `/path` joins with one `/`.
     let mut default = default.clone();
     if let (Some(Part::Text(end)), Some(Part::Text(next))) = (default.last_mut(), tail.first())
         && next.starts_with('/')
@@ -113,22 +98,12 @@ fn fetches(args: &[Value]) -> Option<Vec<Read>> {
     })
 }
 
-/// The `via` prefix of a consumer whose host is unresolved but whose client names itself (a
-/// declarative client without a base URL): the rest is how the reason names the client, as the
-/// language's reader writes it.
 const CLIENT_VIA: &str = "client:";
 
-/// What a consumer's `via` holds between how it names the provider's repository and the proxy
-/// endpoint its URL went through (`env:API_URL through proxy endpoint /api`): the reason of its
-/// link names the endpoint.
 const PROXY_VIA: &str = " through proxy endpoint ";
 
-/// The mark of the default's reading of `${X:default}` (`fetches`), after its `host:` `via`.
 const DEFAULT: &str = "|default";
 
-/// Of the twin readings of each `${X:default}` (`fetches`), the one that applies, its mark
-/// dropped from its `via`: the default's when a provider of the workspace serves its host
-/// (`Provider::hosts`, as `declare` filled them), else the variable's.
 fn keep_applicable(exports: &mut [IndexExport]) {
     let served: HashSet<String> = (exports.iter().flat_map(|e| &e.providers))
         .flat_map(|p| &p.hosts)
@@ -156,8 +131,6 @@ fn keep_applicable(exports: &mut [IndexExport]) {
     }
 }
 
-/// The literal parts of the path of a URL, in order: what is left of `parts` once its scheme
-/// and host and its query are dropped, split at every part that is not literal.
 fn fragments(parts: &[Part]) -> Vec<String> {
     const GAP: &str = "\0";
     let text: String = parts
@@ -172,7 +145,6 @@ fn fragments(parts: &[Part]) -> Vec<String> {
         None => &text,
     };
     let path = path.split(['?', '#']).next().unwrap_or("");
-    // Route paths lose their trailing `/` (`normalize_path`), so a path ending in a literal does.
     let path = match path.ends_with(GAP) {
         true => path,
         false => path.trim_end_matches('/'),
@@ -182,9 +154,6 @@ fn fragments(parts: &[Part]) -> Vec<String> {
         .collect()
 }
 
-/// Whether a repository-relative `path` is a test file by its language's convention: `*_test.go`,
-/// `*.test.*` and `*.spec.*`, `test_*.py` and `*_test.py`, a `tests` or `__tests__` directory
-/// and a JVM `src/test` tree.
 // ponytail: only the conventions the ticket names (#620), not `*Test.java` or `*Tests.cs`; add
 // one when a repository needs it, or let it set `test_routes`.
 pub(crate) fn is_test_file(path: &str) -> bool {
@@ -202,10 +171,6 @@ pub(crate) fn is_test_file(path: &str) -> bool {
         || dirs.windows(2).any(|w| w == ["src", "test"])
 }
 
-/// Drops the providers whose site is in a test file, and the route entry points of those sites:
-/// a test builds a router or a fake upstream to exercise the code, it serves nothing. The
-/// site is where the handler is defined, so a route a test registers with a handler of the
-/// repository's own code stays a provider. A document's route is not read here.
 fn drop_test_providers(repo: &Repository, export: &mut IndexExport) {
     let in_test = |site: &str| {
         let own = site
@@ -227,38 +192,27 @@ fn drop_test_providers(repo: &Repository, export: &mut IndexExport) {
         .retain(|e| !dropped.contains(&e.identity));
 }
 
-/// The method and path of an HTTP contract identifier: `("GET", "/users/{}")`.
 fn route(contract: &str) -> Option<(&str, &str)> {
     contract.strip_prefix("http::")?.split_once("::")
 }
 
-/// The contracts `provider` serves at its gateway paths, each with the reason for the rewrite.
 fn gateway_contracts(provider: &Provider) -> impl Iterator<Item = (String, &str)> {
     let method = route(&provider.contract).map(|(method, _)| method);
     (provider.gateways.iter())
         .filter_map(move |g| Some((contract(method?, &g.path), g.reason.as_str())))
 }
 
-/// Whether a provider of the route `provided` serves the route `wanted`: the same route, or
-/// the same path when the provider serves every method (`ANY`).
 fn fits(provided: &str, wanted: &str) -> bool {
     provided == wanted
         || matches!((route(provided), route(wanted)), (Some((ANY, p)), Some((_, w))) if p == w)
 }
 
-/// Whether `provider` serves `contract`, by its own path or by a gateway path.
 fn serves(provider: &Provider, contract: &str) -> bool {
     fits(&provider.contract, contract)
         || gateway_contracts(provider).any(|(g, _)| fits(&g, contract))
 }
 
-/// Sets the drift (spec #23) of every HTTP link of `links` with a single provider (any level
-/// but `ambiguous`) and a shape on both sides: the consumer's at its call site, and that of the
-/// provider at the link's provider site serving the link's contract. Run on the links of the
-/// whole workspace once the decisions are replayed, so everything reading links sees it.
 fn drift(links: &mut [Link], exports: &[IndexExport]) {
-    // A call site holds one consumer per contract it reaches (a wrapper fetching two routes);
-    // the same contract from several hosts (`via`) counts only when they read alike.
     let mut consumers: HashMap<(&str, Option<&str>), Vec<Option<&Shape>>> = HashMap::new();
     for c in exports.iter().flat_map(|e| &e.consumers) {
         let key = (c.site.as_str(), c.contract.as_deref());
@@ -278,7 +232,6 @@ fn drift(links: &mut [Link], exports: &[IndexExport]) {
         if link.level == Level::Ambiguous || route(&link.contract).is_none() {
             continue;
         }
-        // A decided link of an unresolved consumer carries the provider's contract.
         let site = link.consumer.as_str();
         let Some(consumer) = read(site, Some(&link.contract)).or_else(|| read(site, None)) else {
             continue;
@@ -291,8 +244,6 @@ fn drift(links: &mut [Link], exports: &[IndexExport]) {
     }
 }
 
-/// The path of the route `contract` when a call of `method` can reach it: a route of that
-/// method or of every method (`ANY`), or of any method when `method` is unknown.
 fn route_path<'a>(contract: &'a str, method: Option<&str>) -> Option<&'a str> {
     let (route_method, path) = route(contract)?;
     method
@@ -300,9 +251,6 @@ fn route_path<'a>(contract: &'a str, method: Option<&str>) -> Option<&'a str> {
         .then_some(path)
 }
 
-/// Whether the route `contract` can be what a dynamic URL reaches: it is an HTTP route of
-/// `method` when that is known (or of every method), and its path holds every literal
-/// fragment, in order.
 fn route_fits(contract: &str, method: Option<&str>, fragments: &[String]) -> bool {
     let Some(mut path) = route_path(contract, method) else {
         return false;
@@ -316,10 +264,6 @@ fn route_fits(contract: &str, method: Option<&str>, fragments: &[String]) -> boo
     true
 }
 
-/// Whether the route `contract` can be what a URL reaches whose start Meada could not read and
-/// whose known rest is the path `known` (#801): it is a route of `method` when that is known,
-/// and some suffix of its path that starts at a `/` is `known`, as a whole path fits a route.
-/// A rest that is no path (`/`) may follow any base.
 fn tail_fits(contract: &str, method: Option<&str>, known: &str) -> bool {
     let Some(path) = route_path(contract, method) else {
         return false;
@@ -327,9 +271,6 @@ fn tail_fits(contract: &str, method: Option<&str>, known: &str) -> bool {
     known == "/" || path.match_indices('/').any(|(at, _)| path[at..] == *known)
 }
 
-/// The contract and `via` of `fetch(url, init)`, or `None` when the URL or the method
-/// depends on a parameter; the contract is `None` when the URL or the method cannot be read,
-/// and when the URL starts with a part Meada could not read, which its `Lead` names (#801).
 fn locate(args: &[Value]) -> Option<Read> {
     let method = method(args.get(1)).ok()?;
     let parts = match args.first() {
@@ -338,7 +279,6 @@ fn locate(args: &[Value]) -> Option<Read> {
         Some(Value::Ref(_)) => return None,
         _ => return Some(Read::default()),
     };
-    // A strip around a still-composite receiver can change its last path segment.
     if parts.iter().any(|p| {
         matches!(
             p,
@@ -347,8 +287,6 @@ fn locate(args: &[Value]) -> Option<Read> {
     }) {
         return Some(Read::default());
     }
-    // Only a terminal optional query is irrelevant. If path text follows it, that text
-    // can be either part of the path or part of the query.
     let end = parts.iter().rposition(|p| {
         !matches!(p, Part::QuerySuffix) && !matches!(p, Part::Text(t) if t.is_empty())
     });
@@ -360,7 +298,6 @@ fn locate(args: &[Value]) -> Option<Read> {
         Some((Part::Env(var) | Part::EnvOr(var, _), rest)) => {
             let via = Some(format!("env:{var}"));
             let path = render(rest);
-            // A variable can hold the whole endpoint. Its workload value supplies the path.
             if path.is_empty() || path.starts_with(['?', '#']) {
                 return Some(Read {
                     via,
@@ -383,10 +320,7 @@ fn locate(args: &[Value]) -> Option<Read> {
                         (Some(via), Some(rest[end..].to_string()), None)
                     }
                 }
-                // `/users`: no base, the host unresolved.
                 None if !matches!(parts.first(), Some(p) if unknown(p)) => (None, Some(url), None),
-                // `${base}/users`: the rest is appended to a base Meada could not read, which may
-                // hold a path of its own, so only the end of the path is known.
                 None => {
                     let rest =
                         render(&path_parts[path_parts.iter().take_while(|p| unknown(p)).count()..]);
@@ -403,7 +337,6 @@ fn locate(args: &[Value]) -> Option<Read> {
             }
         }
     };
-    // A path that does not start at the root, such as `${base}${path}`, is not read.
     let path = path.filter(|p| p.is_empty() || p.starts_with(['/', '?', '#']));
     Some(Read {
         contract: method
@@ -415,7 +348,6 @@ fn locate(args: &[Value]) -> Option<Read> {
     })
 }
 
-/// A part of a URL Meada could not read, which a base may hold (#801).
 fn unknown(part: &Part) -> bool {
     matches!(
         part,
@@ -423,17 +355,10 @@ fn unknown(part: &Part) -> bool {
     )
 }
 
-/// The base of a client Meada did not read (#801): a path appended to it leaves the consumer an
-/// open item that names the client's base.
 pub(in crate::http) fn client_base() -> Vec<Part> {
     vec![Part::Limit(Limit::ClientBase)]
 }
 
-/// Whether `url` is a path from the root (`/orders`, not `//host`) over a `base` whose origin is
-/// a part Meada could not read (it starts with one, and no literal `://` places a host after
-/// it). A library that joins as RFC 3986 does (C#'s `Uri`, Retrofit, Ktor's `defaultRequest`,
-/// aiohttp, Foundation's `URL(string:relativeTo:)`) replaces whatever path the base has with it,
-/// so that URL is its path alone: certain, with its host unresolved (#801).
 pub(in crate::http) fn rooted_over_unread(base: &[Part], url: &Value) -> bool {
     let rooted = |t: &str| t.starts_with('/') && !t.starts_with("//");
     matches!(url, Value::Str(parts) if matches!(parts.first(), Some(Part::Text(t)) if rooted(t)))
@@ -441,8 +366,6 @@ pub(in crate::http) fn rooted_over_unread(base: &[Part], url: &Value) -> bool {
         && !(base.iter()).any(|p| matches!(p, Part::Text(t) if t.contains("://")))
 }
 
-/// The method `init` gives: `GET` when it gives none (the `fetch` default), `None` when it
-/// cannot be read.
 fn method(init: Option<&Value>) -> Result<Option<String>, Depends> {
     let Some(init) = init else {
         return Ok(Some("GET".into()));
@@ -463,9 +386,6 @@ fn method(init: Option<&Value>) -> Result<Option<String>, Depends> {
     }
 }
 
-/// `url` with the client's `base` URL joined in front, when `url` is a path relative to it: it
-/// starts with literal text that is not a scheme. An absolute URL, and one whose start is not
-/// known, are left as they are.
 fn based(base: Option<&[Part]>, url: &Value) -> Value {
     let (Some(base), Value::Str(parts)) = (base, url) else {
         return url.clone();
@@ -492,8 +412,6 @@ fn based(base: Option<&[Part]>, url: &Value) -> Value {
     Value::Str(out)
 }
 
-/// The methods a list of literal strings names (`methods=["GET", "post"]`), upper-cased; none
-/// for anything but a list.
 fn methods(list: Value) -> Vec<String> {
     let Value::List(items) = list else {
         return Vec::new();
@@ -506,7 +424,6 @@ fn methods(list: Value) -> Vec<String> {
         .collect()
 }
 
-/// A provider of `contract` at `site`.
 fn provider(site: Site, contract: String) -> Found {
     Found {
         identity: None,
@@ -523,8 +440,6 @@ fn provider(site: Site, contract: String) -> Found {
     }
 }
 
-/// The consumer at the call `index` of `path`, as `read` reads it, with the shape it reads of
-/// the response (spec #23), if any.
 fn consumer(path: &str, index: usize, read: Read, shape: Option<Shape>) -> Found {
     let site = Site::Call {
         path: path.into(),
@@ -533,8 +448,6 @@ fn consumer(path: &str, index: usize, read: Read, shape: Option<Shape>) -> Found
     consumer_at(site, read, shape)
 }
 
-/// The consumer at `site`, as `read` reads it: a call, or a definition (a method of a declarative
-/// client, which has no call of its own).
 fn consumer_at(site: Site, read: Read, shape: Option<Shape>) -> Found {
     Found {
         identity: read
@@ -556,7 +469,6 @@ fn consumer_at(site: Site, read: Read, shape: Option<Shape>) -> Found {
     }
 }
 
-/// `parts` as a path, every non-literal part a parameter.
 fn render(parts: &[Part]) -> String {
     parts
         .iter()
@@ -580,28 +492,17 @@ fn render(parts: &[Part]) -> String {
         .collect()
 }
 
-/// The HTTP methods as lower-case names: Express and FastAPI register routes with them, and
-/// Python clients send requests with them.
 const HTTP_METHODS: &[&str] = &["get", "post", "put", "delete", "patch", "options", "head"];
 
-/// An HTTP client library of Python or Rust, by what it names outside the repository: the
-/// Python rows are `python/clients.rs`'s, the Rust rows `rust/frameworks.rs`'s.
 struct Library {
-    /// The modules whose functions send a request (`requests.get`, `reqwest.blocking.get`).
     modules: &'static [&'static str],
-    /// What constructs a client, an object whose methods send requests. A Rust builder chain
-    /// (`Client::builder().build()?`) is the constructor that starts it.
     clients: &'static [&'static str],
 }
 
-/// A call by its file and index: what creates an app or a router, or a URLconf entry.
 type CallAt<'a> = (&'a str, usize);
 
-/// For each router, the routers it is mounted on and the segment the mount puts before its
-/// routes, `None` when it cannot be read.
 type Mounts<'a, N = CallAt<'a>> = BTreeMap<N, Vec<(N, Option<String>)>>;
 
-/// `prefix` and `path` joined with one `/`.
 fn join(prefix: &str, path: &str) -> String {
     let prefix = prefix.trim_end_matches('/');
     match path.starts_with('/') {
@@ -610,8 +511,6 @@ fn join(prefix: &str, path: &str) -> String {
     }
 }
 
-/// Whether every `{` of `path` closes within its segment, as `{id:[0-9]{3}}` does: a pattern
-/// with a `/` inside braces is not read.
 fn balanced(path: &str) -> bool {
     path.split('/').all(|segment| {
         let mut depth = 0usize;
@@ -629,19 +528,13 @@ fn balanced(path: &str) -> bool {
     })
 }
 
-/// How many mounts deep a router's prefixes are read.
 // ponytail: a router nested deeper than this is served nowhere; the stack is not Meada's to spend.
 const PREFIX_DEPTH: usize = 64;
 
-/// How many mounts are walked to give the prefixes of one router.
 // ponytail: a router whose mounts fan out past this (one router nested twice, 40 levels up) is
 // served nowhere rather than under a part of its prefixes; memoizing the walk would lift it.
 const PREFIX_WORK: usize = 4096;
 
-/// Every prefix the routes of `router` take, sorted: the segment of each mount under every
-/// prefix of the router it is mounted on, or its `root` prefix when nothing mounts it (`None`
-/// when such a router is not served). A prefix that cannot be read adds none, and a router
-/// mounted too deep or through too many mounts (`PREFIX_DEPTH`, `PREFIX_WORK`) has none.
 fn prefixes<'a, N: Copy + Ord>(
     router: N,
     mounts: &Mounts<'a, N>,
@@ -652,7 +545,6 @@ fn prefixes<'a, N: Copy + Ord>(
     prefixes_within(router, mounts, root, seen, &mut work).unwrap_or_default()
 }
 
-/// `prefixes`, `None` when `work` mounts do not cover it.
 fn prefixes_within<'a, N: Copy + Ord>(
     router: N,
     mounts: &Mounts<'a, N>,
@@ -663,7 +555,6 @@ fn prefixes_within<'a, N: Copy + Ord>(
     let Some(parents) = mounts.get(&router) else {
         return Some(root(router).into_iter().collect());
     };
-    // A router mounted inside itself, through any depth, adds nothing.
     if seen.contains(&router) {
         return Some(Vec::new());
     }
@@ -687,8 +578,6 @@ fn prefixes_within<'a, N: Copy + Ord>(
     Some(out)
 }
 
-/// A provider's prefix or path as written: `None` when it is not a string, or when a part of it
-/// cannot be read. A path parameter written in the literal (`{id}`, `<int:id>`) stays one.
 // ponytail: a prefix or path that depends on a parameter is not read through the callers, as
 // `Code::expand` reads a client wrapper's URL; it yields no route.
 fn path_literal(value: Value) -> Option<String> {
@@ -698,9 +587,6 @@ fn path_literal(value: Value) -> Option<String> {
     }
 }
 
-/// Where the route `method` `full` of a handler written in `scope` of `path` starts a trace: a
-/// closure is an inline handler named for its route, a function of the repository the function,
-/// and anything else the file.
 fn handler_site<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -766,8 +652,6 @@ impl ContractKind for Http {
         true
     }
 
-    /// A route is listed by its providers alone: its consumers are calls. Its shape is a
-    /// `response`.
     fn view(&self, contract: &str) -> Option<View> {
         route(contract).map(|_| View {
             provider: "provider",
@@ -796,9 +680,7 @@ impl ContractKind for Http {
     fn extract(&self, code: &Code, indexed: &Indexed) -> Vec<Found> {
         code.with_returned_strings(|| {
             let mut found = Vec::new();
-            // One reader of each shape source for the whole extraction: each budget per file once.
             let mut literals = Literals::default();
-            // One reader of Backstage's `app-config*.yaml` for the extraction (`ts::Config`).
             let config = ts::Config::new(indexed);
             let mut consumers = ts::consumers(code, &config, &mut literals);
             let (providers, mounted) = ts::providers(code, &mut literals);
@@ -824,8 +706,6 @@ impl ContractKind for Http {
         })
     }
 
-    /// Keeps, of the two readings of a `${X:default}` base, the one that applies
-    /// (`keep_applicable`), once every repository declared its hosts.
     fn workspace_step(&self, exports: &mut [IndexExport], _: &[Repository]) {
         keep_applicable(exports);
     }
@@ -848,22 +728,10 @@ impl ContractKind for Http {
         })
     }
 
-    /// Adds the routes of the repository's documents (spec #21), then the gateway paths and
-    /// hosts. A document route with the contract of a code route merges into it: the code
-    /// keeps the handler. Any other is a provider of its own, without a handler, at
-    /// `<repository>::<document>::<METHOD> <path>`; a route an earlier document (by path)
-    /// already listed adds nothing of its own.
-    ///
-    /// Each document listing a route gives it its own gateway forms: one per `servers` path of
-    /// the document (the server path as the prefix, with the `[serve]` strip), or the `[serve]`
-    /// form when the document has no server path. A code route keeps its `[serve]` form and
-    /// adds those of the documents listing it. The hosts of every HTTP provider are the
-    /// `[serve]` hosts and the hosts of every document's servers.
     fn declare(&self, repo: &Repository, export: &mut IndexExport) {
         if !repo.config.test_routes {
             drop_test_providers(repo, export);
         }
-        // IaC is an explicit serving declaration, including a handler in a test-named file.
         iac::declare(repo, export);
         let serve = &repo.config.serve;
         let code: HashSet<String> = (export.providers.iter())
@@ -872,7 +740,6 @@ impl ContractKind for Http {
         let mut listed = code.clone();
         let mut documented = Vec::new();
         let mut forms: HashMap<String, Vec<Gateway>> = HashMap::new();
-        // The first document by path listing a route gives its shape, merged or not.
         let mut shapes = HashMap::new();
         for doc in &export.documents {
             let prefixes = (doc.summary.servers.iter())
@@ -916,7 +783,6 @@ impl ContractKind for Http {
             let Some((_, path)) = route(&p.contract) else {
                 continue;
             };
-            // A document's shape wins over the one the code gives.
             if let Some(Some(shape)) = shapes.get(&p.contract) {
                 p.shape = Some(shape.clone());
             }
@@ -924,8 +790,6 @@ impl ContractKind for Http {
                 .gateway_path(path)
                 .map(|(path, reason)| Gateway { path, reason });
             let from_documents = forms.get(&p.contract).cloned().unwrap_or_default();
-            // The `[serve]` form first: a code route has it, a documented one when a document
-            // without server paths lists it.
             let served =
                 served.filter(|s| code.contains(&p.contract) || from_documents.contains(s));
             p.gateway = served.as_ref().map(|s| s.path.clone());
@@ -949,7 +813,6 @@ impl ContractKind for Http {
         let Some(contract) = &consumer.contract else {
             return Vec::new();
         };
-        // The proxy endpoint a URL went through, which the reason names.
         let (via, endpoint) = match consumer.via.as_deref().map(|v| v.split_once(PROXY_VIA)) {
             Some(Some((via, endpoint))) => (Some(via), Some(endpoint)),
             _ => (consumer.via.as_deref(), None),
@@ -957,12 +820,7 @@ impl ContractKind for Http {
         let through = endpoint.map(|e| format!(" through the proxy endpoint {e}"));
         let through = through.as_deref().unwrap_or_default();
         let var = via.and_then(|v| v.strip_prefix("env:"));
-        // A Base URL declaration settles the module: the routes served under its directory of
-        // this repository, chosen before a code path match elsewhere can drop a gateway match.
         let dir = var.and_then(|var| from.config.declared_dir(var));
-        // A route serves a consumer by its code path, or by its gateway path with the reason
-        // for the rewrite. Within one repository a code path match wins over gateway path
-        // matches; across repositories both are candidates.
         let mut serving: Vec<_> = (providers.iter())
             .filter(|(m, p)| {
                 dir.is_none_or(|dir| {
@@ -977,8 +835,6 @@ impl ContractKind for Http {
                 Some((m, p, Some(reason.to_string())))
             })
             .collect();
-        // A relative URL reaches its own origin: when a route of the consumer's own package
-        // fits, the others (other packages, other repositories) drop.
         if via.is_none() {
             let manifests = (exports.iter())
                 .find(|e| e.repository == from.identity)
@@ -1035,13 +891,10 @@ impl ContractKind for Http {
                 format!("base URL from {var}{through}, a base_url_env of peer"),
             )
         } else {
-            // The host is unresolved: a relative URL, an unknown base, or a variable no
-            // peer names. Exactly one repository serving the route is enough.
             let fits: Vec<_> = serving.collect();
             let mut repos: Vec<&str> = fits.iter().map(|(m, ..)| m.identity.as_str()).collect();
             repos.sort();
             repos.dedup();
-            // A client that names itself says so (`CLIENT_VIA`).
             let client = via.and_then(|v| v.strip_prefix(CLIENT_VIA));
             let why = match (var, client) {
                 (Some(var), _) => format!("base URL from {var}{through}, no peer's base_url_env"),
@@ -1058,8 +911,6 @@ impl ContractKind for Http {
         fits.iter()
             .map(|(repo, provider, gateway)| {
                 let n = fits.len();
-                // Through a gateway the link is inferred, whatever the consumer side gave, and
-                // its reason is the rewrite.
                 let mut reason = match (gateway, ambiguous) {
                     (Some(rewrite), true) => format!("{n} providers fit; {rewrite}"),
                     (Some(rewrite), false) => rewrite.clone(),
@@ -1093,15 +944,10 @@ impl ContractKind for Http {
             .collect()
     }
 
-    /// A method of a declarative client (an interface whose methods are the requests) calls on
-    /// the route it consumes.
     fn calls_from_definition(&self) -> bool {
         true
     }
 
-    /// The Backstage plugins whose routers stay at the root for want of a literal `pluginId`
-    /// (#615), the proxy endpoints whose target is not read (#616), with their calls, and the
-    /// `$include`s of `app-config*.yaml` not followed, with their reason (#689).
     fn status(&self, repo: &Repository, export: &IndexExport, _links: &[Link]) -> Vec<String> {
         let prefix = format!("{}::", repo.identity);
         let mut lines: Vec<String> = (export.unmounted.iter())
@@ -1133,12 +979,10 @@ impl ContractKind for Http {
         lines
     }
 
-    /// The drift of the links, once the decisions are replayed (`drift`).
     fn after_links(&self, links: &mut [Link], exports: &[IndexExport]) {
         drift(links, exports);
     }
 
-    /// A route is labelled by its method and path.
     fn label(&self, contract: &str) -> String {
         match route(contract) {
             Some((method, path)) => format!("{method} {path}"),
@@ -1168,8 +1012,6 @@ impl ContractKind for Http {
         if paths.peek().is_none() {
             return Some(crate::msg::Msg::UrlNoMethod(method.unwrap_or_default()).text());
         }
-        // Suggest a prefix only when the whole server path is an exact suffix at a
-        // segment boundary. A fragment in the middle of a path proves less.
         let written = consumer.lead.as_ref().map(|l| l.path.as_str()).or(
             match consumer.fragments.as_slice() {
                 [one] => Some(one.as_str()),
@@ -1182,8 +1024,6 @@ impl ContractKind for Http {
         Some(crate::msg::Msg::UrlNoPath { prefix }.text())
     }
 
-    /// A route fits a dynamic URL by its code path or by a gateway path: by the literal fragments
-    /// of the URL, or, after a base Meada could not read, by the end of the path (#801).
     fn candidate(&self, consumer: &Consumer, provider: &Provider) -> bool {
         let method = consumer.method.as_deref();
         let fits = |c: &str| match &consumer.lead {
@@ -1193,7 +1033,6 @@ impl ContractKind for Http {
         fits(&provider.contract) || gateway_contracts(provider).any(|(g, _)| fits(&g))
     }
 
-    /// A route is a whole contract (`GET /users` names one too), or a path on any method.
     fn starts<'a>(&self, from: &str, providers: &[(&'a str, &'a str)]) -> Vec<&'a str> {
         let (contract, path) = if route(from).is_some() {
             (Some(from.to_string()), None)
@@ -1216,21 +1055,16 @@ impl ContractKind for Http {
             .collect()
     }
 
-    /// A provider of a route is a door.
     fn entry(&self, role: Role, contract: &str) -> Option<EntryKind> {
         (role == Role::Provider && route(contract).is_some()).then_some(EntryKind::Route)
     }
 }
 
-/// Whether the site `site` of the repository `identity` (`<identity>::<path>::...`) lies under
-/// the directory `dir` of that repository: `svc` holds `svc/a.go`, never `svc-ui/a.go`.
 fn under(site: &str, identity: &str, dir: &str) -> bool {
     (path_of(site, identity).and_then(|p| p.strip_prefix(dir)))
         .is_some_and(|rest| rest.starts_with('/'))
 }
 
-/// The repository path of the site `site` of the repository `identity`
-/// (`<identity>::<path>::...`).
 fn path_of<'s>(site: &'s str, identity: &str) -> Option<&'s str> {
     let rest = site.strip_prefix(identity)?.strip_prefix("::")?;
     Some(rest.split_once("::").map_or(rest, |(path, _)| path))
@@ -1247,8 +1081,6 @@ mod tests {
     use crate::index::{Consumer, Gateway, Provider};
     use crate::lang::{Limit, Part, Value};
 
-    /// A route whose handler names no definition has the whole file for its site
-    /// (`<identity>::<path>`, `Site::File`): a declared directory holds it as it holds a symbol's.
     #[test]
     fn a_whole_file_site_lies_under_its_directory() {
         assert!(under("acme::svc-b/main.go", "acme", "svc-b"));
@@ -1257,9 +1089,6 @@ mod tests {
         assert!(!under("other::svc-b/main.go", "acme", "svc-b"));
     }
 
-    /// A base Meada could not read (a hole, a read no kind decided, a limit of value flow), with
-    /// a path appended, may hold a path of its own: the consumer is unresolved, and its lead
-    /// names why and the known end of the path (#801). With no base, the path is the URL's.
     #[test]
     fn a_base_meada_could_not_read_leaves_the_consumer_unresolved_with_its_lead() {
         let read = Part::Read {
@@ -1289,8 +1118,6 @@ mod tests {
         assert!(found[0].lead.is_none());
     }
 
-    /// After a base Meada could not read, a route fits by the end of its path, at a `/`, as a
-    /// whole path fits a route (#801).
     #[test]
     fn a_route_fits_a_known_end_by_a_suffix_of_its_path_at_a_slash() {
         for (contract, method, known, expected) in [
@@ -1302,7 +1129,6 @@ mod tests {
             ("http::GET::/v2/orders/{}", None, "/orders", false),
             ("http::POST::/v2/orders", Some("GET"), "/orders", false),
             ("http::ANY::/v2/orders", Some("GET"), "/orders", true),
-            // A rest that is no path may follow any base.
             ("http::GET::/v2/orders", None, "/", true),
             ("channel::orders", None, "/", false),
         ] {
@@ -1355,8 +1181,6 @@ mod tests {
         assert_eq!(Http.search_word(), Search::Filter("route"));
     }
 
-    /// `context` on a route lists its providers and calls its shape `response`; a contract that
-    /// is no route has no such view.
     #[test]
     fn a_route_is_viewed_by_its_providers_with_a_response_and_a_non_route_not_at_all() {
         let view = Http.view("http::GET::/users/{}").unwrap();
@@ -1429,8 +1253,6 @@ mod tests {
         assert_eq!(Http.label("resource::db::orders"), "resource::db::orders");
     }
 
-    /// `n` routers, each mounted on the next under `/{i}`, as many times as `ways`; the last
-    /// is the app.
     fn nested(n: usize, ways: usize) -> (Mounts<'static>, CallAt<'static>) {
         let mut mounts = Mounts::new();
         for i in 0..n {
@@ -1493,14 +1315,10 @@ mod tests {
             route_fits(contract, method, &fragments)
         };
         for (contract, method, parts, expected) in [
-            // No method, no fragment: every route.
             ("http::GET::/api/users", None, &[][..], true),
-            // The method filters when known.
             ("http::GET::/api/users", Some("GET"), &[][..], true),
             ("http::POST::/api/users", Some("GET"), &[][..], false),
-            // A route of every method fits any method.
             ("http::ANY::/api/users", Some("DELETE"), &[][..], true),
-            // Every fragment must be in the path, in order, without overlapping.
             ("http::GET::/api/users/{}", None, &["/api/"][..], true),
             (
                 "http::GET::/api/users/{}",
@@ -1528,14 +1346,12 @@ mod tests {
             ),
             ("http::GET::/api/orders", None, &["/users"][..], false),
             ("http::GET::/api/users", None, &["/api/users"][..], true),
-            // Both filters apply together.
             (
                 "http::DELETE::/api/users/{}",
                 Some("GET"),
                 &["/api/"][..],
                 false,
             ),
-            // Not an HTTP route.
             ("channel::orders", None, &[][..], false),
         ] {
             assert_eq!(
@@ -1567,7 +1383,6 @@ mod tests {
                 vec!["/api/users"],
             ),
             (vec![Hole, Hole], vec![]),
-            // The trailing `/` of the end of the path is dropped, as route paths drop it.
             (vec![text("/api/users/?page="), Hole], vec!["/api/users"]),
             (
                 vec![text("/api/users/"), Hole, text("/")],

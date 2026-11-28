@@ -13,7 +13,6 @@ enum Owner<'a> {
 type Site<'a> = (&'a str, usize);
 type Marks<'a> = HashMap<(Owner<'a>, Option<&'a str>), Option<Site<'a>>>;
 
-/// Keep a single write's location so a field may exclude its own initialization.
 #[derive(Default)]
 pub(in crate::resolve) struct Writes<'a> {
     program: Marks<'a>,
@@ -72,7 +71,6 @@ impl<'a> Writes<'a> {
                     match receiver {
                         Binding::Instance(t) => Some(Owner::Class(t)),
                         Binding::Const(path, name) => Some(Owner::Literal(Target { path, name })),
-                        // A property written directly on the constructor is static.
                         Binding::Def(t) if r.is_class(t) => continue,
                         _ => None,
                     }
@@ -129,7 +127,6 @@ impl<'a> Resolver<'a> {
         })
     }
 
-    /// A field or local binds its constructor where the new expression was written.
     pub(in crate::resolve) fn ts_construction(
         &self,
         path: &'a str,
@@ -230,7 +227,6 @@ impl<'a> Code<'a> {
         callers.get(&target).map_or(&[], Vec::as_slice)
     }
 
-    /// Select the property of one record entry, or the possible properties of a dynamic key.
     #[expect(clippy::too_many_arguments)]
     pub(in crate::resolve) fn ts_record(
         &self,
@@ -299,7 +295,6 @@ impl<'a> Code<'a> {
         }
     }
 
-    /// Read the argument at each exact construction, including values supplied to its factory.
     pub(in crate::resolve) fn ts_field_argument(
         &self,
         path: &'a str,

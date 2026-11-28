@@ -1,9 +1,5 @@
 #!/bin/sh
 set -eu
-# The first workspace version of the proof of concept (compose.accounts.yaml): the console cannot
-# start before the job publishes a generation, and the job needs a version. It imports and applies
-# console.repositories.toml only while the store has no current version, so a restart never
-# replaces what the console saved since.
 bootstrap=/etc/meada/meada.workspace.toml
 export LANG=C
 if meada workspace show --workspace "$bootstrap" >/dev/null 2>/tmp/show.err; then

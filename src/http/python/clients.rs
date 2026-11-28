@@ -1,26 +1,9 @@
-//! Python HTTP consumers (spec #24): requests, httpx and aiohttp. A consumer is a function of a
-//! library's module (`requests.get(url)`) or a method of a client it constructs
-//! (`session.get(url)`); its HTTP method is its name or, for `request(method, url)`, its first
-//! argument. The client's `base_url=` is joined by the root's `based`, a wrapper is read at each
-//! of its call sites (`Code::expand`), and the URL and method are read by the root's `fetch`. A
-//! path joined to a `base_url` Meada did not read leaves the consumer an open item that names the
-//! client's base, unless it starts from the root on an aiohttp session, whose `URL.join` replaces
-//! the base's path with it (RFC 3986): then it is the path alone (#801).
-//! The libraries read also include reqwest and ureq (spec #30), whose rows (modules and
-//! constructors) are the Rust HTTP module's (`http/rust/frameworks.rs`), so the Rust clients are
-//! read by the same rules (the Rust pack gives the receiver's value, so a receiver that is a call
-//! is read there). The receiver's client is found with `Code::origins` (`Follow::Values`: assignments, `with`,
-//! `self` attributes, arguments and return values), and a constructor is named by
-//! `Code::outside` read as a name (`by_path` false, also for the Rust rows), not by the
-//! `outside` an origin carries, which a Rust path call reads as a path.
-
 use super::super::rust::frameworks::{self, CLIENT_LIBRARIES};
 use super::super::{HTTP_METHODS, Library, based, consumer, fetch};
 use crate::contract::Found;
 use crate::lang::{Facts, Imported, Part, Value};
 use crate::resolve::{Code, Expand, Expanded, Follow, Of, Origin};
 
-/// The Python rows of the libraries read; the Rust rows are `CLIENT_LIBRARIES`.
 const PYTHON_LIBRARIES: &[Library] = &[
     Library {
         modules: &["requests"],
@@ -36,13 +19,10 @@ const PYTHON_LIBRARIES: &[Library] = &[
     },
 ];
 
-/// Every library read, the Python rows first.
 fn libraries() -> impl Iterator<Item = &'static Library> {
     PYTHON_LIBRARIES.iter().chain(CLIENT_LIBRARIES)
 }
 
-/// Whether the file names a library outside the repository: Python imports its module, Rust
-/// uses a path under its crate or writes one with no `use`.
 fn names_library(facts: &Facts) -> bool {
     let roots = libraries()
         .flat_map(|l| l.modules.iter().chain(l.clients))
@@ -55,17 +35,10 @@ fn names_library(facts: &Facts) -> bool {
     }) || facts.externs.iter().any(|e| roots.contains(&e.as_str()))
 }
 
-/// Whether `member` sends a request: one of the methods, or `request(method, url)`.
 fn sends(member: &str) -> bool {
     HTTP_METHODS.contains(&member) || member == "request"
 }
 
-/// The base URL the clients that may be the receiver with these `origins` were built
-/// with, `None` when it is not a client: `Some(None)` when it has no base URL, an unknown one
-/// when the clients differ. With it, whether every one of them is an aiohttp session, which
-/// joins a request path as RFC 3986 does rather than append it to the base's path as httpx does.
-/// A client is the call of a library's constructor that the receiver traces back to, by
-/// assignment, `with`, a `self` attribute or an argument.
 // ponytail: a Python receiver that is the result of a call (`Session().get(...)`,
 // `make().get(...)`) is not read, a Rust one is (the pack gives the receiver's value); a
 // parameter given a client takes the base of every caller that passes one.
@@ -102,10 +75,6 @@ fn client_base<'a>(code: &Code<'a>, origins: Vec<Origin<'a>>) -> Option<(Option<
     }
 }
 
-/// Python HTTP consumers: a function of a library's module (`requests.get(url)`) or a method
-/// of a client it constructs (`session.get(url)`), whose HTTP method is its name or, for
-/// `request(method, url)`, its first argument. A wrapper around one is read at each of its call
-/// sites, as `fetch` wrappers are.
 pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
     let mut found = Vec::new();
     for (&path, facts) in code.files() {
@@ -124,8 +93,6 @@ pub(in crate::http) fn consumers(code: &Code) -> Vec<Found> {
             let (member, base, joins) = match (function, method) {
                 (Some(function), _) => function,
                 (None, Some((receiver, member))) => {
-                    // A pack that gives the receiver's value reads a receiver that is a call;
-                    // Python's is a name.
                     let origins = match code.receiver(path, n) {
                         Some(value) => code.origins(
                             path,

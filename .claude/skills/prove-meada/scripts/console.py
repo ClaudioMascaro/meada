@@ -60,13 +60,13 @@ def admin_password(d):
 
 def cmd_start(a):
     run = Path(a.run).resolve()
-    if os.sep in a.bin:  # a path is the caller's, not the run's directory's; a bare name stays a PATH lookup
+    if os.sep in a.bin:
         a.bin = str(Path(a.bin).resolve())
     d = run / "console"
     if (d / "ui.pid").exists():
         sys.exit(f"a console of this run may still be up: console.py stop --run {run}")
     d.mkdir(parents=True, exist_ok=True)
-    os.chmod(d, 0o700)  # it holds the signing key
+    os.chmod(d, 0o700)
     ui_dir = Path(a.ui_dir).resolve()
     if not (ui_dir / "meada-ui.json").exists():
         sys.exit(f"BLOCKED: {ui_dir}/meada-ui.json missing: build the front end (references/console.md)")
@@ -100,7 +100,7 @@ def cmd_start(a):
     (d / "index.err").write_text(idx.stderr)
     if idx.returncode:
         sys.exit(f"BLOCKED: meada index --workspace exited {idx.returncode}, see {d}/index.err")
-    if a.accounts:  # the console refuses a schema below its version
+    if a.accounts:
         mig = subprocess.run([a.bin, "postgres", "migrate", "--workspace", "meada.workspace.toml"], cwd=d, env=env,
                              capture_output=True, text=True)
         (d / "migrate.err").write_text(mig.stderr)

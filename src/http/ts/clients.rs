@@ -1,11 +1,3 @@
-//! TypeScript and JavaScript consumers (spec #23): `fetch(url, init)`, only in a pack whose
-//! globals bind `fetch` (also a call to a parameter defaulting to `fetch`). A client wrapper is
-//! read at each of its call sites through `Code::expand`; a URL whose base is Backstage's
-//! `getBaseUrl('<id>')` starts at `/api/<id>` (`backstage`), one through `/api/proxy/<ep>` goes to
-//! the target of the endpoint `app-config*.yaml` gives (`config`), and the shape the consumer reads
-//! of the response is the field paths `response_reads` reads over the frames climbed. Seams of
-//! the root reused: its `fetch(args)` reader (`locate`, `method`, `fragments`) and `consumer`.
-
 use super::super::join::{depends, opaque_lead, resolve, text_parts};
 use super::super::{consumer, fetch};
 use super::backstage;
@@ -18,14 +10,12 @@ use crate::literals::Literals;
 use crate::resolve::{Code, Expand, Expanded, Frame, Target};
 use crate::shape::{self, Import, Shape, Source, under};
 
-/// `fetch` consumers with the shape each reads of its response (spec #23).
 pub(in crate::http) fn consumers(
     code: &Code,
     config: &Config,
     literals: &mut Literals,
 ) -> Vec<Found> {
     let mut found = Vec::new();
-    // `fetch` is a consumer only where the language binds it everywhere.
     let global = code.binds_everywhere("fetch");
     for (&path, facts) in code.files() {
         for (n, call) in facts.calls.iter().enumerate() {
@@ -76,7 +66,6 @@ pub(in crate::http) fn consumers(
     found
 }
 
-/// Keep a replacement on an environment base until the workload supplies its value.
 fn slash_base(args: &mut [Value]) -> Option<ReceiverIdentity> {
     let Value::Str(parts) = args.first_mut()? else {
         return None;
@@ -124,12 +113,6 @@ fn slash_base(args: &mut [Value]) -> Option<ReceiverIdentity> {
     })
 }
 
-/// `args` with a first argument `new URL(reference, base)` replaced by the join of the two (RFC
-/// 3986 section 5.2, which the WHATWG URL Standard's constructor agrees with for these
-/// references), before the `fetch` is read. Over a base that is an environment read or a hole, an
-/// absolute-path reference keeps the read as its origin, and any other unknown origin is dropped,
-/// the path certain (#801); a parameter on either side waits for the call sites; anything else
-/// the join does not read leaves the URL unknown.
 fn joined(args: &[Value]) -> Vec<Value> {
     let Some(Value::New(callee, urls)) = args.first() else {
         return args.to_vec();
@@ -137,7 +120,6 @@ fn joined(args: &[Value]) -> Vec<Value> {
     let ([reference, base], true) = (&urls[..], callee == GLOBAL_URL) else {
         return args.to_vec();
     };
-    // A base that does not fold (a member, a call) is a hole: opaque, whatever it holds.
     let base = text_parts(base).unwrap_or_else(|| vec![Part::Hole]);
     let url = text_parts(reference).and_then(|r| {
         let join = resolve(&base, &r).or_else(|| opaque_lead(&base, &r));
@@ -148,18 +130,12 @@ fn joined(args: &[Value]) -> Vec<Value> {
     out
 }
 
-/// The consumer shape of the `fetch` at `call` (spec #23): the field paths read from the
-/// parsed body of its response, by the function making the call and by each client wrapper
-/// `frames` climbs from it to the consumer's site, which reads what the one below returns.
-/// The body is the result of `.json()` on the response; a wrapper returns the response, the
-/// body or a part of the body. `None` when nothing is read.
 fn response_reads<'a>(
     code: &Code<'a>,
     types: &mut Types,
     call: (&'a str, usize),
     frames: &[Frame<'a>],
 ) -> Option<Shape> {
-    /// What a value is: the response, or the body below a path (`Body(vec![])`: all of it).
     #[derive(Clone, PartialEq)]
     enum Got<'s> {
         Response,
@@ -168,14 +144,11 @@ fn response_reads<'a>(
     let site = frames.last().map_or(call.0, |f| f.path);
     let mut out = Shape::new(Source::Reads(site.to_string()));
     let (mut got, mut at) = (Got::Response, call);
-    // The types the wrapper below declares for the body with its own type parameters, by path:
-    // its call gives the arguments that stand for them. And that wrapper.
     let mut generic: Vec<(String, &'a Ty)> = Vec::new();
     let mut wrapper: Option<Target<'a>> = None;
     for level in 0..=frames.len() {
         let mut returned = Vec::new();
         let mut deferred: Vec<(String, &'a Ty)> = Vec::new();
-        // Where the call `at` is written; a call that is not there reads nothing.
         let scope = code.files().get(at.0).and_then(|f| f.calls.get(at.1));
         let scope = scope.map(|c| c.scope.as_str());
         for steps in code.uses(at.0, at.1)? {
@@ -188,7 +161,6 @@ fn response_reads<'a>(
                 (Got::Response, _) => continue,
                 (Got::Body(path), _) => (path.clone(), &steps[..]),
             };
-            // A read stops at a method call: `name.toUpperCase()` reads `name`.
             let read = (rest.iter())
                 .take_while(|s| matches!(s, Step::Field(_) | Step::Element))
                 .count();
@@ -199,14 +171,12 @@ fn response_reads<'a>(
             }
             match rest.get(read) {
                 Some(Step::Return) => returned.push(Got::Body(path)),
-                // The type declares what the value holds: the scope is the call's.
                 Some(Step::Typed(ty)) if ty.has_param() => deferred.push((base, ty)),
                 Some(Step::Typed(ty)) => {
                     let Some(scope) = scope else { continue };
                     let listed = types.read(code, at.0, scope, ty).unwrap_or_default();
                     typed(&mut out, &base, listed);
                 }
-                // The wrapper's type parameters, given here, stand in the types it declared.
                 Some(Step::Argument(tys)) => {
                     let (Some(scope), Some(wrapper)) = (scope, wrapper) else {
                         continue;
@@ -230,11 +200,9 @@ fn response_reads<'a>(
         let Some(frame) = frames.get(level) else {
             break;
         };
-        // The frame calls the function making the call `at`, which returns one thing.
         returned.dedup();
         match <[Got; 1]>::try_from(returned) {
             Ok([one]) if frame.def.path == at.0 && Some(frame.def.name) == scope => {
-                // A return type that is a type parameter of the wrapper declares what it returns.
                 if let (Got::Body(path), Some(ty)) = (&one, code.returns(at.0, frame.def.name))
                     && ty.has_param()
                 {
@@ -251,8 +219,6 @@ fn response_reads<'a>(
     (!out.fields.is_empty() || !out.imports.is_empty()).then_some(out)
 }
 
-/// Adds the fields a declared type lists, below `base`, to a consumer's `shape`, with the types
-/// and schemas of a package it names for the query to fill.
 fn typed(shape: &mut Shape, base: &str, listed: Declared) {
     for (field, optional) in listed.fields {
         shape.list(under(base, &field), optional, true);
@@ -263,7 +229,6 @@ fn typed(shape: &mut Shape, base: &str, listed: Declared) {
     }
 }
 
-/// The field path `steps` (fields and elements) read: `items[].id`.
 fn written(steps: &[&Step]) -> String {
     let mut out = String::new();
     for step in steps {

@@ -1,12 +1,7 @@
-//! Overloads of one method show as one set in `context` and `trace` (#397); the export keeps
-//! every candidate.
-
 use meada::engine::{Direction, Engine, Start};
 
 use crate::common::{assert_golden, fixture_repo};
 
-/// `context` and `trace` of `caller` in `fixture`, with the export's candidate count of its
-/// first call, which the grouping must not change.
 fn answers(fixture: &str, caller: &str) -> (String, String, usize) {
     let repo = fixture_repo(fixture, fixture, None);
     let engine = Engine::open(&repo).unwrap();

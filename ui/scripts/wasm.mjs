@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-// Keep this pin in sync with the standalone frontend job and container build.
 const version = '0.15.0';
 const installed = spawnSync('wasm-pack', ['--version'], { encoding: 'utf8' });
 if (installed.status !== 0 || installed.stdout.trim() !== `wasm-pack ${version}`) {

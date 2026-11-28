@@ -1,5 +1,3 @@
-//! Development measurements over public fixtures, never performance acceptance thresholds.
-
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -33,7 +31,6 @@ const SMOKE: Suite = Suite {
     symbol: "src/math.ts::sum",
 };
 
-// Keep subjects explicit so the same answers are comparable between runs.
 const SUITES: &[Suite] = &[
     Suite {
         name: "chain",
@@ -370,7 +367,6 @@ fn measure(suite: &Suite) -> Sample {
     let engine = Engine::open(&root).unwrap();
     engine.refresh().unwrap();
     let cold_workspace_ms = started.elapsed().as_secs_f64() * 1000.0;
-    // Reading every prepared repository's index also catches a peer silently left out.
     let indexes: Vec<_> = repositories
         .iter()
         .map(|repo| IndexSize {
@@ -411,7 +407,6 @@ fn measure(suite: &Suite) -> Sample {
         "reindex must observe exactly the source edit"
     );
 
-    // Fixed queries with default budgets. A missing subject is a harness error, not a cheap answer.
     let search = engine.search("", None, None).unwrap();
     let context = engine.context(suite.symbol, None).unwrap();
     let trace = engine

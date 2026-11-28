@@ -1,25 +1,9 @@
-//! The channel kind's Rust forms (spec #30): the message libraries rdkafka, lapin, aws-sdk-sqs,
-//! async-nats and the redis crate. A form is a method called on a client that traces back to the
-//! library's constructor (`Code::origins` with `Follow::Values`, the constructor named by the
-//! file's `use` declarations), so a `send` or a `publish` on anything else is no producer. The
-//! constructor is named by `Code::outside` without the path flag, as the forms always read it: a
-//! name whose head is not the import itself (a method of a value made from it) is accepted too.
-//! The methods that make a client of another (`create_channel`, `get_connection`, the setters of
-//! a builder) are listed per library (`passes`), as the HTTP kind lists its frameworks and
-//! clients.
-//!
-//! Every client of these crates is polled or streamed, so the function that holds the call
-//! naming the topic or the queue handles what it receives.
-
 use super::message::{
     Message, bind, channel_name as name, consume, produce, publish, queue_name, topics,
 };
 use crate::lang::{Call, Value};
 use crate::resolve::{Code, Follow, Keywords, Of};
 
-/// How many calls of a builder chain (`Code::chain`) a form is read through:
-/// `FutureRecord::to(t).payload(p).key(k)` and `client.send_message().message_body(b).queue_url(u)`
-/// are a few; a crafted file's chain of thousands is not read.
 // ponytail: a record or a request with more setters is no form; `FLUENT_CHAIN` bounds the walk
 // itself, for the value flow.
 const CHAIN: usize = 64;
@@ -33,9 +17,6 @@ enum Client {
     Redis,
 }
 
-/// A library by the crate it is imported from, what constructs its client (the tail of the name
-/// the `use` declarations give the call, `ClientConfig.new` under `rdkafka.config`) and the
-/// methods that hand the client back or make the one the forms are called on.
 struct Library {
     client: Client,
     krate: &'static str,
@@ -44,8 +25,6 @@ struct Library {
 }
 
 impl Library {
-    /// Whether `origin`, what a constructor is called outside the repository, is one of the
-    /// library's.
     fn made(&self, origin: &str) -> bool {
         let Some(rest) = origin.strip_prefix(self.krate) else {
             return false;
@@ -106,10 +85,8 @@ const LIBRARIES: &[Library] = &[
     },
 ];
 
-/// The methods that hand back what a `Result` holds, or the object itself.
 const UNWRAPS: &[&str] = &["clone", "unwrap", "expect"];
 
-/// The methods a form is made of.
 const METHODS: &[&str] = &[
     "send",
     "subscribe",
@@ -123,7 +100,6 @@ const METHODS: &[&str] = &[
     "queue_url",
 ];
 
-/// The builders of aws-sdk-sqs a queue is named on.
 const SQS_PRODUCERS: &[&str] = &["send_message", "send_message_batch"];
 const SQS_CONSUMERS: &[&str] = &["receive_message"];
 
@@ -147,7 +123,6 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 out.extend(sqs(code, path, n));
                 continue;
             }
-            // The record names the topic of a Kafka `send`; any other form names it itself.
             let record = match method {
                 "send" => match record(code, path, n) {
                     Some(record) => Some(record),
@@ -210,24 +185,17 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
     out
 }
 
-/// The spelling of what the callee of `call`, written in `path`, names outside the repository,
-/// as the file's imports spell it, read by path as the Rust HTTP readers do, and only when its head
-/// is the import itself.
 fn outside_spelling<'a>(code: &Code<'a>, path: &'a str, call: &'a Call) -> Option<String> {
     let outside = code.outside(path, &call.scope, &call.callee, call.by_path)?;
     outside.direct.then_some(outside.spelled)
 }
 
-/// The client that `receiver`, written in `scope` of `path`, traces back to: the library of the
-/// first constructor it may be, named by the file's imports.
 fn client<'a>(
     code: &Code<'a>,
     path: &'a str,
     scope: &'a str,
     receiver: &'a Value,
 ) -> Option<Client> {
-    // A client held by a `let mut` (redis commands take `&mut self`) is no constant, but it is
-    // still what its call made.
     let held = match receiver {
         Value::Ref(name) => code.mutable(path, scope, name),
         _ => None,
@@ -245,9 +213,6 @@ fn client<'a>(
     })
 }
 
-/// The `FutureRecord::to(topic)` or `BaseRecord::to(topic)` call that the first argument of the
-/// `send` at `n` of `path` is, at the head of its builder chain (`.payload(..).key(..)`): the
-/// argument written in place or a `let` holding it. Its file and position.
 fn record<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<(&'a str, usize)> {
     let send = code.call(path, n)?;
     let (file, at) = call_of(code, path, &send.scope, send.args.first()?)?;
@@ -263,9 +228,6 @@ fn record<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<(&'a str, usiz
     Some((file, at?))
 }
 
-/// The call that makes the aws-sdk-sqs request whose `queue_url` is the call at `n` of `path`
-/// (`client.send_message().message_body(b).queue_url(u)`), as a producer or a consumer of the
-/// queue the URL ends in.
 fn sqs<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Vec<Message> {
     let Some(chain) = chain(code, path, n) else {
         return Vec::new();
@@ -294,16 +256,12 @@ fn sqs<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Vec<Message> {
     Vec::new()
 }
 
-/// The builder chain that ends in the call at `at` of `path` (`Code::chain`): that call and the
-/// `CHAIN` calls below it at most.
 fn chain<'a>(code: &Code<'a>, path: &'a str, at: usize) -> Option<Vec<usize>> {
     let mut chain = code.chain(path, at)?;
     chain.truncate(CHAIN + 1);
     Some(chain)
 }
 
-/// The call that `value`, written in `scope` of `path`, is: written in place, or the `let`
-/// that holds it. Its file and position.
 fn call_of<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -320,9 +278,6 @@ fn call_of<'a>(
     }
 }
 
-/// Whether the options the `xread_options` at `n` of `path` is given (its third argument) set a
-/// consumer group: `StreamReadOptions::default().group(..)` in place or in a `let`. A read
-/// without one is not a consumer.
 fn grouped<'a>(code: &Code<'a>, path: &'a str, n: usize) -> bool {
     let Some(read) = code.call(path, n) else {
         return false;
@@ -335,7 +290,6 @@ fn grouped<'a>(code: &Code<'a>, path: &'a str, n: usize) -> bool {
         .filter_map(|at| code.call(file, at))
         .collect();
     let group = calls.iter().any(|c| c.callee.ends_with(".group"));
-    // The chain starts at the options' constructor, made on no call.
     let start = calls
         .last()
         .filter(|c| !matches!(c.receiver, Some(Value::Call(_))));
@@ -343,18 +297,14 @@ fn grouped<'a>(code: &Code<'a>, path: &'a str, n: usize) -> bool {
     group && origin.is_some_and(|o| o.starts_with("redis.") && o.contains(".StreamReadOptions."))
 }
 
-/// The argument at position `at`, `Undefined` when the call leaves it out.
 fn arg(args: &[Value], at: usize) -> &Value {
     args.get(at).unwrap_or(&Value::Undefined)
 }
 
-/// The one channel name the first argument gives.
 fn one(args: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
     Some(vec![name(arg(args, 0))?])
 }
 
-/// The streams `xread_options` reads: the keys of its first argument, a list. A key that is not
-/// a literal string is unresolved; a list built elsewhere depends on a parameter or is unknown.
 fn keys(args: &[Value], _: &Keywords) -> Option<Vec<Option<String>>> {
     match arg(args, 0) {
         Value::List(items) => items.iter().map(name).collect(),
@@ -371,7 +321,6 @@ mod tests {
     use crate::resolve::Resolver;
     use std::collections::BTreeMap;
 
-    /// The messages of the Rust file `src` as lines.
     fn lines(src: &str) -> Vec<String> {
         let facts = Rust.parse("x.rs", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("x.rs", &facts)]);
@@ -387,7 +336,6 @@ mod tests {
             async fn produce() {\n    let c = connect(\"u\").await.unwrap();\n    c.publish(\"orders.created\", b.into()).await.unwrap();\n}\n\
             async fn consume() {\n    let c = connect(\"u\").await.unwrap();\n    c.subscribe(\"orders.created\").await.unwrap();\n    c.subscribe(std::env::var(\"T\").unwrap()).await.unwrap();\n    tokio::spawn(async move {\n        c.subscribe(\"spawned\").await.unwrap();\n    });\n}\n\
             fn other(c: Other) {\n    c.publish(\"nope\", b.into());\n}\n";
-        // A subscribe inside a closure is handled by the function that holds the closure.
         assert_eq!(
             lines(src),
             [
@@ -408,8 +356,6 @@ mod tests {
 
     #[test]
     fn a_constructor_whose_head_is_not_the_import_itself_gives_no_client() {
-        // `async_nats` is a parameter here: `async_nats.connect` is spelled like the crate's
-        // function, but its head is a value, not the import.
         let src = "use async_nats;\nfn go(async_nats: X) { async_nats.connect(\"u\"); }\n";
         let facts = Rust.parse("x.rs", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("x.rs", &facts)]);

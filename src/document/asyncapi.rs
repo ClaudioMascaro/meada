@@ -1,6 +1,3 @@
-//! AsyncAPI 2.x and 3.0 (spec #21): every operation of a document is a side of a channel, on
-//! the broker kind its server protocol names, with the payloads of its messages as the shape.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
@@ -9,8 +6,6 @@ use super::openapi::{local, text};
 use super::{Format, Problem, Role, Side, Summary, schema};
 use crate::shape::Source;
 
-/// What `doc`, the document at `path`, gives: its channel sides when its `asyncapi` field is a
-/// 2.x or 3.0 version, else the format it has instead.
 pub fn read(path: &str, doc: &Value) -> Summary {
     let version = doc.get("asyncapi").and_then(text);
     let Some(version) = version.filter(|v| supported(v)) else {
@@ -24,7 +19,6 @@ pub fn read(path: &str, doc: &Value) -> Summary {
         true => operations_v2(doc),
         false => operations_v3(doc),
     };
-    // Each server with its protocol, lower case, when it has one.
     let servers: BTreeMap<&str, Option<String>> = (doc.get("servers").and_then(Value::as_object))
         .into_iter()
         .flatten()
@@ -45,7 +39,6 @@ pub fn read(path: &str, doc: &Value) -> Summary {
             no_servers = true;
             continue;
         }
-        // The servers the channel lists, else every server of the document.
         let used: Vec<(&str, &Option<String>)> = match op.servers.is_empty() {
             true => servers.iter().map(|(n, p)| (*n, p)).collect(),
             false => (op.servers.iter())
@@ -132,8 +125,6 @@ pub fn read(path: &str, doc: &Value) -> Summary {
     }
 }
 
-/// One operation of a document: the channel it acts on, which way, the names of the servers the
-/// channel lists and the payload schemas of its messages.
 struct Operation<'a> {
     name: String,
     role: Role,
@@ -141,8 +132,6 @@ struct Operation<'a> {
     payloads: Vec<&'a Value>,
 }
 
-/// The operations of an AsyncAPI 2.x document: the key of a channel is its name, and
-/// `subscribe` is the application sending messages, `publish` it receiving them.
 fn operations_v2(doc: &Value) -> Vec<Operation<'_>> {
     let channels = doc.get("channels").and_then(Value::as_object);
     let mut found = Vec::new();
@@ -156,7 +145,6 @@ fn operations_v2(doc: &Value) -> Vec<Operation<'_>> {
             let Some(operation) = item.get(verb).filter(|o| o.is_object()) else {
                 continue;
             };
-            // A message, or a `oneOf` of them.
             let message = operation.get("message").and_then(|m| local(doc, m));
             let messages = match message {
                 Some(m) => match m.get("oneOf").and_then(Value::as_array) {
@@ -176,9 +164,6 @@ fn operations_v2(doc: &Value) -> Vec<Operation<'_>> {
     found
 }
 
-/// The operations of an AsyncAPI 3.0 document: the name of a channel is its `address`, `send`
-/// is the application sending and `receive` it receiving. An operation that lists messages
-/// keeps those; otherwise every message of its channel counts.
 fn operations_v3(doc: &Value) -> Vec<Operation<'_>> {
     let operations = doc.get("operations").and_then(Value::as_object);
     let mut found = Vec::new();
@@ -220,13 +205,11 @@ fn operations_v3(doc: &Value) -> Vec<Operation<'_>> {
     found
 }
 
-/// The payload schema of each message that has one; a message may be a local reference.
 fn payloads<'a>(doc: &'a Value, messages: Vec<&'a Value>) -> Vec<&'a Value> {
     let messages = messages.into_iter().filter_map(|m| local(doc, m));
     messages.filter_map(|m| m.get("payload")).collect()
 }
 
-/// The broker kind of a server `protocol` (lower case).
 fn broker(protocol: &str) -> Option<&'static str> {
     Some(match protocol {
         "kafka" | "kafka-secure" => "kafka",
@@ -245,7 +228,6 @@ fn broker(protocol: &str) -> Option<&'static str> {
     })
 }
 
-/// `2.x`, or `3.0` and any patch of it.
 fn supported(version: &str) -> bool {
     let mut parts = version.split('.');
     match parts.next() {
@@ -259,7 +241,6 @@ fn supported(version: &str) -> bool {
 mod tests {
     use crate::document::{Format, Problem, Role, read};
 
-    /// The sides of the document `src` as `broker role name`, with its problems.
     fn sides(src: &str) -> (Vec<String>, Vec<Problem>) {
         let summary = read("asyncapi.yaml", src.as_bytes());
         let sides = summary.channels.iter().map(|s| {
@@ -361,7 +342,6 @@ components:
             shape.fields.iter().cloned().collect::<Vec<_>>()
         };
         assert_eq!(fields(0), ["number", "reason"]);
-        // A message behind a local reference.
         assert_eq!(fields(1), ["parcel"]);
     }
 
@@ -434,7 +414,6 @@ channels:
                 "kafka producer both"
             ]
         );
-        // `both` uses every server, so the unsupported one is reported.
         assert_eq!(
             problems,
             [Problem::Protocol {
@@ -445,10 +424,8 @@ channels:
 
     #[test]
     fn channels_without_a_server_protocol_are_ignored_and_reported() {
-        // No root `servers`: no channel has a broker kind.
         let src = "asyncapi: 2.6.0\nchannels:\n  a:\n    subscribe: {}\n";
         assert_eq!(sides(src), (vec![], vec![Problem::NoServers]));
-        // A server without `protocol`, and a channel naming a server the document lacks.
         let src = "
 asyncapi: 2.6.0
 servers:
@@ -478,7 +455,6 @@ channels:
                 ]
             )
         );
-        // 3.0: a channel's servers are references.
         let src = "
 asyncapi: 3.0.0
 channels:
@@ -498,7 +474,6 @@ operations:
                 }]
             )
         );
-        // A document without channels ignores nothing.
         assert_eq!(sides("asyncapi: 3.0.0\n"), (vec![], vec![]));
     }
 
@@ -535,7 +510,6 @@ channels:
             assert_eq!(summary.problems, [Problem::AsyncFormat { found }], "{src}");
             assert_eq!(summary.format, None);
         }
-        // A file named like an AsyncAPI document with neither format field.
         let summary = read("asyncapi.yaml", b"swagger: '2.0'\n");
         let found = Some("swagger 2.0".to_string());
         assert_eq!(summary.problems, [Problem::AsyncFormat { found }]);

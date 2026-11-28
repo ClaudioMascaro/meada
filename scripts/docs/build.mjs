@@ -1,4 +1,3 @@
-// Local static bundle only. No browser process, CDN or runtime API is required.
 import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -10,7 +9,6 @@ const result = await build({
   outfile: resolve(output, 'flow.js'), legalComments: 'linked', metafile: true,
   define: { 'process.env.NODE_ENV': '"production"' }
 });
-// Include complete notices for every package whose code reaches the reader bundle.
 const packages = new Set();
 for (const input of Object.keys(result.metafile.inputs)) {
   const match = input.match(/node_modules\/((?:@[^/]+\/)?[^/]+)\//);

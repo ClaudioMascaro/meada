@@ -13,7 +13,6 @@ export function canOperate(session: Session, config: Config): boolean {
   return session.role === 'operator' && config.operations;
 }
 
-/** Whether the session may save and apply workspace versions: the operator or a team operator. */
 export function canEditWorkspace(session: Session, config: Config): boolean {
   return (session.role === 'operator' || session.role === 'team_operator') && config.operations;
 }

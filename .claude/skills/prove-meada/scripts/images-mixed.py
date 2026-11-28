@@ -22,16 +22,12 @@ PREFIX = 'example.com/zz-prove-mixed/'
 IMAGE = 'image::ghcr.io/mixed-proof/worker'
 TOPIC = 'channel::sns::parcel'
 QUEUE = 'channel::sqs::parcel'
-# The app builds the image twice: its Compose `build: .`, whose site is the repository, and the CI
-# step of `publish.yml`, its own site since #860. Each runner links to both.
 BUILDERS = (PREFIX+'app', PREFIX+'app::.github/workflows/publish.yml::jobs.publish.steps[0]')
 EXPECTED_IMAGE_LINKS = {row + (builder,) for builder in BUILDERS for row in [
     (PREFIX+'infra::compose.yaml::services.parcel', IMAGE, '.', 'exact'),
     (PREFIX+'infra::compose.yaml::services.registry', 'image::*/mixed-proof/worker', '.', 'inferred'),
 ]}
 EXPECTED_SUBSCRIPTION = (TOPIC, QUEUE, PREFIX+'infra::main.tf::aws_sns_topic_subscription.route', '.')
-# ADR 0026 (#755): the app writes no Dockerfile, so the build runs its whole context at `inferred`
-# and the reason says the Dockerfile was not read (#782).
 EXPECTED_EXECUTION = (PREFIX+'app::compose.yaml::services.parcel', '.', PREFIX+'app', '.', 'inferred')
 rows = []
 
@@ -75,7 +71,6 @@ def main(args):
     comparisons = Comparisons(out)
     HEAD, BASE = Path(args.head_bin).resolve(), Path(args.base_bin).resolve()
     os.environ['LANG'] = 'C.UTF-8'
-    # Everything expected below follows the literal source, before Meada is run.
     write(OUT / 'oracle.json', json.dumps({
         'image': IMAGE, 'source': TOPIC, 'target': QUEUE,
         'subscription': 'aws_sns_topic_subscription.route',
@@ -84,8 +79,6 @@ def main(args):
         'image_link_tuples': sorted(EXPECTED_IMAGE_LINKS),
         'subscription_tuple': EXPECTED_SUBSCRIPTION,
         'execution_tuple': EXPECTED_EXECUTION,
-        # Same-repository Compose follows its direct execution rather than adding
-        # a self image link (base ADR 0026 and original image binary's direct flow).
         'head_expected_image_links': len(EXPECTED_IMAGE_LINKS), 'head_expected_channel_links': 1,
     }, indent=2))
     seed = OUT / 'input'
@@ -149,8 +142,6 @@ def main(args):
     app_data, infra_data = exports['head','app'], exports['head','infra']
     app_images=[r for r in app_data['links'] if r['contract'].startswith('image::')]
     infra_images=[r for r in infra_data['links'] if r['contract'].startswith('image::')]
-    # Each endpoint's repository export carries its cross-repository links. This
-    # is the existing export scope, not two additional links or a self link.
     check('each endpoint retains exactly the mixed image links of both builders and no direct self link',
           len(app_images)==len(EXPECTED_IMAGE_LINKS) and app_images==infra_images and {
               (r['consumer'],r['contract'],r.get('root'),r['level'],r['provider'])
@@ -195,7 +186,6 @@ def main(args):
         context = query(client, 'trace/topic-context', 'context', symbol='aws_sns_topic.parcel')
         check('IaC context retains provisioned channel and producer',
               TOPIC in context and 'producer' in context, context)
-        # Editing only image YAML must not disturb the AWS graph or live trace.
         image_file = root/'infra/compose.yaml'
         original = image_file.read_text()
         image_file.write_text(original.replace('mixed-proof/worker:one','mixed-proof/absent:one'))
@@ -208,7 +198,6 @@ def main(args):
         restored = json.loads(command(head, root/'infra', 'restore-image/export', 'export'))
         check('image restore returns all complete contract arrays', all(restored.get(k)==infra_data.get(k)
               for k in ['providers','consumers','links','provisioners','provisions','subscriptions','executions']))
-        # Editing only the subscription must remove its route, preserving images.
         tf_file = root/'infra/main.tf'
         tf_file.write_text(tf.replace('sns:eu-west-1:123456789012:parcel',
                                       'sns:eu-west-1:123456789012:absent'))

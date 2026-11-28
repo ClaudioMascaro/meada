@@ -1,11 +1,7 @@
-//! Azure identity policy shared by config, IaC, environment and SDK readers (#669).
-//! A namespace/account selector is discarded only after validating the whole resource shape.
-
 use std::sync::LazyLock;
 
 pub(crate) mod sdk;
 
-/// Bound splitting and validation before allocating resource-name components.
 // ponytail: ARM identifiers fit within 1 KiB; longer source strings remain unresolved.
 const AZURE_IDENTIFIER_MAX: usize = 1024;
 // ponytail: Azure resource group selectors contain at most 90 Unicode characters.
@@ -27,7 +23,6 @@ const BLOB_CONTAINER_NAME_MAX: usize = 63;
 // ponytail: Azure Key Vault secret names are at most 127 characters.
 const KEYVAULT_SECRET_MAX: usize = 127;
 
-// The platform permits these Unicode categories, rather than every Unicode numeric character.
 static RESOURCE_GROUP_NAME: LazyLock<regex::Regex> =
     LazyLock::new(|| regex::Regex::new(r"\A[\p{L}\p{Nd}_().-]+\z").unwrap());
 
@@ -70,7 +65,6 @@ fn arm(text: &str) -> Option<(&str, Vec<&str>)> {
     Some((parts[5], parts[6..].to_vec()))
 }
 
-/// Plain queue/topic names retain valid slashes. Subscription markers are never plain names.
 pub(crate) fn servicebus(text: &str) -> Option<String> {
     if text.starts_with('/') {
         let (provider, parts) = arm(text)?;
@@ -82,7 +76,6 @@ pub(crate) fn servicebus(text: &str) -> Option<String> {
         {
             return None;
         }
-        // A topics/.../subscriptions/... identifier names a subscription, not a topic.
         if parts[2].eq_ignore_ascii_case("topics")
             && parts[3..]
                 .iter()
@@ -104,7 +97,6 @@ pub(crate) fn subscription_target(topic: &str, subscription: &str) -> Option<Str
     .then(|| format!("subscription:{topic}/{subscription}"))
 }
 
-/// A typed subscription is topic-qualified; an ARM subscription retains both names too.
 pub(crate) fn subscription(text: &str) -> Option<String> {
     if !bounded(text) {
         return None;
@@ -290,7 +282,6 @@ pub(crate) fn typed(alias: &str, text: &str) -> Option<String> {
     Some(format!("{prefix}::{name}"))
 }
 
-/// App settings read secret contents at deployment time. Keep a readable reference only.
 pub(crate) fn keyvault_reference(text: &str) -> Option<String> {
     let rest = text.strip_prefix("@Microsoft.KeyVault(")?;
     let name = bounded(text)
@@ -314,7 +305,6 @@ pub(crate) const ALIASES: &[&str] = &[
     "keyvault_secret",
 ];
 
-/// Patterns retain physical names; unknown selectors never become structured exact IDs.
 pub(crate) fn pattern(ty: &str, text: &str) -> Option<String> {
     if !bounded(text)
         || text.starts_with('/')

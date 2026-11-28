@@ -1,12 +1,3 @@
-//! The version lifecycle of named workspaces in the console (#343, ADR 0021 contract 4): save,
-//! apply and rollback, rename, delete and the operator list, and the reads of a workspace's
-//! versions and history. Identity, authority and grant come from the token and the permissions
-//! set, never from the body. A write is checked in the order the contract fixes: the body, then
-//! the discovery rule (a workspace the caller may not see is the one 404 of an unknown id), the
-//! caller's authority, the base, the entries; the atomic boundary (`lifecycle::transact`) decides
-//! all of them again under the workspace's row lock, so a stale page, a revoked grant or a
-//! forged payload authorizes nothing.
-
 use std::collections::BTreeSet;
 
 use meada_core::authorize::Grant;
@@ -22,7 +13,6 @@ const RENAME_BODY_MAX: usize = 4 << 10;
 const DELETE_BODY_MAX: usize = 1 << 10;
 const OPERATORS_BODY_MAX: usize = 16 << 10;
 
-/// A lifecycle write route (`/api/v1/workspaces/<id>/<op>`), parsed once from its segment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Route {
     Versions,
@@ -54,8 +44,6 @@ impl Route {
         }
     }
 
-    /// The audit action (an apply that goes back to a version that was current before is
-    /// recorded as `workspaces.rollback`).
     fn action(self) -> &'static str {
         match self {
             Self::Versions => "workspaces.save",
@@ -66,7 +54,6 @@ impl Route {
         }
     }
 
-    /// The shape of the body, for the 400 that names it.
     fn shape(self) -> &'static str {
         match self {
             Self::Versions => "{\"entries\", \"message\", \"base\"}",
@@ -80,8 +67,6 @@ impl Route {
     }
 }
 
-/// The cap of the body of the lifecycle route at `path` (`/api/v1/workspaces/<id>/<op>`), none
-/// for any other path: the listener reads no more than this.
 pub(in crate::ui) fn body_max(path: &str) -> Option<usize> {
     let rest = path.strip_prefix("/api/v1/workspaces/")?;
     let (id, op) = rest.split_once('/')?;
@@ -135,12 +120,9 @@ struct NewOperator {
     login: String,
 }
 
-/// What a lifecycle write has resolved before its transaction: the audit action and arguments,
-/// the operation's inputs and the entries it stores.
 struct Plan {
     action: &'static str,
     version: Option<String>,
-    /// For a save: the document to store before the rows that name it.
     document: Option<Vec<Value>>,
     identities: Vec<String>,
     changed: Vec<String>,
@@ -169,8 +151,6 @@ impl Plan {
 }
 
 impl Console {
-    /// A refusal found before the pending record: logged, recorded `refused` when Postgres
-    /// answers, and answered.
     fn turned_away(
         &self,
         session: &Session,
@@ -183,7 +163,6 @@ impl Console {
         error(status, code, &message)
     }
 
-    /// Records a refusal decided before the pending record: the log line and the audit row.
     fn refused_once(
         &self,
         session: &Session,
@@ -197,7 +176,6 @@ impl Console {
         self.audit.refused(&actor, action, arguments, message);
     }
 
-    /// The 409 `stale_base`, naming the current `base` whichever check found it.
     fn stale_base(seq: i64) -> (Answer, String) {
         let message = Msg::WorkspacesStale(seq).text();
         let body = json!({"error": {
@@ -206,7 +184,6 @@ impl Console {
         (json_answer(StatusCode::CONFLICT, &body), message)
     }
 
-    /// `POST workspaces/<id>/<op>`: the lifecycle writes. `None` when `rest` is no such route.
     pub(super) fn operate(&self, rest: &str, body: &Body, session: &Session) -> Option<Answer> {
         let (id, op) = rest.split_once('/')?;
         let route = Route::parse(op)?;
@@ -232,7 +209,6 @@ impl Console {
             let message = Msg::WorkspacesOpBody(route.shape()).text();
             bad(StatusCode::BAD_REQUEST, "bad_request", &message)
         };
-        // Never serde's text, which may echo the body.
         let plan = match route {
             Route::Versions => serde_json::from_slice::<Save>(bytes)
                 .map_err(|_| ())
@@ -292,8 +268,6 @@ impl Console {
         let administrator = session.operator;
         let authority = Authority::of(administrator);
         let grant = Self::read_grant(session);
-        // What a refusal may name: the platform administrator reads every entry of a management
-        // view, anyone else what its grant reads.
         let naming = match administrator {
             true => Grant::All,
             false => grant.clone(),
@@ -309,8 +283,6 @@ impl Console {
                 &message,
             )
         };
-        // The discovery rule: a workspace the caller neither operates nor reads whole does not
-        // exist for it, so the answer is an unknown id's, whatever the body.
         let record = match self.visible_records(session, Some(id)) {
             Ok(mut records) => match records.pop() {
                 Some(record) => record,
@@ -347,7 +319,6 @@ impl Console {
             self.refused_once(session, action, &arguments(None), id, &message);
             return answer;
         }
-        // Resolve the operation against the stored current version.
         let mut plan = Plan::new(action);
         let current = if matches!(request, Decoded::Save(_) | Decoded::Apply(_)) {
             match self.version_entries(&record) {
@@ -369,8 +340,6 @@ impl Console {
                             return unprocessable("invalid_entries", problems.join("\n"));
                         }
                     };
-                // The platform administrator submits the whole manifest; an operator submits the
-                // entries it reads and the version stored keeps the others in place.
                 let stored = match administrator {
                     true => submitted,
                     false => named::compose(&grant, &current, &submitted),
@@ -447,8 +416,6 @@ impl Console {
                 plan.remove = operators.remove.clone();
             }
         }
-        // A cheap look at the admission cache before anything is stored; the transaction decides
-        // again from the newest set. A refusal is recorded all the same (ADR 0021).
         let version = plan.version.clone();
         if !plan.changed.is_empty()
             && let Some((answer, message)) = self.precheck(session, &plan.changed, &naming)
@@ -459,7 +426,6 @@ impl Console {
                 .refused(&actor, action, &arguments(version.as_deref()), &message);
             return answer;
         }
-        // An apply that goes back to a version that was current is recorded as a rollback.
         let mut recorded = plan.action;
         if matches!(request, Decoded::Apply(_)) {
             let version = plan.version.as_deref().unwrap_or_default();
@@ -479,8 +445,6 @@ impl Console {
             Ok(record) => record,
             Err(answer) => return *answer,
         };
-        // The version document is the shared store's, immutable and content-addressed: written
-        // before the rows that name it, so no row ever names a document that is not there.
         if let (Some(version), Some(document)) = (&plan.version, &plan.document)
             && let Err(why) = self.store_version(version, document)
         {
@@ -536,8 +500,6 @@ impl Console {
                         body["saved"] = done.saved.into();
                     }
                     Decoded::Apply(_) => {
-                        // No generation can record a version just applied: it is stored, and
-                        // reaches queries when the next refresh publishes it.
                         body["state"] = "applied".into();
                         body["diagnostics"] = self.written_diagnostics(id, &version_text, session);
                         body["version"] = version_text.into();
@@ -560,8 +522,6 @@ impl Console {
         }
     }
 
-    /// The answer to a read of Postgres or the store that failed before the pending record: the
-    /// 503, logged without the reason's text on the wire.
     pub(super) fn unreadable(
         &self,
         session: &Session,
@@ -581,7 +541,6 @@ impl Console {
         )
     }
 
-    /// The refusal an operation's transaction returned, recorded and answered.
     fn refused_by(
         &self,
         record: PendingRecord,
@@ -640,8 +599,6 @@ impl Console {
         answer
     }
 
-    /// `GET workspaces/<id>/versions[?after=]`, `.../versions/<version>[?against=]` and
-    /// `.../history[?after=]`; `None` when `rest` is none of them.
     pub(super) fn inspect(
         &self,
         rest: &str,
@@ -677,7 +634,6 @@ impl Console {
         })
     }
 
-    /// The one query parameter these reads take, `name`, once, within its bound.
     pub(super) fn cursor(
         query: Option<&str>,
         name: &str,
@@ -703,8 +659,6 @@ impl Console {
         Ok(found)
     }
 
-    /// The entries of `entries` that `session` reads, which are all of them for the platform
-    /// administrator's management view.
     pub(super) fn readable_entries(session: &Session, entries: Vec<Value>) -> Vec<Value> {
         let grant = Self::read_grant(session);
         (entries.into_iter())
@@ -712,9 +666,6 @@ impl Console {
             .collect()
     }
 
-    /// Whether `session` reads a version whose document holds `identities`: the platform
-    /// administrator and the operators see every version (filtered like the current one), anyone
-    /// else only the versions it reads whole.
     pub(super) fn reads_version(session: &Session, record: &Record, identities: &[String]) -> bool {
         Self::operates(session, record)
             || named::visible(false, identities, &Self::read_grant(session))
@@ -858,8 +809,6 @@ impl Console {
                     return self.unreadable(session, "workspaces.versions", &record.id, &why);
                 }
             };
-            // The diff names only entries the caller reads, hidden ones are neither added nor
-            // removed in it.
             let diff = named::diff(&before, &shown);
             document["diff"] = json!({
                 "against": other,
@@ -918,7 +867,6 @@ impl Console {
     }
 }
 
-/// The decoded body of a lifecycle write.
 enum Decoded {
     Save(Save),
     Apply(Apply),

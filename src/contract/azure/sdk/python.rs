@@ -1,4 +1,3 @@
-//! Official Azure Python sync/aio constructors, context-managed children and operations.
 use super::{Argument, Code, Frame, Handle, Role, Stage, argument, imported};
 
 pub(super) fn constructed<'a>(

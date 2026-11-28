@@ -133,7 +133,6 @@ app.kubernetes.io/component: server
 {{- if not .Values.modules.workspaces.enabled -}}
 {{- fail "proposals.enabled requires modules.workspaces: the proposal server reads [workspaces] and [catalog]" -}}
 {{- end -}}
-{{- /* The binary's bare URL: https, a host, no user, path, query or fragment. */ -}}
 {{- if not (regexMatch "^https://[^/?#@]+/?$" .Values.proposals.publicUrl) -}}
 {{- fail "proposals.publicUrl must be a bare https URL (no path, query, fragment or user)" -}}
 {{- end -}}
@@ -252,7 +251,6 @@ app.kubernetes.io/component: console
 {{ include "meada.labels" . }}
 app.kubernetes.io/component: proposals
 {{- end -}}
-{{- /* The proposal server holds the public half of the accounts key, never the private one (ADR 0022, ADR 0024). */ -}}
 {{- define "meada.proposalsVolumes" -}}
 - name: config
   configMap:
@@ -270,7 +268,6 @@ app.kubernetes.io/component: proposals
     name: {{ .Values.tls.caConfigMap }}
 {{- end }}
 {{- end -}}
-{{- /* [proposals] (ADR 0022): the proposal server's bootstrap reads it, and the console's reads it to issue agent tokens for the surface under local accounts. */ -}}
 {{- define "meada.proposalsSection" -}}
 {{- with .Values.proposals }}
 {{- if .enabled }}
@@ -286,7 +283,6 @@ audience = {{ . | toJson }}
 {{- define "meada.postgresName" -}}
 {{- printf "%s-postgres" (include "meada.name" . | trunc 54 | trimSuffix "-") -}}
 {{- end -}}
-{{- /* MEADA_POSTGRES_URL from the Secret's key: write-url for the console and the refresh, read-url for the nodes. */ -}}
 {{- define "meada.postgresEnv" -}}
 {{- if .root.Values.modules.postgres.enabled }}
 - name: MEADA_POSTGRES_URL
@@ -296,7 +292,6 @@ audience = {{ . | toJson }}
       key: {{ .key }}
 {{- end }}
 {{- end -}}
-{{- /* The init container that holds the console and the refresh back until the schema is migrated: `meada status` reports "postgres: reachable" only at a schema version it knows. Nodes start and serve without Postgres (#332), so they never wait. */ -}}
 {{- define "meada.waitPostgres" -}}
 {{- if .root.Values.modules.postgres.enabled }}
 - name: wait-postgres
@@ -312,7 +307,6 @@ audience = {{ . | toJson }}
   volumeMounts: {{ include "meada.mounts" .root | nindent 4 }}
 {{- end }}
 {{- end -}}
-{{- /* The refresh job's workspace bootstrap: with modules.githubApp it carries the App's section, which the nodes' and console's never do. */ -}}
 {{- define "meada.jobWorkspace" -}}
 {{- if .Values.modules.githubApp.enabled -}}/etc/meada/job.workspace.toml{{- else -}}/etc/meada/meada.workspace.toml{{- end -}}
 {{- end -}}
@@ -321,7 +315,6 @@ audience = {{ . | toJson }}
 {{- if eq .Values.workspace.source "store" }}meada workspace pull --workspace {{ $ws }} && {{ end -}}
 {{- if or .Values.modules.oidc.github.enabled .Values.modules.accounts.github.enabled }}meada github-app roles --workspace {{ $ws }} && meada workspace show --pulled --workspace {{ $ws }} > /data/pulled.toml && /bin/sh /etc/meada/fetch.sh /data/pulled.toml{{ else }}/bin/sh /etc/meada/fetch.sh{{ end }} && meada index --workspace {{ $ws }} && meada snapshot publish --workspace {{ $ws }}
 {{- end -}}
-{{- /* [accounts] and its tables (ADR 0024) for one process: "console" names both key files and the break-glass flag, "node" the public key and the grant tables (a node ignores [accounts] beside [oidc], so under breakGlass it gets none), "job" only the GitHub grant provider the role check reads, with no key. */ -}}
 {{- define "meada.accounts" -}}
 {{- $role := .role -}}
 {{- with .Values.modules.accounts }}
@@ -364,7 +357,6 @@ max_age_seconds = {{ .maxAgeSeconds }}
 {{- end }}
 {{- end }}
 {{- end -}}
-{{- /* A node's [ui] under local accounts: only the console's public_url, the issuer of every token it admits (ADR 0024). */ -}}
 {{- define "meada.nodeUi" -}}
 {{- if and .Values.modules.accounts.enabled (not .Values.modules.accounts.breakGlass) }}
 
@@ -373,7 +365,6 @@ dir = "/usr/share/meada/ui"
 public_url = {{ .Values.console.publicUrl | toJson }}
 {{- end }}
 {{- end -}}
-{{- /* The Secrets of the keys as volumes: the public one in the console and the nodes, the private one in the console only. */ -}}
 {{- define "meada.accountsPublicVolume" -}}
 {{- if and .Values.modules.accounts.enabled (not .Values.modules.accounts.breakGlass) }}
 - name: accounts-public
@@ -387,7 +378,6 @@ public_url = {{ .Values.console.publicUrl | toJson }}
   readOnly: true
 {{- end -}}
 
-{{/* The [postgres] block of a workspace manifest: dict "urlEnv" "schema" "ca" (true when ca_file is set). */}}
 {{- define "meada.postgresBlock" -}}
 [postgres]
 url_env = {{ .urlEnv | toJson }}

@@ -1,15 +1,3 @@
-//! The directory (ADR 0016, feature `directory`, #334): users and groups the identity provider
-//! pushes into the data layer through a SCIM 2.0 endpoint on the console's listener
-//! (`scim`, with `[ui]`). The bootstrap manifest's `[directory]` names, without a secret, where
-//! the endpoint's bearer token is (`token_env`, `MEADA_SCIM_TOKEN` by default, or `token_file`),
-//! the token claim that names a user (`user_claim`), the user attribute it matches
-//! (`user_attribute`, `userName` or `externalId`) and the group attribute that names a group
-//! (`group_attribute`, `displayName` by default, or `externalId`). It needs `[postgres]` and
-//! `[oidc]`. Only the console reads the token, once at start: rotating it means restarting the
-//! console. Nodes read the section only for overage (#336, `oidc::overage`), never the token.
-//! The console reads the directory (`read`, #335) at its admission, for the owner picker,
-//! `owner_missing` and the admission counts, and for overage as the nodes do.
-
 use std::path::Path;
 
 use serde::Deserialize;
@@ -22,26 +10,20 @@ pub mod read;
 #[cfg(feature = "ui")]
 pub mod scim;
 
-/// The variable `token_env` names by default.
 pub const TOKEN_ENV: &str = "MEADA_SCIM_TOKEN";
-/// The fewest characters a SCIM token may have.
 const TOKEN_MIN: usize = 32;
 // ponytail: the most `token_file` may hold; past it the console refuses to start, naming the file.
 const TOKEN_MAX: u64 = 4096;
 
-/// The user attributes `user_attribute` accepts.
 const USER_ATTRIBUTES: [&str; 2] = ["userName", "externalId"];
-/// The group attributes `group_attribute` accepts.
 const GROUP_ATTRIBUTES: [&str; 2] = ["displayName", "externalId"];
 
-/// The `[directory]` section as written.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct File {
     token_env: Option<String>,
     token_file: Option<String>,
     user_claim: Option<String>,
-    /// Any value, so that one of another type is the error naming the accepted ones.
     user_attribute: Option<toml::Value>,
     group_attribute: Option<toml::Value>,
 }
@@ -61,7 +43,6 @@ pub struct Config {
 }
 
 impl File {
-    /// The section checked; `token_file` is relative to `base`, the manifest's directory.
     pub fn validate(self, base: &Path) -> Result<Config, Problem> {
         let both = || ("directory.token_file", Msg::DirectoryBoth.text());
         let token = Secret::named(self.token_env, self.token_file, base, both)?;
@@ -102,8 +83,6 @@ impl File {
 }
 
 impl Config {
-    /// The SCIM token, read now (the console's start): unset, unreadable or shorter than
-    /// `TOKEN_MIN` characters is the problem naming the key, never the value.
     pub fn token(&self) -> Result<String, Problem> {
         let key = match self.token {
             Secret::Env(_) => "directory.token_env",

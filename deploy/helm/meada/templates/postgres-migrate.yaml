@@ -1,5 +1,4 @@
 {{- if .Values.modules.postgres.enabled }}
-{{- /* With the example Postgres the database does not exist before the release, so the step runs after the resources are created; the pods hold back (wait-postgres) until the schema is migrated. With your own Postgres it runs before them. */ -}}
 {{- $hook := "pre-install,pre-upgrade" }}
 {{- if .Values.postgres.enabled }}{{ $hook = "post-install,post-upgrade" }}{{ end }}
 apiVersion: v1

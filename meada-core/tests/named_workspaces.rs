@@ -1,11 +1,3 @@
-//! The Y/A/B matrix of ADR 0020 and the contracts of ADR 0021 as an executable table
-//! (`tests/fixtures/named-workspaces.json`, #340). No runtime exists yet, so this file holds a
-//! small reference of the rules the ADRs state and checks every row of the table against it, and
-//! that the table covers what the spec requires. The pure rules of the creation, discovery,
-//! answer and sponsor rows are `meada_core::named`'s since #342, the functions the console and the
-//! browser call; the binary's public-process tests and the front end's WebAssembly tests read the
-//! same rows.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use meada_core::authorize::Grant;
@@ -33,7 +25,6 @@ struct Table {
 struct Caller {
     login: Option<String>,
     rows: Vec<Row>,
-    /// Identities a claims grant reads: reading only, never creation (ADR 0020).
     #[serde(default)]
     claims_grant: Vec<String>,
     #[serde(default)]
@@ -152,9 +143,6 @@ fn table() -> Table {
     serde_json::from_str(include_str!("../../tests/fixtures/named-workspaces.json")).unwrap()
 }
 
-/// What creating a workspace from a selection gives: allowed, or pending on a condition of the
-/// platform or the caller; else the refused identities the caller's grant reads and the count of
-/// the rest.
 #[derive(Debug, PartialEq)]
 struct Outcome {
     allowed: bool,
@@ -174,7 +162,6 @@ impl Outcome {
     }
 }
 
-/// The rules of ADR 0020 and ADR 0021 over a table's callers, at one freshness.
 #[derive(Clone)]
 struct World<'a> {
     table: &'a Table,
@@ -195,8 +182,6 @@ impl<'a> World<'a> {
         &self.callers[name]
     }
 
-    /// The identities the caller's login holds an accepted role on, in a fresh set: what makes a
-    /// repository eligible for creation. Nothing else does (a claims grant does not).
     fn eligible(&self, caller: &Caller) -> BTreeSet<String> {
         if !self.fresh || caller.login.is_none() {
             return BTreeSet::new();
@@ -210,8 +195,6 @@ impl<'a> World<'a> {
             .collect()
     }
 
-    /// What the caller reads: eligible identities and the claims grant. The platform
-    /// administrator's graph answers are bounded by its grant like anyone's.
     fn grant(&self, caller: &Caller) -> BTreeSet<String> {
         let mut grant = self.eligible(caller);
         grant.extend(caller.claims_grant.iter().cloned());
@@ -248,7 +231,6 @@ impl<'a> World<'a> {
         self.caller(name).platform_administrator || workspace.operators.iter().any(|o| o == name)
     }
 
-    /// ADR 0020: a non-operator sees a workspace only when its grant reads every entry.
     fn visible(&self, name: &str, workspace: &Workspace) -> bool {
         let grant = Grant::Only(self.grant(self.caller(name)));
         named::visible(self.operates(name, workspace), &workspace.entries, &grant)
@@ -271,7 +253,6 @@ impl<'a> World<'a> {
         named::shown(operates, &workspace.entries, &grant, from, to)
     }
 
-    /// The entries no operator holds an accepted role on.
     fn excluded(&self, workspace: &Workspace, operators: &[String]) -> Vec<String> {
         let eligible: Vec<BTreeSet<String>> = (operators.iter())
             .map(|op| self.eligible(self.caller(op)))
@@ -448,8 +429,6 @@ fn shared_ingestion_holds_one_entry_per_identity() {
 
 #[test]
 fn provenance_decides_nothing() {
-    // A role held directly and the same role through a group are the same row: every outcome of
-    // alice (groups) equals dave's (direct) on every selection and workspace.
     let table = table();
     let world = World::new(&table, true);
     let selections: [&[&str]; 7] = [
@@ -492,16 +471,12 @@ fn the_table_covers_what_the_spec_requires() {
     };
     let allowed = |caller, select: &[&str]| create(caller, select).is_some_and(|r| r.allowed);
     let refused = |caller, select: &[&str]| create(caller, select).is_some_and(|r| !r.allowed);
-    // A-only creates Y+A and is refused Y+B; B-only the reverse; both groups the union.
     assert!(allowed("alice", &["Y", "A"]) && refused("alice", &["Y", "B"]));
     assert!(allowed("bob", &["Y", "B"]) && refused("bob", &["Y", "A"]));
     assert!(allowed("carol", &["Y", "A", "B"]));
-    // Granting Y alone grants neither.
     assert!(
         allowed("yoda", &["Y"]) && refused("yoda", &["Y", "A"]) && refused("yoda", &["Y", "B"])
     );
-    // Direct and group-derived roles, a rejected role, a claims grant, no login, a stale set and
-    // the administrator are all exercised.
     assert!(allowed("dave", &["Y", "A"]));
     assert!(refused("zed", &["Y", "A"]) && refused("claims", &["Y", "A"]));
     assert!(
@@ -517,7 +492,6 @@ fn the_table_covers_what_the_spec_requires() {
             .any(|r| r.pending.as_deref() == Some("stale_set"))
     );
     assert!(allowed("root", &["Y", "A", "B"]));
-    // The creator versus a group peer: the peer views and mutates nothing.
     let peer = |v| {
         table
             .discovery
@@ -531,7 +505,6 @@ fn the_table_covers_what_the_spec_requires() {
             .iter()
             .any(|r| r.caller == "erin" && !r.may_mutate)
     );
-    // A partial reader sees nothing, and revocation is exercised for the creator and the peer.
     assert!(
         table
             .discovery
@@ -539,7 +512,6 @@ fn the_table_covers_what_the_spec_requires() {
             .any(|r| r.caller == "yoda" && r.workspace == "w_ya" && !r.visible)
     );
     assert!(table.revocation.len() >= 3 && table.sponsor.len() >= 2);
-    // Every name a row uses exists.
     for row in &table.discovery {
         assert!(
             table.callers.contains_key(&row.caller)
@@ -573,8 +545,6 @@ fn a_save_keeps_hidden_entries_and_rechecks_only_what_it_adds_or_changes() {
         }
         let current = entries(&workspace.entries);
         let submitted = entries(&row.submit);
-        // The administrator submits the whole manifest; an operator submits what it reads and
-        // the version stored keeps the rest in place.
         let (grant, stored) = match caller.platform_administrator {
             true => (Grant::All, submitted.clone()),
             false => {
@@ -597,7 +567,6 @@ fn a_save_keeps_hidden_entries_and_rechecks_only_what_it_adds_or_changes() {
             "{}: rechecked",
             row.name
         );
-        // The catalog holds every table repository: the administrator's eligible set.
         let eligible: BTreeSet<String> = match caller.platform_administrator {
             true => table_identities(&table),
             false => world.eligible(caller),

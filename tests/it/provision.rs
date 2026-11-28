@@ -1,5 +1,3 @@
-//! Terraform provisioners across sibling infrastructure and application repositories (#656).
-
 use std::{fs, path::PathBuf};
 
 use meada::engine::{Direction, Engine, Start};
@@ -233,7 +231,6 @@ resource "aws_s3_bucket" "inside" { bucket = "arch${terraform.workspace}ive" }
                 assert_eq!(l["level"], "ambiguous");
                 assert!(l["reason"].as_str().unwrap().contains("archive-*"));
             }
-            // Three letters or digits are the minimum; a separator is no evidence.
             "resource::s3::abc-prod" => assert_eq!(l["level"], "inferred"),
             other => panic!("unexpected pattern target {other}"),
         }
@@ -291,7 +288,6 @@ example.com/orphan/infra (../orphan-infra) indexed, 0 files
 "
     );
     assert_golden("orphan.status.txt", &status);
-    // The same scope works when the infrastructure repository is the entry point.
     let status = meada::engine::status(&infra).unwrap();
     assert_golden("orphan-infra.status.txt", &status);
 }
@@ -335,9 +331,6 @@ fn code_only_scope_marks_uses_in_search_and_context_without_orphan_status() {
     assert_golden("orphan-code.context.txt", &(context + "\n" + &symbol));
 }
 
-/// ADR 0026, amended 2026-11-16 (#814): no IaC type provisions a declared `postgres` resource or a
-/// NATS subject, so their sides carry no orphan mark. An SQS queue used from code keeps it
-/// (`code_only_scope_marks_uses_in_search_and_context_without_orphan_status`).
 #[test]
 fn a_side_of_a_kind_no_iac_type_provisions_carries_no_orphan_mark() {
     let case = "orphan_unprovisionable_kind";
@@ -455,7 +448,6 @@ export async function send() {
             .unwrap()
             .contains("(no use in the workspace)")
     );
-    // No IaC type provisions `postgres` (ADR 0026, amended 2026-11-16).
     assert!(
         !engine
             .context("resource::postgres::archive", None)
@@ -463,7 +455,6 @@ export async function send() {
             .contains("(no provisioner in the workspace)")
     );
     assert_golden("orphan-groups.status.txt", &status);
-    // A use added inside the provisioner's repository enables just its group on refresh.
     fs::write(infra.join("meada.toml"), "[[peer]]\nrepo = \"example.com/orphan/app\"\n[[resource]]\nkind = \"s3\"\nid = \"archive\"\nrole = \"read\"\n").unwrap();
     let status = meada::engine::status(&app).unwrap();
     assert_golden("orphan-local-use.status.txt", &status);
@@ -544,9 +535,6 @@ fn search_finds_provisioner_sides_as_contracts_without_uses() {
     );
 }
 
-/// A use side `inferred` from a key name opens no orphan scope and is never an orphan line, while
-/// one Meada is certain of is, naming its level; `context` still shows the inferred side and the
-/// export's `uses` rows carry the level (ADR 0026, "Orphan sides", #797).
 #[test]
 fn a_use_inferred_from_a_key_name_opens_no_orphan_scope() {
     let repo = fixture_repo(
@@ -580,8 +568,6 @@ fn a_use_inferred_from_a_key_name_opens_no_orphan_scope() {
             (Some("resource::dynamodb::sales.orders"), Some("inferred")),
         ]
     );
-    // A certain use of a queue nothing provisions opens the scope of SQS queues, and of them
-    // alone: the inferred `jobs` and the DynamoDB tables stay out.
     fs::write(
         repo.join("config/arn.yaml"),
         "target: arn:aws:sqs:us-east-1:123456789012:ghost\n",
@@ -594,7 +580,6 @@ fn a_use_inferred_from_a_key_name_opens_no_orphan_scope() {
             "orphan channel::sqs::ghost: no provisioner in example.com/acme/o2; config/arn.yaml#target [exact]",
         ]
     );
-    // A provisioned queue whose only use is an inferred one of its own name is not unused.
     fs::write(
         repo.join("config/labels.yaml"),
         "routing:\n  queue: acme-jobs\n",
@@ -608,10 +593,6 @@ fn a_use_inferred_from_a_key_name_opens_no_orphan_scope() {
     );
 }
 
-/// A structured identifier in the resource list of an IAM policy statement is a policy grant, no
-/// use side: it links to nothing, opens no orphan scope and has an export array of its own; a
-/// value under a keyword of a JSON Schema document gives no side and stays a value (ADR 0026,
-/// "Orphan sides", #798).
 #[test]
 fn a_policy_grant_and_a_schema_example_are_no_use_side() {
     let repo = fixture_repo(
@@ -664,8 +645,6 @@ fn a_policy_grant_and_a_schema_example_are_no_use_side() {
             ),
         ]
     );
-    // A property named `default` holds a subschema, not the keyword's value, and the subschema
-    // of a property named `properties` holds the keyword.
     assert_eq!(
         rows("uses"),
         [
@@ -696,8 +675,6 @@ fn a_policy_grant_and_a_schema_example_are_no_use_side() {
     assert!(!context.contains("schema.json"), "{context}");
     let value = engine.search("orders-events", Some("value"), None).unwrap();
     assert!(value.contains("examples[0].spec.topicArn"), "{value}");
-    // A use of a table nothing provisions opens the scope of DynamoDB tables, and the policy
-    // grants of `acme-sessions` hide no `no use` line.
     fs::create_dir_all(repo.join("config")).unwrap();
     fs::write(
         repo.join("config/app.yaml"),
@@ -711,7 +688,6 @@ fn a_policy_grant_and_a_schema_example_are_no_use_side() {
             "orphan resource::dynamodb::acme-sessions: no use in example.com/acme/o3; infra/main.tf:5 aws_dynamodb_table.sessions (root infra)",
         ]
     );
-    // `examples` in a document with no `$schema` at its root is any key.
     fs::write(
         repo.join("config/examples.json"),
         r#"{ "examples": [ { "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events" } ] }"#,
@@ -727,8 +703,6 @@ fn a_policy_grant_and_a_schema_example_are_no_use_side() {
     );
 }
 
-/// `context` finds a policy grant on its resource and at its place, and a grant carries no
-/// orphan note: nothing provisions a queue in the fixture, yet `acme-dead`'s grant is no orphan.
 #[test]
 fn a_policy_grant_is_found_at_its_place_and_carries_no_orphan_note() {
     let repo = fixture_repo(
@@ -764,8 +738,6 @@ fn a_policy_grant_is_found_at_its_place_and_carries_no_orphan_note() {
     }
 }
 
-/// A document whose root holds `$schema` is a schema: one document of a YAML stream, but not
-/// an item of a JSON file's root array, which is one document.
 #[test]
 fn only_a_document_whose_root_holds_a_schema_key_is_a_schema() {
     let repo = fixture_repo(

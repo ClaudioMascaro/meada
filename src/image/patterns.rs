@@ -1,5 +1,3 @@
-//! A builder's unresolved name is a source item when several literal runner names fit.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::contract::Link;
@@ -64,7 +62,6 @@ impl Builder<'_> {
     }
 }
 
-/// The cross-side scan happens once per distinct builder pattern, never once per runner.
 pub(super) fn prepare(exports: &mut [Export]) {
     let mut prepared = Vec::new();
     for (at, export) in exports.iter().enumerate() {
@@ -142,7 +139,6 @@ pub(super) fn prepare(exports: &mut [Export]) {
     }
 }
 
-/// Orphan reporting follows a valid name choice while retaining direct-code counterparts.
 pub(super) fn active_match(exports: &[Export], provider: &Provider, contract: &str) -> bool {
     super::matches(&provider.contract, contract)
         && builder(exports, provider)
@@ -170,7 +166,6 @@ pub(super) fn handles(decision: &Decision) -> bool {
     decision.call.starts_with("image-builder::")
 }
 
-/// Several builders remain a consumer choice. One ambiguous builder belongs to its own item.
 pub(super) fn consumer_item(link: &Link, exports: &[Export]) -> bool {
     let candidates = exports
         .iter()

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# From the maintainer specs (#662, then ADR 0028's command table), not feature fixtures.
 """#662 literal ko publications: refuse heredoc text, substitution and text in a string. Since #860 no
 shell is evaluated and the command table counts a command after `&&`, `;` or on a later line."""
 import argparse
@@ -112,7 +111,6 @@ def main(args):
                     selected=[row for row in providers if row['contract']==contract]
                     checks.append({'check':label+' export retains exact checked-in command location',
                                    'pass':len(selected)==1 and selected[0].get('at')==expected_at})
-                    # The builder is the CI step (#860): its file, the line of the step and its address.
                     lines=(workflow.parent/file).read_text().splitlines()
                     line=next(n for n in range(lines.index(f'  {label}:')+1,len(lines)) if lines[n].startswith('    - '))+1
                     expected_context=(contract+f'\n  example.com/zz-prove-ko-shell/app builder .github/workflows/{file}:{line} '

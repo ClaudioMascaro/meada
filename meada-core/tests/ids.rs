@@ -1,6 +1,3 @@
-//! The ids at the crate's public seam: the bundle and generation ids the `snapshot` module's
-//! tests expected before the split, and the workspace version id.
-
 use meada_core::ids::{bundle_id, entry_blocks, fence, generation_id, is_id, workspace_version_id};
 use serde_json::{Value, json};
 
@@ -8,8 +5,6 @@ fn short(text: &str) -> String {
     blake3::hash(text.as_bytes()).to_hex()[..16].to_string()
 }
 
-/// Ids of a fixed input, against the canonical texts written out here: any change to the
-/// format shows.
 #[test]
 fn same_inputs_give_the_same_ids_on_any_machine() {
     let blocks = r#"{"serve":{"documents":["openapi.yaml"]}}"#;
@@ -24,7 +19,6 @@ fn same_inputs_give_the_same_ids_on_any_machine() {
     let generation = generation_id(&[("example.com/acme/web", &bundle), api]);
     let lines = format!("example.com/acme/api 0000000000000000\nexample.com/acme/web {bundle}\n");
     assert_eq!(generation, short(&lines));
-    // The order the repositories come in is no input.
     assert_eq!(
         generation,
         generation_id(&[api, ("example.com/acme/web", &bundle)])
@@ -141,8 +135,6 @@ fn api() -> Value {
     json!({"peer": [{"repo": "example.com/acme/web"}]})
 }
 
-/// The id of a fixed input, against its canonical text written out here: nothing but the
-/// entries is hashed (no author, time or message), so any change to the format shows.
 #[test]
 fn the_workspace_version_id_hashes_the_canonical_text_of_the_entries_alone() {
     let (web, api) = (web(), api());
@@ -206,8 +198,6 @@ fn swapping_two_entries_or_changing_a_block_changes_the_workspace_version_id() {
     assert_ne!(id, moved);
 }
 
-/// An entry without an owner has the canonical text it had before owners; an owner joins it
-/// between `blocks` and `path`, and is compared exactly.
 #[test]
 fn an_owner_joins_the_canonical_text_and_changes_the_workspace_version_id() {
     let (web, api) = (web(), api());
@@ -233,8 +223,6 @@ fn an_owner_joins_the_canonical_text_and_changes_the_workspace_version_id() {
     assert_ne!(of(None), of(Some("")));
 }
 
-/// An `added_by` joins the canonical text (keys sorted, so before `blocks`) and changes the
-/// workspace version id; an entry without it keeps the text it had, and it is compared exactly.
 #[test]
 fn an_added_by_joins_the_canonical_text_and_changes_the_workspace_version_id() {
     let (web, api) = (web(), api());
@@ -267,8 +255,6 @@ fn an_added_by_joins_the_canonical_text_and_changes_the_workspace_version_id() {
     assert_ne!(of(None, Some("ana-souza")), of(Some("ana-souza"), None));
 }
 
-/// An `added_by_time` (#454) joins the canonical text after `added_by`, so the same entries
-/// stamped at two times are two versions; an entry without one keeps the text it had.
 #[test]
 fn an_added_by_time_joins_the_canonical_text_and_changes_the_workspace_version_id() {
     let (web, api) = (web(), api());
@@ -308,7 +294,6 @@ fn named_workspaces_change_the_generation_id_and_their_absence_changes_nothing()
         ("h/o/web", "0123456789abcdef"),
         ("h/o/api", "fedcba9876543210"),
     ];
-    // Without members and contexts the id is the one every earlier generation has.
     assert_eq!(
         generation_id_of(&bundles, &[], &[]),
         generation_id(&bundles)
@@ -319,12 +304,10 @@ fn named_workspaces_change_the_generation_id_and_their_absence_changes_nothing()
     let with_context = generation_id_of(&bundles, &member, &context);
     assert_ne!(with_member, generation_id(&bundles));
     assert_ne!(with_context, with_member);
-    // A repository listed as a member is not the same fact as one the deployment lists.
     assert_ne!(
         generation_id_of(&bundles, &member, &[]),
         generation_id_of(&[bundles[0], bundles[1], member[0]], &[], &[])
     );
-    // Order never matters.
     assert_eq!(
         generation_id_of(&[bundles[1], bundles[0]], &member, &context),
         generation_id_of(&bundles, &member, &context)

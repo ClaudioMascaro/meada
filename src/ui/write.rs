@@ -1,8 +1,3 @@
-//! Console operations and their audit boundary. Refused uploads are never consumed. With
-//! `[postgres]`, each write that passed its authorization and its body's checks inserts its
-//! pending record (`Console::pending`) before it touches Valkey or the store, and the helpers
-//! that print its stderr line finish the record with that line's outcome and owners.
-
 use super::*;
 use crate::audit::{Actor, Audit, Outcome, Pending};
 
@@ -46,14 +41,11 @@ fn decode<T: serde::de::DeserializeOwned>(
         }
         Err(_) => return Err(bad()),
     };
-    // Never return serde's error text, which may echo a token or an entire request body.
     serde_json::from_slice(bytes).map_err(|_| bad())
 }
 
-/// A write's pending record and the audit it goes to; `None` before it was inserted.
 pub(super) type PendingRecord<'a> = Option<(&'a Audit, Pending)>;
 
-/// Finishes `record` as `outcome` with the stderr line's `message` and `owners`.
 pub(super) fn finish(
     record: PendingRecord,
     outcome: Outcome,
@@ -65,7 +57,6 @@ pub(super) fn finish(
     }
 }
 
-/// The audit's view of who acts in the console.
 pub(super) fn actor<'a>(session: &'a Session, owners: Option<&'a [String]>) -> Actor<'a> {
     Actor {
         via: "console",
@@ -97,7 +88,6 @@ pub(super) fn refused(
     )
 }
 
-/// `refused` recording `outcome`.
 #[expect(clippy::too_many_arguments)]
 fn unsuccessful(
     record: PendingRecord,
@@ -120,8 +110,6 @@ fn unsuccessful(
     error(status, code, message)
 }
 
-/// An accepted write answers its CLI line; `owners` are the groups a team operator's change
-/// touched, for its audit line. An operational refusal is a 409 with the CLI message.
 #[cfg(feature = "refresh-lock")]
 fn result(
     record: PendingRecord,
@@ -157,15 +145,12 @@ fn result(
     }
 }
 
-/// An operation's error as `result` takes it: its message, and whether it was the operation's
-/// own refusal or a failure.
 #[cfg(feature = "refresh-lock")]
 fn outcome(e: Box<dyn std::error::Error>) -> (String, Outcome) {
     let outcome = Outcome::of(crate::snapshot::generations::OpError::refused(&*e));
     (e.to_string(), outcome)
 }
 
-/// The grant a write is authorized with: the global operator's reads everything.
 #[cfg(feature = "refresh-lock")]
 fn grant(session: &Session) -> Grant {
     match session.operator {
@@ -174,8 +159,6 @@ fn grant(session: &Session) -> Grant {
     }
 }
 
-/// Who a write acts as: the global operator, or a team operator with its groups, `grant` and,
-/// under the GitHub grant provider, its login and the GitHub grant provider's host (#333).
 #[cfg(feature = "refresh-lock")]
 fn acting<'a>(session: &'a Session, grant: &'a Grant) -> Acting<'a> {
     Acting {
@@ -190,7 +173,6 @@ fn acting<'a>(session: &'a Session, grant: &'a Grant) -> Acting<'a> {
     }
 }
 
-/// A refusal whose audit outcome is not its message.
 #[cfg(feature = "refresh-lock")]
 fn refused_with_outcome(
     record: PendingRecord,
@@ -212,10 +194,6 @@ fn refused_with_outcome(
     error(status, code, message)
 }
 
-/// Debug builds only, a knob for tests, not in the user docs (a release binary has none): with
-/// `MEADA_PAUSE_BEFORE_LOCK=<path>` set and the file `<path>` present, the first save or apply to
-/// get here removes it, creates `<path>.reached` and waits (30 seconds at most) for
-/// `<path>.go`, so a test can move the pointer between admission and the refresh lock.
 #[cfg(all(debug_assertions, feature = "refresh-lock"))]
 fn pause_before_lock() {
     let Some(path) = std::env::var_os("MEADA_PAUSE_BEFORE_LOCK") else {
@@ -226,7 +204,6 @@ fn pause_before_lock() {
         name.push(end);
         std::path::PathBuf::from(name)
     };
-    // The removal is the claim: a request that finds nothing to remove does not pause.
     if std::fs::remove_file(&path).is_err() {
         return;
     }
@@ -243,7 +220,6 @@ fn pause_before_lock() {
     );
 }
 
-/// A team operator that lost its role between admission and the lock gets a viewer's refusal.
 #[cfg(feature = "refresh-lock")]
 fn role_lost(record: PendingRecord, session: &Session, action: &str, arguments: &str) -> Answer {
     let message = Msg::UiOperatorRequired.text();
@@ -258,10 +234,6 @@ fn role_lost(record: PendingRecord, session: &Session, action: &str, arguments: 
     )
 }
 
-/// The 403 `entries_refused` (ADR 0015): each refused entry with its change and reason, and
-/// `hidden`, the count of those whose identity `hiding` does not read (an apply names no
-/// identity outside the grant; a save refuses only what the subject submitted or reads).
-/// Nothing was written. The audit outcome is the message, the named identities and the count.
 #[cfg(feature = "refresh-lock")]
 fn entries_refused(
     record: PendingRecord,
@@ -294,9 +266,6 @@ fn entries_refused(
 }
 
 impl Console {
-    /// Inserts the pending record of a write about to run, as `session` with its owners; when
-    /// the insert fails, the 503 `audit_unavailable` with the write's stderr line and one line
-    /// naming why, and nothing is written.
     #[cfg(feature = "refresh-lock")]
     pub(super) fn pending(
         &self,
@@ -326,7 +295,6 @@ impl Console {
         }
     }
 
-    /// The session was authorized before the listener read its bounded body.
     pub(super) fn write(
         &self,
         route: &str,
@@ -475,7 +443,6 @@ impl Console {
                     &problems.join("\n"),
                 )
             };
-            // The id of the entries as submitted, before a team operator's are composed.
             let id =
                 match crate::snapshot::versions::version_id(&save.entries, &save.message, author) {
                     Ok(id) => id,
@@ -602,8 +569,6 @@ impl Console {
     }
 }
 
-/// The four operation routes, each with the name its stderr line gives it and the action its
-/// audit record names: only these fixed names enter a pre-authentication line or record.
 const OPERATIONS: [(&str, &str, &str); 4] = [
     ("pointer", "pointer", "pointer"),
     ("fence/recover", "fence recover", "fence.recover"),
@@ -611,22 +576,18 @@ const OPERATIONS: [(&str, &str, &str); 4] = [
     ("workspace/apply", "workspace apply", "workspace.apply"),
 ];
 
-/// The action a record of a refusal before the body is read names: fixed by the route.
 pub(super) fn recorded(route: &str) -> Option<&'static str> {
     (OPERATIONS.iter())
         .find(|(r, ..)| *r == route)
         .map(|(.., action)| *action)
 }
 
-/// The name of an operation route in a stderr line; none for any other route.
 pub(super) fn operation(route: &str) -> Option<&'static str> {
     (OPERATIONS.iter())
         .find(|(r, ..)| *r == route)
         .map(|(_, name, _)| *name)
 }
 
-/// One line even for hostile subjects, arguments and multiline catalog messages. Neither
-/// tokens nor raw request bodies enter this function; pre-authentication subjects are absent.
 pub(super) fn audit(
     subject: Option<&str>,
     owners: Option<&[String]>,
@@ -634,8 +595,6 @@ pub(super) fn audit(
     arguments: &str,
     outcome: &str,
 ) {
-    // A team operator's line names the owner groups after the subject (ADR 0015, #324); the
-    // JSON array escapes its own controls.
     let as_owners = owners.map_or(String::new(), |owners| format!(" as {}", json!(owners)));
     eprintln!(
         "ui: {}{as_owners} {} {}: {}",

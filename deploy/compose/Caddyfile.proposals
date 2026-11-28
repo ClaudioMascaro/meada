@@ -1,6 +1,4 @@
 https://localhost {
 	tls internal
-	# The proposal server admits a bearer token for its own audience and answers 401 without one.
-	# Authorization reaches it unchanged; Caddy adds no Origin (the server refuses a request with one).
 	reverse_proxy proposals:8090
 }

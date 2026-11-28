@@ -1,5 +1,3 @@
-//! Workspace changes at the public deterministic core seam shared by CLI and browser.
-
 use meada_core::workspace::{diff, entries_text, touched_owners, version_entries};
 use serde_json::json;
 
@@ -94,8 +92,6 @@ fn a_declared_empty_serve_table_keeps_its_presence_when_a_child_changes() {
     );
 }
 
-/// An entry's owner is printed right after its `path`, before its block tables, and the text
-/// reads back to the same entries; entries with no owner print as they did before owners.
 #[test]
 fn entries_text_prints_the_owner_after_the_path() {
     let entries = [
@@ -118,8 +114,6 @@ fn entries_text_prints_the_owner_after_the_path() {
     assert_eq!(read[0].owner.as_deref(), Some("team-x"));
 }
 
-/// Two versions that differ only in an entry's owner list it as changed with the dotted key
-/// `repository.owner`, set, cleared or replaced (ADR 0015, #325).
 #[test]
 fn an_owner_change_alone_is_the_dotted_key_repository_owner() {
     let entry = "[[repository]]\nrepo='a.test/team/web'\npath='web'\n";
@@ -143,8 +137,6 @@ fn an_owner_change_alone_is_the_dotted_key_repository_owner() {
     );
 }
 
-/// The text read as a version document's entries: `repo`, `path`, the owner when there is one,
-/// then the blocks, the form the authorization functions take.
 #[test]
 fn version_entries_reads_a_text_as_a_documents_entries() {
     let text = "[[repository]]\nrepo='a.test/x'\npath='x'\nowner='team-x'\n\
@@ -167,8 +159,6 @@ fn version_entries_reads_a_text_as_a_documents_entries() {
     );
 }
 
-/// An entry's `added_by` is printed right after its `owner` (after its `path` without one),
-/// before its block tables, and the text reads back to the same entry (#330).
 #[test]
 fn entries_text_prints_added_by_after_the_owner() {
     let entries = [
@@ -185,8 +175,6 @@ fn entries_text_prints_added_by_after_the_owner() {
     assert_eq!(version_entries("entries", &text).unwrap(), entries);
 }
 
-/// Two versions that differ only in an entry's `added_by` list it as changed with the dotted key
-/// `repository.added_by`, set, cleared or replaced (#330).
 #[test]
 fn an_added_by_change_alone_is_the_dotted_key_repository_added_by() {
     let entry = "[[repository]]\nrepo='a.test/team/web'\npath='web'\n";

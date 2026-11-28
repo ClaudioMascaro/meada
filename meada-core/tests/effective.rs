@@ -1,8 +1,3 @@
-//! The effective configuration of named-workspace entries (ADR 0021 contract 6, #344) against
-//! `tests/fixtures/effective-configuration.json`, the table the front end's WebAssembly reads
-//! too. The function is pure: the same entries and facts give the same view on any machine, and
-//! two contexts sharing a repository share no block.
-
 use std::collections::BTreeMap;
 
 use meada_core::effective::{Facts, effective};
@@ -13,7 +8,6 @@ fn table() -> Value {
     serde_json::from_str(text).unwrap()
 }
 
-/// `value` with every short identity of the table (`Y`, `A`, `B`) replaced by its full one.
 fn spelled(value: &Value, table: &Value) -> Value {
     match value {
         Value::String(s) => table["identities"][s.as_str()]
@@ -46,7 +40,6 @@ fn facts_of(row: &Value, table: &Value) -> BTreeMap<String, Facts> {
 }
 
 fn entries_of(entries: &Value, table: &Value) -> Vec<Value> {
-    // Only `repo`, a peer's `repo` and the identities are spelled out: blocks keep their text.
     entries
         .as_array()
         .unwrap()
@@ -102,7 +95,6 @@ fn two_contexts_sharing_a_repository_read_only_their_own_blocks() {
         assert_eq!(y(&first), spelled(&row["blocks"]["first"], &table));
         assert_eq!(y(&second), spelled(&row["blocks"]["second"], &table));
         assert_ne!(y(&first), y(&second));
-        // Deterministic: asking again gives the same view.
         assert_eq!(first, effective(&entries_of(&row["first"], &table), &facts));
     }
 }

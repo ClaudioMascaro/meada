@@ -1,4 +1,3 @@
-//! The documented google-cloud Python client forms.
 use super::{Argument, Code, Frame, Handle, Role, Stage, argument, field, imported};
 
 pub(super) fn constructed<'a>(

@@ -1662,8 +1662,6 @@ def extra_transports(binary,root,label,data,run,http):
                     path.unlink()
                 stored=[answer(client.call('tools/call',{'name':q['tool'],'arguments':q['arguments']})) for q in queries]
                 save(run,label+'.source-deleted.http.json',stored)
-                # Locations/snippets intentionally disappear with source. Stored contracts and
-                # execution scope remain answerable; Engine export parity is checked separately.
                 assert contract in stored[0] and contract in stored[1],stored
                 assert 'index behind the mirror' in stored[1],stored
                 assert 'runs code' in stored[2] and 'Pod/sdk-workers' in stored[2],stored

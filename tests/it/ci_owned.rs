@@ -1,8 +1,3 @@
-//! The files the CI reader owns (#828, ADR 0028). In a pipeline or an action, a key of `with`
-//! belongs to the action's vocabulary: a plain name under a typed key gives no use. A
-//! structured identifier keeps its `exact` use and sits on the CI step or CI job that holds
-//! its key, and a `${{ }}` expression resolves only where a literal `env` gives its value.
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -13,8 +8,6 @@ use crate::common::{assert_golden, fixture_repo};
 
 const APP: &str = "example.com/config-use/app";
 const DEPLOY: &str = ".github/workflows/deploy.yml";
-/// One CI step per rule: typed keys (AWS, GCP and Azure aliases), a structured identifier, a
-/// role ARN, and the expressions.
 const PIPELINE: &str = "\
 name: deploy
 on: push
@@ -60,8 +53,6 @@ fn write(root: &Path, path: &str, text: &str) {
     fs::write(path, text).unwrap();
 }
 
-/// The config use fixtures (#661): `infra` provisions the queue `orders`, the topic `events`,
-/// the bucket `archive` and the table `orders`; `app` names them in config files.
 fn workspace(case: &str) -> (PathBuf, PathBuf) {
     let origin = |name: &str| format!("https://example.com/config-use/{name}.git");
     let infra = fixture_repo(case, "config-use-infra", Some(&origin("infra")));
@@ -74,7 +65,6 @@ fn exported(root: &Path) -> Value {
     serde_json::from_str(&text).unwrap()
 }
 
-/// The uses of `export` read from `file`, as (contract, site, key path).
 fn uses(export: &Value, file: &str) -> Vec<(String, String, String)> {
     let text = |row: &Value, field: &str| row[field].as_str().unwrap().to_string();
     let rows = export["uses"].as_array().into_iter().flatten();
@@ -102,7 +92,6 @@ fn a_pipeline_gives_no_use_by_key_name_and_an_identifier_sits_on_its_ci_node() {
     let export = exported(&app);
     let node = |address: &str| format!("{APP}::{DEPLOY}::{address}");
     let step = node("jobs.deploy.steps[3]");
-    // No row for a typed key of `with`, for the role ARN, or for a name no literal gives.
     assert_eq!(
         uses(&export, DEPLOY),
         [
@@ -116,7 +105,6 @@ fn a_pipeline_gives_no_use_by_key_name_and_an_identifier_sits_on_its_ci_node() {
                 &node("jobs.deploy"),
                 "jobs.deploy.env.QUEUE_URL"
             ),
-            // An unresolved part of a name is a wildcard, and the name a pattern.
             row(
                 "resource::s3::acme-*-releases",
                 &step,
@@ -127,7 +115,6 @@ fn a_pipeline_gives_no_use_by_key_name_and_an_identifier_sits_on_its_ci_node() {
                 &node("jobs.deploy.steps[1]"),
                 "jobs.deploy.steps[1].with.target"
             ),
-            // `${{ env.BUCKET }}`, through the pipeline's literal `env`.
             row(
                 "resource::s3::archive",
                 &step,
@@ -137,7 +124,6 @@ fn a_pipeline_gives_no_use_by_key_name_and_an_identifier_sits_on_its_ci_node() {
         "{:#}",
         export["uses"]
     );
-    // The provisioning links follow their use to its CI node, at the level of the identifier.
     let provisions: Vec<(&str, &str, &str)> = (export["provisions"].as_array().unwrap().iter())
         .filter(|link| link["at"].as_str().is_some_and(|at| at.starts_with(DEPLOY)))
         .map(|link| {
@@ -145,7 +131,6 @@ fn a_pipeline_gives_no_use_by_key_name_and_an_identifier_sits_on_its_ci_node() {
             (text("contract"), text("side"), text("level"))
         })
         .collect();
-    // In the export's order: by side, then by provisioner.
     assert_eq!(
         provisions,
         [
@@ -166,7 +151,6 @@ fn a_pipeline_gives_no_use_by_key_name_and_an_identifier_sits_on_its_ci_node() {
         "{:#}",
         export["provisions"]
     );
-    // A CI node that holds a side is in `iac_nodes`.
     let nodes: Vec<&str> = (export["iac_nodes"].as_array().unwrap().iter())
         .map(|n| n["identity"].as_str().unwrap())
         .filter(|identity| identity.contains(DEPLOY))
@@ -179,7 +163,6 @@ fn a_pipeline_gives_no_use_by_key_name_and_an_identifier_sits_on_its_ci_node() {
             node("jobs.deploy.steps[3]")
         ]
     );
-    // The other files of the repository answer as before.
     assert_eq!(uses(&export, "application.yml").len(), 3, "{export:#}");
     assert_eq!(uses(&export, "values.yaml").len(), 4, "{export:#}");
     let mut export = meada_core::export::parse(&export.to_string()).unwrap();
@@ -187,14 +170,10 @@ fn a_pipeline_gives_no_use_by_key_name_and_an_identifier_sits_on_its_ci_node() {
     assert_golden("ci-owned.app.export.json", &export.write().unwrap());
 }
 
-/// What decides is the reader's recognition of the file, never its name or its folder: a file
-/// that is no pipeline and no action keeps the key-name rule, on the repository.
 #[test]
 fn a_file_no_ci_reader_owns_keeps_the_key_name_rule() {
     let (_, app) = workspace("ci_owned_controls");
     let plain = "storage:\n  bucket: archive\n";
-    // Under `.github/`, under `.github/workflows/` with no `jobs`, another CI system, and an
-    // `action.yml` with no `runs`.
     let generic = [
         ".github/settings.yml",
         ".github/workflows/data.yml",
@@ -204,7 +183,6 @@ fn a_file_no_ci_reader_owns_keeps_the_key_name_rule() {
     for file in generic {
         write(&app, file, plain);
     }
-    // An action is owned as a pipeline is.
     let action = "tools/deploy/action.yml";
     write(
         &app,
@@ -239,7 +217,6 @@ fn a_file_no_ci_reader_owns_keeps_the_key_name_rule() {
     assert_eq!(levels, [(APP, "inferred"); 3], "{export:#}");
 }
 
-/// A `gs://` address is a structured identifier as `s3://` is: an `exact` use on its CI step.
 #[test]
 fn a_gcs_address_in_a_pipeline_is_an_exact_use_on_its_ci_step() {
     let (_, app) = workspace("ci_owned_gcs");
@@ -282,7 +259,6 @@ fn every_scalar_of_a_pipeline_stays_a_config_value() {
         assert!(found.contains(&format!("{DEPLOY}:")), "{found}");
         assert!(found.contains(key), "{query}: {found}");
     }
-    // The bucket's own answer names each use by its key, the removed one gone.
     let bucket = engine
         .context("resource::s3::archive", Some(20000))
         .unwrap();
@@ -293,8 +269,6 @@ fn every_scalar_of_a_pipeline_stays_a_config_value() {
     assert!(!bucket.contains("with.bucket"), "{bucket}");
 }
 
-/// ADR 0005's rule on environment variables: `vars.X` and `secrets.X` have no value in a
-/// repository, so two repositories that write the same one share nothing.
 #[test]
 fn a_variable_is_never_matched_by_name_across_repositories() {
     let (infra, app) = workspace("ci_owned_variables");
@@ -332,7 +306,6 @@ jobs:
             "{text}"
         );
         assert_eq!(export["links"], json!([]));
-        // The variable stays named where it is written.
         let engine = Engine::open(root).unwrap();
         let repository = export["repository"].as_str().unwrap();
         let step = format!("{repository}::{DEPLOY}::jobs.deploy.steps[0]");
@@ -344,8 +317,6 @@ jobs:
     }
 }
 
-/// A pattern that fits two buckets is an open item at its key (ADR 0026, "Anchored
-/// provisioning choices"), as a patterned use declared by hand is.
 #[test]
 fn a_pattern_that_fits_two_names_is_an_open_item_at_its_key() {
     let (infra, app) = workspace("ci_owned_ambiguous");
@@ -377,8 +348,6 @@ fn a_pattern_that_fits_two_names_is_an_open_item_at_its_key() {
     );
 }
 
-/// The `env` that gives a value is the nearest one above the key: the CI step's, then its CI
-/// job's, then the pipeline's. An `env` entry never reads the map it is written in.
 #[test]
 fn an_expression_reads_the_nearest_literal_env_above_its_key() {
     let (_, app) = workspace("ci_owned_env");
@@ -425,7 +394,6 @@ jobs:
                 &node("jobs.deploy.steps[0]"),
                 "jobs.deploy.steps[0].with.target"
             ),
-            // Its own map holds `NAME: archive`; the CI job's is the one above.
             row(
                 "resource::s3::orders",
                 &node("jobs.deploy.steps[0]"),
@@ -440,9 +408,6 @@ jobs:
     );
 }
 
-/// An expression reads the environment of its CI step at run time: a name a script of the file
-/// may write to the environment file holds no literal, and neither does any name once a script
-/// writes that file in a line that shows none.
 #[test]
 fn a_name_written_to_the_environment_file_gives_an_expression_no_literal() {
     let (_, app) = workspace("ci_owned_rebound");
@@ -473,9 +438,6 @@ fn a_name_written_to_the_environment_file_gives_an_expression_no_literal() {
     assert!(none.is_empty(), "{none:?}");
 }
 
-/// The nearest `env` that defines the name decides, whatever it holds. A number, a boolean, a
-/// list, a map or an `env` written as one expression gives no literal: the name is then an
-/// unresolved part, never the value of an `env` farther up.
 #[test]
 fn a_nearer_env_entry_that_is_no_literal_hides_the_ones_above() {
     let (_, app) = workspace("ci_owned_shadowed");
@@ -530,14 +492,11 @@ jobs:
                 &format!("{APP}::{DEPLOY}::jobs.whole.steps[0]"),
                 "jobs.whole.steps[0].with.opaque"
             ),
-            // No `env` between the key and the pipeline's defines `FAR`.
             row("resource::s3::cache-v1", &step, &key("far")),
         ]
     );
 }
 
-/// A nearer entry that stores no config value still defines its name: a null, an empty list or
-/// map, and a list or a map that holds only those (#829's verification).
 #[test]
 fn a_nearer_env_entry_with_no_value_hides_the_ones_above() {
     let (_, app) = workspace("ci_owned_hollow");
@@ -587,8 +546,6 @@ jobs:
     assert_eq!(found, expected);
 }
 
-/// An action's metadata holds no `env` of its own: a composite action reads only the `env` of
-/// its CI steps.
 #[test]
 fn an_action_reads_no_env_at_its_root() {
     let (_, app) = workspace("ci_owned_action_env");

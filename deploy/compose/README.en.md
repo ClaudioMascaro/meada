@@ -339,3 +339,18 @@ curl --cacert proposals-ca.crt -i https://localhost:8445/ -H 'Content-Type: appl
 
 Without a token, the second call answers 401 with a `WWW-Authenticate` that points to the metadata (the first, also without a token, answers a `resource` equal to `public_url`). With a token whose `aud` is `[proposals] audience`, the same call lists `catalog`, `workspaces`, `show` and `propose`; a node's or the console's token is refused with 401. To stop, `compose_proposals down`.
 
+## Interface
+
+Profiles assemble the services and their volumes. The refresh job fetches repositories, indexes them and, when publishing is enabled, uploads the generation. `[refresh.sh:PUBLISH]` `[compose.yaml:services]`
+
+## Invariants
+
+The loop requires a positive interval and holds the snapshot lock during refresh. `[index-loop.sh:REFRESH_SECONDS]` `[index-loop.sh:stop]`
+
+## Side effects
+
+Refresh runs Git and Meada, writes indexes to the volume and can publish to snapshot storage. `[fetch.sh:git]` `[managed-refresh.sh:publish]`
+
+## Verification
+
+From the repository root, run `scripts/compose-check`.

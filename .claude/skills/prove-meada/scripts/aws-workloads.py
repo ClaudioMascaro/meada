@@ -153,12 +153,9 @@ def main():
         ('aws_lambda_function.image', IMAGE), ('aws_lambda_function.unbuilt', MISSING),
         ('aws_ecs_task_definition.task', IMAGE), ('aws_ecs_task_definition.task', MISSING)]}, consumers
     executions = {(x['workload'].split('::')[-1], x['path'], x['root'], x['level']) for x in initial['infra']['executions']}
-    # `filename = var.code_dir` goes through a root variable's default, an overridable value
-    # (ADR 0025), so the Lambda runs that code at `inferred` (ADR 0026, Levels; #782).
     expected_exec = {('aws_lambda_function.code', 'lambda', '.', 'inferred'), ('aws_lambda_function.zip', 'worker.zip', '.', 'exact'),
                      ('SamWorker', 'sam', 'sam.yaml', 'exact'), ('functions.local', 'functions/send.ts', 'serverless.yml', 'exact')}
     assert executions == expected_exec, executions
-    # The builder is the CI step of `build.yaml` that holds the form, no longer the repository (#860).
     expected_links = {(f'{PREFIX}infra::main.tf::{node}', PREFIX + 'app::.github/workflows/build.yaml::jobs.publish.steps[0]',
                        'image::' + IMAGE, '.', 'exact')
                       for node in ['aws_lambda_function.image', 'aws_ecs_task_definition.task']}

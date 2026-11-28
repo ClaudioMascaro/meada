@@ -1,5 +1,3 @@
-//! Repository declarations mapping private abstractions onto the embedded type table.
-
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -44,7 +42,6 @@ pub(crate) struct Custom {
     pub key_path: String,
 }
 
-/// A declared module code input, checked on disk only by the image kind during indexing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Code {
     pub key: String,

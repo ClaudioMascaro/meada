@@ -1,13 +1,7 @@
-//! The awk program the deploy fetch scripts share (#544): `deploy/compose/fetch-pulled.sh` and the
-//! chart's `workspace.fetch` read the entries of `meada workspace show --pulled` with it. Needs no
-//! services, so it runs in the default `cargo test`.
-
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-/// The awk program between `awk '` and `' "$list"` in a deploy fetch script, one line per line
-/// with its indentation dropped, so the copy in a shell script and the one in a YAML block compare.
 fn fetch_awk(path: &str) -> String {
     let text = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(path)).unwrap();
     let (_, rest) = text
@@ -20,9 +14,6 @@ fn fetch_awk(path: &str) -> String {
     lines.join("\n")
 }
 
-/// The Compose fetch script and the chart's `workspace.fetch` carry one awk program (#544), and it
-/// reads the `repo` and `path` of each `[[repository]]` table itself: a peer or resource table
-/// after an entry replaces nothing, a comment after a closing quote is not part of the value.
 #[test]
 fn the_deploy_fetch_reads_each_repository_table_by_its_own_keys() {
     let compose = fetch_awk("deploy/compose/fetch-pulled.sh");
@@ -47,7 +38,6 @@ fn the_deploy_fetch_reads_each_repository_table_by_its_own_keys() {
         );
         String::from_utf8_lossy(&out.stdout).into_owned()
     };
-    // The oracle: the `repository` array of tables as the toml crate reads the input.
     let expected = |input: &str| -> String {
         let doc: toml::Table = toml::from_str(input).expect("the case is valid TOML");
         let get =

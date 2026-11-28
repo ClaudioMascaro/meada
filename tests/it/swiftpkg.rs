@@ -1,6 +1,3 @@
-//! SwiftPM packages link through literal `Package.swift` files, without a Swift toolchain or
-//! `Package.resolved` (spec #29, "Packages").
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -39,7 +36,6 @@ fn package_swift_gives_providers_and_links_literal_dependencies() {
         .map(|p| p["name"].as_str().unwrap())
         .collect();
     assert_eq!(names, ["Kit"]);
-    // One contract per package, the library products and their targets recorded.
     assert_eq!(
         json["providers"].as_array().unwrap().len(),
         1,
@@ -62,7 +58,6 @@ fn package_swift_gives_providers_and_links_literal_dependencies() {
             (at("consumer"), at("level"), at("reason"))
         })
         .collect();
-    // A url and a path link exact; the computed url is ambiguous; vapor is outside the workspace.
     let level = |name: &str| links.iter().find(|l| l.0.ends_with(name)).map(|l| l.1);
     assert_eq!(level("::Kit"), Some("exact"), "{links:?}");
     assert_eq!(level("::Shared"), Some("exact"), "{links:?}");
@@ -76,8 +71,6 @@ fn package_swift_gives_providers_and_links_literal_dependencies() {
         !app_export.contains("vapor"),
         "an external dependency is ignored"
     );
-    // A computed part that folding takes out of a URL (a userinfo) still makes it uncertain, and
-    // so does a package whose name is computed.
     assert!(
         links
             .iter()
@@ -92,7 +85,6 @@ fn package_swift_gives_providers_and_links_literal_dependencies() {
             && l.2.contains("computed dependency")),
         "{links:?}"
     );
-    // `Package.resolved` is never read: the fixture pins a version no manifest writes.
     assert!(!app_export.contains("9.9.9"), "Package.resolved was read");
     assert_golden("swift-pkg-app.export.json", &app_export);
     assert_golden(
@@ -104,7 +96,6 @@ fn package_swift_gives_providers_and_links_literal_dependencies() {
 const APP: &str = "example.com/apps/shop::Sources/App/main.swift::";
 const KIT: &str = "example.com/swift/kit::Sources/Kit/Greeter.swift::";
 
-/// `(call, level, how, target)` of every import made from a call in `caller`.
 fn calls(json: &Value, caller: &str) -> Vec<(String, String, String, String)> {
     let site = format!("{APP}{caller}::");
     (json["imports"].as_array().into_iter().flatten())
@@ -133,8 +124,6 @@ fn an_import_of_a_module_reaches_its_exported_declarations_by_labels() {
         );
         target
     };
-    // Argument labels narrow among the overloads of `greet`, through a bare call, a call
-    // qualified by the module and an unlabelled one.
     assert_eq!(
         target("welcome(who:)", "greet#0"),
         format!("{KIT}greet(name:)")
@@ -144,8 +133,6 @@ fn an_import_of_a_module_reaches_its_exported_declarations_by_labels() {
         format!("{KIT}greet(name:greeting:)")
     );
     assert_eq!(target("plain(who:)", "greet#0"), format!("{KIT}greet(_:)"));
-    // A constructor, and a method on a local made by one or on a typed parameter, with a
-    // defaulted parameter left out.
     assert_eq!(
         target("hello(who:)", "Greeter#0"),
         format!("{KIT}Greeter.init(name:)")
@@ -158,12 +145,10 @@ fn an_import_of_a_module_reaches_its_exported_declarations_by_labels() {
         target("typed(greeter:)", "greeter.hello#0"),
         format!("{KIT}Greeter.hello(to:loudly:)")
     );
-    // A module of another package.
     assert_eq!(
         target("loud(text:)", "shout#0"),
         "example.com/swift/lib::Sources/Shared/Shared.swift::shout(_:)"
     );
-    // Two packages expose `KitMoney`: ambiguous, never exact.
     let money = calls(&json, "total()");
     assert!(!money.is_empty());
     assert!(money.iter().all(|m| m.1 == "ambiguous"), "{money:?}");
@@ -172,16 +157,13 @@ fn an_import_of_a_module_reaches_its_exported_declarations_by_labels() {
         .map(|m| m.3.split("::").next().unwrap())
         .collect();
     assert!(repos.contains(&"example.com/swift/kit") && repos.contains(&"example.com/swift/lib"));
-    // A method of a type only one package declares, when two expose the module: still ambiguous.
     let both = calls(&json, "both(m:)");
     assert!(!both.is_empty());
     assert!(both.iter().all(|m| m.1 == "ambiguous"), "{both:?}");
-    // A variadic with a label of its own takes the unlabelled arguments after its first.
     assert_eq!(
         target("variadic()", "record#0"),
         format!("{KIT}record(level:items:)")
     );
-    // A package whose name is computed is an uncertain provider.
     let dynamic: Vec<_> = (json["links"].as_array().unwrap().iter())
         .filter(|l| {
             l["consumer"]
@@ -197,7 +179,6 @@ fn an_import_of_a_module_reaches_its_exported_declarations_by_labels() {
         dynamic[0]["provider"],
         "example.com/swift/dyn::Sources/Dyn/Dyn.swift::dynamic(name:)"
     );
-    // Internal declarations and outside modules reach nothing.
     assert!(
         calls(&json, "local()").is_empty(),
         "{:?}",
@@ -205,8 +186,6 @@ fn an_import_of_a_module_reaches_its_exported_declarations_by_labels() {
     );
 }
 
-/// What a name the code declares itself (a parameter, a local, a closure parameter, a value
-/// that is not only a construction) hides: no import of a call that `call` names in `caller`.
 #[test]
 fn a_name_the_code_declares_hides_the_one_an_import_brings() {
     let json = app_json("swift_packages_hidden");
@@ -216,7 +195,6 @@ fn a_name_the_code_declares_hides_the_one_an_import_brings() {
         ("hidesGreeterByParameter(greeter:)", "greeter.hello#0"),
         ("hidesGreeterByLocal()", "greeter.hello#0"),
         ("hidesTheTypeByParameter(Greeter:)", "Greeter.hello#0"),
-        // Through values: two origins, and a construction a method was called on.
         ("twoOrigins(flag:)", "held.hello#0"),
         ("onAResult()", "result.hello#0"),
     ] {
@@ -224,7 +202,6 @@ fn a_name_the_code_declares_hides_the_one_an_import_brings() {
         assert!(found.iter().all(|c| c.0 != call), "{caller}: {found:?}");
     }
     assert!(calls(&json, "hidesGreetByClosure()").is_empty());
-    // The same shapes without the hiding do reach the package.
     assert!(!calls(&json, "typed(greeter:)").is_empty());
 }
 

@@ -1,25 +1,3 @@
-//! Cargo packages (spec #30): a `Cargo.toml` with a `[package]` name provides
-//! `package::cargo::<name>`, and each dependency entry consumes the crate it names. The entries
-//! come from the Rust pack's walker (`crates::entries`), so a manifest is read one way only.
-//! The module answers the trait's questions as follows:
-//!
-//! - `owns`: only a manifest with a package; a virtual workspace root owns nothing.
-//! - `ways`: the crate is its library's root file, named by the crate (`How::CrateName`).
-//! - `entries`: the `use` head names the entry of the owning manifest whose key it is when the
-//!   entry renames the package, else whose provider's library head it is.
-//! - `reaches`: the entry's source (`sourced`), see below.
-//! - `resolve`: the entry file only, no candidates; an entry that does not rename its crate
-//!   must be written as the provider's library head.
-//!
-//! An entry keeps where its crate comes from in `Entry::via`: `path <manifest>` (the
-//! `Cargo.toml` the path names, folded lexically from the manifest's directory: a path of the
-//! repository, or one that starts with `../` when it leaves it, which `sourced` matches
-//! against the workspace repositories' roots), `git <identity>` (the remote, as
-//! `repo::normalize_remote` spells it) or nothing for a version. A declared source that cannot
-//! be read (an empty or mistyped `path`, `git` or `package`, an absolute path, or both `path`
-//! and `git`) drops the entry, as does any entry that gives no valid name. Cargo ranges are
-//! never checked, and neither `Cargo.lock` nor a registry is read.
-
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -31,12 +9,8 @@ use crate::index::Export;
 use crate::lang::rust::crates::{crate_name, entries, lib_name, lib_root, workspace_deps};
 use crate::repo::{normalize_remote, relative};
 
-/// The field a `[workspace.dependencies]` entry is kept under, in `Summary::workspace`.
 const WORKSPACE: &str = "workspace.dependencies";
 
-/// The dependency `key = spec` of the table `field`, for a manifest in `dir` (empty at the
-/// root); `None` when it is neither a version nor a table, its crate has no valid name or its
-/// source cannot be read (see `source`).
 fn entry(dir: &str, field: &str, key: &str, spec: &toml::Value) -> Option<Entry> {
     if spec.get("workspace").and_then(|w| w.as_bool()) == Some(true) {
         return is_crate_name(key).then(|| Entry {
@@ -68,8 +42,6 @@ fn entry(dir: &str, field: &str, key: &str, spec: &toml::Value) -> Option<Entry>
     })
 }
 
-/// The string field `name` of a dependency table: `Some(None)` when absent, `None` when it is
-/// there but not a non-empty string.
 fn declared<'a>(spec: &'a toml::Value, name: &str) -> Option<Option<&'a str>> {
     match spec.get(name) {
         None => Some(None),
@@ -78,9 +50,6 @@ fn declared<'a>(spec: &'a toml::Value, name: &str) -> Option<Option<&'a str>> {
     }
 }
 
-/// Where a dependency's crate comes from, as `Entry::via`: `Some(None)` for a version,
-/// `None` when the source it declares cannot be read (see `declared`, `relative`), or when it
-/// declares two.
 fn source(dir: &str, spec: &toml::Value) -> Option<Option<String>> {
     Some(match (declared(spec, "path")?, declared(spec, "git")?) {
         (Some(path), None) => match relative(dir, path)?.as_str() {
@@ -93,8 +62,6 @@ fn source(dir: &str, spec: &toml::Value) -> Option<Option<String>> {
     })
 }
 
-/// Whether `name` can be a package name: Cargo's alphabet (ASCII letters and digits, `-` and
-/// `_`), not empty, at most `MAX_NAME` bytes.
 fn is_crate_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= MAX_NAME
@@ -103,30 +70,22 @@ fn is_crate_name(name: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
-/// Whether `specifier`, the first segment of a `use` path, may name a dependency: a crate
-/// identifier that is not the standard library's.
 pub fn names_crate(specifier: &str) -> bool {
     !matches!(specifier, "std" | "core" | "alloc")
         && is_crate_name(specifier)
         && !specifier.contains('-')
 }
 
-/// What a `use` writes for the dependency `entry` when it renames the package: its key with
-/// hyphens turned into underscores. An entry that does not rename it writes the library's own
-/// name (`lib_head`) instead.
 pub fn key_head(entry: &Entry) -> String {
     crate_name(entry.key())
 }
 
-/// What a `use` writes for the library of the package a manifest summary describes: `[lib] name`,
-/// else the package name, hyphens as underscores.
 pub fn lib_head(s: &Summary) -> Option<String> {
     s.lib_name
         .clone()
         .or_else(|| s.name.as_deref().map(crate_name))
 }
 
-/// The Cargo ecosystem.
 pub struct Cargo;
 
 impl Ecosystem for Cargo {
@@ -138,9 +97,6 @@ impl Ecosystem for Cargo {
         file_name == "Cargo.toml"
     }
 
-    /// Reads a `Cargo.toml` from its bytes. Hostile input: a file too large, not UTF-8 or not TOML
-    /// reads as empty; a field of another type counts as absent; a name Cargo would refuse makes no
-    /// provider; a `workspace = true` entry is kept as such until `inherit` fills it.
     fn read(&self, path: &str, src: &[u8]) -> Summary {
         let table: Option<toml::Table> = (src.len() <= MAX_BYTES)
             .then(|| std::str::from_utf8(src).ok()?.parse().ok())
@@ -171,10 +127,8 @@ impl Ecosystem for Cargo {
             workspace.extend(entry(dir, WORKSPACE, key, spec));
         }
         workspace.sort_by(|a, b| a.key().cmp(b.key()));
-        // `version.workspace = true` takes the version from `[workspace.package]` (see `inherit`).
         let version = package.and_then(|p| p.get("version"));
         let inherits_version = version.and_then(|v| v.get("workspace")?.as_bool()) == Some(true);
-        // The library name only when it is not the one a path writes for the package anyway.
         let lib = (name.as_deref())
             .map(|n| (crate_name(n), lib_name(&table, n)))
             .filter(|(own, lib)| lib != own && is_crate_name(lib))
@@ -198,11 +152,6 @@ impl Ecosystem for Cargo {
         &["rs"]
     }
 
-    /// Fills each `workspace = true` entry of a Cargo manifest from the `[workspace.dependencies]`
-    /// of the nearest manifest above it (or itself) that has any, and `version.workspace = true`
-    /// from that manifest's `[workspace.package] version`; an entry that finds no entry of its key
-    /// is dropped, as Cargo refuses it. The member keeps its own table (`dev-dependencies`...) and
-    /// key, so a workspace entry that renames a crate renames it for the member too.
     fn inherit(&self, manifests: &mut [Manifest]) {
         type Root = (String, HashMap<String, Entry>, Option<String>);
         let roots: Vec<Root> = (manifests.iter())
@@ -259,9 +208,6 @@ impl Ecosystem for Cargo {
         names_crate(specifier)
     }
 
-    /// The specifier is the crate a `use` names: the entry of the owning manifest whose key it
-    /// is when the entry renames the package, else whose provider's library head it is (the
-    /// package's own name, with no provider to ask), hyphens as underscores.
     fn entries<'e>(
         &self,
         exports: &'e [Export],
@@ -281,7 +227,6 @@ impl Ecosystem for Cargo {
         entry.map(|e| (e, ".".to_string())).into_iter().collect()
     }
 
-    /// `path` by the folded location, `git` by the remote's identity (`sourced`).
     fn reaches(
         &self,
         (via, _): (Option<&str>, Option<&str>),
@@ -291,13 +236,10 @@ impl Ecosystem for Cargo {
         sourced(via, from, to)
     }
 
-    /// Only a manifest with a package: a virtual workspace root has none.
     fn owns(&self, manifest: &Manifest) -> bool {
         manifest.summary.name.is_some()
     }
 
-    /// The crate is its library's root file, a path of the repository as `read` folded it; a
-    /// subpath is a module path, followed by name.
     fn ways(&self, manifest: &Manifest, subpath: &str) -> Vec<(How, Vec<String>)> {
         match (subpath, &manifest.summary.main) {
             (".", Some(root)) => vec![(How::CrateName, vec![root.clone()])],
@@ -305,8 +247,6 @@ impl Ecosystem for Cargo {
         }
     }
 
-    /// The entry file only, no candidates; an entry that does not rename its crate reaches the
-    /// libraries named as it writes.
     fn resolve(
         &self,
         at: &Provided,
@@ -334,8 +274,6 @@ mod tests {
     use super::*;
     use crate::contract::Level;
 
-    /// A Cargo path keeps the crate at that path of the dependent's repository, a source from a
-    /// remote the repository of that remote, a version every repository.
     #[test]
     fn a_path_or_git_source_reaches_the_provider_it_names() {
         let at = |id| {
@@ -355,7 +293,6 @@ mod tests {
         assert!(Cargo.reaches(remote, at("a"), (lib, "Cargo.toml")));
         assert!(!Cargo.reaches(remote, at("a"), (at("b"), "Cargo.toml")));
         assert!(Cargo.reaches((None, Some("1")), at("a"), (at("b"), "Cargo.toml")));
-        // A path out of the repository lands where the two roots say, folded without reading.
         let out = (Some("path ../b/core/Cargo.toml"), None);
         assert!(Cargo.reaches(out, at("a"), (at("b"), "core/Cargo.toml")));
         assert!(!Cargo.reaches(out, at("a"), (at("b"), "Cargo.toml")));
@@ -416,7 +353,6 @@ mod tests {
                     Some("git example.com/org/repo")
                 ),
                 ("dependencies", "serde", "serde", Some("1"), None),
-                // A path out of the repository keeps its leading `..`.
                 (
                     "dev-dependencies",
                     "far",
@@ -459,7 +395,6 @@ mod tests {
             "Cargo.toml",
             "[package]\nname = \"a-b\"\n[lib]\nname = \"a_b\"\npath = \"./src/./l.rs\"\n",
         );
-        // The package's own library name is not stored; the path is folded.
         assert_eq!(
             (lib.lib_name, lib.main.as_deref()),
             (None, Some("src/l.rs"))
@@ -547,7 +482,6 @@ mod tests {
                 ("dependencies", "shared", "shared", Some("1"), None),
             ]
         );
-        // The nearest root is the workspace's, wherever it sits above.
         assert_eq!(keys(&manifests[2].summary).len(), 1);
     }
 
@@ -566,8 +500,6 @@ mod tests {
         }
     }
 
-    /// One repository: `app` depends on `core-lib` (its library is `corelib`, in the workspace)
-    /// and on `fancy`, which renames the crate `other-lib` that no repository provides.
     fn workspace() -> Export {
         let file = |path: &str| {
             let mut file = crate::index::File::default();
@@ -630,7 +562,6 @@ mod tests {
             Cargo.ways(&custom, "."),
             [(How::CrateName, vec!["src/x.rs".to_string()])]
         );
-        // A virtual manifest has no library root.
         assert!(
             Cargo
                 .ways(&manifest("Cargo.toml", "[workspace]\n"), ".")
@@ -649,13 +580,10 @@ mod tests {
                 .collect()
         };
         let entry = |name: &str| vec![(name.to_string(), ".".to_string())];
-        // An entry that does not rename its crate is written as the provider's library head.
         assert_eq!(named("corelib"), entry("core-lib"));
         assert!(named("core_lib").is_empty());
-        // One that renames it is written as its key, hyphens as underscores.
         assert_eq!(named("fancy"), entry("other-lib"));
         assert!(named("other_lib").is_empty());
-        // Never the standard library, and only for a file a manifest with a package owns.
         assert!(named("std").is_empty());
         let providers_of = Cargo.entries(&exports, &providers, (0, "elsewhere/x.rs"), "corelib");
         assert!(providers_of.is_empty());
@@ -678,10 +606,8 @@ mod tests {
         };
         let exact = |id: &str| Some((How::CrateName, Level::Exact, vec![id.to_string()]));
         assert_eq!(resolve("corelib", "f"), exact("r::core/src/lib.rs::f"));
-        // A module the library root exports.
         assert_eq!(resolve("corelib", "m.g"), exact("r::core/src/m.rs::g"));
         assert_eq!(resolve("corelib", "missing"), None);
-        // The package's own name is not what a `use` writes for a library named otherwise.
         assert_eq!(resolve("core_lib", "f"), None);
     }
 }

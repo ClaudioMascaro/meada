@@ -21,7 +21,6 @@ beforeAll(() => {
 });
 afterEach(async () => { await act(() => root.render(null)); vi.unstubAllGlobals(); });
 
-// What `GET /api/v1/workspace/versions/<id>` returns a team operator: the entries its grant reads.
 const x = { repo: 'a.com/x', path: 'x', owner: 'team-a' };
 const q = { repo: 'a.com/q', path: 'q', owner: 'team-a' };
 const y = { repo: 'a.com/y', path: 'y', owner: 'team-b' };
@@ -88,7 +87,7 @@ test.each(refusals.flatMap(row => (['pt-BR', 'en'] as const).map(locale => ({ ..
   expect(diff.textContent).toContain(repo);
   expect(diff.textContent).toContain(`${t.refusedMark}: `); expect(diff.textContent).toContain(t[`reason_${reason}`]);
   expect(getByRole(form, 'status').textContent).toBe(t.refusedSummary);
-  expect(diff.tabIndex).toBe(0); expect(diff.getAttribute('aria-label')).toBe(t.editorDiff); // the mark is text inside a focusable, labelled region
+  expect(diff.tabIndex).toBe(0); expect(diff.getAttribute('aria-label')).toBe(t.editorDiff);
   expect(save.hasAttribute('disabled')).toBe(true);
   await type(entries, original);
   expect(getByRole(form, 'region', { name: t.editorDiff }).textContent).not.toContain(t.refusedMark);

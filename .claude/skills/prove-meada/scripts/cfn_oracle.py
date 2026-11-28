@@ -11,13 +11,12 @@ import re
 import subprocess
 from pathlib import Path, PurePosixPath
 
-import yaml  # PyYAML: see SKILL.md's Gotchas
+import yaml
 
 SAM = "AWS::Serverless-2016-10-31"
 MAX_BYTES = 1 << 20
 EVAL_DEPTH = 32
 NAME_MAX = 1024
-# type -> (the property that holds the physical name, whether `Ref` returns the name itself).
 NAMED = {
     "AWS::DynamoDB::GlobalTable": ("TableName", True),
     "AWS::DynamoDB::Table": ("TableName", True),
@@ -284,7 +283,7 @@ def templates(repo, unreadable):
             text = raw.decode()
             root_node = yaml.compose(text, Loader=Loader)
             doc = yaml.load(text, Loader=Loader)
-        except Exception as e:  # not UTF-8, not YAML, not JSON
+        except Exception as e:
             unreadable.append((rel, str(e)[:80]))
             continue
         if root_node is not None and is_template(doc):
@@ -322,7 +321,7 @@ def evaluate(repo):
         names = Names(rel, params, resources, lines)
         for rid in sorted(resources):
             body = resources[rid]
-            if rid not in spans:  # a resource that came by a merge key or an alias has no lines
+            if rid not in spans:
                 continue
             found = names.name_of(rid, 0)
             name, pattern, through = (None, False, set()) if found is None else found

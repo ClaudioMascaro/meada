@@ -1,12 +1,4 @@
 #!/bin/sh
-# Lists what Meada makes of a directory, for reviewing a resolution or contract change: each
-# call with its level and target, then providers, consumers and links.
-# Usage: scripts/edges <dir>[=<origin url>] [<peer dir>[=<origin url>]...]
-# Each directory is copied as a sibling into a fresh temporary directory and made a git
-# repository, with <origin url> as its origin (for fixtures whose meada.toml names peers by
-# identity). Meada runs in the first: the calls, providers and consumers are the first one's,
-# the links every link that touches it; a peer joins when the first one's meada.toml names it.
-# The temporary directory is printed and kept, to edit and rerun there.
 set -eu
 
 if [ $# -eq 0 ]; then
@@ -29,7 +21,6 @@ for arg in "$@"; do
   [ -e "$repo" ] && { echo "scripts/edges: two directories named $(basename "$repo")" >&2; exit 1; }
   cp -R "$dir" "$repo"
   rm -rf "$repo/.git" "$repo/.meada"
-  # Pinned like tests/it/common/mod.rs, so ids and hashes match across machines.
   (
     cd "$repo"
     export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
@@ -44,7 +35,6 @@ for arg in "$@"; do
   [ -n "$first" ] || first=$repo
 done
 
-# Built from the repository root, where rust-toolchain.toml picks the toolchain.
 meada=$(cd "$root" && cargo build --quiet --bin meada --message-format=json |
   jq -r 'select(.reason == "compiler-artifact" and .executable != null) | .executable')
 (cd "$first" && "$meada" export) > "$tmp/export.json"

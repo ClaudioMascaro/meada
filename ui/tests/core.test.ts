@@ -6,7 +6,6 @@ import {
   initSync, init, validate, workspaceVersionId, workspaceDiff, entriesText, entriesJson, authorizeEntries, composeEntries,
 } from '../wasm/meada_core';
 
-// One table, three kinds of rows: text validation, authorization and a team operator's save (#323).
 const validations = fixtures.flatMap(row => row.text === undefined ? [] : [row]);
 const authorizations = fixtures.flatMap(row => row.refused === undefined ? [] : [row]);
 const compositions = fixtures.flatMap(row => row.composed === undefined ? [] : [row]);
@@ -24,7 +23,6 @@ test.each(validations)('WebAssembly and CLI share validation: $name', row => {
   }
 });
 
-// A row's login and GitHub host (#333): both absent or null without the GitHub grant provider.
 test.each(authorizations)('WebAssembly and CLI share authorization: $name', row => {
   const groups = json(row.groups), grant = json(row.grant), current = json(row.current), entries = json(row.new);
   const login = row.login ?? undefined, host = row.github_host ?? undefined;

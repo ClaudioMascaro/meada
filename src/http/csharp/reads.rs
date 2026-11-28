@@ -1,24 +1,3 @@
-//! Environment and configuration reads in the URLs of C# consumers (spec #28, #112). The pack
-//! writes what looks like a read, without knowing what it reads: a call or a subscript with one
-//! string literal (`Part::Read`, or a `Value::Call` the kind turns into one). This module decides.
-//!
-//! - `Environment.GetEnvironmentVariable("X")`, with `Environment` the framework's
-//!   `System.Environment` (a type of the repository with that name hides it), is the variable
-//!   `X` (`Part::Env`), also through a local or a field it is bound to.
-//! - `configuration["Section:Key"]` on a receiver declared `IConfiguration`, or on
-//!   `builder.Configuration` with `builder` a `WebApplicationBuilder` (its declared type, or made
-//!   by `WebApplication.CreateBuilder` and its siblings), names a key of the project's base
-//!   `appsettings.json` (`dotnet::appsettings`). The key maps to the variable `Section__Key`, as
-//!   .NET's environment provider names it, and a literal the file holds for it is that
-//!   variable's default (`Part::EnvOr`): `http::fetches` then links by the literal's host when a
-//!   provider of the workspace serves it, and otherwise through the variable and `base_url_env`.
-//!   A key the file lacks is the variable alone.
-//!
-//! Any other call or subscript (`GetValue<T>("k")`, `GetSection("s")`, `connectionStrings["x"]`)
-//! is no read: an unknown part. Meada never reads an environment value.
-//!
-//! The variable keeps the spelling of the key as the code writes it, and `base_url_env` compares
-//! it as written: .NET compares keys without case, Meada's peers do not.
 // ponytail: the receiver and the scope of a read are looked up in the file that holds the
 // consumer, so a read passed in from another file's wrapper call is an unknown part.
 
@@ -35,7 +14,6 @@ const GET: &str = "GetEnvironmentVariable";
 const CONFIGURATION: &str = "Microsoft.Extensions.Configuration.IConfiguration";
 const BUILDER: &str = "Microsoft.AspNetCore.Builder.WebApplicationBuilder";
 
-/// The reads of one extraction; the configuration files are parsed the first time one asks.
 pub(super) struct Reads<'i> {
     configs: &'i [(&'i str, &'i [u8])],
     settings: OnceCell<Settings>,
@@ -49,8 +27,6 @@ impl<'i> Reads<'i> {
         }
     }
 
-    /// `value`, written in `path`, with the reads in a string decided (each read carries the
-    /// scope it was written in).
     pub(super) fn value<'a>(&self, code: &Code<'a>, path: &'a str, value: Value) -> Value {
         match value {
             Value::Str(parts) => {
@@ -61,10 +37,8 @@ impl<'i> Reads<'i> {
         }
     }
 
-    /// What a part is: a read decided, anything else as it is.
     fn part<'a>(&self, code: &Code<'a>, path: &'a str, part: Part) -> Vec<Part> {
         match part {
-            // The pack drops the trims: a read with a member left is unknown.
             pending @ Part::Read {
                 parameter: true, ..
             } => vec![pending],
@@ -80,8 +54,6 @@ impl<'i> Reads<'i> {
         }
     }
 
-    /// The parts the call or subscript `callee` with the literal `key`, written in `scope` of
-    /// `path`, reads (see the module).
     fn read<'a>(
         &self,
         code: &Code<'a>,
@@ -124,8 +96,6 @@ impl<'i> Reads<'i> {
     }
 }
 
-/// The scope written as `scope` among the file's definitions (`""` is the file's), as the
-/// resolver reads it.
 fn scope_of<'a>(facts: &'a Facts, scope: &str) -> Option<&'a str> {
     match scope.is_empty() {
         true => Some(""),
@@ -133,7 +103,6 @@ fn scope_of<'a>(facts: &'a Facts, scope: &str) -> Option<&'a str> {
     }
 }
 
-/// The name `name` as the file writes it for a field, a local or a parameter.
 fn name_in<'a>(facts: &'a Facts, name: &str) -> Option<&'a str> {
     let params = facts.defs.iter().flat_map(|d| &d.params);
     (facts.receivers.iter().map(|r| r.name.as_str()))
@@ -141,8 +110,6 @@ fn name_in<'a>(facts: &'a Facts, name: &str) -> Option<&'a str> {
         .find(|n| *n == name)
 }
 
-/// Whether `receiver`, written in `scope` of `path`, is a configuration: a name declared
-/// `IConfiguration`, or `builder.Configuration` of a web application builder.
 fn configuration<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), receiver: &str) -> bool {
     let receiver = receiver.strip_prefix("this.").unwrap_or(receiver);
     let facts = code.files()[path];
@@ -156,8 +123,6 @@ fn configuration<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), receive
     }
 }
 
-/// Whether the type the source writes for `name` in `scope` of `path` is `full`, in full or
-/// through the usings.
 fn declared<'a>(
     code: &Code<'a>,
     (path, scope): (&'a str, &'a str),
@@ -170,8 +135,6 @@ fn declared<'a>(
     is_type(code, at, within, ty, full)
 }
 
-/// Whether `name` is a web application builder: declared as one, or a local made by
-/// `WebApplication.CreateBuilder(..)` or a sibling.
 fn builder<'a>(code: &Code<'a>, (path, scope): (&'a str, &'a str), name: &'a str) -> bool {
     if code.written(path, scope, name).is_some() {
         return declared(code, (path, scope), name, BUILDER);

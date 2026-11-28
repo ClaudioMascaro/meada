@@ -1,11 +1,3 @@
-//! What every protocol checks of an answer before it becomes a decision (spec #18): the choice
-//! is one of the offered keys, the probability is in [0,1], and the model id can be recorded.
-//! The `chat` adapter reads an answer into these three values and calls `proposal`; the
-//! `decisions` adapter calls it once per question, after its own strict shape checks.
-//!
-//! Every error here already carries its final text (`invalid answer: <reason>`), ready to be
-//! printed under the item id.
-
 use std::fmt::Display;
 
 use crate::Result;
@@ -14,24 +6,17 @@ use crate::msg::Msg;
 
 use super::{Config, Offer, Question};
 
-/// An answer that passed validation: the decision it would record, and the candidate it picks
-/// as a person reads it.
 pub(crate) struct Proposal {
     pub decision: Decision,
-    /// The probability of the decision.
     pub p: f64,
-    /// The picked candidate: repository identity, method and path.
     pub candidate: String,
-    /// How sure the decider says it is, when the protocol gives it: printed, not recorded.
     pub confidence: Option<f64>,
 }
 
-/// The error for an answer that is not valid, with `reason` as its detail.
 pub(super) fn invalid(reason: impl Display) -> Box<dyn std::error::Error> {
     Msg::DecideInvalid(&reason.to_string()).text().into()
 }
 
-/// `p` if it is a number in [0,1] (so neither NaN nor infinite).
 pub(super) fn probability(p: f64) -> Result<f64> {
     match crate::decisions::probability(p) {
         true => Ok(p),
@@ -39,9 +24,6 @@ pub(super) fn probability(p: f64) -> Result<f64> {
     }
 }
 
-/// The answer of a decider to `question`: `choice` must be an offered key, `p` a probability,
-/// and `by` a model id: printed and recorded, so no control characters, and not `human`, which
-/// is the person's. Every upstream string printed or recorded goes through `Config::shown`.
 pub(super) fn proposal(
     config: &Config,
     question: &Question,
@@ -69,7 +51,6 @@ pub(super) fn proposal(
     })
 }
 
-/// The offer of `question` whose key is `choice`, or the error naming it.
 pub(super) fn offered<'q>(
     config: &Config,
     question: &'q Question,

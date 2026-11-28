@@ -1,4 +1,3 @@
-//! Directionless config uses (#661), observed through the public engine.
 use crate::common::{assert_golden, fixture_repo};
 use meada::engine::Engine;
 
@@ -158,7 +157,6 @@ fn config_use_refresh_and_secret_boundaries_preserve_complete_sets() {
             .iter()
             .all(|l| l["at"] != "values.yaml#worker.queue")
     );
-    // A key-name use is `inferred`: no orphan line, while `context` shows the refreshed side (#797).
     let (_, reports) = engine.status_report().unwrap();
     let reports = reports.into_iter().flatten().collect::<Vec<_>>().join("\n");
     assert!(!reports.contains("channel::sqs::absent"), "{reports}");
@@ -182,8 +180,6 @@ fn config_use_classification_stays_bounded_on_a_full_file() {
         time::{Duration, Instant},
     };
     let (infra, app) = workspace("config_use_hostile");
-    // A Terraform var file keeps its values past `VALUES_MAX` (#817), so the whole file is still
-    // classified; a generic YAML file of this size is data and gives no use at all.
     let mut input = String::from("{\n");
     let mut count = 0;
     while input.len() < (1 << 20) - 2048 {
@@ -330,7 +326,6 @@ fn config_uses_and_workload_images_keep_their_own_edges_on_refresh() {
     assert_eq!(engine.export().unwrap(), original);
 }
 
-/// The `at` of every config use of the repository at `repo`.
 fn uses_at(repo: &std::path::Path) -> Vec<String> {
     let text = Engine::open(repo).unwrap().export().unwrap();
     let json: serde_json::Value = serde_json::from_str(&text).unwrap();
@@ -339,9 +334,6 @@ fn uses_at(repo: &std::path::Path) -> Vec<String> {
         .collect()
 }
 
-/// A document the reader of a contract kind recognizes means what that reader says (ADR 0026,
-/// "Orphan sides", #800): a Prometheus rule's `queue` label is an alert label, no use of a
-/// queue, while a queue ARN in the same rule is still a use at `exact`.
 #[test]
 fn a_rule_file_the_alert_reader_takes_feeds_no_key_name_rule() {
     let repo = fixture_repo(
@@ -370,7 +362,6 @@ fn a_rule_file_the_alert_reader_takes_feeds_no_key_name_rule() {
         values.contains("o5 alerts/app.rules.yaml:8 groups[0].rules[0].labels.queue = \"jobs\""),
         "{values}"
     );
-    // Named `jobs`, the provisioned queue keeps its provisioner alone.
     std::fs::write(
         repo.join("infra/main.tf"),
         "resource \"aws_sqs_queue\" \"jobs\" {\n  name = \"jobs\"\n}\n",
@@ -388,8 +379,6 @@ fn a_rule_file_the_alert_reader_takes_feeds_no_key_name_rule() {
             ),
         "{jobs}"
     );
-    // A queue ARN in the rule is a use at `exact`; the same label in a file no reader recognizes
-    // keeps its `inferred` use.
     let rule = std::fs::read_to_string(repo.join("alerts/app.rules.yaml")).unwrap();
     std::fs::write(
         repo.join("alerts/app.rules.yaml"),
@@ -421,8 +410,6 @@ fn a_rule_file_the_alert_reader_takes_feeds_no_key_name_rule() {
     );
 }
 
-/// In a Kubernetes stream only the document the alert reader takes a rule from is its own: the
-/// key-name rule still reads the stream's other documents (#800).
 #[test]
 fn only_the_rule_document_of_a_stream_is_kept_from_the_key_name_rule() {
     let repo = fixture_repo(
@@ -443,8 +430,6 @@ fn only_the_rule_document_of_a_stream_is_kept_from_the_key_name_rule() {
     assert_eq!(uses_at(&repo), ["k8s/app.yaml#[0].data.queue"]);
 }
 
-/// A provider document (an OpenAPI file of a repository with a `[serve]` table) is the HTTP
-/// kind's own; without the table the same file is configuration the key-name rule reads (#800).
 #[test]
 fn a_provider_document_feeds_no_key_name_rule() {
     let repo = fixture_repo(
@@ -465,9 +450,6 @@ fn a_provider_document_feeds_no_key_name_rule() {
     assert_eq!(uses_at(&repo), ["openapi.yaml#[\"x-messaging\"].queue"]);
 }
 
-/// Only what the document reader reads is a provider document (#800): a file it ignores, listed
-/// in `[serve] documents` or named like a document (a Swagger 2.0 `openapi.yaml`), and the
-/// documents of a stream after the first, which it never reads, keep the key-name rule.
 #[test]
 fn what_the_document_reader_does_not_read_keeps_the_key_name_rule() {
     let repo = fixture_repo(
@@ -503,10 +485,6 @@ fn what_the_document_reader_does_not_read_keeps_the_key_name_rule() {
     );
 }
 
-/// Each document the alert reader takes something from (a Loki rule file, a Grafana alert rule
-/// file, an Alertmanager configuration, an `AlertmanagerConfig` object of a stream) feeds no
-/// key-name rule, while a Terraform `grafana_rule_group` (an IaC source) and a promtool test file
-/// (which no reader takes) are still read.
 #[test]
 fn each_document_the_alert_reader_takes_feeds_no_key_name_rule() {
     let repo = fixture_repo(

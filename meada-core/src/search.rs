@@ -51,7 +51,6 @@ pub fn answer_by<T, E>(
 mod tests {
     use super::*;
 
-    /// `answer_by` over the payloads `line` makes for the hits `answer` takes made.
     fn lazy(hits: &[Hit], budget: Option<usize>, made: &mut usize) -> String {
         let payloads = hits.iter().map(|(r, k, l)| (*r, k.clone(), l.clone()));
         answer_by("q", payloads.collect(), budget, |l: &String| {
@@ -63,7 +62,6 @@ mod tests {
 
     #[test]
     fn a_cut_answer_makes_only_the_lines_it_shows() {
-        // Pairs tie on rank and key, and their lines sort against the order they come in.
         let hits: Vec<Hit> = (0..1000)
             .map(|i| {
                 let line = format!("line {:04} {}", 999 - i, "x".repeat(40));

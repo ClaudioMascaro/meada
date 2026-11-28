@@ -1,9 +1,7 @@
-//! GCP Terraform projections, evaluated in the existing root and instance budget.
 use super::environment::Entry;
 use super::*;
 
 impl<'m> Eval<'m> {
-    /// Empty nested blocks still cost work. Charge scans before collecting their children.
     fn gcp_walk(&mut self, structures: usize) -> bool {
         let cost = structures
             .max(1)
@@ -25,8 +23,6 @@ impl<'m> Eval<'m> {
         let Some(text) = self.nodes[node].name.as_deref() else {
             return;
         };
-        // Charge the largest possible projection before allocating its name/provenance.
-        // Structured identifiers may shrink; only a subscription adds a fixed prefix.
         let bytes = text.len()
             + if block.ty == "google_pubsub_subscription" {
                 "subscriptions/".len()
@@ -251,7 +247,6 @@ impl<'m> Eval<'m> {
         if block.kind != Kind::Resource || block.ty != "google_sql_database" {
             return;
         }
-        // A database with an unreadable instance must never fall back to its short name.
         self.nodes[node].provisioned = Some(Projection::default());
         let Some(instance) =
             self.endpoint_arg(at, each, block, "instance", "google_sql_database_instance")

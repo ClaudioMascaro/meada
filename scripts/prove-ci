@@ -21,8 +21,6 @@ from unittest.mock import patch
 SCRIPTS = Path('.claude/skills/prove-meada/scripts')
 SCOPE = SCRIPTS.parent / 'references/scope.md'
 SURFACES = ('cli', 'console', 'accounts', 'deploy', 'container', 'goldens')
-# Bases from before a feature, as a7-a8-audit.py names them: `images.py` compares against one
-# before #662 (`PRE_IMAGE`), `config_uses.py` against one before #661 (`PRE_CONFIG`).
 HISTORICAL = {'pre_image': 'eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62',
               'pre_config': '6a5eca5853193d205bcf756983b41e9cb16ffa9d',
               'pre_private_fields': 'b73e1e5318508d69a8e98e1081e2e9fb3c61076e',
@@ -30,10 +28,6 @@ HISTORICAL = {'pre_image': 'eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62',
               'before_invalidation': 'e0925fe4463ea44b6d1a928509fc68c0d8c14b81',
               'before_sqs_restore': '68f1c0ba675f951a191c4fc7a87f75d77de02bef',
               'before_class_authority': '674b7ee52939ed58dccc43935b12322a56496696'}
-# A flow's ceiling, the audit's: one hung driver must not spend the job's 90 minutes. Every step but
-# the cleanups runs under timeout(1) with what is left of CAPTURE_END, and one with under a minute
-# left is BLOCKED unrun: with the setup before and the upload after, the receipt fits the job's 90.
-# `ci-corpus` fetches and indexes about 70 public repositories in six workspaces (#904): its own ceiling.
 FLOW_TIMEOUT = 1200
 FLOW_CEILINGS = {'ci-corpus': 2400}
 CAPTURE_END = 75 * 60
@@ -45,18 +39,12 @@ IMAGES = r'src/(image\.rs|image/|iac/types|index\.rs|engine\.rs|trace\.rs|items\
 PATTERNS = r'src/(iac/(pattern|provision)\.rs|image/patterns\.rs|decisions\.rs)'
 INCIDENTS = r'src/(alert/(incident|forwarding|pcl)\.rs|alert\.rs|config\.rs)'
 CI = r'src/(iac/actions\.rs|ci(\.rs|/)|trace\.rs|engine\.rs|index\.rs|iac\.rs|iac/config_uses\.rs)'
-# F2 of #820: a `run` script gives sides of the package and image kinds, so their modules select it too.
 CI_RUN = f'{CI}|' + r'src/(iac/actions/|package(\.rs|/)|image(\.rs|/))'
 A8 = r'src/(lang/(ts|go|mod)|http\.rs|http/(ts|go|join)|resolve\.rs|index\.rs)'
 SOURCE_KEY = '{scripts}/a7-source-keys/native-hcl-values/'
-# The Scope table's shared core: every answer goes through it, the A7/A8 flows' too.
 SHARED = (r'src/(lang/mod\.rs|resolve\.rs|index\.rs|engine\.rs|trace\.rs|partial\.rs|contract\.rs|community\.rs|entry\.rs'
           r'|items\.rs|drift_view\.rs|render\.rs)|meada-core/src/(render|search|context|trace|shape|drift|export)\.rs'
           r'|tests/golden/schema\.txt$')
-# The drivers the skill's Scope table names (`SCOPE`), each with the paths its row names (None: on
-# every run of its surface; a change to the verifier or to shared core runs them all). `{head}`, `{base}` and `{ui}` are this run's builds: a flow with `{ui}` runs
-# in a console run after the console's API checks, the others after `cli-mcp`. A `HISTORICAL` base is
-# built only for a flow that names it (`{pre_image}`, `{pre_config}`), just before the console's flows.
 FLOWS = (
     ('http-iac', None, 'http-iac.py --head-bin {head} --base-bin {base}'),
     ('iac-http-routes', None, 'iac-http-routes.py --head-bin {head} --base-bin {base}'),
@@ -194,8 +182,6 @@ def capture(run, scope, base, head, repos, paths=()):
             return
         limit = None if cleanup else min(ceiling or left, left)
         if limit:
-            # timeout(1) sends TERM to the step's process group, the `meada` a driver started too
-            # (exit 124), and KILLs it 10 s later, itself included, which Python reads as -9.
             # shortcut: a server a driver starts in its own session (console-graph.py, config_uses.py)
             # outlives a timed-out driver, idle until the runner's cleanup; stop it here if one ever spins.
             args = ['timeout', '-k', '10', limit, *args]
@@ -209,7 +195,7 @@ def capture(run, scope, base, head, repos, paths=()):
                 code = 2
         seconds = time.monotonic() - start
         if code == -9 and limit and seconds >= limit:
-            code = 124  # timeout's own KILL; a KILL before the limit (the OOM killer's) stays -9
+            code = 124
         difference = driver and code == 4 or compares and code == 1
         outcome = ('difference' if difference else {0: 'completed', 2: 'blocked', 3: 'oracle-failed',
                    124: 'timeout'}.get(code, 'failed'))
@@ -221,7 +207,6 @@ def capture(run, scope, base, head, repos, paths=()):
             raise RuntimeError(f'{name} failed; see logs/{name}.log')
 
     def drive(flow):
-        # A missing historical binary blocks only the driver which needs it.
         failed = [step['name'] for step in steps if step['exit_code'] and step['name'] in
                   {'build-' + key.replace('_', '-') for key in HISTORICAL if f'{{{key}}}' in flow[2]}]
         if failed:
@@ -251,7 +236,6 @@ def capture(run, scope, base, head, repos, paths=()):
             for flow in cli_flows:
                 drive(flow)
         if scope['console']:
-            # The base can leave same-version core artifacts in the shared Cargo target.
             command('clean-console-core', ['cargo', 'clean', '-p', 'meada-core', '--target-dir',
                                           os.environ.get('CARGO_TARGET_DIR', str(Path.cwd() / 'target'))], required=True)
             command('build-console', [SCRIPTS / 'build.sh', 'head-ui', '.', run,
@@ -276,7 +260,6 @@ def capture(run, scope, base, head, repos, paths=()):
                                 cleanup=True)
                     finally:
                         (api_run / 'console/private.pem').unlink(missing_ok=True)
-            # The old bases images and config-uses compare against, built only for them.
             build_references(ui_flows)
             for flow in ui_flows:
                 drive(flow)
@@ -309,7 +292,6 @@ def capture(run, scope, base, head, repos, paths=()):
     except (OSError, RuntimeError) as error:
         blocked = str(error)
     finally:
-        # These clean only this run's processes, indexes and signing key. Evidence stays.
         try:
             if scope['console']:
                 command('console-stop', [python, SCRIPTS / 'console.py', 'stop', '--run', run], cleanup=True)
@@ -339,15 +321,12 @@ def capture(run, scope, base, head, repos, paths=()):
                             'Mutation audits run only through an explicitly requested audit phase.',
                             'A Scope step the skill marks "CI does not run" is the reviewer\'s.'],
         }
-        # A selected flow with no step is owed: its surface did not run, or the capture stopped before
-        # the flows. A flow with no paths of its own goes with its surface: no surface, nothing owed.
         ran = {step['name'] for step in steps}
         owed = [flow[0] for flow in flows if flow[0] not in ran
                 and (flow[1] is not None or scope['console' if flow in ui_flows else 'cli'])]
         if owed:
             receipt['not_covered'].append(f'Selected flows that did not run: {", ".join(owed)}.')
         (run / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
-        # Each nonzero step is in one list, so a reader of the log or the artifact need not count them.
         exits = collections.Counter(step['exit_code'] for step in steps)
         summary = (f"E2E capture: {receipt['capture']}{f' ({blocked})' if blocked else ''}; semantic verdict: UNPROVEN.\n"
                    f"Base: {base}\nHead: {head}\n"
@@ -376,8 +355,6 @@ def selftest():
             raise AssertionError('local E2E must be refused')
     scope = dict.fromkeys(SURFACES, False)
     scope['cli'] = True
-    # A difference from the base is evidence for the checker (exit 1); a budget overrun or a
-    # nondeterministic index fails the capture (exit 3).
     for code, expected in ((0, 'CAPTURED'), (1, 'CAPTURED'), (3, 'FAILED'), (2, 'BLOCKED')):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
             def fake(args, **kwargs):
@@ -394,8 +371,6 @@ def selftest():
             assert f'- Steps: {steps}; exit 0: {steps - (code != 0)}' in summary, summary
             lists = {'Differences': 1, 'Failed': 3, 'BLOCKED': 2}
             assert all((f'- {label}: cli-mcp\n' in summary) == (lists[label] == code) for label in lists), summary
-    # A comparison, oracle failure, missing input, crash and timeout keep distinct receipts and the next
-    # driver's evidence. This exercises the drivers' protocol independently of prove.py's exit 1.
     for code, outcome in ((4, 'difference'), (3, 'oracle-failed'), (2, 'blocked'), (1, 'failed'), (124, 'timeout')):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
             def fake_driver(args, **kwargs):
@@ -409,15 +384,12 @@ def selftest():
             steps = {step['name']: step for step in json.loads((run / 'receipt.json').read_text())['steps']}
             assert steps['http-iac']['outcome'] == outcome and steps['iac-http-routes']['exit_code'] == 0
             assert bool(result) == (code != 4) and (run / 'logs/http-iac.log').read_text() == 'driver evidence\n'
-    # The driver adapter must return the same codes for real Python exceptions. In particular,
-    # a broken legacy driver must never inherit the status of a Boolean oracle returning 1.
     for exception, code in (('AssertionError', 3), ('FileNotFoundError', 2), ('RuntimeError', 1), ('TimeoutError', 124)):
         probe = ('from proof_result import run_driver\n'
                  f'def broken(): raise {exception}("probe evidence")\n'
                  'run_driver(broken, legacy=True)')
         result = subprocess.run([sys.executable, '-B', '-c', probe], cwd=SCRIPTS, capture_output=True, text=True)
         assert result.returncode == code and f'{exception}: probe evidence' in result.stderr, result
-    # `rebless` reports no difference by its exit: its exit 1 is a crash, a failed capture.
     goldens = dict.fromkeys(SURFACES, False)
     goldens['goldens'] = True
     with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True):
@@ -434,7 +406,6 @@ def selftest():
                 assert capture(run, dict(scope, console=console), 'a' * 40, 'b' * 40, 'meada') == 2
             receipt = json.loads((run / 'receipt.json').read_text())
             assert (run / 'summary.md').read_text().startswith(f"E2E capture: BLOCKED ({receipt['blocked']}); ")
-            # Stopped before the flows: the receipt names each flow its surfaces owed.
             assert receipt['capture'] == 'BLOCKED' and [step['name'] for step in receipt['steps']] \
                 == ['build-head', *(['console-stop'] if console else []), 'clean'], receipt['steps']
             owed = 'http-iac, iac-http-routes' + (', console-graph' if console else '')
@@ -462,34 +433,28 @@ def selftest():
             for entry in ('meada', 'click'):
                 assert names.index(f'console-{entry}-start') < names.index(f'console-{entry}-api') < names.index(f'console-{entry}-stop')
                 assert (run / 'console-api' / entry / 'head').resolve() == run / 'head'
-            # The console flows start their own servers, before this console starts.
             assert names.index('console-meada-stop') < names.index('console-graph') < names.index('console-start')
             assert names[-2:] == ['console-stop', 'clean'] and receipt['verdict'] == 'UNPROVEN'
-    # Flows follow the paths their Scope rows name; the verifier or shared core runs every flow.
     chosen = lambda paths: [flow[0] for flow in selected(paths)]
     always = ['http-iac', 'iac-http-routes', 'console-graph']
     assert chosen([]) == chosen([f'{SCRIPTS}/a7-tf-set/README.md']) == chosen(['docs/a.md']) \
         == chosen(['.github/workflows/ci.yml']) == always
     assert {'iac', 'terraform-json', 'values', 'native-hcl-values'} <= set(chosen(['src/iac.rs', 'src/config_values.rs']))
-    sdk = set(chosen(['src/contract/sdk/java.rs']))  # PR #753's path
+    sdk = set(chosen(['src/contract/sdk/java.rs']))
     assert {'aws-sdk-jvm-go-dotnet', 'gcp-sdk'} <= sdk and 'images' not in sdk
-    assert {'patterns', 'images'} <= set(chosen(['src/decisions.rs']))  # the patterns row names images.py
+    assert {'patterns', 'images'} <= set(chosen(['src/decisions.rs']))
     assert chosen(['scripts/prove-ci']) == chosen([f'{SCRIPTS}/http-iac.py']) == chosen(['src/partial.rs']) \
         == chosen(['.github/workflows/proof.yml']) == chosen(['tests/golden/schema.txt']) == [flow[0] for flow in FLOWS]
-    # Each driver a Scope row names runs here as a flow that row's first path selects, so a flow
-    # dropped from a script with several (`prove.py values`, `aws.py`) fails too; each flow has a row.
     rows = scope_table()[2:]
     drivers = lambda text: [re.sub(r' --(head|base|historical)-bin$', '', name) for name in
                             re.findall(r'prove\.py [a-z]+|[\w-]+\.(?:py|sh)(?: --[a-z-]+)?', text) if name != 'prove.py']
     driver = {flow[0]: drivers(flow[2])[0] for flow in FLOWS}
-    # `prove.py run`, `rebless` and `deploy` are the corpus, goldens and deploy steps; `console.py` the console's.
     corpus = {'prove.py run', 'prove.py rebless', 'prove.py deploy', 'console.py'}
     for row in rows:
         first = re.search(r'`([^`]+)`', row.split(' | ')[0]).group(1)
         for name in set(drivers(row)) - corpus:
             assert any(driver[flow[0]] == name and (flow[1] is None or re.match(flow[1], first)) for flow in FLOWS), \
                 f'Scope only: {name} (the row of {first})'
-    # The Feature skills table of the skill sends a judge to each flow: one row per flow, one per sibling skill.
     skills = [row for row in (SCOPE.parents[1] / 'SKILL.md').read_text().splitlines() if row.startswith('| [prove-meada-')]
     routed = [name for row in skills for name in re.findall(r'`([^`]+)`', row.split(' | ')[2])]
     assert sorted(flow[0] for flow in FLOWS if routed.count(flow[0]) != 1) == [], 'Feature skills: flow not in exactly one row'
@@ -497,7 +462,6 @@ def selftest():
         == sorted(path.name for path in SCOPE.parents[2].glob('prove-meada-*')), 'Feature skills: rows and folders differ'
     named = {name for row in rows for name in drivers(row)}
     assert set(driver.values()) <= named, f'CI only: {sorted(set(driver.values()) - named)}'
-    # Each bug the audit plans to plant selects the flow that catches it (A7-02: shared core).
     for mutation in json.loads((SCRIPTS / 'a7-a8-mutations.json').read_text()):
         check = {'ssm-values': 'aws-json-values', 'http-services': 'http-iac', 'a8': 'a8-peers'}.get(
             mutation['check'], mutation['check'])
@@ -521,24 +485,20 @@ def selftest():
         assert {flow for flow in chosen([path]) if flow.startswith('smoke-')} == smoke, path
         assert all(any(f'--slice {flow.removeprefix("smoke-")}' in row for row in rows_for([path]))
                    for flow in smoke), path
-    # The address column is a required part of the input this verifier selects.
     names = (SCRIPTS / 'a7-tf-set/terraform-names.tsv').read_text().splitlines()
     assert all(len(row.split('\t')) == 4 for row in names if row and not row.startswith('#'))
-    # `--rows` reads a row's first cell: a file, a directory, a glob, `{a,b}` choices.
     first = lambda path: [row.split(' | ')[0] for row in rows_for([path])]
     assert first('src/contract/gcp.rs')[0].startswith('| `src/contract/gcp.rs`')
     assert first('src/dotnet/project.rs') == ['| `src/jvm/`, `src/dotnet/`, `src/xml.rs`']
     assert first('src/lang/kotlin.rs')[0].startswith('| `src/lang/*.rs` but `mod.rs`')
     assert any(cell.startswith('| `ui/src/{graph,') for cell in first('ui/src/GraphPage.tsx'))
-    assert first('src/lang/python/queries.scm')[0].startswith('| `src/lang/*.rs` but')  # `src/lang/*/`
+    assert first('src/lang/python/queries.scm')[0].startswith('| `src/lang/*.rs` but')
     assert any(cell.startswith('| `src/alert/incident.rs`') for cell in first('src/config.rs'))
     assert rows_for(['docs/a.md']) == [] and len(rows) > 30
     a8 = flow_command(Path('/r'), next(flow for flow in FLOWS if flow[0] == 'a8-peers'))
     assert [str(arg) for arg in a8] == ['sh', f'{SCRIPTS}/a8-peers.sh', 'check', '/r/bin/meada-base', '/r/bin/meada-head', '/r/flows/a8-peers']
     smoke = flow_command(Path('/r'), next(flow for flow in FLOWS if flow[0] == 'smoke-resolution'))
     assert smoke[8:10] == ['--old-bin', '/r/bin/meada-before-class-authority'], smoke
-    # The CLI flows follow `cli-mcp` and the console's its API checks, with this run's builds; images
-    # builds its own base and is BLOCKED without it.
     scope = dict.fromkeys(SURFACES, False)
     scope['cli'] = scope['console'] = True
     clock = [0.0]
@@ -557,26 +517,22 @@ def selftest():
                 (run / 'head/meada/export1.json').write_text('{}')
             argv[Path(args[1]).name] = args
             if script == 'image-ko.py':
-                clock[0] += (limit or 0) + 10  # an unheeded TERM: timeout(1)'s KILL, 10 s past the limit
+                clock[0] += (limit or 0) + 10
                 return subprocess.CompletedProcess(args, -9)
-            # A KILL before the limit (the OOM killer's) and a driver's own 137 fail; neither timed out.
             code = {'orphans.py': -9, 'a7-source-capture.py': 137}.get(script, 1 if 'pre-image' in args or 'values' in args else 0)
             return subprocess.CompletedProcess(args, code)
         with patch('subprocess.run', side_effect=fake_flows):
             paths = ['src/image/builder.rs', 'src/iac/config_uses.rs', 'src/msg.rs']
             assert capture(run, scope, 'a' * 40, 'b' * 40, 'meada', paths) == 2
         receipt = json.loads((run / 'receipt.json').read_text())
-        # Every step but the cleanups runs under timeout(1): a flow for at most FLOW_TIMEOUT, the others
-        # for what is left of the capture, which image-ko's 1210 s shortened.
         assert limits.get('image-ko.py') == [FLOW_TIMEOUT] and limits['build.sh'][0] == CAPTURE_END, limits
-        assert plain == ['console.py stop', 'console.py stop', 'prove.py clean'], plain  # meada's API, the console, clean
+        assert plain == ['console.py stop', 'console.py stop', 'prove.py clean'], plain
         names = [step['name'] for step in receipt['steps']]
         exits = {step['name']: step['exit_code'] for step in receipt['steps']}
         order = ('cli-mcp', 'images-mixed', 'build-console', 'console-meada-stop', 'build-pre-image', 'build-pre-config',
                  'console-graph', 'config-uses', 'images', 'console-start', 'console-pages')
         assert [names.index(name) for name in order] == sorted(names.index(name) for name in order), names
         assert argv['config_uses.py'][4:6] == ['--historical-bin', str(run / 'bin/meada-pre-config')], argv['config_uses.py']
-        # `prove.py values`' exit 1 is a difference from the base; a hung driver times out, alone.
         assert [exits[name] for name in ('image-ko', 'orphans', 'native-hcl-values')] == [124, -9, 137], exits
         assert receipt['steps'][names.index('values')]['differences'] and receipt['blocked'] == 'image-ko timed out'
         assert receipt['steps'][names.index('images')] == {
@@ -585,12 +541,9 @@ def selftest():
         summary = (run / 'summary.md').read_text()
         assert f'- Steps: {len(names)}; ' in summary and '- Timed out: image-ko\n' in summary, summary
         assert argv['images-mixed.py'][-4:] == ['--base-bin', str(run / 'bin/meada-base'), '--run', str(run / 'flows/images-mixed')]
-        for name in ('http-iac.py', 'iac-http-routes.py'):  # against the merge-base, every run
+        for name in ('http-iac.py', 'iac-http-routes.py'):
             assert argv[name][2:6] == ['--head-bin', str(run / 'bin/meada-head'), '--base-bin', str(run / 'bin/meada-base')]
         assert limits['build.sh'][-1] == CAPTURE_END - FLOW_TIMEOUT - 10, limits
-    # A step with under a minute of the capture left is BLOCKED unrun, and a required one stops the
-    # capture there; the cleanups still run. Each run moves the clock: http-iac gets the 230 s left, not
-    # its 1200, iac-http-routes runs with 60 s left and alerts gets 59; build-base gets 59 in the second.
     late = dict.fromkeys(SURFACES, False)
     late['cli'] = late['goldens'] = True
     paths = ['src/alert/incident.rs']

@@ -29,13 +29,10 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
   const [attempt, setAttempt] = useState(0);
   const [signedOut, setSignedOut] = useState(false);
   const t = copy[locale];
-  // Account administration exists with local accounts alone (not under break glass, where `sign_in` is the identity provider's).
   const administers = config.sign_in === 'accounts' && isLocal(api.auth);
-  // With local accounts the tab is signed out, signed in but bound to its password change, or in.
   const local = isLocal(api.auth) ? api.auth : undefined;
   const stage: Stage = useSyncExternalStore(local?.subscribe ?? noSubscription, () => local?.stage() ?? 'in');
   const before = useRef(stage);
-  // Under break glass a signed-out tab stays on the console's own page, so a reload keeps it there.
   const signInPath = config.break_glass === true ? BREAK_GLASS_PATH : '/config';
   const operational = (['fleet', 'store', 'repositories', 'credentials', 'admission'] as const).find(kind => path === `/${kind}`);
 
@@ -57,8 +54,6 @@ export function App({ api, config, initialLanguage }: { api: Api; config: Config
     void loadCore(locale).catch(setError);
   }, [locale]);
 
-  // A session that ends (sign-out or a 401) returns to the first page and forgets what it read; the
-  // change that frees a bound session opens the workspace.
   useEffect(() => {
     const was = before.current;
     before.current = stage;

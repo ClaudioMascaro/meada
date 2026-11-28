@@ -1,5 +1,3 @@
-//! Communities and processes in `search` and `context` (spec #31), over the chain fixture.
-
 use crate::common;
 
 use std::fs;
@@ -57,7 +55,6 @@ fn a_decided_link_counts_and_an_ambiguous_one_does_not() {
     decisions(&web, "chain-web");
     let after = health(&Engine::open(&web).unwrap());
 
-    // `dashboard` reaches the route through an ambiguous link until a person decides it.
     assert!(!before.contains("dashboard"), "{before}");
     assert!(
         after.contains(
@@ -101,7 +98,6 @@ fn the_processes_line_is_cut_under_the_budget_with_a_count_of_the_rest() {
     let answer = engine.context("lib/products.ts::find", Some(90)).unwrap();
 
     assert_golden("chain.context-processes-cut.txt", &answer);
-    // The span is omitted here: the range in the first line is where to read it.
     assert_eq!(
         answer.lines().next(),
         Some("example.com/chain/catalog lib/products.ts:10-12 find")
@@ -130,7 +126,6 @@ fn the_answer_stays_within_the_budget_and_keeps_the_summary() {
     let (_, _, catalog) = chain("community_queries_sweep");
     let engine = Engine::open(&catalog).unwrap();
 
-    // 47 is the smallest budget whose answer keeps the header, community and processes summary.
     for budget in [None, Some(90), Some(60), Some(47)] {
         let answer = engine.context("lib/products.ts::find", budget).unwrap();
 

@@ -1,5 +1,3 @@
-//! The TypeScript and JavaScript language pack.
-
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Range;
 use std::rc::Rc;
@@ -19,29 +17,17 @@ mod references;
 mod types;
 mod uses;
 
-/// How many definitions may nest in one file. Names are qualified by the definitions around
-/// them and each call resolves its names up that chain, so unbounded nesting costs cubic time.
-/// Past the limit a function is not a definition (its body belongs to the one around it, and
-/// its name hides outer ones as a local).
 // ponytail: real code nests a few dozen levels; 128 is the depth `document/schema.rs` reads
 // (`MAX_DEPTH`).
 const DEFINITION_DEPTH: usize = 128;
 
-/// How many levels of arguments, objects, arrays and receivers of method chains `value` reads;
-/// deeper is `Unknown`. A value is read again by every call or `new` around it, and the
-/// recursion must stay shallow.
 // ponytail: real code nests a few levels of options; 64 is far past any.
 const VALUE_DEPTH: usize = 64;
 
-/// How deep `parts`, `env_read` and `callee` follow a `+` chain, a chain of string method
-/// calls or a member chain; the cut side is a hole (`parts`) or its node kind (`callee`).
 // ponytail: real code concatenates and chains a few dozen terms; the recursion must stay
 // shallow, whatever the file.
 const FOLD_DEPTH: usize = 256;
 
-/// How many bytes of receivers (`Call::receiver`) `value` reads in one file: each call of a
-/// method chain reads the chain below it again. Past it a receiver is `Unknown`, which the SDK
-/// kinds read as no client.
 // ponytail: real files read a few kilobytes of receivers; one budget per file keeps a crafted
 // chain from costing the square of its length: a file costs its length plus at most the budget.
 const RECEIVER_BUDGET: usize = 1 << 20;
@@ -68,9 +54,6 @@ impl LanguagePack for TsJs {
             .ok_or("tree-sitter returned no tree")?;
         let module = path.ends_with(".mjs");
         let parents = Parents::new(tree.root_node(), src, module);
-        // The grammar gives `undefined` a dedicated token and recovers its bare arrow
-        // parameter as `undefined = > body`. Reparse only that adjacent `=>` form with an
-        // equal-length identifier token. All facts still read the original bytes and spans.
         let repaired = if parents.arrow_parameters.is_empty() {
             None
         } else {
@@ -98,24 +81,16 @@ impl LanguagePack for TsJs {
         let mut receiver_bytes = 0;
         let mut uses = uses::Uses::new(src, &parents);
         let mut references = references::References::default();
-        // The instance fields only their declaration or constructor may assign, or only their
-        // class reach (`sealed_field`), by class and name, with their initializer; and every
-        // member write, by name (`None`: any member of `this`) and scope (`member_writes`).
         let typescript = path.ends_with(".ts") || path.ends_with(".tsx");
         let mut sealed: Vec<(String, String, Option<Value>)> = Vec::new();
         let mut writes: BTreeMap<(Option<String>, String), Vec<Option<Value>>> = BTreeMap::new();
-        // The private fields by class and name with their initializer (`private_field`), and
-        // each member write's value as a statement of any method (`Stated`, `member_writes`).
         let mut private: Vec<(String, String, Stated)> = Vec::new();
         let mut stated: BTreeMap<(Option<String>, String), Vec<Stated>> = BTreeMap::new();
         let mut assigned = HashSet::new();
         let mut query_writes = HashMap::new();
         let mut query_locals = Vec::new();
-        // Each function definition by its node: the `return`s written in its body.
         let mut functions: HashMap<usize, usize> = HashMap::new();
         let mut results: HashMap<usize, usize> = HashMap::new();
-        // Explicit stack instead of recursion: generated code can nest deeper than the call
-        // stack.
         let mut stack = vec![Visit {
             node: root,
             block: root,
@@ -144,7 +119,6 @@ impl LanguagePack for TsJs {
                 && let Some((name, kind, _)) = defined.take()
                 && matches!(kind, Kind::Function | Kind::Class)
             {
-                // Not a definition, but its name still hides the outer one, as a `let` does.
                 facts.locals.push(qualify(&scope, &name));
             }
             let is_def = defined.is_some();
@@ -168,7 +142,6 @@ impl LanguagePack for TsJs {
                             node.kind() == "arrow_function"
                         }
                     }),
-                    // An arrow function's expression body is what it returns.
                     return_values: (node.child_by_field_name("body"))
                         .filter(|b| {
                             node.kind() == "arrow_function" && b.kind() != "statement_block"
@@ -183,8 +156,6 @@ impl LanguagePack for TsJs {
             match node.kind() {
                 "call_expression" | "new_expression" => {
                     facts.loads.extend(loads_from(node, src, &parents));
-                    // `new X(...)` is a call of `X`: constructors are how some libraries are
-                    // used (`new SendMessageCommand(...)`, `new Worker(...)`).
                     let arguments =
                         (node.child_by_field_name("arguments")).filter(|a| a.kind() == "arguments");
                     if let Some(function) = callee_node(node) {
@@ -192,7 +163,6 @@ impl LanguagePack for TsJs {
                             facts.receivers[receiver].class =
                                 super::Class::Result(facts.calls.len());
                         }
-                        // The artifact's `await` is outside the call: so is its span.
                         let start = if awaited_artifact(node) {
                             function.start_byte()
                         } else {
@@ -293,8 +263,6 @@ impl LanguagePack for TsJs {
                     }
                     if let Some(name) = sealed_field(node, src) {
                         let initial = node.child_by_field_name("value");
-                        // A URL whose members `this.f` writes is no longer what it was built
-                        // from.
                         let rewritten = (initial)
                             .is_some_and(|v| is_url_new(unwrapped(v), src, &parents))
                             && parents.written.contains(&format!("this.{name}"));
@@ -318,7 +286,6 @@ impl LanguagePack for TsJs {
                 }
                 "import_statement" => {
                     imports(node, src, &mut facts.imports);
-                    // `import 'x'`: a source and no clause binds nothing.
                     if !children(node).any(|c| c.kind() == "import_clause")
                         && let Some(source) = node.child_by_field_name("source")
                     {
@@ -326,11 +293,8 @@ impl LanguagePack for TsJs {
                     }
                 }
                 "export_statement" => exports(node, src, &mut facts.exports),
-                // A `return` of a function that is no definition (one returned in place, or
-                // one past `DEFINITION_DEPTH`) is nobody's.
                 "return_statement" => {
                     if let Some(&at) = functions.get(&body.id()) {
-                        // A generator's call returns its iterator, not what it returns.
                         let generator = body.kind().starts_with("generator_function")
                             || children(body).any(|n| n.kind() == "*");
                         let returned = match generator {
@@ -364,7 +328,6 @@ impl LanguagePack for TsJs {
                         super::QueryWrite::Other
                     };
                     let mut at = scope.as_str();
-                    // A nested function can write its enclosing function's local or parameter.
                     while !at.is_empty() {
                         let local = qualify(at, &name);
                         query_writes
@@ -413,12 +376,9 @@ impl LanguagePack for TsJs {
                 "for_in_statement" => node
                     .child_by_field_name("kind")
                     .and(node.child_by_field_name("left")),
-                // A `const` holding one name is a constant or a definition.
                 "variable_declarator" if named.is_none() => node.child_by_field_name("name"),
                 _ => None,
             };
-            // A definition's parameters are `Def::params`; only the names they leave out (a
-            // nested, array or rest pattern) are locals.
             let params = (facts.defs.last())
                 .filter(|_| is_def)
                 .map_or(&[][..], |d| d.params.as_slice());
@@ -475,8 +435,6 @@ impl LanguagePack for TsJs {
                     receiver,
                     Some(facts.consts.len()),
                 );
-                // A `new URL` whose path or host the file writes through its name is no longer
-                // the string it was built from.
                 let rewritten = is_url_new(unwrapped(*value_node), src, &parents)
                     && parents.written.contains(name.as_str());
                 facts.consts.push(Const {
@@ -505,11 +463,6 @@ impl LanguagePack for TsJs {
                 }
             }));
         }
-        // A sealed field written once, by its initializer or by the plain `this.f = v` of its
-        // class's constructor body, holds that value: a constant of the class, written in the
-        // constructor, as Java's `final` and C#'s `readonly` fields are (`Const::scope`), which
-        // `this.f` reads. Any other write of a member so named inside the class, or a computed
-        // one of `this`, leaves it none.
         // ponytail: a write through an alias of `this` (`const self = this; self.f = v`) or
         // `Object.assign(this, ..)` is not seen, nor a subclass that redeclares a non-private
         // `readonly` field; see `docs/agents/ceilings/language-packs.md`.
@@ -519,8 +472,6 @@ impl LanguagePack for TsJs {
                 (scope.strip_prefix(class.as_str()))
                     .is_some_and(|r| r.is_empty() || r.starts_with('.'))
             };
-            // The writes of `name` (or of any member) in scopes from `class` up to `class/`, which
-            // holds every `class.*` scope; `inside` drops the others the range holds (`class-x`).
             let mut given = [Some(name.clone()), None].into_iter().flat_map(|name| {
                 let (from, to) = (class.clone(), format!("{class}/"));
                 (writes.range((name.clone(), from)..(name, to)))
@@ -605,12 +556,10 @@ impl LanguagePack for TsJs {
         &[
             "**/tsconfig.json",
             "**/jsconfig.json",
-            // Backstage's configuration, which `http::ts` reads for `config.getString`.
             "**/app-config*.yaml",
         ]
     }
 
-    /// The `$include` targets of Backstage's `app-config*.yaml` (#689).
     fn config_inputs<'b>(&self, configs: &[(&str, &[u8])], read: &dyn Fn(&str) -> ConfigInput<'b>) {
         crate::http::config_inputs(configs, read);
     }
@@ -632,11 +581,6 @@ impl LanguagePack for TsJs {
     }
 
     fn modules(&self, configs: &[(&str, &[u8])], _: &BTreeMap<&str, &Facts>) -> Result<Modules> {
-        // Read as `package::read_tsconfig` reads one: a config past the size limit, not UTF-8,
-        // not JSON or not an object declares no paths, and indexing carries on.
-        // The nearest config above an importer serves it; in one directory `tsconfig.json`
-        // comes first in `configs`, so it wins. A config under `node_modules` declares nothing.
-        // Each config is read once; an `extends` is followed among these (`Aliases::of_chain`).
         let mut options: HashMap<String, Options> = HashMap::new();
         let mut nearest: HashMap<&str, &str> = HashMap::new();
         for (path, src) in configs {
@@ -681,15 +625,9 @@ impl LanguagePack for TsJs {
 
 type Paths = Rc<Vec<(String, Vec<String>)>>;
 
-/// What one `tsconfig.json` (or `jsconfig.json`) in `dir` says of `baseUrl`, `paths` and
-/// `extends`, each `None` when it does not say it.
 struct Options {
     dir: String,
-    /// The config an `extends` names, as a repository path: a relative path inside the
-    /// repository (`.json` added when missing). A package, an absolute path or a path that leaves
-    /// the repository is no `extends` here.
     extends: Option<String>,
-    /// `baseUrl` joined to `dir`; `Some(None)` when it leaves the repository.
     base_url: Option<Option<String>>,
     paths: Option<Paths>,
 }
@@ -724,27 +662,19 @@ impl Options {
     }
 }
 
-/// How many configs an `extends` chain may follow after the nearest one. A chain that goes
-/// deeper, or back to a config it already holds, reads as the nearest config alone.
 // ponytail: real monorepos extend one or two levels (package, then root); 8 is far past any.
 const EXTENDS_DEPTH: usize = 8;
 
-/// The `compilerOptions.baseUrl` and `paths` an importer's nearest config gives it: those of the
-/// config itself, then of the chain of its `extends`, the nearest to declare each option winning
-/// (the option as a whole, as TypeScript merges them).
 // ponytail: project `references`, an `extends` array and a base that is not named `tsconfig.json`
 // or `jsconfig.json` are not followed (only those files are read).
 #[derive(Default)]
 struct Aliases {
-    /// What `paths` targets are relative to without `baseUrl`: the directory of the config
-    /// that declares `paths`.
     dir: String,
     base_url: Option<String>,
     paths: Paths,
 }
 
 impl Aliases {
-    /// The aliases of the config at `path`, among every config of the repository, read once.
     fn of_chain(path: &str, configs: &HashMap<String, Options>) -> Self {
         let mut chain: Vec<&Options> = Vec::new();
         let mut seen: Vec<&str> = Vec::new();
@@ -772,9 +702,6 @@ impl Aliases {
         }
     }
 
-    /// The paths a bare specifier names: the targets of the `paths` pattern with the
-    /// longest prefix that matches, then the specifier under `baseUrl`. Without `baseUrl`,
-    /// targets are relative to the config file's directory.
     fn expand(&self, specifier: &str) -> Vec<String> {
         let mut best: Option<(usize, &str, &[String])> = None;
         for (pattern, targets) in self.paths.iter() {
@@ -805,7 +732,6 @@ impl Aliases {
     }
 }
 
-/// JSON with comments and trailing commas, as `tsconfig.json` allows, made plain JSON.
 pub(crate) fn strip_jsonc(src: &str) -> String {
     let mut out = String::with_capacity(src.len());
     let mut chars = src.chars().peekable();
@@ -842,8 +768,6 @@ pub(crate) fn strip_jsonc(src: &str) -> String {
 
 pub(crate) const EXTENSIONS: [&str; 6] = ["ts", "tsx", "js", "jsx", "mjs", "cjs"];
 
-/// The files a module path may name: itself, its `.ts` source when it names `.js` output,
-/// itself with each extension, and its `index` file.
 pub(crate) fn with_extensions(base: &str) -> Vec<String> {
     let mut out = vec![base.to_string()];
     if let Some(stem) = base.strip_suffix(".js") {
@@ -861,8 +785,6 @@ pub(crate) fn with_extensions(base: &str) -> Vec<String> {
     out
 }
 
-/// `path` resolved against the repository-relative directory `dir`; `None` when it leaves
-/// the repository.
 fn join(dir: &str, path: &str) -> Option<String> {
     let mut parts: Vec<&str> = dir.split('/').filter(|p| !p.is_empty()).collect();
     for part in path.split('/') {
@@ -881,16 +803,11 @@ struct Visit<'t> {
     node: Node<'t>,
     block: Node<'t>,
     scope: String,
-    /// How many definitions enclose `node`.
     depth: usize,
-    /// The function whose body holds `node`, or the root at the top level.
     body: Node<'t>,
-    /// The name and span a binding gives an anonymous function or class: `const f = () => {}`,
-    /// `export default () => {}`.
     binding: Option<(String, Range<usize>)>,
 }
 
-/// The definition `node` makes, named by itself or by the binding that holds it.
 fn definition(
     node: Node,
     binding: Option<(String, Range<usize>)>,
@@ -904,13 +821,10 @@ fn definition(
     let (kind, (name, range)) = match node.kind() {
         "function_declaration" | "generator_function_declaration" => (Kind::Function, own()?),
         "class_declaration" | "abstract_class_declaration" => (Kind::Class, own()?),
-        // Methods of object literals are definitions only in a class body, in an options
-        // object (written in place like an argument) and in a top-level `const` (below).
         "method_definition" if up.of(node)?.kind() == "class_body" => (Kind::Method, own()?),
         "method_definition" if in_options(node, up) => {
             (Kind::Inline, (inline(node), node.byte_range()))
         }
-        // A method of an object literal bound by a top-level `const` is `o.m`.
         "method_definition" => {
             let name = node.child_by_field_name("name")?;
             let owner =
@@ -936,33 +850,21 @@ fn definition(
     Some((name, kind, range))
 }
 
-/// The parent of every node, read once: `Node::parent` walks down from the root, so asking it
-/// for each function in deeply nested code costs time quadratic in the file. It also holds the
-/// names the file assigns after declaring them (`f = other`, `[f] = list`, `for (f in o)`).
 struct Parents<'t> {
     up: HashMap<usize, Node<'t>>,
     assigned: HashSet<String>,
-    /// The names a member is written through (`u.p = ..`, `u.p += ..`, `u["p"] = ..`), except
-    /// `search` and `hash`, which keep the path of a URL (WHATWG URL Standard).
     // ponytail: per name across the whole file, whichever function writes it; see `docs/agents/ceilings.md`.
     written: HashSet<String>,
-    /// Whether the file binds a `URL` other than the runtime constructor: `new URL(x)` is then
-    /// no runtime global.
     url_declared: bool,
-    /// Whether the file binds or assigns `require` anywhere: a `require(..)` is then no load.
     // ponytail: per file, not per scope; a file that shadows `require` once records none.
     require_declared: bool,
     local_literals: HashMap<String, HashMap<usize, Option<usize>>>,
     global_shadows: HashMap<String, Vec<Range<usize>>>,
     imported_types: HashSet<String>,
     promise_shadows: Vec<Range<usize>>,
-    /// Merged lexical scopes that hide the runtime String conversion.
     string_shadows: Vec<Range<usize>>,
-    /// Merged lexical scopes that hide the Node.js process object.
     process_shadows: Vec<Range<usize>>,
-    /// Modules, class bodies and functions/programs with a strict directive prologue.
     strict_scopes: HashSet<usize>,
-    /// Bare `undefined =>` parameters the grammar recovered as a comparison.
     arrow_parameters: Vec<usize>,
 }
 
@@ -1068,7 +970,6 @@ impl<'t> Parents<'t> {
             arrow_parameters,
         };
         for (name, nodes) in bindings {
-            // Record shadowing declarations too, including parameters of anonymous functions.
             let fresh = |node: Node<'t>| {
                 let declaration = parents.of(node)?;
                 (node.kind() == "variable_declarator"
@@ -1133,7 +1034,6 @@ impl<'t> Parents<'t> {
                 shadows.push(scope);
             }
         }
-        // An assignment outside a lexical binding can replace the global itself.
         if writes.into_iter().any(|at| !runtime_hidden(&shadows, at)) {
             return vec![root.byte_range()];
         }
@@ -1170,9 +1070,6 @@ impl<'t> Parents<'t> {
         false
     }
 
-    /// Parameters and expression names belong to their own function; declarations belong
-    /// to their enclosing lexical scope, or function for var. A bounded lookup that cannot
-    /// establish the scope conservatively hides the runtime throughout the file.
     fn runtime_scope(&self, node: Node<'t>, src: &[u8], root: Node<'t>) -> Range<usize> {
         self.binding_scope(node, src).unwrap_or(root).byte_range()
     }
@@ -1201,8 +1098,6 @@ impl<'t> Parents<'t> {
             .of(node)
             .is_some_and(|parent| parent.kind() == "variable_declaration")
             || node.kind() == "for_in_statement"
-            // Annex B also creates an enclosing var binding for ordinary block functions
-            // in non-strict code. Async and generator declarations stay block scoped.
             || node.kind() == "function_declaration"
                 && !children(node).any(|child| child.kind() == "async")
                 && !self.enclosing_strict(node);
@@ -1242,8 +1137,6 @@ fn runtime_hidden(shadows: &[Range<usize>], at: usize) -> bool {
     next > 0 && at < shadows[next - 1].end
 }
 
-/// Only raw string-literal directive statements can enable strict mode. Comments do not
-/// end the prologue, but an ordinary expression does (ECMAScript 14.1.1).
 fn strict_directive(body: Node, src: &[u8]) -> bool {
     for statement in named(body) {
         if matches!(statement.kind(), "comment" | "hash_bang_line") {
@@ -1262,8 +1155,6 @@ fn strict_directive(body: Node, src: &[u8]) -> bool {
     false
 }
 
-/// The specifier a call loads without a binding: `require('x')` of the runtime's `require`, or
-/// `import('x')`, each with one plain string argument.
 fn loads_from(node: Node, src: &[u8], up: &Parents) -> Option<String> {
     let function = node.child_by_field_name("function")?;
     let loads = match function.kind() {
@@ -1276,7 +1167,6 @@ fn loads_from(node: Node, src: &[u8], up: &Parents) -> Option<String> {
     (loads && args.next().is_none()).then(|| unquote(arg, src))
 }
 
-/// Type declarations and imported local names can hide the built-in Promise type.
 fn declares_promise(node: Node, src: &[u8]) -> bool {
     match node.kind() {
         "type_alias_declaration"
@@ -1299,8 +1189,6 @@ fn declares_promise(node: Node, src: &[u8]) -> bool {
     }
 }
 
-/// Whether `node` binds `name`, hiding the runtime name. Only the named `URL` export of Node's
-/// `url` and `node:url` modules proves that a binding named `URL` is the runtime constructor.
 fn shadows_runtime(node: Node, src: &[u8], name: &str) -> bool {
     match node.kind() {
         "class_declaration"
@@ -1319,7 +1207,6 @@ fn shadows_runtime(node: Node, src: &[u8], name: &str) -> bool {
                 && (node.child_by_field_name("name"))
                     .is_some_and(|n| bound(n, src).iter().any(|n| n == name))
         }
-        // A parameter or a `catch` binding of that name hides the global as well.
         "formal_parameters" => bound(node, src).iter().any(|n| n == name),
         "for_in_statement" => node
             .child_by_field_name("left")
@@ -1346,8 +1233,6 @@ fn shadows_runtime(node: Node, src: &[u8], name: &str) -> bool {
     }
 }
 
-/// `const { URL } = require('url')` (or `node:url`), including an explicit `URL: URL` binding.
-/// A module object, another export, a rest or nested pattern does not prove a constructor.
 fn runtime_url_require(node: Node, src: &[u8]) -> bool {
     if node.kind() != "variable_declarator" {
         return false;
@@ -1383,10 +1268,8 @@ fn runtime_url_require(node: Node, src: &[u8]) -> bool {
         })
 }
 
-/// The callee of a `new URL(reference, base)` of the runtime global, as a `Value::New` names it.
 pub const GLOBAL_URL: &str = "globalThis.URL";
 
-/// Whether `node` is `new URL(..)` of the runtime global: no declaration of the file hides it.
 fn is_url_new(node: Node, src: &[u8], up: &Parents) -> bool {
     node.kind() == "new_expression"
         && !up.url_declared
@@ -1394,7 +1277,6 @@ fn is_url_new(node: Node, src: &[u8], up: &Parents) -> bool {
             .is_some_and(|c| c.kind() == "identifier" && text(c, src) == "URL")
 }
 
-/// `node` inside the parentheses and type assertions around it, which keep its value.
 fn unwrapped(mut node: Node) -> Node {
     while let Some(inner) = match node.kind() {
         "parenthesized_expression"
@@ -1409,10 +1291,6 @@ fn unwrapped(mut node: Node) -> Node {
     node
 }
 
-/// Adds to `out` the names `node` writes a member of, other than `search` and `hash`: `u` for
-/// `u.p = ..`, `u.p += ..`, `u.p++` and `u["p"] = ..`, a member as a destructuring or a
-/// `for (.. of ..)` target, `Object.assign(u, ..)`, and a name another takes (`v = u`), whose
-/// writes are not followed; `this.f` for the same writes of `this.f.p`.
 fn members_written(node: Node, src: &[u8], out: &mut HashSet<String>) {
     let object = |n: Node| match n.kind() {
         "identifier" => Some(text(n, src).to_string()),
@@ -1618,7 +1496,6 @@ fn selector_writes(
     }
 }
 
-/// Whether the whole body is one return from a synchronous function.
 fn single_return(node: Node) -> bool {
     if !(FUNCTIONS.contains(&node.kind()) || node.kind() == "function_declaration")
         || node.kind() == "generator_function"
@@ -1638,7 +1515,6 @@ fn single_return(node: Node) -> bool {
     })
 }
 
-/// The kinds of anonymous function expressions.
 const FUNCTIONS: &[&str] = &[
     "arrow_function",
     "function_expression",
@@ -1646,7 +1522,6 @@ const FUNCTIONS: &[&str] = &[
     "generator_function",
 ];
 
-/// The kinds of functions with a body, whose parameters bind names; a signature's do not.
 const BODIES: &[&str] = &[
     "function_declaration",
     "generator_function_declaration",
@@ -1657,18 +1532,14 @@ const BODIES: &[&str] = &[
     "generator_function",
 ];
 
-/// The names a binding pattern binds: an identifier, or each name an object, array, rest or
-/// default pattern (or a parameter list) holds, never a key or a default value.
 fn bound(pattern: Node, src: &[u8]) -> Vec<String> {
     (bound_nodes(pattern).into_iter())
         .map(|n| text(n, src).to_string())
         .collect()
 }
 
-/// The identifier nodes `bound` reads the names of.
 fn bound_nodes(pattern: Node) -> Vec<Node> {
     let mut out = Vec::new();
-    // Explicit stack: a pattern can nest deeper than the call stack.
     let mut stack = vec![pattern];
     while let Some(node) = stack.pop() {
         match node.kind() {
@@ -1689,8 +1560,6 @@ fn bound_nodes(pattern: Node) -> Vec<Node> {
     out
 }
 
-/// Whether the anonymous function `node` is written in place as an argument, or as a property
-/// of an options object given as one: `run({ eachMessage: async () => {} })`.
 fn written_in_place(node: Node, up: &Parents) -> bool {
     match up.of(node) {
         Some(p) if p.kind() == "arguments" => true,
@@ -1703,7 +1572,6 @@ fn written_in_place(node: Node, up: &Parents) -> bool {
     }
 }
 
-/// Whether `property` (a pair or a method) belongs to an object literal given as an argument.
 fn in_options(property: Node, up: &Parents) -> bool {
     up.of(property)
         .filter(|o| o.kind() == "object")
@@ -1711,14 +1579,10 @@ fn in_options(property: Node, up: &Parents) -> bool {
         .is_some_and(|a| a.kind() == "arguments")
 }
 
-/// The last name segment of the `Kind::Inline` definition an anonymous function argument
-/// makes.
 fn inline(node: Node) -> String {
     format!("@{}", node.start_byte())
 }
 
-/// The parameters of a function `node`; `scope` is the function's own qualified name, where
-/// default values are read.
 fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
     let Some(list) = node
         .child_by_field_name("parameters")
@@ -1767,7 +1631,6 @@ fn params(node: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Param> {
         .collect()
 }
 
-/// The names an object pattern binds: `{ a, b = 1, c: d, e: f = 2 }`.
 // ponytail: a rest (`...rest`) or nested (`{ a: { b } }`) pattern binds nothing, so a name it
 // holds stays unknown; bind them when a wrapper reads through one.
 fn fields(pattern: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Field> {
@@ -1807,11 +1670,6 @@ fn fields(pattern: Node, src: &[u8], scope: &str, up: &Parents) -> Vec<Field> {
         .collect()
 }
 
-/// The child of `node` that a binding names, with that name and the binding's span:
-/// the value of a `const` declarator, of a `let` or `var` one that holds a function or class
-/// and is assigned nowhere else, of an `export default`, of a top-level assignment to a member
-/// (`assignment`) or of a function-valued property of an object literal bound by a top-level
-/// `const`.
 fn binds<'t>(node: Node<'t>, src: &[u8], up: &Parents) -> Option<(Node<'t>, String, Range<usize>)> {
     match node.kind() {
         "variable_declarator" => {
@@ -1857,20 +1715,12 @@ fn binds<'t>(node: Node<'t>, src: &[u8], up: &Parents) -> Option<(Node<'t>, Stri
     }
 }
 
-/// A top-level assignment of a function or class to a member, as `binds` and `exports` read it.
 struct Assigned {
-    /// The name it defines: `obj.y`, `X.y` for `X.prototype.y`, `exports.y` for `exports.y` and
-    /// `module.exports.y` (exported as `y`), `default` for `module.exports`.
     name: String,
-    /// `X.prototype.y`: a method of `X`.
     method: bool,
-    /// A CommonJS export.
     exported: bool,
 }
 
-/// What the statement `node` (an assignment) defines, when it is `<member> = <function or
-/// class>` at the top level of the file. Other chains than `a.b.c` of plain names define
-/// nothing, and neither does anything under `exports` or `module` but the CommonJS forms.
 fn assignment(node: Node, src: &[u8], up: &Parents) -> Option<Assigned> {
     let (left, right) = (
         node.child_by_field_name("left")?,
@@ -1892,8 +1742,6 @@ fn assignment(node: Node, src: &[u8], up: &Parents) -> Option<Assigned> {
     }
     let (name, method, exported) = match names.as_slice() {
         ["module", "exports"] => ("default".to_string(), false, true),
-        // The symbol is `exports.y`, not `y`: Node binds no local `y`, so a bare `y()` must not
-        // reach it.
         ["exports", y] | ["module", "exports", y] => (format!("exports.{y}"), false, true),
         ["exports" | "module", ..] => return None,
         [.., "prototype"] => return None,
@@ -1908,8 +1756,6 @@ fn assignment(node: Node, src: &[u8], up: &Parents) -> Option<Assigned> {
     })
 }
 
-/// The name of the top-level `const` whose object literal holds `property` (a pair or a
-/// method): `o` for the `litM` of `const o = { litM() {} }`.
 fn literal_owner(property: Node, src: &[u8], up: &Parents) -> Option<String> {
     literal_name(up.of(property).filter(|o| o.kind() == "object")?, src, up)
 }
@@ -1931,7 +1777,6 @@ fn literal_name(object: Node, src: &[u8], up: &Parents) -> Option<String> {
         .then(|| text(name, src).to_string())
 }
 
-/// Inspect each key once. A later spread or computed key may change any earlier method.
 fn literal_methods(object: Node, src: &[u8]) -> BTreeMap<String, bool> {
     let mut methods = BTreeMap::new();
     let mut wildcard = 0;
@@ -1972,7 +1817,6 @@ fn literal_methods(object: Node, src: &[u8]) -> BTreeMap<String, bool> {
         .collect()
 }
 
-/// The bindings of `import d, { a, b as c } from 's'` and `import * as ns from 's'`.
 fn imports(node: Node, src: &[u8], out: &mut Vec<Import>) {
     let (Some(source), Some(clause)) = (
         node.child_by_field_name("source"),
@@ -2009,7 +1853,6 @@ fn imports(node: Node, src: &[u8], out: &mut Vec<Import>) {
     }
 }
 
-/// What an `export` statement adds to the file's exports.
 fn exports(node: Node, src: &[u8], out: &mut Vec<Export>) {
     let local = |exported: &str, local: &str| Export::Local {
         exported: exported.to_string(),
@@ -2024,7 +1867,6 @@ fn exports(node: Node, src: &[u8], out: &mut Vec<Export>) {
         let name = match (own_name, value) {
             (Some(name), _) => name,
             (None, Some(v)) if v.kind() == "identifier" => text(v, src),
-            // An anonymous function or class: its definition is named `default`.
             _ => "default",
         };
         out.push(local("default", name));
@@ -2058,7 +1900,6 @@ fn exports(node: Node, src: &[u8], out: &mut Vec<Export>) {
     if let Some(name) = own_name {
         out.push(local(name, name));
     } else if let Some(declaration) = declaration {
-        // `export const a = ..., b = ...`
         for declarator in children(declaration).filter(|c| c.kind() == "variable_declarator") {
             if let Some(name) = declarator
                 .child_by_field_name("name")
@@ -2077,12 +1918,7 @@ fn exports(node: Node, src: &[u8], out: &mut Vec<Export>) {
     }
 }
 
-/// The top-level declarations of `root` that are no definitions, exported or not: `const`s
-/// holding no function or class, interfaces, type aliases, enums and an `export default`
-/// expression (named `default`). One per name: the first value one, else the first type one (a
-/// value and a type may share a name). Hashes are left for `hash_spans`.
 fn declarations(root: Node, src: &[u8], facts: &Facts) -> Vec<Declaration> {
-    // (name, range, holds a value), in source order.
     let mut found: Vec<(&str, Range<usize>, bool)> = Vec::new();
     let not_value = |v: Node| v.kind() == "class" || FUNCTIONS.contains(&v.kind());
     for child in named(root) {
@@ -2131,7 +1967,6 @@ fn declarations(root: Node, src: &[u8], facts: &Facts) -> Vec<Declaration> {
         }
     }
     let defined: HashSet<&str> = facts.defs.iter().map(|d| d.name.as_str()).collect();
-    // The first value one, else the first type one: `found` is in source order.
     let mut kept: HashMap<&str, (Range<usize>, bool)> = HashMap::new();
     for (name, range, value) in found {
         if defined.contains(name) {
@@ -2153,8 +1988,6 @@ fn declarations(root: Node, src: &[u8], facts: &Facts) -> Vec<Declaration> {
         .collect()
 }
 
-/// The function written in place as `inline` within `scope`: `Unknown` when `scope` is as deep
-/// as definitions go, since no definition stands behind it.
 fn function(scope: &str, inline: &str) -> Value {
     let nested = if scope.is_empty() {
         0
@@ -2167,19 +2000,15 @@ fn function(scope: &str, inline: &str) -> Value {
     Value::Function(qualify(scope, inline))
 }
 
-/// What an expression is, as far as its own syntax tells; `scope` is the qualified name of
-/// the enclosing definition.
 fn value(node: Node, src: &[u8], scope: &str, up: &Parents) -> Value {
     value_at(node, src, scope, up, 0)
 }
 
-/// `value` of a node `depth` levels inside the expression it started from.
 fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> Value {
     if depth >= VALUE_DEPTH {
         return Value::Unknown;
     }
     let deeper = |n: Node| value_at(n, src, scope, up, depth + 1);
-    // `x as T` is `x`, or the schema `T` infers; the type of a cast is `cast`'s.
     if node.kind() == "as_expression"
         && let Some(inner) = named(node).next()
     {
@@ -2217,8 +2046,6 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
                     let key = text(property.child_by_field_name("name")?, src).to_string();
                     Some((key, function(scope, &inline(property))))
                 }
-                // A getter or method of a literal that is no options object: a key whose value
-                // Meada does not read, not a key that is absent.
                 "method_definition" => {
                     let key = text(property.child_by_field_name("name")?, src).to_string();
                     Some((key, Value::Unknown))
@@ -2233,7 +2060,6 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
             .map_or(Value::Unknown, |n| Value::Await(Box::new(deeper(n)))),
         "number" => Value::Scalar(text(node, src).parse().ok()),
         "true" | "false" => Value::Scalar(None),
-        // `undefined` is a shadowable name, including the grammar's dedicated node.
         "identifier" | "undefined" => Value::Ref(text(node, src).to_string()),
         "member_expression" if let Some(name) = this_member(node, src, up) => Value::Ref(name),
         kind if FUNCTIONS.contains(&kind) && written_in_place(node, up) => {
@@ -2255,7 +2081,6 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
                         receiver,
                         args: args.map_or(Vec::new(), |a| named(a).map(deeper).collect()),
                         kwargs: Vec::new(),
-                        // The span of the call in `Facts::calls`.
                         range: match awaited {
                             true => f.start_byte()..node.end_byte(),
                             false => node.byte_range(),
@@ -2276,8 +2101,6 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
                     .into_iter()
                     .flatten()
                     .collect();
-                // `new URL(reference, base)` of the runtime global: the name no declaration of
-                // the file can hide, for the HTTP kind to join (`http::join`).
                 let name = match args.len() == 2 && is_url_new(node, src, up) {
                     true => GLOBAL_URL.to_string(),
                     false => callee(f, src),
@@ -2299,8 +2122,6 @@ fn value_at(node: Node, src: &[u8], scope: &str, up: &Parents, depth: usize) -> 
     }
 }
 
-/// The type a cast `node` (`x as T`) declares, when it lists fields (`z.infer` types are the
-/// value's, see `value_at`).
 fn cast(node: Node, src: &[u8], up: &Parents) -> Option<Ty> {
     let declared = named(node)
         .nth(1)
@@ -2308,8 +2129,6 @@ fn cast(node: Node, src: &[u8], up: &Parents) -> Option<Ty> {
     Some(types::ty(declared, src, up, &mut 0)).filter(|t| !matches!(t, Ty::Unknown | Ty::Schema(_)))
 }
 
-/// What a `const` holds and the type it is declared to have: by the annotation of the variable
-/// or by a cast of its initializer. A `z.infer` type gives the value the schema it names.
 fn declared(
     annotation: Option<Node>,
     init: Node,
@@ -2328,8 +2147,6 @@ fn declared(
     )
 }
 
-/// A string expression folded into literal text, environment reads and holes; `None` when
-/// `node` is not a string expression Meada folds.
 fn parts(node: Node, src: &[u8], up: &Parents) -> Option<Vec<Part>> {
     parts_at(node, src, up, 0)
 }
@@ -2353,14 +2170,11 @@ fn trailing_slash<'a>(call: Node<'a>, src: &[u8]) -> Option<(Node<'a>, super::Sl
     Some((function.child_by_field_name("object")?, strip))
 }
 
-/// `parts` of a node `depth` levels inside the expression it started from; past `FOLD_DEPTH`
-/// the rest is a hole.
 fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Part>> {
     if depth >= FOLD_DEPTH {
         return Some(vec![Part::Hole]);
     }
     let parts = |n: Node| parts_at(n, src, up, depth + 1);
-    // Anything inside a string that is not itself foldable is unread.
     let inside = |n: Node| parts(n).unwrap_or_else(|| vec![unread(n, src)]);
     match node.kind() {
         "string" => Some(vec![Part::Text(unquote(node, src))]),
@@ -2390,7 +2204,6 @@ fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
             let left = node.child_by_field_name("left")?;
             let right = node.child_by_field_name("right")?;
             match text(node.child_by_field_name("operator")?, src) {
-                // At least one side must be a string for `+` to concatenate.
                 "+" => {
                     let (l, r) = (parts(left), parts(right));
                     if l.is_none() && r.is_none() {
@@ -2400,7 +2213,6 @@ fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
                     let r = r.unwrap_or_else(|| vec![unread(right, src)]);
                     Some(l.into_iter().chain(r).collect())
                 }
-                // A fallback keeps the environment read on its left, if it is the only one.
                 "||" | "??" => {
                     let env = single_env(parts(left)?)?;
                     let more = inside(right).iter().any(|p| matches!(p, Part::Env(_)));
@@ -2450,8 +2262,6 @@ fn parts_at(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
     }
 }
 
-/// What a string holds where the expression `node` is written and no part of it can be read: the
-/// return value of a call names its callee (#801), anything else is a hole.
 fn unread(mut node: Node, src: &[u8]) -> Part {
     let mut awaited = false;
     while matches!(
@@ -2483,10 +2293,6 @@ fn unread(mut node: Node, src: &[u8]) -> Part {
     )
 }
 
-/// The URL forms that pass a string through, as the WHATWG URL Standard reads them: `new URL(x)`
-/// with one argument parses `x` (#dom-url-url), and `u.toString()`, `u.href` and `String(u)` are
-/// the URL's `href` (#dom-url-href). The receiver is a `new URL(..)` or a name no member write
-/// reaches (`Parents::written`): a write to the path or the host changes what it holds.
 fn url_form(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Part>> {
     let parts = |n: Node| parts_at(n, src, up, depth + 1);
     let written = |n: Node| n.kind() == "identifier" && up.written.contains(text(n, src));
@@ -2539,8 +2345,6 @@ fn url_form(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Vec<Pa
     }
 }
 
-/// `process.env.X`, `process.env["X"]` or `import.meta.env.X`, also through string method
-/// calls such as `.replace(...)` or `.trim()`.
 fn env_read(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Part> {
     const STRING_METHODS: &[&str] = &[
         "replace",
@@ -2595,13 +2399,9 @@ fn env_read(node: Node, src: &[u8], up: &Parents, depth: usize) -> Option<Part> 
     }
 }
 
-/// The members whose call with one string literal reads a key of Backstage's configuration
-/// (`config.getString('a.b')`); the kind decides whether the receiver is one and what the key
-/// holds, as it does for C#'s `GetEnvironmentVariable`.
 // ponytail: the one library form of this pack beside C#'s (`CODING_STANDARDS.md`); see `docs/agents/ceilings.md`.
 const CONFIG_READS: &[&str] = &["getString", "getOptionalString"];
 
-/// `config.getString('a.b')` as a `Part::Read` of the key, for the kind to decide.
 fn config_read(call: Node, function: Node, src: &[u8]) -> Option<Part> {
     let key = |call: Node| {
         let mut args =
@@ -2635,16 +2435,10 @@ fn config_read(call: Node, function: Node, src: &[u8]) -> Option<Part> {
     })
 }
 
-/// How many nodes `this_member` climbs to the class member around a `this`; past it the `this`
-/// is read as no instance's.
 // ponytail: real code nests a `this` a few dozen nodes inside its method; the climb must stay
 // cheap whatever the file. See `docs/agents/ceilings/language-packs.md`.
 const THIS_CLIMB: usize = 256;
 
-/// `this.f` or `this.#f` as the name the resolver reads (`LanguagePack::receiver`), when the
-/// `this` is an instance of the class around it: written in an instance method or field
-/// initializer of a class body, through arrow functions only. A `function`, a method of an
-/// object literal, a `static` member and a static block bind another `this`.
 fn this_member(node: Node, src: &[u8], up: &Parents) -> Option<String> {
     let object = node.child_by_field_name("object")?;
     let property = node.child_by_field_name("property")?;
@@ -2680,26 +2474,16 @@ fn instance_context(node: Node, up: &Parents) -> bool {
     false
 }
 
-/// The name of the instance field `node` (a `public_field_definition`) declares, when only its
-/// declaration or a constructor of its class may assign it (`readonly`) or only its class may
-/// reach it (`private`, `#x`): TypeScript's handbook
-/// (https://www.typescriptlang.org/docs/handbook/2/classes.html#readonly) and ECMAScript's
-/// private names (https://tc39.es/ecma262/#sec-private-names). A `static` or `abstract` field
-/// is no instance's.
 fn sealed_field(node: Node, src: &[u8]) -> Option<String> {
     let (name, private, readonly) = instance_field(node, src)?;
     (private || readonly).then_some(name)
 }
 
-/// The name of the instance field `node` (a `public_field_definition`) declares when only its
-/// class may reach it (`private`, `#x`), whatever writes it there (`Facts::field_writes`).
 fn private_field(node: Node, src: &[u8]) -> Option<String> {
     let (name, private, _) = instance_field(node, src)?;
     private.then_some(name)
 }
 
-/// The plain name of the instance field `node` declares, whether only its class may reach it
-/// and whether it is `readonly`; `None` for a `static` or `abstract` field or a computed name.
 fn instance_field(node: Node, src: &[u8]) -> Option<(String, bool, bool)> {
     let name = node.child_by_field_name("name")?;
     let mut private = name.kind() == "private_property_identifier";
@@ -2719,13 +2503,8 @@ fn instance_field(node: Node, src: &[u8]) -> Option<(String, bool, bool)> {
     plain.then(|| (text(name, src).to_string(), private, readonly))
 }
 
-/// What one write gives a private field (`Facts::field_writes`): `Some(Some(v))` the value of a
-/// plain `this.f = v` statement or an initializer, `Some(None)` a `null` or no initializer,
-/// `None` any other write (an operator, a pattern, an expression that is no statement, a
-/// function).
 type Stated = Option<Option<Value>>;
 
-/// What the right side `right` of a plain write or an initializer gives (`Stated`).
 fn stated_value(right: Option<Node>, src: &[u8], scope: &str, up: &Parents) -> Stated {
     match right {
         None => Some(None),
@@ -2735,9 +2514,6 @@ fn stated_value(right: Option<Node>, src: &[u8], scope: &str, up: &Parents) -> S
     }
 }
 
-/// The values each private field's class assigns it (`Facts::field_writes`): the writes of a
-/// member so named, or of a computed member of `this`, in scopes from its class down. None for a
-/// field one of them leaves unknown, nor for one only `null` reaches.
 fn field_writes(
     private: Vec<(String, String, Stated)>,
     stated: &BTreeMap<(Option<String>, String), Vec<Stated>>,
@@ -2769,10 +2545,6 @@ fn field_writes(
     out
 }
 
-/// The members the write `node` (`=`, `op=`, `++`) assigns: each one's name, `None` for a
-/// computed member of `this` (it may be any), with the value of a plain `this.f = v` written
-/// as a statement of a constructor's body, the one write a sealed field may have. A pattern
-/// (`[this.a] = ..`) writes every member it holds.
 fn member_writes(
     node: Node,
     src: &[u8],
@@ -2818,14 +2590,12 @@ fn member_writes(
                 false => value(v, src, scope, up),
             }
         });
-        // As a statement of any method, a write a private field's values hold (`Stated`).
         let statement = node.kind() == "assignment_expression"
             && Some(t) == target
             && on_this
             && up
                 .of(node)
                 .is_some_and(|s| s.kind() == "expression_statement");
-        // A computed member of `this` may be any field: it leaves each unknown.
         let stated = match node.child_by_field_name("right") {
             Some(right) if statement && name.is_some() => stated_value(Some(right), src, scope, up),
             _ => None,
@@ -2835,7 +2605,6 @@ fn member_writes(
     out
 }
 
-/// Whether the expression `node` is a statement of the body of a class's `constructor`.
 fn in_constructor_body(node: Node, src: &[u8], up: &Parents) -> bool {
     let statement = up.of(node).filter(|s| s.kind() == "expression_statement");
     let block = statement
@@ -2851,7 +2620,6 @@ fn in_constructor_body(node: Node, src: &[u8], up: &Parents) -> bool {
         .is_some_and(|c| c.kind() == "class_body")
 }
 
-/// The environment read that makes up all of `parts`, if that is what they are.
 fn single_env(parts: Vec<Part>) -> Option<Part> {
     match <[Part; 1]>::try_from(parts) {
         Ok([env @ Part::Env(_)]) => Some(env),
@@ -2863,7 +2631,6 @@ fn lossy(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
 
-/// A string literal's content: `'./m'` is `./m`.
 fn unquote(node: Node, src: &[u8]) -> String {
     let quoted = text(node, src);
     quoted
@@ -2872,10 +2639,6 @@ fn unquote(node: Node, src: &[u8]) -> String {
         .to_string()
 }
 
-/// The specifier of a dynamic `import()` of one plain literal, as `value` gives the call: the
-/// one place that knows how the pack spells it (the callee `(import)`, the fallback `callee`
-/// gives a callee that is no name). `None` for a template hole, a second argument or any other
-/// call.
 pub(crate) fn dynamic_import(value: &Value) -> Option<&str> {
     let Value::Call(call) = value else {
         return None;
@@ -2889,9 +2652,6 @@ pub(crate) fn dynamic_import(value: &Value) -> Option<&str> {
     }
 }
 
-/// What a call or `new` expression calls. With type arguments under `await`, the grammar
-/// reads `await get<Row>(x)` as a call whose `function` is `await get`: the awaited call is
-/// `get<Row>(x)`, so the callee is the operand of that `await`.
 fn callee_node(node: Node) -> Option<Node> {
     let function = node
         .child_by_field_name("function")
@@ -2903,8 +2663,6 @@ fn callee_node(node: Node) -> Option<Node> {
     }
 }
 
-/// Whether `node` is the parse artifact `await f<T>(x)`: type arguments, and an `await` as
-/// the `function`.
 fn awaited_artifact(node: Node) -> bool {
     node.child_by_field_name("type_arguments").is_some()
         && node
@@ -2913,11 +2671,7 @@ fn awaited_artifact(node: Node) -> bool {
             .is_some_and(|f| f.kind() == "await_expression")
 }
 
-/// `a.b.c` for identifier and member chains; any other expression becomes `(<node kind>)`,
-/// so no source text beyond names reaches the index.
 fn callee(node: Node, src: &[u8]) -> String {
-    // The properties of the chain, outermost first; a chain longer than `FOLD_DEPTH` ends in
-    // the kind of the node where it is cut.
     let (mut node, mut names) = (node, Vec::new());
     let base = loop {
         match node.kind() {
@@ -3023,12 +2777,10 @@ mod tests {
         assert!(has("app/src/a.ts", "app/src/b.ts"));
         assert!(!has("app/src/a.ts", "app/js/b.ts"));
         assert!(has("web/a.ts", "web/js/b.ts"));
-        // A hostile nested config declares nothing, and hides the root's aliases from its subtree.
         assert!(modules("bad/a.ts", "@/b").is_empty());
         assert!(!has("app/node_modules/p/a.ts", "app/node_modules/p/x/b.ts"));
     }
 
-    /// The files `@/b` names from `from`, given `configs` as `(path, json)`.
     fn aliased(configs: &[(&str, &str)], from: &str) -> Vec<String> {
         let configs: Vec<(&str, &[u8])> = configs.iter().map(|(p, j)| (*p, j.as_bytes())).collect();
         let modules = TsJs.modules(&configs, &BTreeMap::new()).unwrap();
@@ -3050,7 +2802,6 @@ mod tests {
                 "packages/c/tsconfig.json",
                 r#"{"extends": "../a/tsconfig.json", "compilerOptions": {"paths": {"@/*": ["c/*"]}}}"#,
             ),
-            // A package, a path outside the repository and an absolute path are unread.
             (
                 "packages/d/tsconfig.json",
                 r#"{"extends": "@tsconfig/node18"}"#,
@@ -3065,12 +2816,9 @@ mod tests {
             ),
         ];
         let has = |from: &str, file: &str| aliased(&configs, from).contains(&file.to_string());
-        // `paths` are relative to the config that declares them.
         assert!(has("packages/a/src/x.ts", "lib/b.ts"));
-        // The nearest `baseUrl` is the base of the root's `paths`, and also resolves the bare name.
         assert!(has("packages/b/src/x.ts", "packages/b/lib/b.ts"));
         assert!(has("packages/b/src/x.ts", "packages/b/@/b.ts"));
-        // A nested `paths` replaces the base's, through the chain.
         assert!(has("packages/c/src/x.ts", "packages/c/c/b.ts"));
         assert!(!has("packages/c/src/x.ts", "lib/b.ts"));
         for dir in ["d", "e", "f"] {
@@ -3081,7 +2829,6 @@ mod tests {
     #[test]
     fn an_extends_chain_past_the_limit_or_in_a_cycle_reads_as_the_nearest_config_alone() {
         let root = r#"{"compilerOptions": {"paths": {"@/*": ["lib/*"]}}}"#.to_string();
-        // `c0` extends `c1` and so on, the last extending the root: `links` configs in between.
         let chain = |links: usize| {
             let mut configs = vec![("tsconfig.json".to_string(), root.clone())];
             for i in 0..links {
@@ -3104,11 +2851,9 @@ mod tests {
                 .collect();
             aliased(&configs, "c0/x.ts").contains(&"lib/b.ts".to_string())
         };
-        // The nearest config and `EXTENDS_DEPTH` more reach the root's paths; one more does not.
         assert!(reaches(&chain(EXTENDS_DEPTH)));
         assert!(!reaches(&chain(EXTENDS_DEPTH + 1)));
         assert!(!reaches(&chain(EXTENDS_DEPTH * 1000)));
-        // A cycle reads as the nearest config alone, which here declares paths of its own.
         let own = r#"{"extends": "../c1/tsconfig.json", "compilerOptions": {"paths": {"@/*": ["own/*"]}}}"#;
         let cycle = [
             ("c0/tsconfig.json", own),
@@ -3133,7 +2878,6 @@ mod tests {
         let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
         let held = facts.consts.iter().find(|c| c.name == "u").unwrap();
         assert!(matches!(&held.value, Value::Ref(name) if name == "BASE"));
-        // A type that lists no fields is no type of the constant.
         assert_eq!(held.ty, None);
         let args: Vec<_> = facts.calls.iter().filter(|c| c.callee == "fetch").collect();
         assert!(matches!(args[0].args.as_slice(), [Value::Ref(name)] if name == "url"));
@@ -3141,8 +2885,6 @@ mod tests {
         assert!(matches!(args[1].args.as_slice(), [Value::Str(_)]));
     }
 
-    /// What the first argument of the one `fetch` in `path` folds to, `src` alone in the
-    /// repository.
     fn fetched_parts(path: &'static str, src: &str) -> Vec<Part> {
         use crate::resolve::{Code, Resolver};
         let facts = TsJs.parse(path, src.as_bytes()).unwrap();
@@ -3164,13 +2906,9 @@ mod tests {
         }
     }
 
-    /// A field TypeScript lets only its declaration or its constructor assign (`readonly`), or
-    /// only its class reach (`private`, ECMAScript's `#x`), written once holds that value: a
-    /// constant of the class, written in the constructor, which `this.f` in a method reads.
     #[test]
     fn a_readonly_or_private_field_written_once_is_a_constant_of_its_class() {
         let env = || vec![Part::Env("API".into()), Part::Text("/o".into())];
-        // `F` is the field's name.
         let class = |members: &str, field: &str| {
             let method = "list() { return fetch(`${this.F}/o`); }";
             format!("class C {{\n{members}\n{method}\n}}\n").replace('F', field)
@@ -3187,7 +2925,6 @@ mod tests {
             let src = class(&members, field);
             assert_eq!(fetched_parts("a.ts", &src), env(), "{src}");
         }
-        // Through a concatenation, and a Backstage read the HTTP kind decides.
         let src = "class C {\nprivate readonly base: string;\n\
                    constructor(config: Config) { this.base = config.getString('a.b'); }\n\
                    list() { return fetch(this.base + '/o'); }\n}\n";
@@ -3199,11 +2936,8 @@ mod tests {
 
         let hole = || vec![Part::Hole, Part::Text("/o".into())];
         for members in [
-            // Public and mutable.
             "base = process.env.API;",
             "public base: string;\nconstructor() { this.base = process.env.API; }",
-            // Written twice: by the initializer and the constructor, twice in the constructor,
-            // or under a condition (written, or not).
             "private readonly base = process.env.API;\nconstructor() { this.base = process.env.API; }",
             "private base: string;\nconstructor() { this.base = process.env.API; this.base = process.env.API; }",
             "private base: string;\nconstructor(x: boolean) { if (x) { this.base = process.env.API; } }",
@@ -3211,21 +2945,15 @@ mod tests {
             "private base = process.env.API;\nreset(o: C) { o.base = 'x'; }",
             "private base = process.env.API;\nreset() { [this.base] = ['x']; }",
             "private base = process.env.API;\nreset() { this['base'] = 'x'; }",
-            // Written outside the constructor, or in a nested function of it.
             "private base: string;\ninit() { this.base = process.env.API; }",
             "private base: string;\nconstructor() { const f = () => { this.base = process.env.API; }; f(); }",
-            // A parameter property, or a constructor's parameter: its callers give the value.
             "constructor(private readonly base: string) {}",
             "private readonly base: string;\nconstructor(base: string) { this.base = base; }",
-            // Static: no instance holds it.
             "static readonly base = process.env.API;",
         ] {
             let src = class(members, "base");
             assert_eq!(fetched_parts("a.ts", &src), hole(), "{src}");
         }
-        // Only an instance method's `this` is the instance, also through an arrow function: a
-        // `function`, a method of an object literal, a `static` method and a nested class bind
-        // another `this`.
         let sealed = "private readonly base = process.env.API;";
         let with = |method: &str| format!("class C {{\n{sealed}\n{method}\n}}\n");
         let arrow = with("list() { return [1].map(() => fetch(`${this.base}/o`)); }");
@@ -3239,12 +2967,10 @@ mod tests {
             let src = with(method);
             assert_eq!(fetched_parts("a.ts", &src), hole(), "{src}");
         }
-        // A JavaScript file declares no `readonly` or `private`, and its `#x` is left as today.
         let js = class("F = process.env.API;", "#base");
         assert_eq!(fetched_parts("a.js", &js), hole(), "{js}");
     }
 
-    /// A `this` nested past `THIS_CLIMB` nodes inside its method is no instance's.
     #[test]
     fn a_this_nested_past_the_climb_reads_nothing() {
         let nested = |n: usize| {
@@ -3277,12 +3003,9 @@ mod tests {
             facts.consts.iter().filter(|c| c.scope.is_some()).count(),
             8192
         );
-        // 1.4 s measured in a local debug build; the bound is over twenty times that.
         assert!(took.as_secs() < 40, "{took:?}");
     }
 
-    /// The text of the literal parts of a folded value, `<env>` for an environment read, `?`
-    /// for a name and `_` for a hole; `None` when the value is no string.
     fn folded(value: &Value) -> Option<String> {
         let Value::Str(parts) = value else {
             return None;
@@ -3306,8 +3029,6 @@ mod tests {
         calls.map(|c| folded(&c.args[0])).collect()
     }
 
-    /// WHATWG URL Standard: `new URL(x)` parses `x` (#dom-url-url), and `toString()`, `href` and
-    /// `String(u)` give its `href` (#dom-url-href), also inside a template string.
     #[test]
     fn a_url_of_one_argument_is_the_string_it_parses() {
         let got = fetched(
@@ -3325,15 +3046,12 @@ mod tests {
         assert_eq!(got[2], host("b"));
         assert_eq!(got[3], host("c"));
         assert_eq!(got[4], Some("https://h.example.com/d/e".into()));
-        // A name folds through the existing name folding at the shared side.
         assert!(
             got[5..].iter().all(|g| g.as_deref() == Some("?")),
             "{got:?}"
         );
     }
 
-    /// Only a call with the shape of the standard's reads: `toString(16)`, `new URL(x, base)` and
-    /// a `href` of anything but a name or a `new URL(..)` stay as they were.
     #[test]
     fn other_shapes_of_those_names_stay_calls() {
         let facts = parse(
@@ -3356,8 +3074,6 @@ mod tests {
         assert!(matches!(args[5], Value::Call(_)));
     }
 
-    /// WHATWG URL Standard: `searchParams` changes only the query (#dom-url-searchparams), as
-    /// `search` and `hash` do; a write to any other member changes the path or the host.
     #[test]
     fn a_member_write_other_than_the_query_leaves_the_url_unknown() {
         let unknown = |src: &str| {
@@ -3379,28 +3095,23 @@ mod tests {
             "u.href = 'https://o.example.com/';",
             "u['pathname'] = '/b';",
             "u[key] = '/b';",
-            // Written through a pattern, a loop target or an increment.
             "[u.pathname] = ['/b'];",
             "({ p: u.pathname } = o);",
             "({ p: u.pathname = '/b' } = o);",
             "for (u.pathname of paths) {}",
             "u.port++;",
-            // Handed to `Object.assign`, or held by another name that writes it.
             "Object.assign(u, { pathname: '/b' });",
             "const v = u; v.pathname = '/b';",
             "let v; v = u; v.pathname = '/b';",
-            // A target in parentheses or an assertion is the name.
             "(u).pathname = '/b';",
             "u!.pathname = '/b';",
             "(u as URL).port++;",
         ] {
             assert!(unknown(&format!("{url}{write}")), "{write}");
         }
-        // Reading its members into other names leaves it as it was.
         for read in ["const { pathname } = u;", "({ pathname: p } = u);"] {
             assert!(!unknown(&format!("{url}{read}")), "{read}");
         }
-        // The initializer may be wrapped in parentheses or a type assertion.
         for made in [
             "(new URL('https://h.example.com/a'))",
             "new URL('https://h.example.com/a') as URL",
@@ -3413,7 +3124,6 @@ mod tests {
                 "{made}"
             );
         }
-        // A sealed field holding a URL whose members its class writes holds none.
         let field = |write: &str| {
             let facts = parse(&format!(
                 "class C {{\n  private readonly url = new URL('https://h.example.com/a');\n  \
@@ -3428,7 +3138,6 @@ mod tests {
         assert!(!field("this.url.pathname = '/b';"));
         assert!(!field("Object.assign(this.url, { pathname: '/b' });"));
         assert!(!field("(this.url).pathname = '/b';"));
-        // So does one its constructor builds.
         let built = |write: &str| {
             let facts = parse(&format!(
                 "class C {{\n  private readonly url: URL;\n  constructor() {{ this.url = \
@@ -3441,7 +3150,6 @@ mod tests {
         };
         assert!(built(""));
         assert!(!built("this.url.pathname = '/b';"));
-        // The pass-through forms of a written name stay calls and members, as they were.
         let facts = parse(&format!(
             "{url}u.pathname = '/b'; fetch(u.toString()); fetch(u.href);"
         ));
@@ -3453,8 +3161,6 @@ mod tests {
         assert!(matches!(args[1], Value::Member(o, p) if o == "u" && p == "href"));
     }
 
-    /// A file that declares a `URL`, or imports one from a relative path, has no runtime global
-    /// of that name: its `new URL(x)` is the repository's constructor.
     #[test]
     fn a_url_the_file_declares_or_imports_from_the_repository_is_no_global() {
         for head in [
@@ -3471,7 +3177,6 @@ mod tests {
             let got = fetched(&format!("{head}fetch(new URL('https://h.example.com/a'));"));
             assert_eq!(got, [None], "{head}");
         }
-        // An import from a package, or a `require` of one, is the same global.
         let got = fetched(
             "const { URL } = require('node:url');\nfetch(new URL('https://h.example.com/a'));",
         );
@@ -3481,7 +3186,6 @@ mod tests {
         assert_eq!(got, [Some("https://h.example.com/a".into())]);
     }
 
-    /// How many calls deep the first argument of `value` goes.
     fn nesting(value: &Value) -> usize {
         let mut value = value;
         let mut depth = 0;
@@ -3580,12 +3284,10 @@ mod tests {
         );
         let loaded: Vec<&str> = crate::lang::loaded(&facts).into_iter().collect();
         assert_eq!(loaded, ["a", "b", "c", "d", "e", "q"]);
-        // Stored facts keep them: the index reads loads back from `files.facts`.
         let stored: Facts = serde_json::from_str(&serde_json::to_string(&facts).unwrap()).unwrap();
         assert_eq!(crate::lang::loaded(&stored), crate::lang::loaded(&facts));
     }
 
-    /// The `(scope, name, kind)` of each reference of `src` parsed as `path`, sorted.
     fn uses_of(path: &str, src: &str) -> Vec<(String, String, &'static str)> {
         let facts = TsJs.parse(path, src.as_bytes()).unwrap();
         let mut got: Vec<_> = (facts.references.iter())
@@ -3619,9 +3321,6 @@ mod tests {
                    type T = typeof tokens;\n\
                    export { X } from '@scope/b';\n\
                    export * from '@scope/s';\n";
-        // An interface or a type alias is no definition, so what it writes is at the scope
-        // around it (here the file's, ""), as for calls; the index lifts it to its declaration
-        // symbol (`holder`).
         assert_eq!(
             uses_of("a.tsx", src),
             expected(&[
@@ -3642,7 +3341,6 @@ mod tests {
                 ("Page", "Shape", "extends"),
             ])
         );
-        // The first occurrence's range is kept.
         let facts = TsJs.parse("a.tsx", src.as_bytes()).unwrap();
         let header = (facts.references.iter())
             .find(|r| r.name == "Header" && r.kind == Use::Jsx)
@@ -3711,7 +3409,6 @@ mod tests {
                 ("helper", "./local"),
             ]
         );
-        // Only a dynamic reference names a specifier.
         assert!(
             (facts.references.iter())
                 .all(|r| matches!(r.kind, Use::Dynamic | Use::Reexport) == r.from.is_some())
@@ -3808,7 +3505,6 @@ mod tests {
             .unwrap();
         let names: Vec<_> = js.declarations.iter().map(|d| d.name.as_str()).collect();
         assert_eq!(names, ["a", "z"]);
-        // A type written before the value of its name: the row is still the value's.
         let src = "export type Bar = z.infer<typeof Bar>;\nexport const Bar = z.object({});\n";
         let bar = parse(src);
         let got: Vec<_> = (bar.declarations.iter())
@@ -3858,8 +3554,6 @@ mod tests {
         }
     }
 
-    /// Each `return` of a function is one of its values; a nested function's are its own, and
-    /// those of a function that is no definition (one returned in place) belong to nobody.
     #[test]
     fn a_function_lists_the_values_it_returns() {
         let facts = parse(
@@ -3879,7 +3573,6 @@ mod tests {
         };
         assert_eq!(returned("make"), ["r", "?"]);
         assert_eq!(returned("make.inner"), ["scalar"]);
-        // A generator's call returns its iterator, whatever its `return`s hold.
         let facts = parse(
             "function* make() {\n  return new Storage();\n}\nclass A {\n  *each() { return 1; }\n}\n",
         );
@@ -3891,12 +3584,9 @@ mod tests {
             })
             .collect::<Vec<_>>();
         assert_eq!(generators, [true, true]);
-        // A callback written in place, and an arrow's expression body.
         let facts = parse("const f = () => Router();\nxs.map((x) => { return x; });\n");
         let values = |d: &Def| d.return_values.len();
         assert_eq!(facts.defs.iter().map(values).collect::<Vec<_>>(), [1, 1]);
-        // Past `DEFINITION_DEPTH` the innermost function is no definition: its `return` is
-        // nobody's, not the deepest definition's.
         let n = DEFINITION_DEPTH + 1;
         let src = format!("{}return 1;{}", "f(() => { ".repeat(n), " });".repeat(n));
         let facts = parse(&src);
@@ -3912,7 +3602,6 @@ mod tests {
         assert_eq!(deepest.max(), Some(DEFINITION_DEPTH.min(n)));
     }
 
-    /// The definitions of `facts` as `(name, kind)`, sorted by name.
     fn defined(facts: &Facts) -> Vec<(&str, &'static str)> {
         let kind = |k: Kind| match k {
             Kind::Function => "function",
@@ -4076,8 +3765,6 @@ mod tests {
 
     #[test]
     fn a_long_method_chain_reads_its_receivers_within_one_budget() {
-        // Each call of the chain reads the chain below it as its receiver: the receivers of a
-        // file share one budget of bytes, past which a receiver is unknown.
         let n = 30_000;
         let source = format!("const a = process.env.X{};", ".trim()".repeat(n));
         let start = std::time::Instant::now();
@@ -4088,7 +3775,6 @@ mod tests {
             .filter(|c| matches!(c.receiver, Some(Value::Unknown)))
             .count();
         assert!(0 < unknown && unknown < n, "{unknown}");
-        // 1.1 s measured in a local debug build; the bound is over twenty times that.
         assert!(took.as_secs() < 25, "{took:?}");
     }
 
@@ -4103,7 +3789,6 @@ mod tests {
 
     #[test]
     fn type_arguments_under_await_leave_the_call_intact() {
-        // The grammar reads `await get<Row>("/x")` as a call of `await get`.
         for (typed, plain) in [
             ("await get<Row>(\"/x\")", "await get(\"/x\")"),
             ("await api.get<Row>(\"/x\")", "await api.get(\"/x\")"),
@@ -4159,9 +3844,6 @@ mod tests {
         }
     }
 
-    /// A private field (`private`, `#x`) keeps each non-null value its class writes it as a plain
-    /// statement or initializer, in the constructor or any method; a public or static field, one
-    /// only `null` reaches, one an operator or a computed member of `this` writes, keeps none.
     #[test]
     fn field_writes_keep_what_a_class_writes_its_private_fields() {
         let src = "class C {\n\

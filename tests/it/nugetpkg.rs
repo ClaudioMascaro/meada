@@ -1,6 +1,3 @@
-//! NuGet packages and project references link through literal `.csproj` files, without MSBuild
-//! or a feed (spec #28, "Packages").
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -24,7 +21,6 @@ fn export(repo: &Path) -> (String, Value) {
     (export, json)
 }
 
-/// The links of `json` a project file declares: a reference, not a call through a `using`.
 fn declared(json: &Value) -> Vec<&Value> {
     (json["links"].as_array().into_iter().flatten())
         .filter(|l| !l["consumer"].as_str().unwrap().contains(".cs::"))
@@ -41,7 +37,6 @@ fn package_and_project_references_link_to_workspace_projects() {
         .iter()
         .map(|p| p["name"].as_str().unwrap())
         .collect();
-    // The id is the `PackageId`, else the `AssemblyName`.
     assert_eq!(names, ["Example.Kit", "Example.Money"]);
     assert_eq!(lib_json["packages"][0]["ecosystem"], "nuget");
     assert_golden("dotnet-lib.export.json", &lib_export);
@@ -57,8 +52,6 @@ fn package_and_project_references_link_to_workspace_projects() {
             )
         })
         .collect();
-    // Newtonsoft.Json is outside the workspace, and Shared is a project of the app's own
-    // repository: neither is a package link.
     assert_eq!(
         contracts,
         [
@@ -223,7 +216,6 @@ fn write(root: &Path, path: &str, text: &str) {
     fs::write(file, text).unwrap();
 }
 
-/// The twin repository, a peer of `app`.
 fn twin(case: &str, app: &Path) -> PathBuf {
     let twin = fixture_repo(
         case,
@@ -237,7 +229,6 @@ fn twin(case: &str, app: &Path) -> PathBuf {
     twin
 }
 
-/// The `(provider, level)` of each link whose consumer ends with `suffix`.
 fn calls<'a>(json: &'a Value, suffix: &str) -> Vec<(&'a str, &'a str)> {
     (json["links"].as_array().unwrap().iter())
         .filter(|l| l["consumer"].as_str().unwrap().ends_with(suffix))
@@ -284,8 +275,6 @@ fn a_project_reference_pins_its_project_over_a_twin_with_the_same_package_id() {
 fn a_project_of_the_same_repository_is_ambiguous_with_no_project_of_another() {
     let [_, app] = workspace("nuget_packages_own_project");
     let twin = twin("nuget_packages_own_project", &app);
-    // Another repository's project is named like the app's own `Shared` and declares a type the
-    // app's `using` also reaches in the project it really references.
     edit(twin.join("src/Twin.csproj"), "Example.Twin", "Shared");
     let order = twin.join("src/Order.cs");
     fs::write(&order, "namespace Example.Money;\n\npublic class Currency\n{\n    public static string Cents(int amount) => \"\";\n}\n").unwrap();
@@ -392,7 +381,6 @@ fn a_project_reference_beyond_the_workspace_links_nothing() {
 #[test]
 fn a_file_counts_for_the_ecosystem_that_imports_its_extension_only() {
     let [lib, app] = workspace("nuget_packages_extensions");
-    // A Java class under a `.csproj` and a polyfill in `System.*` are no types a `using` brings.
     let gizmo = "package Example.Kit.Pricing;\n\npublic class Gizmo {\n    public static int make() { return 1; }\n}\n";
     write(&lib, "src/Kit/Pricing/Gizmo.java", gizmo);
     let poly =
@@ -422,8 +410,6 @@ fn a_type_with_a_base_the_workspace_does_not_hold_is_inferred() {
     );
 }
 
-/// Edits the `.csproj` files of the workspace: a package renamed, a reference dropped and a
-/// project added.
 fn change_projects([lib, app]: &[PathBuf; 2]) {
     let replace = |path: PathBuf, old: &str, new: &str| {
         let text = fs::read_to_string(&path).unwrap();
@@ -470,7 +456,6 @@ fn edited_and_added_projects_refresh_like_a_cold_workspace() {
 #[test]
 fn a_file_sees_the_references_its_project_references_pass_on() {
     let [_, app] = workspace("nuget_packages_transitive");
-    // App -> Lib, of the app's repository; Lib -> Money, and Kit, privately.
     let lib = "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup>\n\
                <PackageReference Include=\"Example.Money\" />\n\
                <PackageReference Include=\"Example.Kit\" PrivateAssets=\"all\" />\n\
@@ -493,7 +478,6 @@ fn a_file_sees_the_references_its_project_references_pass_on() {
     let at = |ns: &str, call: &str| calls(&json, &format!("Example.{ns}.Uses.Go()::{call}#0"));
     assert_eq!(at("Lib", "Currency.Cents"), [(cents, "exact")], "{export}");
     assert_eq!(at("Lib", "Order.Of"), [(&of[..], "exact")], "{export}");
-    // Through `import namespace`, as from Lib; the private reference stays Lib's.
     assert_eq!(at("App", "Currency.Cents"), [(cents, "exact")], "{export}");
     assert!(at("App", "Order.Of").is_empty(), "{export}");
     let reason = (json["links"].as_array().unwrap().iter())
@@ -510,7 +494,6 @@ fn a_file_sees_the_references_its_project_references_pass_on() {
     );
 }
 
-/// A project of the app that names no reference, and a call in it on `Money`'s type.
 fn tool(app: &Path) {
     write(
         app,
@@ -528,9 +511,6 @@ fn tool_calls(json: &Value) -> Vec<(&str, &str)> {
     calls(json, "Example.App.Tool.Run.Go()::Currency.Cents#0")
 }
 
-/// A `Directory.Build.props` gives the projects below it its `PackageReference`s and
-/// `ProjectReference`s (relative to each project), the nearest hiding the ones above unless it
-/// imports them; the props file itself declares none.
 #[test]
 fn a_directory_build_props_gives_its_references_to_the_projects_below_it() {
     let [_, app] = workspace("nuget_packages_props");
@@ -552,12 +532,10 @@ fn a_directory_build_props_gives_its_references_to_the_projects_below_it() {
             .all(|c| !c.contains("Directory.Build.props")),
         "{text}"
     );
-    // A project reference, written relative to the project, not to the props file.
     let project = "<Project><ItemGroup><ProjectReference Include=\"..\\..\\..\\dotnet-lib\\src\\Money\\Money.csproj\" /></ItemGroup></Project>";
     write(&app, "Directory.Build.props", project);
     let (text, json) = export(&app);
     assert_eq!(tool_calls(&json), [(CENTS, "exact")], "{text}");
-    // The nearest hides it; with the import, both apply.
     write(&app, "src/Directory.Build.props", "<Project></Project>");
     let (text, json) = export(&app);
     assert!(tool_calls(&json).is_empty(), "{text}");
@@ -567,7 +545,6 @@ fn a_directory_build_props_gives_its_references_to_the_projects_below_it() {
     assert_eq!(tool_calls(&json), [(CENTS, "exact")], "{text}");
 }
 
-/// Editing only a `Directory.Build.props` changes the next answer, as a cold index gives it.
 #[test]
 fn an_edited_directory_build_props_refreshes_like_a_cold_workspace() {
     let package =
@@ -597,9 +574,6 @@ fn an_edited_directory_build_props_refreshes_like_a_cold_workspace() {
     assert_eq!(refreshed.0, export(&cold[1]).0);
 }
 
-/// A receiver typed only by a declaration (a parameter, a field, a typed local), with no call
-/// naming the type, links through the package `using` as a call head does; a type the
-/// repository declares itself wins, and one no package provides stays outside.
 #[test]
 fn a_receiver_typed_by_a_declaration_links_through_a_package_using() {
     let [_, app] = workspace("nuget_packages_declared");
@@ -640,7 +614,6 @@ fn a_receiver_typed_by_a_declaration_links_through_a_package_using() {
         "using Example.Nowhere;\n\n",
         "    public int Run(Order o) => o.Total();\n",
     );
-    // The repository declares `Order` too, in the namespace of the file: it wins.
     write(
         &app,
         "src/Web/Own.cs",

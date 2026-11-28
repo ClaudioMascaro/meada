@@ -37,7 +37,6 @@ pub enum Absent {
 }
 
 impl Absent {
-    /// Every side, so a test reads every orphan line.
     #[cfg(test)]
     const ALL: [Absent; 7] = [
         Absent::Use,
@@ -49,7 +48,6 @@ impl Absent {
         Absent::Matcher,
     ];
 
-    /// The side in English, pt-BR and Spanish.
     fn words(self) -> (&'static str, &'static str, &'static str) {
         match self {
             Absent::Use => ("use", "uso", "uso"),
@@ -73,7 +71,6 @@ pub enum Scope<'a> {
 }
 
 impl<'a> Scope<'a> {
-    /// The scope of the orphan lines of a workspace whose index contents are `exports`.
     pub(crate) fn of(exports: &'a [crate::index::Export]) -> Self {
         match exports {
             [one] => Scope::Repository(&one.repository),
@@ -82,7 +79,6 @@ impl<'a> Scope<'a> {
     }
 }
 
-/// An orphan line in English, pt-BR and Spanish: the one place every orphan line names its scope.
 fn orphan(contract: &str, absent: Absent, scope: Scope, place: &str) -> (String, String, String) {
     let (en, pt, es) = absent.words();
     let (en_in, pt_in, es_in) = match scope {
@@ -1636,7 +1632,6 @@ impl Msg<'_> {
     pub fn text(&self) -> String {
         use meada_core::msg::Msg as Core;
         let lang = meada_core::msg::lang();
-        // `Lang` is non_exhaustive: a language this catalog lacks reads English.
         let pick = |en: String, pt_br: String, es: String| match lang {
             Lang::Pt => pt_br,
             Lang::Es => es,
@@ -6067,8 +6062,6 @@ impl Msg<'_> {
     }
 }
 
-/// The `, confidence 0.80` part of a proposal line, in English, pt-BR and Spanish; empty without
-/// one.
 fn confidence_of(confidence: Option<f64>) -> (String, String, String) {
     match confidence {
         Some(c) => (
@@ -6080,7 +6073,6 @@ fn confidence_of(confidence: Option<f64>) -> (String, String, String) {
     }
 }
 
-/// The half of the signing key pair a message names, in English, pt-BR and Spanish.
 #[cfg(feature = "accounts")]
 fn half_of(private: bool) -> (&'static str, &'static str, &'static str) {
     match private {
@@ -6093,8 +6085,6 @@ fn half_of(private: bool) -> (&'static str, &'static str, &'static str) {
 mod tests {
     use super::{Absent, Scope, orphan};
 
-    /// Every orphan line names the scope its absence holds in, in every language: the
-    /// workspace, or the repository of a workspace of one (ADR 0020, "The bound of an answer").
     #[test]
     fn every_orphan_line_names_its_scope_in_every_language() {
         let place = "main.tf:4 aws_s3_bucket.unused (root .)";

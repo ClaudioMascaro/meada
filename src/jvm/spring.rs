@@ -1,22 +1,3 @@
-//! Spring Boot configuration (spec #26), shared by the JVM packs' contract kinds: the base
-//! `application.properties` and `application.yml` (or `.yaml`) of a module's
-//! `src/main/resources`, read for the sources of that module (those under a main source root its
-//! Maven or Gradle build declares, else under `<module>/src/main/`), and the placeholders a
-//! value holds.
-//! `.properties` files are read line by line for literal assignments; YAML (`.yml`, `.yaml`)
-//! through the hardened reader of the provider documents, its nested keys joined with dots.
-//! Where a module has several, `.properties` wins, then `.yml`, as in Spring. Profiles
-//! (`application-<profile>` files, a document that activates on one, the sections after a
-//! `.properties` file's `#---`) and relaxed binding are not read. Nothing read here is kept in the index:
-//! the bytes come from the pack's config files on every refresh, and a value lives only while
-//! the contracts are extracted.
-//!
-//! A placeholder `${key}` takes the value of `key` when the module's configuration holds one;
-//! otherwise it names the environment variable `key` (`Part::Env`), whose value Meada never
-//! reads, and `${key:default}` names it with the default (`Part::EnvOr`). `inject` reads Spring's
-//! `@Value("${key}")` on a field or a parameter that way (`Code::expand_with`), and `resolved` the
-//! text of any other annotation Spring resolves (a listener's topic or queue).
-
 use std::collections::BTreeMap;
 
 use crate::document::events::{self, Syntax};
@@ -25,42 +6,26 @@ use crate::names::annotation as known_annotation;
 use crate::package::Manifest;
 use crate::resolve::Code;
 
-/// The keys and raw values of one module's configuration.
 pub type Properties = BTreeMap<String, String>;
 
-/// Spring Boot's base configuration files, which the JVM packs list as their config files
-/// (`LanguagePack::config_files`) so the kinds get them through `Indexed::configs`; imports
-/// do not read them.
 pub const CONFIG_FILES: &[&str] = &[
     "**/application.properties",
     "**/application.yml",
     "**/application.yaml",
 ];
 
-/// Spring's annotation that injects a value into a field or a parameter.
 const VALUE: &str = "org.springframework.beans.factory.annotation.Value";
 const RESOURCES: &str = "src/main/resources/";
-/// The keys whose presence makes a YAML document a profile's.
 const PROFILE_KEYS: &[&str] = &["spring.config.activate.on-profile", "spring.profiles"];
 
-/// How many placeholders deep a value is resolved, through the keys it names; deeper (a cycle
-/// among keys included), the placeholder is an unknown part.
 // ponytail: real configurations chain a few keys; 32 leaves room and bounds a cycle.
 const PLACEHOLDER_DEPTH: usize = 32;
-/// What resolving one value may cost: each placeholder visited and each byte of text copied.
-/// Past it the rest of the value is one unknown part, so keys that double each other cannot
-/// expand a small file into a huge value.
 // ponytail: a flat 64 KiB per value; a base URL is a few dozen bytes.
 const PLACEHOLDER_BUDGET: usize = 1 << 16;
-/// The bytes of joined keys one YAML file may allocate. Past it the file is not read, since
-/// a long key over many children would otherwise cost its length per child.
 // ponytail: flattening stays; real files join a few KB of keys, so 1 MiB (`lang::MAX_BYTES`)
 // is loose, and a hostile one stops at about twice that.
 const YAML_KEY_BUDGET: usize = crate::lang::MAX_BYTES;
 
-/// The configurations of a repository's modules, by the module's directory (`api/`, or empty
-/// for the repository root), and the main source roots the builds declare, as
-/// `(module, root/)` paths from the repository root.
 #[derive(Default)]
 pub struct Configs {
     modules: BTreeMap<String, Properties>,
@@ -68,12 +33,6 @@ pub struct Configs {
 }
 
 impl Configs {
-    /// The configurations among `files` (repository path and bytes): those at
-    /// `<module>/src/main/resources/application.properties`, `.../application.yml` or
-    /// `.../application.yaml`, in Spring's order of precedence (`.properties`, then `.yml`).
-    /// A file past `lang::MAX_BYTES`, which the index reads cut, is not read. The Maven and
-    /// Gradle builds among `manifests` give their modules' main source roots (a Gradle source
-    /// set's `srcDirs` included), which `of` maps a source to its module by.
     pub fn read(files: &[(&str, &[u8])], manifests: &[Manifest]) -> Self {
         let mut by_rank: [BTreeMap<&str, Properties>; 3] = Default::default();
         for &(path, src) in files {
@@ -97,7 +56,6 @@ impl Configs {
             };
             by_rank[rank].insert(module, read);
         }
-        // The one of higher precedence is laid over the others.
         let mut modules: BTreeMap<String, Properties> = BTreeMap::new();
         for files in by_rank {
             for (module, read) in files {
@@ -121,8 +79,6 @@ impl Configs {
         Self { modules, roots }
     }
 
-    /// The configuration of the module whose sources hold `source`: the module of the deepest
-    /// main source root a build declares for it, else the one whose `src/main/` it is under.
     pub fn of(&self, source: &str) -> Option<&Properties> {
         let built = (self.roots.iter())
             .filter(|(_, root)| source.starts_with(root.as_str()))
@@ -142,16 +98,10 @@ impl Configs {
     }
 }
 
-/// `prefix` as a module's directory: empty, or a path ending at a `/`.
 fn module_dir(prefix: &str) -> Option<&str> {
     (prefix.is_empty() || prefix.ends_with('/')).then_some(prefix)
 }
 
-/// The literal assignments of a `.properties` file's first document: `key=value`, `key: value`
-/// or `key value`, one per line, the last of a key winning. A comment (`#`, `!`), a line
-/// continued with an odd number of trailing `\` and the lines it continues onto, and a key or a
-/// value with an escape (`\`) are not literal, and are left out. A `#---` or `!---` line starts
-/// another document (a profile's, in Spring Boot), which is not read.
 fn read_properties(src: &str) -> Properties {
     let mut out = Properties::new();
     let mut continued = false;
@@ -177,10 +127,6 @@ fn read_properties(src: &str) -> Properties {
     out
 }
 
-/// The scalars of a YAML file's first document, by their keys joined with dots (`api.url`);
-/// a list, a null and anything the reader cannot read are left out (and the whole file,
-/// when its joined keys pass `YAML_KEY_BUDGET`), and so is a document
-/// that activates on a profile.
 pub fn read_yaml(src: &str) -> Properties {
     let Ok(root) = events::first(Syntax::Yaml, src.as_bytes()) else {
         return Properties::new();
@@ -192,12 +138,8 @@ pub fn read_yaml(src: &str) -> Properties {
     out
 }
 
-/// The scalars of a tree, by their keys joined with dots (`api.url`): a list and a null are left
-/// out, and so is everything when the joined keys pass `YAML_KEY_BUDGET`. `read_yaml` reads a
-/// Spring file through it, and Backstage's `app-config*.yaml` once its includes are grafted.
 pub fn flatten(root: &serde_json::Value) -> Properties {
     let mut out = Properties::new();
-    // The YAML reader bounds the nesting; the walk is an explicit stack.
     let mut budget = YAML_KEY_BUDGET;
     let mut pending = vec![(String::new(), root)];
     while let Some((key, value)) = pending.pop() {
@@ -226,10 +168,6 @@ pub fn flatten(root: &serde_json::Value) -> Properties {
     out
 }
 
-/// `text` with its placeholders resolved against `config` (see the module): literal text,
-/// environment reads, and an unknown part for a placeholder that cannot be read (unclosed,
-/// with no name, past `PLACEHOLDER_DEPTH` or `PLACEHOLDER_BUDGET`). A SpEL expression
-/// (`#{...}`) makes the whole value unknown.
 pub fn resolve(text: &str, config: Option<&Properties>) -> Vec<Part> {
     if text.contains("#{") {
         return vec![Part::Hole];
@@ -301,7 +239,6 @@ fn charge(budget: &mut usize, cost: usize) -> bool {
     }
 }
 
-/// `part` after `out`, joined to the text before it.
 fn push(out: &mut Vec<Part>, part: Part) {
     match (out.last_mut(), part) {
         (Some(Part::Text(before)), Part::Text(text)) => before.push_str(&text),
@@ -309,8 +246,6 @@ fn push(out: &mut Vec<Part>, part: Part) {
     }
 }
 
-/// The place of the `}` that closes the placeholder `${...` starting `text`, nested ones
-/// skipped.
 fn closing(text: &str) -> Option<usize> {
     let mut depth = 0usize;
     let bytes = text.as_bytes();
@@ -334,7 +269,6 @@ fn closing(text: &str) -> Option<usize> {
     None
 }
 
-/// The place of the `:` that starts a placeholder's default, outside nested placeholders.
 fn separator(inner: &str) -> Option<usize> {
     let mut depth = 0usize;
     let bytes = inner.as_bytes();
@@ -349,11 +283,6 @@ fn separator(inner: &str) -> Option<usize> {
     None
 }
 
-/// What Spring's `@Value` written in `path` (the annotation as the pack reads it, with what it
-/// marks) injects: its text, constants folded, with its placeholders resolved against the
-/// configuration of the file's module (`resolved`). `None` for any other annotation, which
-/// counts only when `Code::outside` says an import from Spring binds its name, and for a
-/// `static` field, which Spring injects nothing into.
 pub fn inject<'a>(
     configs: &Configs,
     code: &Code<'a>,
@@ -375,11 +304,6 @@ pub fn inject<'a>(
     ))
 }
 
-/// A folded value as Spring reads an annotation's text: a string's literal text with its
-/// placeholders resolved against `config` (`resolve`) and an environment read kept as it is;
-/// any other part (a parameter, a part not read) is unknown (`Part::Hole`), and so is a value
-/// that is no string. An annotation's value is a constant, so a part that is not text means
-/// the text was not read whole.
 pub fn resolved(value: &Value, config: Option<&Properties>) -> Value {
     let Value::Str(parts) = value else {
         return Value::Unknown;
@@ -468,7 +392,6 @@ mod tests {
 
     #[test]
     fn a_hostile_yaml_key_prefix_is_stopped_by_the_key_budget() {
-        // One 200 KB key (explicit, as a simple key stops at 1024) holding thousands of children: joined, the keys would weigh gigabytes.
         let mut src = format!("? {}\n:\n", "k".repeat(200_000));
         for n in 0..3000 {
             src += &format!("  c{n}: v\n");
@@ -477,7 +400,6 @@ mod tests {
         let start = std::time::Instant::now();
         assert!(read_yaml(&src).is_empty());
         assert!(start.elapsed() < std::time::Duration::from_secs(1));
-        // Keys within the budget still join.
         assert_eq!(read_yaml("a:\n  b: c\n"), props(&[("a.b", "c")]));
     }
 
@@ -512,11 +434,9 @@ mod tests {
         );
         let root = configs.of("src/main/java/a/B.java").unwrap();
         assert_eq!(root, &props(&[("a", "root")]));
-        // Test sources, and sources outside a module's `src/main`, take none.
         assert!(configs.of("api/src/test/java/a/B.java").is_none());
         assert!(configs.of("other/src/main/java/a/B.java").is_none());
         assert!(configs.of("lib/a/B.java").is_none());
-        // A file past the size the index reads whole is not read.
         let big = format!("a=cut{}", "x".repeat(crate::lang::MAX_BYTES));
         let path = "src/main/resources/application.properties";
         let files: &[(&str, &[u8])] = &[(path, big.as_bytes())];
@@ -553,7 +473,6 @@ mod tests {
                 text("/v1")
             ]
         );
-        // A key the configuration lacks is a variable, with its default when it has one.
         assert_eq!(resolve("${MISSING}", c), [env("MISSING")]);
         assert_eq!(
             resolve("${A:${B:http://b.example.com}}", None),
@@ -580,7 +499,6 @@ mod tests {
     fn a_cycle_of_keys_stops_at_the_placeholder_depth() {
         let config = props(&[("a", "${b}"), ("b", "${a}")]);
         assert_eq!(resolve("${a}", Some(&config)), [Part::Hole]);
-        // One key short of the depth still resolves.
         let mut chain: Properties = (0..PLACEHOLDER_DEPTH - 1)
             .map(|n| (format!("k{n}"), format!("${{k{}}}", n + 1)))
             .collect();
@@ -592,7 +510,6 @@ mod tests {
 
     #[test]
     fn keys_that_double_each_other_stop_at_the_budget() {
-        // Each key holds the next twice: the value would be 2^31 copies of the last one.
         let mut config: Properties = (0..31)
             .map(|n| (format!("k{n}"), format!("${{k{0}}}${{k{0}}}", n + 1)))
             .collect();
@@ -633,11 +550,8 @@ mod tests {
         let tools = props(&[("a", "tools")]);
         assert_eq!(configs.of("tools/src/core/java/a/B.java"), Some(&tools));
         assert_eq!(configs.of("tools/src/main/java/a/B.java"), Some(&tools));
-        // A test source set takes none, as `src/test` does, and neither does a file outside
-        // every root.
         assert!(configs.of("tools/src/it/java/a/B.java").is_none());
         assert!(configs.of("tools/other/a/B.java").is_none());
-        // Without the build, a literal source set is in no module.
         let bare = Configs::read(files, &[]);
         assert!(bare.of("tools/src/core/java/a/B.java").is_none());
     }

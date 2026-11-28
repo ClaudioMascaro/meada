@@ -23,15 +23,9 @@ use crate::valkey::{self, Valkey};
 use crate::workspace::Manifest;
 use crate::{Result, engine};
 
-/// How many periods a heartbeat lives: a node that misses two rounds disappears.
 const PERIODS: u64 = 3;
-/// How long the write waits for Valkey, as `status --generations` does: an unreachable Valkey
-/// never delays the next round by more.
 const WRITE_TIMEOUT: Duration = Duration::from_secs(2);
 
-/// The write. KEYS: the heartbeat, the node set. ARGV: the document, the TTL in seconds, the
-/// name. The score is the expiry by Valkey's own clock, so no node's skew removes another's
-/// name; names whose score is at or below now are removed.
 const WRITE: &str = r"
 local now = tonumber(redis.call('TIME')[1])
 redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
@@ -51,7 +45,6 @@ pub fn host() -> String {
     name.unwrap_or_default().to_lowercase()
 }
 
-/// The node's name: `[snapshot] node_name`, else the host name, which must be a node name too.
 fn name(config: &Config) -> std::result::Result<String, String> {
     resolve(config.node_name.as_deref(), &host())
 }
@@ -108,7 +101,6 @@ pub fn beat(manifest: &Path, every: u64) -> Option<String> {
     })
 }
 
-/// The heartbeat document of the node at `local`, as the files say now.
 fn document(manifest: &Path, local: &Path, name: &str) -> serde_json::Value {
     let pointer = pull::current(local).ok().flatten();
     let ready = crate::index::with_busy_timeout(engine::PROBE_BUSY, || {
@@ -125,7 +117,6 @@ fn document(manifest: &Path, local: &Path, name: &str) -> serde_json::Value {
     })
 }
 
-/// Runs `WRITE` for the heartbeat `document` at `key`, living `ttl` seconds.
 async fn put(
     config: &valkey::Config,
     key: &str,
@@ -144,12 +135,10 @@ async fn put(
     valkey.query::<i64>(&script).await.map(drop)
 }
 
-/// A checked heartbeat, safe to use in a fleet diagnostic or a generation lookup.
 #[cfg(any(feature = "ui", feature = "refresh-lock"))]
 #[derive(serde::Deserialize, serde::Serialize)]
 pub(crate) struct Heartbeat {
     pub name: String,
-    // Require both nullable fields to be present; serde otherwise accepts a missing Option.
     #[serde(deserialize_with = "serde::Deserialize::deserialize")]
     pub generation: Option<String>,
     #[serde(deserialize_with = "serde::Deserialize::deserialize")]
@@ -160,8 +149,6 @@ pub(crate) struct Heartbeat {
     pub time: String,
 }
 
-/// The complete heartbeat of this checked node name. A partial JSON object is never a source
-/// of a fence, even when the field it happens to hold is a valid unsigned decimal.
 #[cfg(any(feature = "ui", feature = "refresh-lock"))]
 pub(super) fn checked(name: &str, bytes: &[u8]) -> Option<Heartbeat> {
     serde_json::from_slice::<Heartbeat>(bytes)
@@ -178,7 +165,6 @@ pub(super) fn checked(name: &str, bytes: &[u8]) -> Option<Heartbeat> {
         })
 }
 
-/// A live entry that cannot contribute a fence or a generation lookup.
 #[cfg(any(feature = "ui", feature = "refresh-lock"))]
 pub(crate) enum Malformed {
     Name(String),
@@ -212,14 +198,12 @@ impl Malformed {
     }
 }
 
-/// Live, well-formed heartbeats and malformed names/documents. Invalid names never form keys.
 #[cfg(any(feature = "ui", feature = "refresh-lock"))]
 pub(crate) async fn read(
     valkey: &Valkey,
     config: &valkey::Config,
 ) -> std::result::Result<(Vec<Heartbeat>, Vec<Malformed>), String> {
     let nodes = config.key("nodes", true);
-    // Scores are written against Valkey's own clock, including when a node's clock is skewed.
     let time: (u64, u64) = valkey.query(&cmd("TIME")).await?;
     let names: Vec<Vec<u8>> = valkey
         .query(

@@ -1,5 +1,3 @@
-//! Which repository methods remain candidates for TypeScript library receivers.
-
 use crate::common::fixture_repo;
 use meada::engine::Engine;
 use serde_json::Value;

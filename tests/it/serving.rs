@@ -1,9 +1,3 @@
-//! Serving a pulled generation (ADR 0012, spec #259, feature `snapshot`): `meada mcp --listen
-//! --workspace <node manifest> --generations`, `meada status --generations` and `meada export
-//! --generations` over `local_dir`s two nodes pulled from the local S3-compatible server
-//! `MEADA_TEST_S3_ENDPOINT` names. Without it these tests print why and skip; with
-//! `MEADA_TEST_SERVICES_REQUIRED=1` they fail. The ones over a generation made by hand
-//! (`hand_node`) need no store.
 #![cfg(feature = "snapshot")]
 
 use std::fs;
@@ -22,7 +16,6 @@ use crate::snapshot::{
 const WEB: &str = "example.com/chain/web";
 const CATALOG: &str = "example.com/chain/catalog";
 
-/// `meada mcp --listen 127.0.0.1:0 --workspace <manifest> --generations`, in `dir`.
 pub(crate) fn serve(dir: &Path, manifest: &str) -> Server {
     let args = [
         "--listen",
@@ -34,8 +27,6 @@ pub(crate) fn serve(dir: &Path, manifest: &str) -> Server {
     Server::start_args(dir, &args, &[])
 }
 
-/// `meada status --workspace <manifest> --generations` in `dir`, with the store's key id: stdout,
-/// stderr and the exit code.
 pub(crate) fn probe(dir: &Path, manifest: &str) -> (String, String, Option<i32>) {
     let out = Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(dir)
@@ -49,7 +40,6 @@ pub(crate) fn probe(dir: &Path, manifest: &str) -> (String, String, Option<i32>)
     (text(&out.stdout), text(&out.stderr), out.status.code())
 }
 
-/// The index of `WEB` in generation `generation` of `local`: the file a call opens first.
 fn web_index(local: &Path, generation: &str) -> PathBuf {
     let document = fs::read(local.join(generation).join("generation.json")).unwrap();
     let document: serde_json::Value = serde_json::from_slice(&document).unwrap();
@@ -58,7 +48,6 @@ fn web_index(local: &Path, generation: &str) -> PathBuf {
     local.join(generation).join(bundle).join("index.db")
 }
 
-/// The answer to `search second` at `WEB`'s endpoint of `server`.
 async fn search_second(server: &Server) -> String {
     let client = server.client(&format!("/{WEB}")).await;
     let query = serde_json::json!({"query": "second"});
@@ -67,14 +56,11 @@ async fn search_second(server: &Server) -> String {
     text(&answer).to_string()
 }
 
-/// A published chain and two nodes, each with the generation pulled.
 struct Nodes {
     endpoint: String,
     bucket: String,
-    /// The case directory, where the chain's manifest and every node's directory are.
     dir: PathBuf,
     first: String,
-    /// Each node's manifest, relative to `dir`, and its `local_dir`.
     nodes: Vec<(String, PathBuf)>,
 }
 
@@ -101,8 +87,6 @@ fn nodes(case: &str) -> Option<Nodes> {
     })
 }
 
-/// Two nodes pull one published generation; `trace`, `context` and `export` over it equal the
-/// chain's goldens, and the status probe prints the node's generation and writes nothing.
 #[test]
 fn a_pulled_generation_answers_as_the_chain_goldens_have_it() {
     let Some(Nodes {
@@ -114,8 +98,6 @@ fn a_pulled_generation_answers_as_the_chain_goldens_have_it() {
     answer_the_goldens(&dir, &first, &nodes);
 }
 
-/// A node whose companion writes heartbeats answers as the chain's goldens have it, with the
-/// same `Meada-Generation` header and `_meta` (#298).
 #[cfg(feature = "generation-pointer")]
 #[test]
 fn a_node_whose_companion_writes_heartbeats_answers_the_same() {
@@ -140,7 +122,6 @@ fn a_node_whose_companion_writes_heartbeats_answers_the_same() {
         std::thread::sleep(std::time::Duration::from_millis(20));
     };
     answer_the_goldens(&fleet.dir, &first, &[(node.clone(), local.clone())]);
-    // Heartbeats were written all the while, and the server named the generation.
     assert!(
         redis::cmd("EXISTS")
             .arg(&key)
@@ -165,7 +146,6 @@ fn answer_the_goldens(dir: &Path, first: &str, nodes: &[(String, PathBuf)]) {
     for (manifest, local) in nodes {
         let before = contents(local);
         let server = serve(dir, manifest);
-        // No path names a repository but the ones the generation recorded.
         let listing: String = CHAIN.iter().map(|(repo, _)| format!("{repo}\n")).collect();
         let (status, _, body) = get(&server.url);
         assert_eq!((status, body.as_str()), (404, listing.as_str()));
@@ -205,8 +185,6 @@ fn answer_the_goldens(dir: &Path, first: &str, nodes: &[(String, PathBuf)]) {
     }
 }
 
-/// A call opened before a swap finishes on the generation it read; the next one, and a call
-/// on a node that has not pulled, are answered by the generation each node holds.
 #[test]
 fn a_call_before_a_swap_answers_from_the_old_generation_and_the_next_from_the_new() {
     let Some(Nodes {
@@ -222,8 +200,6 @@ fn a_call_before_a_swap_answers_from_the_old_generation_and_the_next_from_the_ne
     let ((one, local), (two, _)) = (nodes[0].clone(), nodes[1].clone());
     let (first_server, second_server) = (serve(&dir, &one), serve(&dir, &two));
 
-    // The call waits on a commit in progress in the first generation's index, read before the
-    // node swaps; the pull needs nothing of that index.
     let commit = rusqlite::Connection::open(web_index(&local, &first)).unwrap();
     commit.execute_batch("BEGIN EXCLUSIVE").unwrap();
     let swap = async {
@@ -238,8 +214,6 @@ fn a_call_before_a_swap_answers_from_the_old_generation_and_the_next_from_the_ne
 
     let after = block_on(search_second(&first_server));
     assert!(after.contains("src/status.ts"), "{after}");
-    // The node that has not pulled still answers from the first generation, and then from the
-    // second once it has.
     let unpulled = block_on(search_second(&second_server));
     assert!(!unpulled.contains("src/status.ts"), "{unpulled}");
     assert_eq!(pull(&dir, &two, &[]).0.trim(), second);
@@ -247,8 +221,6 @@ fn a_call_before_a_swap_answers_from_the_old_generation_and_the_next_from_the_ne
     assert!(pulled.contains("src/status.ts"), "{pulled}");
 }
 
-/// `meada mcp --listen 127.0.0.1:0 --workspace <manifest> --generations` where the start is
-/// refused: the exit code and stderr, with no address printed.
 fn refused(dir: &Path, manifest: &str) -> (Option<i32>, String) {
     let args = [
         "mcp",
@@ -263,8 +235,6 @@ fn refused(dir: &Path, manifest: &str) -> (Option<i32>, String) {
     (code, stderr)
 }
 
-/// The probe exits on local state only: 1 while the node holds no servable generation, naming
-/// the pull and refusing the start, and 0 once it does, the store reachable or not.
 #[test]
 fn the_probe_and_the_start_depend_on_the_nodes_generation_and_not_on_the_store() {
     let Some(Nodes {
@@ -277,7 +247,6 @@ fn the_probe_and_the_start_depend_on_the_nodes_generation_and_not_on_the_store()
     else {
         return;
     };
-    // A node that has pulled nothing.
     let (empty, _) = named_node(&dir, "empty", &endpoint, &bucket);
     let (stdout, stderr, code) = probe(&dir, &empty);
     assert_eq!(code, Some(1), "{stderr}");
@@ -292,7 +261,6 @@ fn the_probe_and_the_start_depend_on_the_nodes_generation_and_not_on_the_store()
     assert!(stderr.contains("meada snapshot pull"), "{stderr}");
     assert!(!stderr.contains("listening on"), "{stderr}");
 
-    // A node that has: the generation, the ids held and the store's current one.
     let (one, local) = nodes[0].clone();
     let (stdout, stderr, code) = probe(&dir, &one);
     assert_eq!((code, stderr.as_str()), (Some(0), ""), "{stdout}");
@@ -301,7 +269,6 @@ fn the_probe_and_the_start_depend_on_the_nodes_generation_and_not_on_the_store()
         format!("current: {first}\nheld: {first}\nstore: reachable (current {first})\n")
     );
 
-    // The store stopped: the node stays ready and a new server starts and serves.
     let manifest = dir.join(&one);
     let dead = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = dead.local_addr().unwrap().port();
@@ -320,8 +287,6 @@ fn the_probe_and_the_start_depend_on_the_nodes_generation_and_not_on_the_store()
     let served = block_on(search_second(&serve(&dir, &one)));
     assert!(served.starts_with("no matches"), "{served}");
 
-    // An index of this schema version holding a schema object this build does not create is
-    // not servable either: the start names the repository and the object.
     let index = web_index(&local, &first);
     let kept = local.join("kept.db");
     fs::copy(&index, &kept).unwrap();
@@ -337,8 +302,6 @@ fn the_probe_and_the_start_depend_on_the_nodes_generation_and_not_on_the_store()
     }
     fs::rename(&kept, &index).unwrap();
 
-    // An index of another schema version is not servable: the probe says which generation and
-    // repository, and the start is refused.
     let db = rusqlite::Connection::open(web_index(&local, &first)).unwrap();
     db.execute_batch("PRAGMA user_version = 999").unwrap();
     drop(db);
@@ -350,7 +313,6 @@ fn the_probe_and_the_start_depend_on_the_nodes_generation_and_not_on_the_store()
     assert_eq!(code, Some(1));
     assert!(stderr.contains(&why), "{stderr}");
 
-    // `--generations` belongs to `--workspace`, and the section needs a `local_dir`.
     let (_, stderr, code) = run_args(&dir, &["status", "--generations"]);
     assert_ne!(code, Some(0), "{stderr}");
     let (_, stderr, code) = run_args(&dir, &["status", "--workspace", MANIFEST, "--generations"]);
@@ -361,21 +323,14 @@ fn the_probe_and_the_start_depend_on_the_nodes_generation_and_not_on_the_store()
     );
 }
 
-/// The generation id of `hand_node`.
 const HAND: &str = "00000000000000aa";
 
-/// A node holding a generation made by hand, as a pull leaves one, with no store: the chain's
-/// mirrors (copied, `.git` included) and indexes under `<case>/hand/generations/HAND/`, its
-/// document and the pointer naming it. Returns the case directory, the node's manifest relative
-/// to it and its `local_dir`.
 pub(crate) fn hand_node(case: &str) -> (PathBuf, String, PathBuf) {
     let dir = chain_manifest(case);
     let (manifest, local) = hand_node_of(&dir, &CHAIN);
     (dir, manifest, local)
 }
 
-/// `hand_node` over `repos` (identity, directory in `dir`), listed and indexed in `dir` already.
-/// Returns the node's manifest relative to `dir` and its `local_dir`.
 pub(crate) fn hand_node_of(dir: &Path, repos: &[(&str, &str)]) -> (String, PathBuf) {
     assert!(run(dir, "index").2, "index");
     let (manifest, local) = named_node(dir, "hand", "http://127.0.0.1:1", "meada-hand");
@@ -408,16 +363,12 @@ pub(crate) fn hand_node_of(dir: &Path, repos: &[(&str, &str)]) -> (String, PathB
     (manifest, local)
 }
 
-/// A node whose current generation stops being servable answers every request 503 with a fixed
-/// body: no local path and no parse error reaches a client. A browser's request gets the 403
-/// before it.
 #[test]
 fn a_node_with_no_servable_generation_answers_503_with_a_fixed_body() {
     let (dir, manifest, local) = hand_node("serving_unservable");
     let server = serve(&dir, &manifest);
     let listing: String = CHAIN.iter().map(|(repo, _)| format!("{repo}\n")).collect();
     assert_eq!(get(&server.url).2, listing);
-    // A document that no longer parses, then a pointer to no generation.
     fs::write(local.join(HAND).join("generation.json"), b"{").unwrap();
     let other = "00000000000000bb";
     fs::write(local.join("current"), format!("{other} 0\n")).unwrap();
@@ -429,9 +380,6 @@ fn a_node_with_no_servable_generation_answers_503_with_a_fixed_body() {
     }
 }
 
-/// An index row naming a file outside the mirror (an absolute path, `..`) renders as a source
-/// that cannot be read, and the answer still comes: `/dev/zero` would fill the memory, and a
-/// path outside would show the line layout of another file.
 #[test]
 fn an_index_naming_files_outside_its_mirror_answers_without_reading_them() {
     let (dir, manifest, local) = hand_node("serving_outside");
@@ -464,10 +412,6 @@ fn an_index_naming_files_outside_its_mirror_answers_without_reading_them() {
     });
 }
 
-/// A mirror's `meada.toml` or `meada.decisions.toml` that is a symbolic link to a file on the
-/// node (#506): the probe, the start and `export` fail naming the file, and what the target
-/// holds (which would parse) is in none of their output. The file itself, copied in its place,
-/// serves.
 #[cfg(unix)]
 #[test]
 fn a_mirror_config_through_a_symbolic_link_is_refused_and_never_read() {
@@ -503,7 +447,6 @@ fn a_mirror_config_through_a_symbolic_link_is_refused_and_never_read() {
         fs::write(&outside, &target).unwrap();
         let _ = fs::remove_file(&file);
         std::os::unix::fs::symlink(&outside, &file).unwrap();
-        // The manifest names `local_dir` relative to it, as every path it reports.
         let why = format!(
             "hand/generations/{HAND}/{:016x}/mirror/{name}: a symbolic link",
             0
@@ -523,7 +466,6 @@ fn a_mirror_config_through_a_symbolic_link_is_refused_and_never_read() {
         assert_eq!((code, stdout.as_str()), (Some(1), ""), "{name}: {stderr}");
         assert!(stderr.contains(&why), "{stderr}");
         assert!(!stderr.contains(marker), "{stderr}");
-        // The same bytes as the mirror's own file are read.
         fs::remove_file(&file).unwrap();
         fs::write(&file, &target).unwrap();
         let (stdout, stderr, code) = run_args(&dir, &export);

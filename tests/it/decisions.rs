@@ -1,7 +1,3 @@
-//! `meada.decisions.toml` (spec #18, ADR 0006): a repository's decisions turn its ambiguous
-//! links and unresolved consumers into links at the level `decided`. The chain fixture has two
-//! open items, both in `chain-web`; `tests/fixtures/decisions/` holds the files that resolve them.
-
 use crate::common;
 
 use std::fs;
@@ -60,8 +56,6 @@ fn context_shows_a_decided_link_with_its_level_and_reason() {
     }
 }
 
-/// The error `Engine::open` gives for a repository whose `meada.decisions.toml` is `toml`, with
-/// the repository's path replaced by `<repo>`.
 fn decisions_error(case: &str, toml: &str) -> String {
     let repo = fixture_repo(case, "ts-basic", Some("https://example.com/acme/web.git"));
     fs::write(repo.join("meada.decisions.toml"), toml).unwrap();
@@ -131,7 +125,6 @@ fn a_decision_that_no_longer_fits_is_ignored() {
 
     let export = Engine::open(&web).unwrap().export().unwrap();
 
-    // Every decision is stale, so the rest of the export is the core's.
     let (core, _) = export.split_once(",\n  \"stale_decisions\"").unwrap();
     assert_golden_but_indexed_commit("chain-web.export.json", &format!("{core}\n}}\n"));
     assert_golden("chain-web.unfit.export.json", &without_processes(&export));
@@ -150,8 +143,6 @@ fn a_decision_of_the_wrong_kind_for_its_call_is_ignored() {
     );
 }
 
-/// A dynamic URL decided to a route its repository serves but the call cannot reach is stale
-/// (#806): the tracking call posts, the target is a `GET`. The item stays open.
 #[test]
 fn a_dynamic_url_decision_to_a_route_that_is_no_candidate_is_stale() {
     let (web, _, _) = chain("decided_dynamic_not_candidate");
@@ -183,7 +174,6 @@ fn inserting_a_line_above_a_decided_call_leaves_the_decision_applied() {
 
     let export = Engine::open(&web).unwrap().export().unwrap();
 
-    // The links alone: the processes show levels too.
     let export: serde_json::Value = serde_json::from_str(&export).unwrap();
     let levels: Vec<&str> = (export["links"].as_array().unwrap().iter())
         .map(|l| l["level"].as_str().unwrap())

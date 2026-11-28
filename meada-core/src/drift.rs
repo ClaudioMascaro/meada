@@ -20,7 +20,6 @@ pub struct Entry<'a> {
 }
 
 impl Entry<'_> {
-    /// `path:line caller`.
     fn place(&self) -> String {
         format!("{}:{} {}", self.path, self.line, self.caller)
     }

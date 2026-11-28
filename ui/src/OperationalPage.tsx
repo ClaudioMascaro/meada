@@ -173,7 +173,7 @@ function AdmissionView({ data, api, t, locale }: { data: Admission; api: Api; t:
     <Fields rows={admissionModel(data, t)} />
     {isOidcAdmission(data) && data.failed && <p className="error">{data.failed.time}: {data.failed.reason}</p>}
     <Table label={t.groups} t={t} headers={[t.group, t.identities]} rows={Object.entries(data.groups ?? {}).map(([group, identities]) => [group, identities.join(', ') || t.none])} />
-    {/* The token check and the issuer's metadata are the identity provider's alone. */}
+    { }
     {isOidcAdmission(data) && <><h2>{t.metadata}</h2><pre className="configuration" role="region" aria-label={t.metadata} tabIndex={0}>{JSON.stringify(data.metadata, null, 2)}</pre>
     <form className="token-check" aria-label={t.checkToken} onSubmit={event => { event.preventDefault(); void check(); }}>
       <label htmlFor="check-token">{t.token}</label>

@@ -1,5 +1,3 @@
-//! Constructor arguments as values of TypeScript instance fields.
-
 use crate::common::{edited, fixture_repo, in_repo};
 use meada::engine::Engine;
 use serde_json::Value;

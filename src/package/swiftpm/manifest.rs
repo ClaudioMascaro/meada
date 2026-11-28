@@ -1,44 +1,24 @@
-//! What the SwiftPM package kind reads of a `Package.swift` (spec #29, #124): the package's
-//! name (a `*` for each computed part), its library products and its `.package(url:)` and
-//! `.package(path:)` dependencies with their version requirement. The PackageDescription forms
-//! live here; the Swift pack's manifest reader (`lang::swift::manifest`) gives the grammar.
-
 use tree_sitter::{Node, Parser};
 
 use crate::lang::named;
 use crate::lang::swift::manifest::{Argument, call, literal, pattern};
 
-/// What the package kind reads of a `Package.swift`: only literal values count.
 #[derive(Debug, Default, PartialEq)]
 pub struct Package {
-    /// The `name:` of the `Package(...)` call, with a `*` for each part that is computed.
     pub name: Option<String>,
-    /// Whether any part of `name` is computed.
     pub name_computed: bool,
-    /// The library products, as `(name, targets)`: the targets are the modules `import` can name.
-    /// A target name that is not a literal is left out of its product.
     pub products: Vec<(String, Vec<String>)>,
     pub dependencies: Vec<Dependency>,
 }
 
-/// A `.package(url:)` or `.package(path:)` dependency.
 #[derive(Debug, PartialEq)]
 pub struct Dependency {
-    /// Whether it names a git `url:` rather than a local `path:`.
     pub url: bool,
-    /// The URL or path as written, with a `*` for each part that is computed (an interpolation,
-    /// a variable, a concatenation).
     pub text: String,
-    /// Whether any part of `text` is computed.
     pub computed: bool,
-    /// The version requirement as written (`from 1.2.0`, `exact 2.0.0`, `1.0.0..<2.0.0`,
-    /// `branch main`), when it is a literal one.
     pub range: Option<String>,
 }
 
-/// The name, library products and package dependencies `src` declares, wherever the calls sit
-/// (a variable may hold a list). A `url:` or `path:` that is no string at all reads as a single
-/// computed part.
 // ponytail: `.package(name:url:)`'s deprecated `name:` and a product whose `targets:` is not a
 // list literal are not read; `.executable`, `.plugin` products expose no module.
 pub fn package(src: &[u8]) -> Package {
@@ -51,7 +31,6 @@ pub fn package(src: &[u8]) -> Package {
         return Package::default();
     };
     let mut found = Package::default();
-    // Source order, so the first `Package(name:)` is the package's.
     let mut pending = vec![tree.root_node()];
     while let Some(node) = pending.pop() {
         let children: Vec<Node> = named(node).collect();
@@ -104,9 +83,6 @@ pub fn package(src: &[u8]) -> Package {
     found
 }
 
-/// The version requirement among a `.package(...)` call's `arguments`: `from:`, `exact:`,
-/// `branch:` and `revision:` labels, `.upToNextMajor(from:)`-like members and a range of two
-/// string literals, written compactly.
 fn requirement(arguments: &[Argument], src: &[u8]) -> Option<String> {
     for &(label, value) in arguments {
         match (label, value.kind()) {

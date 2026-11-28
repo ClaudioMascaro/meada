@@ -1,4 +1,3 @@
-//! Official Node Azure SDK constructor, child-client and operation inventory.
 use super::{Code, Frame, Handle, Role, Stage, Value, argument, imported};
 
 pub(super) fn constructed<'a>(

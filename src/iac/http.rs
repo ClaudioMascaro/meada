@@ -1,5 +1,3 @@
-//! Finite API Gateway route declarations, evaluated once with their exact resource targets.
-
 mod rest;
 
 use super::attribute::Attribute;
@@ -83,7 +81,6 @@ impl<'m> Eval<'m> {
         Some(found)
     }
 
-    /// A reference identifies one local function; a literal Lambda ARN proves only the repo.
     fn http_lambda(
         &mut self,
         input: &Input<'m>,
@@ -198,7 +195,6 @@ impl<'m> Eval<'m> {
                 )
             })
             .collect();
-        // Iterate the declaration order, not a map's randomized order, when charging budgets.
         for &(node, _, block, _) in pending {
             let Some(input) = inputs.get(&node) else {
                 continue;

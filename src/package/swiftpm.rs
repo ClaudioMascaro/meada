@@ -1,25 +1,3 @@
-//! SwiftPM packages (spec #29): a `Package.swift` with a literal `name:` provides
-//! `package::swiftpm::<name>`, and each `.package(url:)` or `.package(path:)` dependency consumes
-//! the package of the workspace it points at. The manifest is read by the Swift pack's own reader
-//! (`lang::swift::manifest`), so a manifest is read one way only. The module answers the trait's
-//! questions as follows:
-//!
-//! - `read`: the package's name, its library products with the targets each holds (the modules
-//!   an `import` can name) and the directory of every target; `Package.swift` carries no version.
-//! - `entries`: every dependency of the nearest `Package.swift` above the file.
-//! - `reaches`: the entry's source. A `url:` reaches the root `Package.swift` of the repository
-//!   whose identity is the URL normalized as a remote is (ADR 0004), a `path:` the package at
-//!   that directory (`sourced`, Cargo's rule). A computed part of either (an interpolation, a
-//!   variable) is written `*`: the entry is `ambiguous` and reaches every provider whose location
-//!   fits the literal parts (`computed git <pattern>`, `computed path <pattern>`).
-//! - `settle`: a dependency names no package, only a location, so the workspace step gives each
-//!   literal one the name its provider gives the package.
-//! - `imports`, `resolutions` and `declares`: an `import Module` of a module a depended-on
-//!   package exposes through a library product reaches that module's public declarations, found
-//!   by their written name and the argument labels of the call.
-//!
-//! `Package.resolved` is never read, and a dependency outside the workspace is ignored.
-
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -36,12 +14,8 @@ use crate::resolve::{Code, Follow, Form, Of, Origin, Outside, labelled, passes_n
 
 mod manifest;
 
-/// The field every dependency is kept under.
 const FIELD: &str = "dependencies";
 
-/// The modules of the platform and its toolchain, which no package of the workspace provides.
-// A table of the language's runtime, not a library form; a package named like one is not
-// followed.
 const PLATFORM: &[&str] = &[
     "Swift",
     "Foundation",
@@ -59,7 +33,6 @@ const PLATFORM: &[&str] = &[
     "Testing",
 ];
 
-/// Whether `module` can be the module of a package: a Swift identifier, not the platform's.
 fn names_module(module: &str) -> bool {
     let mut chars = module.chars();
     chars.next().is_some_and(|c| c.is_alphabetic() || c == '_')
@@ -67,8 +40,6 @@ fn names_module(module: &str) -> bool {
         && !PLATFORM.contains(&module)
 }
 
-/// A pattern as an entry's name: always with a `*`, so `fits` knows it is computed even when
-/// folding the location (a userinfo, a port, a `..`) took the computed part out of it.
 fn marked(pattern: &str) -> String {
     match pattern.contains('*') {
         true => pattern.to_string(),
@@ -76,8 +47,6 @@ fn marked(pattern: &str) -> String {
     }
 }
 
-/// The entry of the dependency `d` written in the package at `dir`. `None` when its path is
-/// absolute.
 fn entry(dir: &str, d: &manifest::Dependency) -> Option<Entry> {
     let (name, via) = match (d.url, d.computed) {
         (true, false) => {
@@ -89,8 +58,6 @@ fn entry(dir: &str, d: &manifest::Dependency) -> Option<Entry> {
             (marked(&pattern), format!("computed git {pattern}"))
         }
         (false, computed) => {
-            // A path that starts with a computed part cannot be placed in the repository; one
-            // that folds to a computed first part is the repository's, not the workspace's.
             let at = match (d.text.starts_with('*'), computed) {
                 (true, _) => d.text.clone(),
                 (false, false) => relative(dir, &d.text)?,
@@ -105,7 +72,6 @@ fn entry(dir: &str, d: &manifest::Dependency) -> Option<Entry> {
                         "" => MANIFEST.to_string(),
                         at => format!("{at}/{MANIFEST}"),
                     };
-                    // The repository's own root has no name of its path.
                     let name = if at.is_empty() { ".".to_string() } else { at };
                     (name, format!("path {manifest}"))
                 }
@@ -122,13 +88,8 @@ fn entry(dir: &str, d: &manifest::Dependency) -> Option<Entry> {
     })
 }
 
-/// The Swift symbols of a provider by their written name, built the first time an import asks.
 pub struct Symbols<'e> {
-    /// `(file, id)` of each function, method, initializer and type, by its qualified name up to
-    /// the parameter list (`Greeter.hello`, `greet`, `Greeter.init`).
     by_name: HashMap<&'e str, Vec<(&'e str, &'e str)>>,
-    /// The argument counts of the functions that take more than one, as `(least, most)`, by
-    /// `<file>::<name with labels>`.
     flexible: HashMap<String, (usize, Option<usize>)>,
 }
 
@@ -136,7 +97,6 @@ impl<'e> Symbols<'e> {
     pub(super) fn new(at: &Provided<'e>) -> Self {
         let mut by_name: HashMap<&str, Vec<(&str, &str)>> = HashMap::new();
         for &id in &at.symbols {
-            // `<repository>::<file>::<qualified name>[(<labels>)]`
             let Some((_, rest)) = id.split_once("::") else {
                 continue;
             };
@@ -147,7 +107,6 @@ impl<'e> Symbols<'e> {
                 continue;
             }
             let base = match name.split_once('(') {
-                // A nested function (`f(x:).g(y:)`) or a closure is no member of its type.
                 Some((_, inner)) if inner.contains(").") || inner.contains('@') => continue,
                 Some((base, _)) => base,
                 None => name,
@@ -162,8 +121,6 @@ impl<'e> Symbols<'e> {
     }
 }
 
-/// The labels a symbol id writes after its name: `place(order:quantity:)` or, for overloads told
-/// apart by their types, `audit(_:Order,limit:Int)`. `None` for a type.
 fn labels_of(id: &str) -> Option<Vec<&str>> {
     let inner = id.split_once("::")?.1.split_once("::")?.1;
     let inner = inner.split_once('(')?.1.strip_suffix(')')?;
@@ -194,11 +151,6 @@ fn labels_of(id: &str) -> Option<Vec<&str>> {
     )
 }
 
-/// Whether a call with argument `labels` (`_` for none, empty for a trailing closure) fits a
-/// function whose parameters are labelled `params` and which takes `least` to `most` arguments
-/// (any number more when `None`, a variadic): the labels the resolver matches
-/// (`resolve::labelled`), each parameter one the call may leave out and, when the function has a
-/// variadic one, each variadic.
 // ponytail: which parameters have defaults, and which is variadic, is not stored, only how many
 // arguments the function takes; a call that skips a required parameter and keeps an optional
 // one still fits.
@@ -221,8 +173,6 @@ fn fits(params: &[&str], (least, most): (usize, Option<usize>), labels: &[String
     least <= n && most.is_none_or(|m| n <= m) && labelled(&params, labels)
 }
 
-/// The qualified name and labels of an import's chain, `Greeter.hello(to:loudly:)`; the labels
-/// are `None` when the call's are not known.
 fn parse(chain: &str) -> (&str, Option<Vec<String>>) {
     let Some((name, inner)) = chain.split_once('(') else {
         return (chain, None);
@@ -238,7 +188,6 @@ fn parse(chain: &str) -> (&str, Option<Vec<String>>) {
     (name, Some(labels))
 }
 
-/// The directory of each module the package at `manifest` exposes through a library product.
 fn exposed<'m>(manifest: &'m Manifest, module: &str) -> Option<&'m str> {
     let s = &manifest.summary;
     let held = s
@@ -249,9 +198,6 @@ fn exposed<'m>(manifest: &'m Manifest, module: &str) -> Option<&'m str> {
     target.filter(|_| held).map(|(_, dir)| dir.as_str())
 }
 
-/// The ids of the public declarations the import `(module, chain)` names in the package at
-/// `manifest`: the module must be exposed, the head of the name a public top-level declaration of
-/// it, and the labels fit (`fits`).
 fn found<'e>(
     at: &Provided<'e>,
     manifest: &Manifest,
@@ -268,7 +214,6 @@ fn found<'e>(
         let under = dir.is_empty() || file.strip_prefix(dir).is_some_and(|r| r.starts_with('/'));
         under && at.owned_source(manifest, file)
     };
-    // A public declaration at the top level of a file of the module.
     let public = (at.exported.iter())
         .filter(|(file, _)| inside(file))
         .any(|(_, rows)| rows.iter().any(|e| e.name.as_deref() == Some(head)));
@@ -305,8 +250,6 @@ fn found<'e>(
 pub struct Swiftpm;
 
 impl Swiftpm {
-    /// The packages (a repository and a manifest in it) the file's dependencies reach that expose
-    /// `module` through a library product.
     fn exposing(
         &self,
         exports: &[Export],
@@ -330,9 +273,6 @@ impl Ecosystem for Swiftpm {
         file_name == MANIFEST
     }
 
-    /// Reads a `Package.swift` from its bytes. Hostile input: a file too large or not Swift reads
-    /// as empty, and only literal values count: a computed name (written `*` for each computed
-    /// part) or URL or path makes an uncertain entry.
     fn read(&self, path: &str, src: &[u8]) -> Summary {
         if src.len() > super::MAX_BYTES {
             return Summary::default();
@@ -349,7 +289,6 @@ impl Ecosystem for Swiftpm {
             .collect();
         Summary {
             name: package.name.filter(|n| match package.name_computed {
-                // A literal name with a `*` of its own is no name.
                 false => valid_name(n) && !n.contains('*'),
                 true => valid_name(&n.replace('*', "x")),
             }),
@@ -368,26 +307,18 @@ impl Ecosystem for Swiftpm {
         names_module(specifier)
     }
 
-    /// A call's module and what it names there: `Kit.greet(name:)` or an unqualified `greet(name:)`
-    /// under `import Kit`, `Greeter.init(name:)` for a construction, `Greeter.hello(to:)` for a
-    /// method of a type the source writes for its receiver. The chain ends with the call's
-    /// argument labels (`_` for none, `{}` for a trailing closure).
     fn imports<'a>(&self, code: &Code<'a>, path: &'a str, call: &'a Call) -> Vec<(String, String)> {
         let callee = call.callee.as_str();
-        // `(type or module path, member)`
         let mut found: Vec<(String, String)> = Vec::new();
         if let (false, Some((receiver, member))) = (call.constructs, callee.rsplit_once('.')) {
             let origins = |follow| code.origins(path, &call.scope, Of::Name(receiver), follow);
-            // What the source writes for the receiver, else the construction it holds.
             let mut found_origins = origins(Follow::Declarations);
-            // A type of the repository names nothing outside: the construction may.
             found_origins.retain(|o| o.outside.is_some());
             if found_origins.is_empty() {
                 found_origins = origins(Follow::Values {
                     passes: passes_nothing,
                 });
             }
-            // A written type, or a construction: the receiver is an instance of the type built.
             let made = |o: &Origin<'a>| match (o.form, o.call) {
                 (Form::Type, _) => true,
                 (Form::Call, Some((file, index))) => {
@@ -401,7 +332,6 @@ impl Ecosystem for Swiftpm {
                 }
                 _ => None,
             };
-            // A construction found through values names its type outside only by its own callee.
             let outside = origin.and_then(|o| match (o.outside, o.call) {
                 (Some(outside), _) => Some(outside),
                 (None, Some((file, index))) => {
@@ -451,8 +381,6 @@ impl Ecosystem for Swiftpm {
             .collect()
     }
 
-    /// A constructor or a method of the type itself, by its id: the type's id, a dot, then a
-    /// name and a parameter list; a nested type's member is not.
     fn member_of(&self, target: &str, class: &str) -> bool {
         (target.strip_prefix(class))
             .and_then(|rest| rest.strip_prefix('.'))
@@ -461,7 +389,6 @@ impl Ecosystem for Swiftpm {
     }
 
     fn fits(&self, wanted: &str, provided: &str) -> bool {
-        // A computed dependency is named by its pattern; `reaches` tells where it may point.
         wanted.contains('*') || wanted == provided
     }
 
@@ -512,9 +439,6 @@ impl Ecosystem for Swiftpm {
             .collect()
     }
 
-    /// The module must be one the package exposes (`found`); the targets are the declarations
-    /// the written name and labels fit, one `exact` and several `ambiguous`. The module is exposed
-    /// by one package when only one is reached (`resolutions`).
     fn resolve(
         &self,
         at: &Provided,
@@ -537,8 +461,6 @@ impl Ecosystem for Swiftpm {
         })
     }
 
-    /// Node's rule over the dependencies, then `ambiguous` when several packages the file
-    /// depends on expose the module the import names, whether or not they declare the name.
     fn resolutions<'e>(
         &self,
         exports: &'e [Export],
@@ -559,8 +481,6 @@ impl Ecosystem for Swiftpm {
         out
     }
 
-    /// Whether a package the file depends on exposes the module and declares the import's head
-    /// at the top level of it, whatever the labels.
     fn declares<'e>(
         &self,
         exports: &'e [Export],
@@ -584,10 +504,6 @@ impl Ecosystem for Swiftpm {
         })
     }
 
-    /// Each literal dependency takes the name the package it points at gives itself: a `url:`
-    /// the root `Package.swift` of the repository with that identity, a `path:` the package at
-    /// that directory. One that points at no package of the workspace keeps the location as its
-    /// name and reaches nothing.
     fn settle(&self, exports: &mut [Export]) {
         let swift = |m: &Manifest| self.is_manifest(m.path.rsplit('/').next().unwrap_or(""));
         let mut located: HashMap<PathBuf, String> = HashMap::new();
@@ -618,8 +534,6 @@ impl Ecosystem for Swiftpm {
                     Some(("path", at)) => located.get(&folded(&root.join(at))),
                     _ => None,
                 };
-                // A provider whose name is computed cannot be told from its name: the entry is
-                // uncertain, held to the location it was written with.
                 if let Some(name) = name {
                     entry.name = name.clone();
                     if name.contains('*') {
@@ -631,8 +545,6 @@ impl Ecosystem for Swiftpm {
     }
 }
 
-/// The uncertain form of the literal source `via` (`git <identity>`, `path <dir>/Package.swift`):
-/// `computed git <identity>`, `computed path <dir>`.
 fn computed(via: &str) -> String {
     match via.split_once(' ') {
         Some(("path", manifest)) => {
@@ -670,7 +582,6 @@ mod tests {
             s.targets
                 .contains(&("Core".to_string(), "pkg/Sources/Core".to_string()))
         );
-        // A computed name is an uncertain provider: `*` for each computed part.
         let computed = read("let p = Package(name: base + \"x\")");
         assert_eq!(computed.name.as_deref(), Some("*"));
         let partly = read("let p = Package(name: \"Kit\\(v)\")");
@@ -729,16 +640,12 @@ mod tests {
         let call = |l: &[&str], least, most| fits(&params, (least, most), &labels(l));
         assert!(call(&["order", "quantity", "note"], 3, Some(3)));
         assert!(!call(&["order", "quantity"], 3, Some(3)));
-        // Defaults let a call leave labelled parameters out, but not reorder them.
         assert!(call(&["order", "note"], 1, Some(3)));
         assert!(!call(&["note", "order"], 1, Some(3)));
         assert!(!call(&["quantity"], 2, Some(3)));
         assert!(!call(&["other"], 0, Some(3)));
-        // A trailing closure takes a parameter of any label.
         assert!(fits(&["x", "body"], (2, Some(2)), &labels(&["x", ""])));
-        // A variadic parameter takes the unlabelled arguments after its first.
         assert!(fits(&["_"], (0, None), &labels(&["_", "_", "_"])));
-        // Nor does it need to be unlabelled: `log(level: 1, items: "a", "b")`.
         let log = labels(&["level", "items", "_"]);
         assert!(fits(&["level", "items"], (1, None), &log));
         assert!(!fits(&["level", "items"], (1, Some(2)), &log));
@@ -794,7 +701,6 @@ mod tests {
         assert!(!reaches("git example.com/swift/other", kit));
         assert!(reaches("computed git example.com/swift/*", kit));
         assert!(!reaches("computed git example.com/other/*", kit));
-        // Only the root manifest of a repository is what a URL names.
         let nested = (at("example.com/swift/kit", "/w/kit"), "sub/Package.swift");
         assert!(!reaches("git example.com/swift/kit", nested));
         assert!(reaches(
@@ -809,7 +715,6 @@ mod tests {
             "computed path *",
             (at("k", "/w/kit"), "Package.swift")
         ));
-        // A computed path of a nested manifest is held to the repository it was written in.
         let own = |root, manifest| (at("x", root), manifest);
         assert!(reaches(
             "computed path ./*",
@@ -820,7 +725,6 @@ mod tests {
             own("/w/kit", "Package.swift")
         ));
         assert!(!reaches("computed path ./*", kit));
-        // A package computed in name is the location it was written with, uncertain.
         assert_eq!(computed("git example.com/k"), "computed git example.com/k");
         assert_eq!(computed("path lib/Package.swift"), "computed path lib");
         assert_eq!(computed("path Package.swift"), "computed path ");

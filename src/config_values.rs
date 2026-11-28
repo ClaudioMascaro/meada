@@ -1,9 +1,3 @@
-//! Config values (ADR 0025, #639): every scalar of the YAML and JSON files the walk visits, and
-//! of the CI configuration under the hidden paths `HIDDEN_CI`, kept with its file, key path,
-//! value, type and line, which `search` finds with the kind `value`. Read through the event
-//! reader (`document::events`); the rows live in `config_values` beside the stamped
-//! `config_files`, which keeps each file's `Outcome` for `meada status`. Never exported.
-
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt::Write;
@@ -23,7 +17,6 @@ pub(crate) mod sites;
 
 pub(crate) use hcl::{nested_past, wide_past};
 
-/// The lockfiles a YAML or JSON extension reaches, skipped by file name (ADR 0025).
 const LOCKFILES: [&str; 4] = [
     "package-lock.json",
     "npm-shrinkwrap.json",
@@ -31,27 +24,15 @@ const LOCKFILES: [&str; 4] = [
     "packages.lock.json",
 ];
 
-/// A YAML/JSON dependency lockfile is not application configuration.
 pub(crate) fn lockfile(path: &str) -> bool {
     LOCKFILES.contains(&path.rsplit('/').next().unwrap_or(path))
 }
 
-/// A Helm values file by its name: one of its words (split at `.`, `-` and `_`) is `values`,
-/// as `values.yaml`, `values-prod.yaml` and `prod.values.yml` are.
 pub(crate) fn helm_values(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
     name.split(['.', '-', '_']).any(|word| word == "values")
 }
 
-/// Whether a reader of a kind takes the YAML or JSON file at `path` (bytes `src`) as its own, so
-/// that it keeps every value past `VALUES_MAX` (#817): one `taken` names (an OpenAPI or AsyncAPI
-/// document, a configuration file a language pack reads or includes), a Compose file, a GitHub
-/// workflow or Skaffold file the image reader reads by name, a pipeline or an action the CI
-/// reader reads by its place and name, a package manifest, a kustomization
-/// or a file the Kubernetes reader takes an object from, a CloudFormation or SAM template or
-/// Serverless service, and one the alert reader takes a rule, a route or a receiver from. Terraform's own files are
-/// read whole by `read_with`. A Helm values file is none of them: the image reader takes its
-/// images from the file's bytes, not from its config values.
 pub(crate) fn kind_file(path: &str, src: &[u8], taken: impl Fn(&str) -> bool) -> bool {
     taken(path)
         || crate::image::named_file(path)
@@ -62,8 +43,6 @@ pub(crate) fn kind_file(path: &str, src: &[u8], taken: impl Fn(&str) -> bool) ->
         || crate::alert::takes(path, src)
 }
 
-/// The hidden entries of the repository root read although hidden (ADR 0025): the CI
-/// directories, read whole, and the CI files.
 pub(crate) const HIDDEN_CI: [&str; 6] = [
     ".github",
     ".gitlab-ci.yml",
@@ -73,98 +52,66 @@ pub(crate) const HIDDEN_CI: [&str; 6] = [
     ".drone.yml",
 ];
 
-/// The bytes of a value kept; a longer one is stored cut at a character boundary, marked.
 // ponytail: 1 KiB keeps a URL, an image name or an expression whole; past it a value is prose.
 pub(crate) const VALUE_MAX: usize = 1024;
 
-/// The documents one file may hold; a stream of more is unreadable.
 // ponytail: a manifest bundle holds tens of documents; past a thousand it is generated output.
 pub(crate) const DOCUMENTS_MAX: usize = 1000;
 
-/// The values a YAML or JSON file that only this reader takes may give, all its documents
-/// together, redacted ones counted (#817): past it the file is data and keeps none. A Terraform
-/// or OpenTofu file, and one a reader of a kind takes as its own (`kind_file`), keeps them all.
 // ponytail: the configuration a contract or a rule reads holds tens to hundreds of values; a
 // data dump (measurements, a generated schema snapshot) holds thousands.
 pub(crate) const VALUES_MAX: usize = 1000;
 
-/// The data files `meada status` names, in path order; it counts the rest.
 // ponytail: a repository holds a handful; past ten the count says it.
 const DATA_NAMED: usize = 10;
 
-/// The bytes the rows of one file may store (key paths and values), as a factor of its size,
-/// plus `STORED_SLACK`: a file of long keys nested deep, each repeated in the key path of every
-/// scalar below it, cannot store a tree many times its size. Past it the file is unreadable.
 // ponytail: an indented file stores about twice its size; 4 is the hostile probes' bound, and
 // keeps a minified file of tiny scalars (a long array of numbers) out.
 const STORED_EXPANSION: usize = 4;
 const STORED_SLACK: usize = 1 << 12;
 
-/// What reading one config file came to, stored as `config_files.summary`.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Outcome {
-    /// Read: how many values it holds, and how many of them are `redacted`. A `.tfvars` file, and
-    /// a Terraform file of a directory holding an override file, also keep the sensitive
-    /// variables they were read against (`Sensitive`), since a variable another file marks
-    /// `sensitive` redacts the values or the default this one gives it.
     Read {
         values: usize,
         redacted: usize,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         sensitive: Vec<String>,
     },
-    /// A lockfile, skipped by name.
     Lockfile,
-    /// Skipped: it does not parse, or passes a ceiling, at `line`; or it is an Alertmanager
-    /// configuration with a regular expression Go refuses (`alert::refused`), whose values it
-    /// still keeps.
-    Unreadable { line: usize, reason: String },
-    /// Data: a YAML or JSON file that only this reader takes, past `VALUES_MAX` values, which
-    /// keeps none (#817).
+    Unreadable {
+        line: usize,
+        reason: String,
+    },
     Data,
 }
 
-/// One config value as stored.
 #[derive(Debug, PartialEq)]
 pub(crate) struct Row {
     pub key: String,
-    /// `None` when a format marks it secret: only its key path, type and line are kept.
     pub value: Option<String>,
-    /// `string`, `number` or `boolean`.
     pub kind: &'static str,
     pub line: usize,
-    /// Whether `value` was cut at `VALUE_MAX`.
     pub cut: bool,
 }
 
-/// Whether the file at `path` (relative, `/`-separated) holds config values: a `*.yaml`,
-/// `*.yml` or `*.json` file, or a Terraform or OpenTofu one (`*.tf`, `*.tofu`, `*.tfvars`),
-/// lockfiles included (they are counted as skipped).
 pub(crate) fn is_config(path: &str) -> bool {
     [".yaml", ".yml", ".json", ".tf", ".tofu", ".tfvars"]
         .iter()
         .any(|e| path.ends_with(e))
 }
 
-/// Whether the file at `path` gives values to variables: `*.tfvars`, `*.auto.tfvars` or
-/// `*.tfvars.json`.
 pub(crate) fn is_tfvars(path: &str) -> bool {
     path.ends_with(".tfvars") || path.ends_with(".tfvars.json")
 }
 
-/// The endings of the Terraform and OpenTofu files that declare blocks.
 const TERRAFORM: [&str; 4] = [".tf", ".tofu", ".tf.json", ".tofu.json"];
 
-/// Whether the file at `path` is a Terraform or OpenTofu file that declares blocks: `*.tf`,
-/// `*.tofu`, `*.tf.json` or `*.tofu.json`.
 pub(crate) fn is_terraform(path: &str) -> bool {
     TERRAFORM.iter().any(|e| path.ends_with(e))
 }
 
-/// Whether the Terraform file at `path` is an override file (`override.tf`, `*_override.tf` and
-/// their OpenTofu and JSON forms), whose blocks Terraform merges into those of the other files of
-/// its directory.
 pub(crate) fn is_override(path: &str) -> bool {
     let file = path.rsplit('/').next().unwrap_or(path);
     TERRAFORM.iter().any(|e| {
@@ -172,9 +119,6 @@ pub(crate) fn is_override(path: &str) -> bool {
     })
 }
 
-/// `found` without the Terraform files a OpenTofu one shadows, and their paths: a `.tofu` file
-/// hides the `.tf` file of the same name in its directory, and a `.tofu.json` the `.tf.json`
-/// (ADR 0025).
 pub(crate) fn unshadowed<T>(found: Vec<(String, T)>) -> (Vec<(String, T)>, Vec<String>) {
     let paths: HashSet<String> = found.iter().map(|(p, _)| p.clone()).collect();
     let shadowed = |path: &str| {
@@ -188,46 +132,24 @@ pub(crate) fn unshadowed<T>(found: Vec<(String, T)>) -> (Vec<(String, T)>, Vec<S
     (kept, hidden.into_iter().map(|(p, _)| p).collect())
 }
 
-/// Whether the Terraform file at `path` is one only OpenTofu reads: a `.tofu` or `.tofu.json` file.
 pub(crate) fn only_opentofu(path: &str) -> bool {
     path.ends_with(".tofu") || path.ends_with(".tofu.json")
 }
 
-/// The parent directory of `path`, `""` for the root.
 pub(crate) fn parent(path: &str) -> &str {
     path.rsplit_once('/').map_or("", |(dir, _)| dir)
 }
 
-/// What a `.tfvars` file's values are redacted for in place of a variable's name: every value it
-/// gives. Part of `Sensitive::of` when a Terraform file that may declare variables is unreadable.
 pub(crate) const ANY_VARIABLE: &str = "*";
 
-/// The sensitive variables a file is read against, beside those its own blocks mark. A `.tfvars`
-/// file: the names any Terraform file found declares sensitive (`is_sensitive`), since a var-file
-/// can be given to a module in any directory and redacting too much is the safe direction, and
-/// `ANY_VARIABLE` when a Terraform file in its directory or above it is unreadable, since the
-/// variables it declares are unknown. A Terraform file of a directory holding an override file,
-/// whose blocks Terraform merges into the others: the names the other Terraform files of the
-/// directory declare sensitive, with `ANY_VARIABLE` when one of them is unreadable (`merged`).
-/// In such a directory a Terraform file a OpenTofu one shadows counts as unreadable: Meada does
-/// not read it, and Terraform, which ignores `.tofu` files, does.
-/// Computed once per refresh from the rows of the files found: the `.tfvars` files are refreshed
-/// after the others, and a Terraform file of such a directory is first read against
-/// `ANY_VARIABLE`, then again against `merged` once every file is refreshed, so a default no
-/// other file marks is stored in clear and a marked one never is.
 pub(crate) struct Sensitive<'a> {
     db: &'a Connection,
     found: HashSet<&'a str>,
-    /// The directories holding an override file found.
     overridden: HashSet<&'a str>,
-    /// The Terraform files a OpenTofu one shadows (`unshadowed`).
     shadowed: &'a [String],
-    /// Each name a Terraform file found declares sensitive, with the file, and the unreadable
-    /// Terraform files found.
     loaded: RefCell<Option<Marked>>,
 }
 
-/// What `Sensitive::load` reads: (file, name) pairs, and the unreadable Terraform files.
 type Marked = (Vec<(String, String)>, Vec<String>);
 
 impl<'a> Sensitive<'a> {
@@ -248,9 +170,6 @@ impl<'a> Sensitive<'a> {
         }
     }
 
-    /// The sensitive variables the file at `path` is read against while the files found are
-    /// refreshed: for a `.tfvars` file, those above; for a Terraform file of a directory holding
-    /// an override file, `ANY_VARIABLE`, until `merged` reads it again; for any other file none.
     pub(crate) fn of(&self, path: &str) -> Result<BTreeSet<String>> {
         if is_terraform(path) && self.overridden.contains(parent(path)) {
             return Ok([ANY_VARIABLE.to_string()].into());
@@ -272,8 +191,6 @@ impl<'a> Sensitive<'a> {
         Ok(names)
     }
 
-    /// Whether the stored rows of the `.tfvars` file at `path` were read against other
-    /// sensitive variables than those now: they are read again though the file did not change.
     pub(crate) fn stale(&self, path: &str) -> Result<bool> {
         if !is_tfvars(path) {
             return Ok(false);
@@ -282,10 +199,6 @@ impl<'a> Sensitive<'a> {
         Ok(self.read_against(path)?.is_some_and(|then| then != now))
     }
 
-    /// The sensitive variables the Terraform file at `path` is read again against once every
-    /// file found is refreshed, when it was read against others: in a directory holding an
-    /// override file, the names the other Terraform files of the directory declare sensitive,
-    /// with `ANY_VARIABLE` when one of them is unreadable; elsewhere none.
     pub(crate) fn merged(&self, path: &str) -> Result<Option<BTreeSet<String>>> {
         if !is_terraform(path) {
             return Ok(None);
@@ -311,8 +224,6 @@ impl<'a> Sensitive<'a> {
             .then_some(names))
     }
 
-    /// The sensitive variables the stored rows of the file at `path` were read against, when it
-    /// was read.
     fn read_against(&self, path: &str) -> Result<Option<Vec<String>>> {
         let summary: Option<String> = self
             .db
@@ -328,8 +239,6 @@ impl<'a> Sensitive<'a> {
         })
     }
 
-    /// The names and unreadable files, read on first use: only once every Terraform file found
-    /// is refreshed.
     fn loaded(&self) -> Result<std::cell::Ref<'_, Option<Marked>>> {
         if self.loaded.borrow().is_none() {
             let marked = self.load()?;
@@ -339,7 +248,6 @@ impl<'a> Sensitive<'a> {
     }
 
     fn load(&self) -> Result<Marked> {
-        // A JSON file whose root is an array of bodies starts its keys with the index into it.
         let mut statement = self.db.prepare(
             "SELECT path, key, type, value FROM config_values
              WHERE key LIKE 'variable%.sensitive' OR key LIKE '[%].variable%.sensitive'",
@@ -354,7 +262,6 @@ impl<'a> Sensitive<'a> {
             ))
         })? {
             let (path, key, kind, value) = row?;
-            // A row keeps a boolean or a string as its text, and any other expression as written.
             let attribute = match (kind.as_str(), value) {
                 ("boolean", Some(v)) => Value::Bool(v == "true"),
                 ("string", Some(v)) => Value::String(v),
@@ -392,8 +299,6 @@ impl<'a> Sensitive<'a> {
     }
 }
 
-/// The name of the variable whose `sensitive` attribute the key path `key` is
-/// (`variable.db_password.sensitive`, `variable["db-password"].sensitive`).
 fn variable(key: &str) -> Option<String> {
     let path = sites::parts_without_selectors(key)?;
     let path = crate::iac::json::from_section(&path);
@@ -406,8 +311,6 @@ fn variable(key: &str) -> Option<String> {
     named(body).map(str::to_string)
 }
 
-/// The name of the variable whose body is at `body`: its last key (`variable.<name>`, or
-/// `variable[0].<name>[0]` under the arrays HCL JSON permits).
 fn named(body: &[Step]) -> Option<&str> {
     body.iter().rev().find_map(|step| match step {
         Step::Key(name) => Some(name.as_str()),
@@ -415,37 +318,24 @@ fn named(body: &[Step]) -> Option<&str> {
     })
 }
 
-/// Whether a hidden entry the walk meets at the root, named `name`, is read anyway.
 pub(crate) fn is_hidden_ci(name: &str) -> bool {
     HIDDEN_CI.contains(&name)
 }
 
-/// What a scalar row is before its document is known: its document, the steps that tell
-/// whether a Secret holds it, and the row.
 struct Pending {
     document: usize,
     secret: SecretPlace,
     row: Row,
 }
 
-/// Where a scalar sits relative to the places a format keeps secret values.
 #[derive(Clone, PartialEq)]
 enum SecretPlace {
     No,
-    /// Under the root's `data` or `stringData` of a Kubernetes `Secret`.
     Root,
-    /// Under `items[n].data` or `items[n].stringData` of a list.
     Item(usize),
-    /// Under `variable.<name>.default` of a Terraform JSON file: secret when the variable is
-    /// sensitive (`is_sensitive`).
     Variable(Vec<Step>),
-    /// Under the top-level key `<name>` of a `.tfvars.json` file: secret when the variable is
-    /// sensitive.
     Tfvars(String),
-    /// Under `Parameters.<name>.Default`: secret when the file is a CloudFormation template and
-    /// the parameter says `NoEcho`.
     Parameter(String),
-    /// An SSM parameter value in Terraform/OpenTofu JSON; its type controls redaction.
     SsmParameter(Vec<Step>),
 }
 
@@ -472,9 +362,7 @@ impl SecretPlace {
                             .nth(1)
                             == Some("aws_ssm_parameter")))
             {
-                // The body as its marker names it (`markers`), from the root of the file.
                 let body = &path[..path.len() - blocks.len() + within.len()];
-                // Pending redaction metadata holds paths only, charged before cloning them.
                 let cost = crate::iac::json::path_cost(body)
                     .saturating_add(body.len().saturating_mul(std::mem::size_of::<Step>()));
                 *left = left.checked_sub(cost)?;
@@ -507,14 +395,10 @@ impl SecretPlace {
     }
 }
 
-/// Only an explicitly public SSM type permits storing its value. An unresolved type is
-/// conservatively secret in both HCL and JSON; absence is handled by their attribute readers.
 fn ssm_value_is_secret(kind: Option<&str>) -> bool {
     !matches!(kind, Some("String" | "StringList"))
 }
 
-/// A completed Terraform JSON body that marks one of its attributes private. Consumed at
-/// collection close, so repeated section properties cannot erase an earlier marker.
 fn json_secret_body(path: &[Step], body: &Value) -> bool {
     let path = crate::iac::json::from_section(path);
     let Some(Step::Key(section)) = path.first() else {
@@ -543,14 +427,10 @@ fn json_secret_body(path: &[Step], body: &Value) -> bool {
             .is_some_and(|t| ssm_value_is_secret(t.as_str()))
 }
 
-/// Whether `file` is a Terraform or OpenTofu JSON file (`*.tf.json`, `*.tofu.json`).
 fn terraform_json(file: &str) -> bool {
     file.ends_with(".tf.json") || file.ends_with(".tofu.json")
 }
 
-/// The type of a string of a Terraform JSON file, where every string is a template: `string`
-/// when it holds no interpolation or directive (a doubled `$` or `%` escapes one), `expression`
-/// when it is one interpolation and nothing else, else `template`.
 fn json_kind(s: &str) -> &'static str {
     let bare = s.replace("$${", "").replace("%%{", "");
     if !bare.contains("${") && !bare.contains("%{") {
@@ -575,9 +455,6 @@ fn json_kind(s: &str) -> &'static str {
     if single { "expression" } else { "template" }
 }
 
-/// The value and type of the string `s` at `path` of the file `file`: a Terraform JSON string
-/// is a template (`json_kind`), stored as the quoted JSON string when it is not a plain one, and
-/// with its escapes (`$${`) undone when it is; a variable's `default` is a literal.
 fn json_string(file: &str, path: &[Step], s: &str) -> (&'static str, String) {
     let path = crate::iac::json::from_section(path);
     let literal = matches!(path.first(), Some(Step::Key(v)) if v == "variable")
@@ -593,33 +470,21 @@ fn json_string(file: &str, path: &[Step], s: &str) -> (&'static str, String) {
     }
 }
 
-/// Whether a Terraform variable whose `sensitive` attribute reads `attribute` is sensitive: unless
-/// the attribute is absent, null, `false` or `"false"`. Terraform converts the string `"true"` as
-/// well and refuses the other values, so they count as sensitive, which can only redact too much.
 pub(crate) fn is_sensitive(attribute: Option<&Value>) -> bool {
     !matches!(attribute, None | Some(Value::Null | Value::Bool(false)))
         && attribute.and_then(Value::as_str) != Some("false")
 }
 
-/// Whether `object` is a Kubernetes `Secret`: an object with an `apiVersion` and `kind: Secret`.
 fn is_secret(object: &Value) -> bool {
     object.get("apiVersion").is_some()
         && object.get("kind").and_then(Value::as_str) == Some("Secret")
 }
 
-/// The values of the file at `path` and what reading it came to. Every scalar but a null is a
-/// row; a value of a Kubernetes `Secret`'s `data` or `stringData` (at the root of a document,
-/// or an item of a `List`) keeps its key path, type and line only. A YAML or JSON file past
-/// `VALUES_MAX` values is data, Terraform's aside.
 #[cfg(test)]
 pub(crate) fn read(path: &str, src: &[u8]) -> (Outcome, Vec<Row>) {
     read_with(path, src, &BTreeSet::new(), || false)
 }
 
-/// `read` for the file at `path` against `sensitive`, the Terraform variables marked sensitive
-/// that a `.tfvars` file's values are redacted for (`Sensitive::of`). A YAML or JSON file past
-/// `VALUES_MAX` values keeps them when `whole` says a reader of a kind takes it (`kind_file`),
-/// asked only then.
 pub(crate) fn read_with(
     path: &str,
     src: &[u8],
@@ -768,8 +633,6 @@ pub(crate) fn read_with(
     if rows.len() > VALUES_MAX && !is_terraform(path) && !is_tfvars(path) && !whole() {
         return (Outcome::Data, Vec::new());
     }
-    // An Alertmanager configuration Go's `regexp` refuses is one Alertmanager cannot load; its
-    // values stay searchable.
     if let Some(reason) = crate::alert::refused(path, &documents) {
         return (Outcome::Unreadable { line: 1, reason }, rows);
     }
@@ -785,9 +648,6 @@ pub(crate) fn read_with(
     )
 }
 
-/// The key path of the scalar at `path` (ADR 0025), jq style: keys joined by dots, a list item
-/// `[n]`, a key that is not a plain identifier `["..."]` with JSON escaping; `.` for a document
-/// that is the scalar itself. A file of several documents puts `[document]` first (`prefixed`).
 pub(crate) fn key_path(path: &[Step]) -> String {
     let mut out = String::new();
     for step in path {
@@ -813,7 +673,6 @@ pub(crate) fn key_path(path: &[Step]) -> String {
     out
 }
 
-/// `key`, a key path written without its document, with `[document]` first.
 pub(crate) fn prefixed(document: usize, key: &str) -> String {
     match key {
         "." => format!("[{document}]"),
@@ -822,13 +681,10 @@ pub(crate) fn prefixed(document: usize, key: &str) -> String {
     }
 }
 
-/// The index a stored key path starts with: its document in a file of several (`prefixed`), an
-/// item of the root sequence or array in a file of one.
 pub(crate) fn leading_index(key: &str) -> Option<usize> {
     key.strip_prefix('[')?.split_once(']')?.0.parse().ok()
 }
 
-/// An ASCII letter or `_`, then ASCII letters, digits or `_`: what jq reads as `.key`.
 fn plain(key: &str) -> bool {
     let mut bytes = key.bytes();
     bytes
@@ -837,9 +693,6 @@ fn plain(key: &str) -> bool {
         && bytes.all(|b| b.is_ascii_alphanumeric() || b == b'_')
 }
 
-/// Replaces the rows of the file at `path` with `rows`, each with its key path and value
-/// lowercased beside it for the B-trees `hits` searches, and indexed by trigrams in
-/// `config_search` for its substring rank.
 pub(crate) fn store(tx: &Transaction, path: &str, rows: &[Row]) -> Result<()> {
     forget(tx, path)?;
     let mut insert = tx.prepare_cached(
@@ -863,9 +716,7 @@ pub(crate) fn store(tx: &Transaction, path: &str, rows: &[Row]) -> Result<()> {
     Ok(())
 }
 
-/// Drops the rows of the file at `path`.
 pub(crate) fn forget(tx: &Transaction, path: &str) -> Result<()> {
-    // An external-content FTS5 table is told the text it indexed, to drop it.
     tx.execute(
         "INSERT INTO config_search (config_search, rowid, folded_key, folded_value) \
          SELECT 'delete', id, folded_key, folded_value FROM config_values WHERE path = ?1",
@@ -875,22 +726,12 @@ pub(crate) fn forget(tx: &Transaction, path: &str) -> Result<()> {
     Ok(())
 }
 
-/// The values of `db` (repository `identity`) whose lowercased value or key path is `needle`,
-/// starts with it or holds it, as `search` hits whose payload is the row `line` shows, ordered
-/// by rank, then repository, path, line and key path. The B-trees on the lowercased key path
-/// and value serve exact and prefix, and the trigram table `config_search` serves substring
-/// (ADR 0025, #647); a query under three characters is answered by a scan, which is also what
-/// the trigram path must agree with, byte for byte. No value is read here: an answer reads
-/// only the rows it shows.
 pub(crate) fn matches(identity: &str, db: &Connection, needle: &str) -> Result<Vec<Match>> {
     matches_by(identity, db, needle, true)
 }
 
-/// A matching value before it is shown: its rank, the key `matches` orders by and its rowid.
 pub(crate) type Match = (u8, String, i64);
 
-/// The `search` line of the value at `rowid`: `<identity> <path>:<line> <key path> = <value>`,
-/// a string quoted as JSON, a cut one followed by `(cut)` and a secret one `redacted`.
 pub(crate) fn line(identity: &str, db: &Connection, rowid: i64) -> Result<String> {
     let row = "SELECT path, key, value, type, line, cut FROM config_values WHERE rowid = ?1";
     let (path, key, value, kind, line, cut): (String, String, Option<String>, String, i64, bool) =
@@ -907,24 +748,16 @@ pub(crate) fn line(identity: &str, db: &Connection, rowid: i64) -> Result<String
     shown(identity, &path, line, &key, value.as_deref(), &kind, cut)
 }
 
-/// The characters in a trigram: a query of fewer cannot be matched in `config_search`.
 const TRIGRAM: usize = 3;
 
-/// The substring filter by scan, over the folded key path and value (`?1` the needle).
 const SCAN: &str = "instr(folded_key, ?1) > 0 OR instr(folded_value, ?1) > 0";
 
-/// The substring filter through `config_search` (`?1` the needle, `?2` it as an FTS5 phrase).
-/// The scan stays as a refilter: the table only narrows the rows looked at.
 fn trigram_filter() -> String {
     format!("id IN (SELECT rowid FROM config_search WHERE config_search MATCH ?2) AND ({SCAN})")
 }
 
-/// `matches`, the substring rank answered by the trigram table when `indexed` and the query is
-/// long enough, else by a scan.
 fn matches_by(identity: &str, db: &Connection, needle: &str, indexed: bool) -> Result<Vec<Match>> {
     const ROW: &str = "SELECT rowid, path, key, line FROM config_values WHERE";
-    // A key path or value that starts with `needle` sorts from it up to the least text above
-    // all of them, as SQLite compares text by its UTF-8 bytes; with none, up to the end.
     let past = successor(needle);
     let (prefix, prefix_args): (&str, Vec<&str>) = match &past {
         Some(past) => (
@@ -933,7 +766,6 @@ fn matches_by(identity: &str, db: &Connection, needle: &str, indexed: bool) -> R
         ),
         None => ("folded_key >= ?1 OR folded_value >= ?1", vec![needle]),
     };
-    // A trigram needs three characters; a NUL cannot be quoted into the match expression.
     let trigram = indexed && needle.chars().count() >= TRIGRAM && !needle.contains('\0');
     let phrase = format!("\"{}\"", needle.replace('"', "\"\""));
     let (substring, substring_args): (String, Vec<&str>) = if trigram {
@@ -965,8 +797,6 @@ fn matches_by(identity: &str, db: &Connection, needle: &str, indexed: bool) -> R
         .collect())
 }
 
-/// `<identity> <path>:<line> <key path> = <value>`: a string quoted as JSON, an expression or a
-/// template on one line, a cut value followed by `(cut)` and a secret one `redacted`.
 fn shown(
     identity: &str,
     path: &str,
@@ -986,9 +816,6 @@ fn shown(
     Ok(format!("{identity} {path}:{line} {key} = {shown}{mark}"))
 }
 
-/// The values of the file at `path` of `db` (repository `identity`) whose key path is `block` or
-/// lies under it (`block.` or `block[`), as `hits` shows them, by line and key path: the config
-/// values of an IaC node. An empty `block` (an object that is the whole of its file) is every row.
 pub(crate) fn under(
     identity: &str,
     db: &Connection,
@@ -1019,9 +846,6 @@ pub(crate) fn under(
     Ok(lines)
 }
 
-/// `text` on one line, as an answer has one line per match: a line break (and any other control
-/// character, or a Unicode line separator) is written as an escape, so a multi-line expression
-/// cannot pass for matches of its own.
 fn one_line(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
@@ -1037,13 +861,9 @@ fn one_line(text: &str) -> String {
     out
 }
 
-/// The least text above every text that starts with `prefix`, in code point order (the byte
-/// order of UTF-8): `prefix` with its last character raised by one, after dropping each last
-/// `char::MAX`; `None` when nothing is above them (an empty `prefix`, or one of `char::MAX` only).
 fn successor(prefix: &str) -> Option<String> {
     let mut chars: Vec<char> = prefix.chars().collect();
     while let Some(last) = chars.pop() {
-        // Past the surrogates, which no `char` holds.
         let next = match last {
             '\u{D7FF}' => Some('\u{E000}'),
             c => char::from_u32(c as u32 + 1),
@@ -1056,9 +876,6 @@ fn successor(prefix: &str) -> Option<String> {
     None
 }
 
-/// The `meada status` lines of the config files of `db`: how many were read and skipped (as
-/// lockfiles, as unreadable, as data) and how many values they hold and redact, then the data
-/// files by path, the first `DATA_NAMED` named and the rest counted; none with no file.
 pub(crate) fn status(db: &Connection) -> Result<Vec<String>> {
     let mut statement = db.prepare("SELECT path, summary FROM config_files ORDER BY path")?;
     let files =
@@ -1122,8 +939,6 @@ mod tests {
         rows(path, text).into_iter().map(|r| r.0).collect()
     }
 
-    /// Every text that starts with the prefix sorts below its successor, even one where the
-    /// last character is followed by `char::MAX`.
     #[test]
     fn the_successor_of_a_prefix_is_the_least_text_above_all_that_start_with_it() {
         let max = char::MAX;
@@ -1193,7 +1008,6 @@ mod tests {
             variable("variable[\"a\\\"b\"].sensitive").as_deref(),
             Some("a\"b")
         );
-        // A JSON file whose root is an array of bodies.
         assert_eq!(variable("[1].variable.db.sensitive").as_deref(), Some("db"));
         assert_eq!(variable("[0][0].variable.db.sensitive"), None);
         assert_eq!(variable("output.x.sensitive"), None);
@@ -1377,9 +1191,6 @@ mod tests {
         assert_eq!(shown("[3].data.noversion").as_deref(), Some("kept"));
     }
 
-    /// A byte order mark, which some editors write first, is no part of the first key: a `Secret`
-    /// behind one stays a `Secret`, also in a later document of a stream, as files joined into
-    /// one carry it there, and a JSON file behind one reads.
     #[test]
     fn a_byte_order_mark_before_the_first_key_changes_nothing() {
         let secret = "\u{feff}apiVersion: v1\nkind: Secret\nstringData:\n  token: hunter2\n";
@@ -1466,19 +1277,15 @@ mod tests {
         ));
     }
 
-    /// `n` scalars as one YAML document: `k0: 0`, `k1: 1`, and on.
     fn yaml_of(n: usize) -> String {
         (0..n).map(|i| format!("k{i}: {i}\n")).collect()
     }
 
-    /// `n` scalars as one JSON object, a key a line.
     fn json_of(n: usize) -> String {
         let keys: Vec<String> = (0..n).map(|i| format!("  \"k{i}\": {i}")).collect();
         format!("{{\n{}\n}}\n", keys.join(",\n"))
     }
 
-    /// A YAML or JSON file of `VALUES_MAX` values is read whole; one more and it is data (#817),
-    /// which keeps no row, not even its first thousand.
     #[test]
     fn a_generic_file_past_the_values_ceiling_is_data_and_keeps_no_row() {
         for (path, text) in [
@@ -1501,8 +1308,6 @@ mod tests {
         }
     }
 
-    /// The documents of a stream count together against `VALUES_MAX`, and so do the values a
-    /// format redacts.
     #[test]
     fn the_documents_of_a_stream_and_redacted_values_count_against_the_values_ceiling() {
         let half = VALUES_MAX / 2;
@@ -1515,7 +1320,6 @@ mod tests {
             read("stream.yaml", past.as_bytes()),
             (Outcome::Data, vec![])
         );
-        // Three values name the Secret; the rest of its data is redacted.
         let secret = |n: usize| {
             let data: String = (0..n).map(|i| format!("  k{i}: djA=\n")).collect();
             format!("apiVersion: v1\nkind: Secret\nmetadata:\n  name: s\ndata:\n{data}")
@@ -1532,8 +1336,6 @@ mod tests {
         );
     }
 
-    /// Terraform's JSON files and var files keep every value past the ceiling: a kind of its
-    /// own, whatever `whole` says (#817).
     #[test]
     fn terraform_json_and_its_var_files_keep_every_value_past_the_ceiling() {
         let locals = format!("{{\"locals\": {}}}", json_of(VALUES_MAX + 1));
@@ -1552,8 +1354,6 @@ mod tests {
         }
     }
 
-    /// A file past the ceiling keeps its values when `whole` says a reader of a kind takes it,
-    /// and `whole` is asked only past the ceiling.
     #[test]
     fn whole_is_asked_only_past_the_ceiling_and_keeps_the_values() {
         let (outcome, rows) = read_with(
@@ -1574,15 +1374,12 @@ mod tests {
         assert!(!asked.get());
     }
 
-    /// The files a reader of a kind takes as its own (#817); a Helm values file is none, and
-    /// neither is a file that only looks like one by a word in it.
     #[test]
     fn kind_file_names_the_files_a_reader_of_a_kind_takes() {
         let none = |_: &str| false;
         for (path, src) in [
             ("docker-compose.yml", "services: {}\n"),
             (".github/workflows/ci.yml", "on: push\n"),
-            // A workflow whose name holds the word of a Helm values file is still a workflow.
             (".github/workflows/release-values.yml", "on: push\n"),
             ("skaffold.yaml", "build: {}\n"),
             ("tools/setup/action.yml", "runs: {}\n"),
@@ -1622,8 +1419,6 @@ mod tests {
         }
     }
 
-    /// `meada status` counts the data files apart and names them in path order, up to
-    /// `DATA_NAMED`, counting the rest; the value total leaves them out.
     #[test]
     fn status_counts_and_names_the_data_files_up_to_a_bound() {
         let db = Connection::open_in_memory().unwrap();
@@ -1672,8 +1467,6 @@ mod tests {
         );
     }
 
-    /// Long keys nested deep, each repeated in the key path of every scalar below them, would
-    /// store many times the file: the file stops at its stored budget.
     #[test]
     fn a_file_whose_key_paths_store_past_the_budget_is_unreadable() {
         let key = "k".repeat(4000);
@@ -1688,10 +1481,6 @@ mod tests {
         assert!(rows.is_empty());
     }
 
-    /// The trigram table and the scan answer every query shape alike over many values: exact,
-    /// prefix, substring (in a value, in a key path, with characters a pattern would read
-    /// specially, in several scripts) and under three characters; the first two do not use the
-    /// table, the substring ones do, and each finds something.
     #[test]
     fn the_trigram_index_answers_every_query_shape_as_the_scan_does() {
         const WORDS: [&str; 9] = [
@@ -1715,8 +1504,6 @@ mod tests {
             team[format!("svc{n}")] = Value::String(value);
         }
         let text = serde_json::to_string(&Value::Object(teams)).unwrap();
-        // Read whole, as a file a reader of a kind takes: past `VALUES_MAX` a generic one is
-        // data (#817).
         let (outcome, rows) = read_with("big.json", text.as_bytes(), &BTreeSet::new(), || true);
         assert!(
             matches!(outcome, Outcome::Read { values: 1500, .. }),
@@ -1759,7 +1546,6 @@ mod tests {
             assert_eq!(indexed, scanned, "{query:?}");
             assert_eq!(!indexed.is_empty(), found, "{query:?}");
         }
-        // A file stored again leaves nothing of its old rows in the table.
         let kept = &rows[..10];
         let tx = db.transaction().unwrap();
         store(&tx, "big.json", kept).unwrap();
@@ -1775,7 +1561,6 @@ mod tests {
             indexed,
             matches_by("acme/app", &db, "queue", false).unwrap()
         );
-        // The substring rank asks the trigram table (a scan would not name it).
         let mut statement = db
             .prepare(&format!(
                 "EXPLAIN QUERY PLAN SELECT rowid FROM config_values WHERE {}",
@@ -1787,7 +1572,6 @@ mod tests {
             .collect::<std::result::Result<_, _>>()
             .unwrap();
         assert!(plan.iter().any(|d| d.contains("config_search")), "{plan:?}");
-        // Emptying the table with the rows, as a new identity does, leaves it consistent.
         db.execute_batch(
             "DELETE FROM config_values; INSERT INTO config_search (config_search) VALUES ('delete-all');",
         )

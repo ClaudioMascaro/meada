@@ -4,7 +4,7 @@ Detail behind the [architecture map](../architecture.md), which routes flow, ide
 seams and invariants (the limits are in [Known ceilings](../ceilings.md)). The code wins over
 this file, and a change to these modules updates it.
 
-The crates are described in the [crate overview](overview/crates.md). The modules of
+The [crate contract](../../../meada-core/README.en.md) records the build and version rules. The modules of
 `meada-core`:
 
 - `meada-core/src/manifest.rs`: a workspace manifest's `[[repository]]` (`EntryFile`,

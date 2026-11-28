@@ -26,7 +26,6 @@ use super::{Config, Credentials};
 use crate::modules::{Secret, read_utf8};
 use crate::msg::Msg;
 
-/// The object metadata every object Meada stores carries: its size and BLAKE3 hash.
 const SIZE: &str = "meada-size";
 const HASH: &str = "meada-blake3";
 // ponytail: the most a credential file (a key id, a secret, a token) may hold; past it the file
@@ -37,8 +36,6 @@ const CA_MAX: u64 = 1 << 20;
 /// Each part of a bundle's multipart upload, and how many are in flight at once.
 pub const PART: usize = 8 << 20;
 const IN_FLIGHT: usize = 2;
-/// The Pod Identity agent and the instance metadata service (ADR 0012, the only `http`
-/// endpoints outside loopback).
 const POD_AGENTS: [&str; 2] = ["169.254.170.23", "[fd00:ec2::23]"];
 const METADATA: &str = "http://169.254.169.254";
 
@@ -65,7 +62,6 @@ impl Stored {
         attributes
     }
 
-    /// The metadata of an object of `size` bytes, when it records that size and a hash.
     fn read(attributes: &Attributes, size: u64) -> Option<Self> {
         let get = |name: &'static str| attributes.get(&Attribute::Metadata(name.into()));
         let recorded: u64 = get(SIZE)?.as_ref().parse().ok()?;
@@ -78,7 +74,6 @@ impl Stored {
     }
 }
 
-/// A scheme, host and port a request may go to.
 #[derive(Debug, PartialEq)]
 struct Origin(String, String, u16);
 
@@ -104,8 +99,6 @@ impl Origin {
     }
 }
 
-/// The transport under the client: a request to an origin the section did not configure is
-/// refused before it leaves, and a redirect is never followed (nor a proxy used).
 #[derive(Debug, Clone)]
 struct Guard {
     client: reqwest::Client,
@@ -134,7 +127,6 @@ impl HttpConnector for Guard {
 /// A connection to the configured bucket.
 pub struct Store {
     s3: AmazonS3,
-    /// What an error must never show: the secret key and the session token.
     secrets: Vec<String>,
 }
 
@@ -175,7 +167,6 @@ impl Store {
                 let credential = AwsCredential {
                     key_id: key_id.read(SECRET_MAX)?.ok_or_else(|| unset(key_id))?,
                     secret_key: secret.read(SECRET_MAX)?.ok_or_else(|| unset(secret))?,
-                    // The default variable may be unset: a key pair without a session.
                     token: token.read(SECRET_MAX)?,
                 };
                 secrets.push(credential.secret_key.clone());
@@ -206,7 +197,6 @@ impl Store {
                         token_file,
                     );
             }
-            // IMDSv2 only: object_store falls back to IMDSv1 only when told to.
             Credentials::Instance => {
                 allowed.extend(Url::parse(METADATA).ok().as_ref().and_then(Origin::of));
                 builder = builder.with_config(AmazonS3ConfigKey::MetadataEndpoint, METADATA);
@@ -425,9 +415,6 @@ impl Upload<'_> {
     }
 }
 
-/// The store client's TLS: rustls with ring, the one provider every build carries (no process
-/// default is read or installed), system roots augmented by the optional private CA, HTTP/2
-/// or HTTP/1.1 offered. Credential endpoints retain their system trust roots too.
 fn tls(ca_file: Option<&Path>) -> Result<rustls::ClientConfig, String> {
     use rustls::pki_types::{CertificateDer, pem::PemObject};
     use rustls_platform_verifier::BuilderVerifierExt;
@@ -467,8 +454,6 @@ fn tls(ca_file: Option<&Path>) -> Result<rustls::ClientConfig, String> {
     Ok(config)
 }
 
-/// `uri` when it names the Pod Identity agent, at one of its two addresses, over `http` (the
-/// only way the platform serves it).
 fn pod_agent(uri: &str) -> Option<Url> {
     Url::parse(uri).ok().filter(|url| {
         url.scheme() == "http"
@@ -479,7 +464,6 @@ fn pod_agent(uri: &str) -> Option<Url> {
     })
 }
 
-/// The variable `var`, which the credential source needs.
 fn env(var: &str) -> Result<String, String> {
     std::env::var(var).map_err(|_| Msg::SnapshotEnvUnset(var).text())
 }
@@ -491,8 +475,6 @@ fn unset(secret: &Secret) -> String {
     }
 }
 
-/// The elements of an S3 error body that echo the signed request: with a session token from
-/// any credential source, `x-amz-security-token` is in them.
 const ECHOES: [&str; 4] = [
     "CanonicalRequest",
     "CanonicalRequestBytes",
@@ -500,8 +482,6 @@ const ECHOES: [&str; 4] = [
     "StringToSignBytes",
 ];
 
-/// `text` without the `ECHOES` elements: each `<Name>...</Name>` becomes `<Name/>`. An element
-/// left open drops the rest of the text.
 fn without_echoes(text: &str) -> String {
     let mut text = text.to_string();
     for name in ECHOES {
@@ -551,9 +531,6 @@ mod tests {
         assert_eq!(without_echoes("plain"), "plain");
     }
 
-    /// A TLS handshake with a loopback port that closes every connection fails with an error.
-    /// In a build with every module, two rustls providers made a TLS connection panic instead
-    /// (one provider, ring, now).
     #[test]
     fn a_tls_handshake_that_fails_is_an_error_and_no_panic() {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();

@@ -1,5 +1,3 @@
-//! Kotlin DSL builds give package contracts and links like the Groovy ones (spec #27).
-
 use std::fs;
 use std::path::PathBuf;
 
@@ -8,7 +6,6 @@ use meada::engine::{Direction, Engine, Start};
 use serde_json::Value;
 
 fn workspace(case: &str) -> [PathBuf; 2] {
-    // The kit is a peer of the app too: it declares the package of a second provider.
     fixture_repo(
         case,
         "kotlin-pkg-kit",
@@ -47,11 +44,9 @@ fn kotlin_dsl_builds_export_packages_and_link_literal_dependencies() {
     let engine = Engine::open(&app).unwrap();
     let export = engine.export().unwrap();
     let json: Value = serde_json::from_str(&export).unwrap();
-    // The links of the build files: a call through an import is another test's.
     let links: Vec<_> = (json["links"].as_array().unwrap().iter())
         .filter(|l| !l["consumer"].as_str().unwrap().contains(".kt::"))
         .collect();
-    // Each declaration, by its configuration: a contract with several sources loses none of them.
     let declared = |l: &Value| {
         let site = l["consumer"].as_str().unwrap();
         let mut parts = site.split("::").skip(2);
@@ -112,7 +107,6 @@ fn kotlin_dsl_builds_export_packages_and_link_literal_dependencies() {
             "3.1",
         ),
         "implementation package::maven::dev.kit:kit exact build.gradle.kts | package::maven::dev.kit:kit 1.0 (local 1.0), range unchecked".to_string(),
-        // `${artifact}` is the one literal `val artifact = "util"` gives it: a written coordinate.
         exact(
             "implementation",
             "dev.kt:util",
@@ -121,10 +115,8 @@ fn kotlin_dsl_builds_export_packages_and_link_literal_dependencies() {
         ),
     ];
     expected.sort();
-    // project(":web") and okhttp declare no coordinate; nor does a Kotlin comment, which nests.
     assert_eq!(found, expected, "{export}");
     assert!(!export.contains("9.9"), "{export}");
-    // `api(project(":util"))` in core stays inside the repository although `:util` is a provider.
     let lib_json: Value = serde_json::from_str(&lib_export).unwrap();
     assert!(
         (lib_json["consumers"].as_array().unwrap().iter()).all(|c| !c["site"]
@@ -192,8 +184,6 @@ const KOTLIN: &str = "example.com/kotlin/";
 const LIB: &str = "example.com/kotlin/lib::";
 const CORE: &str = "example.com/kotlin/lib::core/src/main/kotlin/dev/kt/core/";
 
-/// The `(call, specifier, name, level, how, target)` of every import made from a call site that
-/// starts with `site`, the site without it.
 fn imports<'j>(
     json: &'j Value,
     site: &str,
@@ -213,8 +203,6 @@ fn imports<'j>(
         .collect()
 }
 
-/// The imports of the calls in `caller` of `file` in the app, as `(call, specifier, name,
-/// level, target)`.
 fn calls(json: &Value, file: &str, caller: &str) -> Vec<(String, String, String, String, String)> {
     (imports(json, &format!("{APP}{file}::dev.shop.{caller}::")).into_iter())
         .inspect(|i| assert_eq!(i.4, "package"))
@@ -235,8 +223,6 @@ fn an_import_reaches_the_declaration_in_the_provider_sources() {
         (call.into(), spec.into(), name.into(), level.into(), target)
     };
     let money = |member: &str| format!("{CORE}Money.kt::dev.kt.core.Money{member}");
-    // A constructor is the class, a companion call its member, an extension and a method by the
-    // type of the receiver.
     assert_eq!(
         at("Shop.kt", "pay(Int)"),
         [
@@ -248,8 +234,6 @@ fn an_import_reaches_the_declaration_in_the_provider_sources() {
                 "exact",
                 money(".Companion.of(Int)")
             ),
-            // An extension crosses by the import of its name, never as a member of the class:
-            // `exact` on a receiver of the provider's class, whose members are all known.
             row(
                 "doubled.format#0",
                 "dev.kt.core",
@@ -273,7 +257,6 @@ fn an_import_reaches_the_declaration_in_the_provider_sources() {
             ),
         ]
     );
-    // A top-level function, overloads narrowed by the argument count.
     let greet = |sig: &str| format!("{CORE}Core.kt::dev.kt.core.greet({sig})");
     assert_eq!(
         at("Shop.kt", "hello()"),
@@ -294,8 +277,6 @@ fn an_import_reaches_the_declaration_in_the_provider_sources() {
             ),
         ]
     );
-    // An extension function is imported by its name: a name match, as a member of the receiver's
-    // type, which is not read, would win.
     assert_eq!(
         at("Shop.kt", "loud(String)"),
         [row(
@@ -306,7 +287,6 @@ fn an_import_reaches_the_declaration_in_the_provider_sources() {
             format!("{CORE}Core.kt::dev.kt.core.String.shout()")
         )]
     );
-    // An alias names the class, a star import the package.
     assert_eq!(
         at("Shop.kt", "aliased()"),
         [row(
@@ -336,8 +316,6 @@ fn an_import_reaches_the_declaration_in_the_provider_sources() {
             ),
         ]
     );
-    // A top-level function of a main source set nested in a test root; the test sources, a
-    // literal test directory, an internal function and a type outside the workspace: no import.
     assert_eq!(
         at("Shop.kt", "reached()"),
         [row(
@@ -348,7 +326,6 @@ fn an_import_reaches_the_declaration_in_the_provider_sources() {
             format!("{LIB}core/src/test/kotlin/shared/dev/kt/core/Extras.kt::dev.kt.core.extras()")
         )]
     );
-    // A file outside every root of its module resolves by its package declaration.
     assert_eq!(
         at("Shop.kt", "loosely()"),
         [row(
@@ -382,7 +359,6 @@ fn a_call_that_may_leave_arguments_out_reaches_every_overload_it_could() {
             String::new(),
         )
     };
-    // `pick(x, y = 0)` takes the call that leaves `y` out, and so does `pick(text)`.
     assert_eq!(
         rows(&json, "defaults()"),
         [
@@ -394,7 +370,6 @@ fn a_call_that_may_leave_arguments_out_reaches_every_overload_it_could() {
         rows(&json, "every()"),
         [row("pick#0", "pick(2)", "exact", core("pick(Int,Int)"))]
     );
-    // A vararg takes any number of arguments.
     assert_eq!(
         rows(&json, "varargs()"),
         [row(
@@ -420,8 +395,6 @@ fn an_extension_crosses_by_the_import_of_its_name_and_a_member_wins() {
             String::new(),
         )
     };
-    // Typed receivers, in a file of neither class: a class of the provider, whose members are
-    // known (`exact`), and an outside type, whose members may hide the extension.
     assert_eq!(
         rows(&json, "labelled(Money)"),
         [ext(
@@ -440,7 +413,6 @@ fn an_extension_crosses_by_the_import_of_its_name_and_a_member_wins() {
             "MoneyExt.kt::dev.kt.core.Thing.render()"
         )]
     );
-    // The member of the receiver's type, not the extension of the same name.
     assert_eq!(
         rows(&json, "counted(Money)"),
         [(
@@ -450,7 +422,6 @@ fn an_extension_crosses_by_the_import_of_its_name_and_a_member_wins() {
             String::new()
         )]
     );
-    // The explicit import beats the star import of the same name.
     assert_eq!(
         rows(&json, "shouted(String)"),
         [(
@@ -460,7 +431,6 @@ fn an_extension_crosses_by_the_import_of_its_name_and_a_member_wins() {
             String::new()
         )]
     );
-    // The app's own extension of the same class and name, with the provider's never imported.
     let own = format!("{APP}own/Own.kt::");
     assert!(imports(&json, &own).is_empty(), "{json}");
 }
@@ -494,13 +464,9 @@ fn a_call_on_the_class_name_is_the_companion_s_and_one_on_an_instance_the_member
 #[test]
 fn a_name_the_code_hides_or_a_class_from_outside_reaches_no_provider() {
     let json = app_export("kotlin_imports_probes");
-    // Hidden names: a local function, a parameter, a local value and a member of the enclosing
-    // class, each named like the imported function; the one call that reaches it is the control.
     let hidden = imports(&json, &format!("{APP}probes/Hidden.kt::"));
     assert_eq!(hidden.len(), 1, "{hidden:?}");
     assert_eq!(hidden[0].0, "dev.shop.probes.real()::greet#0");
-    // Opaque outside: a class from a library named like the package's, imported by name over the
-    // package's star import, has members unknown to the workspace.
     assert!(
         imports(&json, &format!("{APP}probes/Opaque.kt::")).is_empty(),
         "{json}"
@@ -520,7 +486,6 @@ fn several_providers_declaring_the_package_and_declaration_make_the_import_ambig
     let row = |c: &str, s: &str, n: &str, t: &str| {
         (c.into(), s.into(), n.into(), "ambiguous".into(), t.into())
     };
-    // A Kotlin object of one provider and a Java class of another.
     assert_eq!(
         seen("stamp()"),
         [
@@ -550,7 +515,6 @@ fn several_providers_declaring_the_package_and_declaration_make_the_import_ambig
             ),
         ]
     );
-    // The link's reason says the symbol hop.
     let reasons: Vec<_> = (json["links"].as_array().unwrap().iter())
         .filter(|l| {
             l["consumer"]
@@ -599,8 +563,6 @@ fn trace_down_crosses_the_package_hop_and_onward() {
     assert_golden("kotlin-pkg-app.trace-down.txt", &down);
 }
 
-/// Moves the `test` source set of `core` onto another directory, so `src/check/kotlin` is no
-/// source root: `Checks` is then a file outside any root, which resolves by its package.
 fn move_test_set(lib: &std::path::Path) {
     let file = lib.join("core/build.gradle.kts");
     let text = fs::read_to_string(&file).unwrap();

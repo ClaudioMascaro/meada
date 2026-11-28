@@ -1,4 +1,3 @@
-//! Constructor-backed Azure SDK sides (#670), through the public Engine seam.
 use crate::common::fixture_repo;
 use meada::engine::Engine;
 use serde_json::Value;
@@ -121,8 +120,6 @@ fn python_azure_operations_require_constructed_clients() {
     assert_golden("azure-sdk-python.export.json", &text);
 }
 
-/// A Java builder held in a local that receives another call names no entity; one nothing
-/// else calls keeps its name.
 #[test]
 fn a_java_azure_builder_changed_after_it_is_made_names_no_entity() {
     let repo = fixture_repo("azure_sdk_java_changed", "azure-sdk-java", None);

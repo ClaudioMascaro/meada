@@ -1,8 +1,3 @@
-//! Answer-sized reads (#396): `search`, `context` and `trace` read from the indexes the rows of
-//! their answer, and answer as if they had read every row. Each query runs both ways over the
-//! fixture workspaces, symbols, call sites, contracts and every process of them, and the
-//! answers must be the same bytes: `with_every_row` reads every row, as `meada export` does.
-
 use crate::common;
 
 use std::fs;
@@ -12,10 +7,8 @@ use common::{decisions, fixture_repo};
 use meada::engine::{Direction, Engine, Start, with_every_row};
 use serde_json::Value;
 
-/// No cut hides a difference.
 const BUDGET: Option<usize> = Some(1_000_000);
 
-/// The `search` kinds, `None` being every kind but the early ones.
 const KINDS: [Option<&str>; 17] = [
     None,
     Some("symbol"),
@@ -36,25 +29,19 @@ const KINDS: [Option<&str>; 17] = [
     Some("ci"),
 ];
 
-/// At most this many symbols, call sites and contracts of a repository are queried, spread
-/// over all of them: every row of a large fixture costs the suite minutes and finds nothing more.
 const SAMPLE: usize = 24;
 
-/// At most `SAMPLE` of `all`, spread over them in order.
 fn sample(all: Vec<String>) -> Vec<String> {
     let step = all.len().div_ceil(SAMPLE).max(1);
     all.into_iter().step_by(step).collect()
 }
 
-/// The strings of `field` in every object of the array `list` of `export`.
 fn each(export: &Value, list: &str, field: &str) -> Vec<String> {
     let rows = export[list].as_array().into_iter().flatten();
     rows.filter_map(|row| row[field].as_str().map(String::from))
         .collect()
 }
 
-/// Asserts that every query from `repo` answers the same reading the rows of its answer and
-/// reading every row.
 fn answers_alike(repo: &Path) {
     let engine = Engine::open(repo).unwrap();
     let export: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
@@ -122,7 +109,6 @@ fn answers_alike(repo: &Path) {
         let ask = || format!("{:?}", engine.trace(start, direction, BUDGET));
         alike(&format!("trace {start:?} {direction:?}"), &ask);
     };
-    // Short names too: `trace::starts` finds them by suffix, and lists several fits.
     let starts = (symbols
         .iter()
         .chain(&names)
@@ -135,7 +121,6 @@ fn answers_alike(repo: &Path) {
         trace(start, Direction::Down);
         trace(start, Direction::Up);
     }
-    // An uncommitted edit inside a symbol, so the trace from the changes starts somewhere.
     let Some((path, start)) = first_span(&export) else {
         return;
     };
@@ -146,7 +131,6 @@ fn answers_alike(repo: &Path) {
     if !source.is_char_boundary(start) {
         return;
     }
-    // A space at the end of the symbol's first line.
     let end = source[start..]
         .find('\n')
         .map_or(source.len(), |at| start + at);
@@ -156,7 +140,6 @@ fn answers_alike(repo: &Path) {
     fs::write(&file, source).unwrap();
 }
 
-/// The path and start offset (in bytes) of the first symbol of `export`.
 fn first_span(export: &Value) -> Option<(String, usize)> {
     let symbols = export["symbols"].as_array()?;
     symbols.iter().find_map(|s| {
@@ -175,7 +158,6 @@ fn the_chain_answers_alike() {
     }
 }
 
-/// The CI kind (#829): the reproduction of #816, its pipelines, an intermediate one and callers.
 #[test]
 fn the_ci_reproduction_answers_alike() {
     for repo in crate::ci_calls::reproduction("partial_ci") {
@@ -272,9 +254,6 @@ fn contract_trace_call_owners_answer_alike() {
     }
 }
 
-/// Terraform JSON nodes must survive the partial path, including their references and
-/// root-specific context and trace starts. The mutation named in PR #711 drops only
-/// JSON nodes from partial exports and makes this equivalence fail.
 #[test]
 fn terraform_json_infrastructure_queries_answer_alike() {
     for fixture in [
@@ -287,7 +266,6 @@ fn terraform_json_infrastructure_queries_answer_alike() {
     }
 }
 
-/// Every fixture alone, in four shards so they run side by side.
 fn every_fixture_alone(shard: usize) {
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     let mut names: Vec<String> = fs::read_dir(fixtures)
@@ -299,8 +277,6 @@ fn every_fixture_alone(shard: usize) {
     names.sort();
     for name in names.iter().skip(shard).step_by(4) {
         let repo = fixture_repo(&format!("partial_alone_{shard}"), name, None);
-        // A directory of data (decisions files, schema samples) or one a test means to be
-        // refused is no workspace to query.
         if Engine::open(&repo).and_then(|e| e.export()).is_ok() {
             answers_alike(&repo);
         }

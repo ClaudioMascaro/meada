@@ -1,22 +1,3 @@
-//! Swift HTTP consumers (spec #29, #121): URLSession's `data(from:)` and `data(for:)`, Alamofire's
-//! `request` and AsyncHTTPClient's `execute`. A call counts when its receiver is the library's by
-//! what the imports say: a name the library binds (`URLSession.shared`, `AF`), a name written as
-//! its type (a parameter, a property, a local), or the construction or the name a local or a
-//! constant holds (`URLSession(configuration:)`, `let session = URLSession.shared`); a type of
-//! the repository with the same name hides it. UIKit, AppKit, SwiftUI and Cocoa re-export
-//! Foundation, so an import of one of them spells its names. `dataTask(with:)` is not read.
-//!
-//! The call is read whole (`Expand::Chain`), so a client wrapper, a function whose URL or method
-//! depends on its parameters, makes each of its call sites a consumer with its arguments
-//! substituted, through any number of levels. The URL folds like any value (`lang/swift/values.rs`:
-//! literals, interpolation, `+`, `let` and `static let` constants), through `URL(string:)`,
-//! `URL(string:relativeTo:)` (resolved as RFC 3986 does: over a base Meada did not read, a path
-//! from the root is the path alone, #801) and `appendingPathComponent`. A request
-//! is `URLRequest(url:)` or `HTTPClientRequest(url:)`, its method the one the pack records for
-//! the statement that assigns it (`httpMethod = ..`, `method = ..`, `Facts::bound`), `GET` when
-//! none does; an assignment that may not run, or a second one, leaves the method unknown, and
-//! an assigned `url` leaves the URL unknown. What does not fold is an unresolved consumer.
-
 use super::super::{consumer, fetches};
 use crate::contract::Found;
 use crate::lang::{Call, Invocation, Part, Value};
@@ -25,19 +6,14 @@ use crate::resolve::{Code, Expand, Expanded, method as member, scope_of};
 
 use super::super::join::{depends, find, merged, resolve, slice, text_parts};
 
-/// The libraries a call can send through.
 #[derive(Clone, Copy)]
 enum Lib {
-    /// Foundation's `URLSession.data(from:)` and `data(for:)`.
     Session,
-    /// Alamofire's `request`.
     Alamofire,
-    /// AsyncHTTPClient's `execute`.
     Http,
 }
 
 impl Lib {
-    /// The library a call of this member and labels may send through.
     fn of(call: &Call) -> Option<Self> {
         let labels = call.labels.as_deref()?;
         let first = labels.first().map(String::as_str);
@@ -49,7 +25,6 @@ impl Lib {
         }
     }
 
-    /// The types the receiver may be, and the values the library binds, as the imports spell them.
     fn receivers(self) -> (&'static [&'static str], &'static [&'static str]) {
         match self {
             Self::Session => (
@@ -67,7 +42,6 @@ impl Lib {
         }
     }
 
-    /// The request type the library sends, and the member that assigns its method.
     fn request(self) -> (&'static str, &'static str) {
         match self {
             Self::Http => ("HTTPClientRequest", "method="),
@@ -76,8 +50,6 @@ impl Lib {
     }
 }
 
-/// The modules that re-export Foundation's names: `import UIKit` spells `URLSession` as
-/// `Foundation.URLSession` does.
 const FOUNDATION: &[&str] = &[
     "UIKit",
     "AppKit",
@@ -86,8 +58,6 @@ const FOUNDATION: &[&str] = &[
     "FoundationNetworking",
 ];
 
-/// Whether exactly one of the spellings of a name is in `table`, Foundation's re-exports being
-/// one spelling with it.
 fn named(spelled: &[String], table: &[&str]) -> bool {
     let mut spellings: Vec<String> = Vec::new();
     for s in spelled {
@@ -106,14 +76,10 @@ struct Clients<'c, 'a> {
     code: &'c Code<'a>,
 }
 
-/// How many locals and constants a client is followed through.
 // ponytail: real clients are held through a name or two; the limit keeps a crafted chain cheap.
 const CLIENT_DEPTH: usize = 8;
 
 impl<'c, 'a> Clients<'c, 'a> {
-    /// Whether `receiver`, written in `scope` of `path`, is the library's client: exactly one
-    /// spelling of its name is a value the library binds or a type it declares, or the name is
-    /// written as that type, or it holds one (a local, a constant, a construction).
     fn is(
         &self,
         path: &'a str,
@@ -150,7 +116,6 @@ impl<'c, 'a> Clients<'c, 'a> {
     }
 }
 
-/// Swift HTTP consumers: see the module.
 pub(super) fn consumers(code: &Code) -> Vec<Found> {
     let clients = Clients { code };
     let mut found = Vec::new();
@@ -162,7 +127,6 @@ pub(super) fn consumers(code: &Code) -> Vec<Found> {
             let Some(lib) = Lib::of(stored) else {
                 continue;
             };
-            // The values of the call: `files` holds none, only the facts the index keeps.
             let (Some(call), Some(receiver)) = (code.call(path, n), code.receiver(path, n)) else {
                 continue;
             };
@@ -194,7 +158,6 @@ pub(super) fn consumers(code: &Code) -> Vec<Found> {
     found
 }
 
-/// What a folded call sends, read where the call is written (`path`, `scope`).
 struct Reads<'c, 'a> {
     code: &'c Code<'a>,
     path: &'a str,
@@ -210,8 +173,6 @@ fn keyword<'v>(call: &'v Invocation, key: &str) -> Option<&'v Value> {
 }
 
 impl Reads<'_, '_> {
-    /// The URL and the method the folded call `sent` of `lib` sends; a name that depends on a
-    /// parameter stays a `Value::Ref`, read again at the wrapper's call sites.
     fn sent(&self, lib: Lib, sent: &Invocation, kwargs: &[(String, Value)]) -> (Value, Value) {
         let key = |k: &str| kwargs.iter().find(|(name, _)| name == k).map(|(_, v)| v);
         match lib {
@@ -242,12 +203,10 @@ impl Reads<'_, '_> {
         }
     }
 
-    /// The URL and the method of a request value.
     fn request(&self, lib: Lib, value: &Value) -> (Value, Value) {
         let (ty, method) = lib.request();
         let unknown = (Value::Unknown, Value::Unknown);
         let Value::Call(request) = value else {
-            // A request a wrapper takes is read at its callers.
             return match value {
                 Value::Ref(_) => (value.clone(), value.clone()),
                 _ => unknown,
@@ -256,7 +215,6 @@ impl Reads<'_, '_> {
         if request.callee != ty || self.code.definition(self.path, self.scope, ty).is_some() {
             return unknown;
         }
-        // An assigned `url` is a URL Meada does not read.
         let url = match keyword(request, "url=") {
             Some(_) => Value::Unknown,
             None => keyword(request, "url").map_or(Value::Unknown, |u| self.url(u)),
@@ -271,7 +229,6 @@ impl Reads<'_, '_> {
         (url, method)
     }
 
-    /// The text a URL or a string value is.
     fn url(&self, value: &Value) -> Value {
         match value {
             Value::Str(_) | Value::Ref(_) => value.clone(),
@@ -280,8 +237,6 @@ impl Reads<'_, '_> {
         }
     }
 
-    /// The parts of a URL a call makes: `URL(string:)`, `URL(string:relativeTo:)` or
-    /// `appendingPathComponent` on one. A type of the repository named `URL` is no Foundation's.
     fn made(&self, call: &Invocation) -> Option<Vec<Part>> {
         if call.callee == "URL" && self.code.definition(self.path, self.scope, "URL").is_none() {
             let parts = text_parts(keyword(call, "string")?)?;
@@ -289,20 +244,17 @@ impl Reads<'_, '_> {
                 None => Some(parts),
                 Some(base) => {
                     let base = text_parts(&self.url(base));
-                    // A path from the root replaces the path of a base Meada did not read (#801).
                     let unread = crate::http::client_base();
                     let read = base.as_deref().unwrap_or(&unread);
                     if crate::http::rooted_over_unread(read, &Value::Str(parts.clone())) {
                         return Some(parts);
                     }
                     let base = base?;
-                    // A parameter on either side is resolved at the wrapper's call sites.
                     resolve(&base, &parts).or_else(|| depends(&base, &parts))
                 }
             };
         }
         if member(&call.callee) == "appendingPathComponent" && call.callee.contains('.') {
-            // A component appended to a base Meada did not read leaves the URL an open item (#801).
             let base = text_parts(&self.url(call.receiver.as_deref()?));
             let base = base.unwrap_or_else(crate::http::client_base);
             return Some(append(base, text_parts(call.args.first()?)?));
@@ -311,8 +263,6 @@ impl Reads<'_, '_> {
     }
 }
 
-/// `base` with the path component `component` added after a `/`, in its path (before a query or
-/// a fragment).
 fn append(base: Vec<Part>, mut component: Vec<Part>) -> Vec<Part> {
     let end = (base.len(), 0);
     let at = find(&base, (0, 0), &['?', '#']).unwrap_or(end);
@@ -329,15 +279,10 @@ fn append(base: Vec<Part>, mut component: Vec<Part>) -> Vec<Part> {
     merged(out)
 }
 
-/// The methods of Alamofire's `HTTPMethod`, by their lower-case members.
 const ALAMOFIRE_METHODS: &[&str] = &["get", "post", "put", "patch", "delete", "head", "options"];
 
-/// The methods of NIOHTTP1's `HTTPMethod`, by their upper-case members.
 const NIO_METHODS: &[&str] = &["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 
-/// The method an implicit member (`.post`) or one of `HTTPMethod` as the imports spell it
-/// (`Alamofire.HTTPMethod.post`) names among `table`; a parameter of a wrapper stays as it is,
-/// anything else is unknown.
 fn member_method(value: &Value, prefixes: &[&str], table: &[&str], upper: bool) -> Value {
     let named = match value {
         Value::Member(ty, name) if ty.is_empty() => Some(name.as_str()),

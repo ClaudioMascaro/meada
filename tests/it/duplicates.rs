@@ -1,12 +1,7 @@
-//! `search` with kind `duplicate` lists the symbols whose text is the same in two or more
-//! places of the workspace (#254); the export carries each symbol's hash.
-
 use meada::engine::Engine;
 
 use crate::common::{assert_golden, fixture_repo};
 
-/// Repository `a` holds `slug` twice and a near copy of it (whitespace differs); its peer `b`
-/// holds it once more. Both also hold `other`, a shorter function.
 fn duplicates(case: &str) -> Engine {
     fixture_repo(
         case,

@@ -1,4 +1,3 @@
-//! Constructor-backed AWS SDK use sides (#660).
 use crate::common::{assert_golden, fixture_repo};
 use meada::engine::{Direction, Engine, Start};
 use serde_json::Value;
@@ -123,7 +122,6 @@ fn sdk_clients_require_construction_or_a_declared_sqs_type_and_follow_only_exact
         .map(|w| w["contract"].as_str().unwrap())
         .collect::<Vec<_>>();
     contracts.sort_unstable();
-    // A declared SNS client stays without a side; SQS keeps its earlier injected-client forms.
     assert_eq!(
         contracts,
         [
@@ -472,9 +470,6 @@ fn sdk_environment_aliases_keep_provenance_and_hidden_java_collections_stay_unkn
     assert_export_golden("aws-sdk-alias-env.export.json", &text);
 }
 
-/// A request changed after it was made names no resource: a TypeScript input object whose field
-/// is assigned again, and a Java builder held in a local that receives another call. A field
-/// left alone, and a builder nothing else calls, keep their names.
 #[test]
 fn sdk_requests_changed_after_they_are_made_name_no_resource() {
     let repo = fixture_repo(
@@ -518,7 +513,6 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
          void two() { var sns = SnsClient.create(); sns.publish(base.message(\"b\").build()); var t = PublishRequest.builder().topicArn(\"arn:aws:sns:us-east-1:123:kept-twice\"); sns.publish(t.build()); sns.publish(t.message(\"c\").build()); }\n}\n",
     )
     .unwrap();
-    // A named entry an inline request holds changes the same way.
     std::fs::write(
         repo.join("Entries.java"),
         "import software.amazon.awssdk.services.eventbridge.EventBridgeClient;\n\
@@ -578,13 +572,6 @@ fn sdk_requests_changed_after_they_are_made_name_no_resource() {
     }
 }
 
-/// A list of EventBridge entries held in a name and changed in place before the call (an
-/// element replaced, the list cleared and filled again, a helper that replaces an element, in Go,
-/// C# and Java; an element replaced through the request, in Go and C#) names no bus: the call
-/// sends to the later entries, and each call keeps an unresolved side (#773). A list made and
-/// passed straight to the request keeps its buses. A method's name is no mention in Java, so a
-/// local named as the setter it is passed to (`.entries(entries)`, `.transactItems(..)`, a
-/// builder `put` in `.put(put.build())`) keeps its bus or table.
 #[test]
 fn sdk_entry_lists_changed_in_place_name_no_bus() {
     let repo = fixture_repo(
@@ -683,10 +670,6 @@ fn sdk_entry_lists_changed_in_place_name_no_bus() {
     );
 }
 
-/// ADR 0026: an EventBridge entry without `EventBusName` sends to `default`, and an SNS phone
-/// publish names no topic, in Java, Go and C# as in TypeScript and Python. A request whose
-/// fields Meada cannot all see (a `toBuilder()`, a helper's result, a factory of the
-/// repository's own named `builder`) still publishes somewhere, so it keeps an unresolved side.
 #[test]
 fn sdk_omitted_bus_is_default_and_phone_publishes_name_no_topic() {
     let repo = fixture_repo("aws_sdk_defaults", "aws-sdk-defaults", None);
@@ -892,8 +875,6 @@ fn aws_sdk_operation_matrix_has_only_the_requested_sides() {
     assert_golden("aws-sdk-matrix.sides.txt", &(actual.join("\n") + "\n"));
 }
 
-/// The Java 2.x, Go v2 and .NET operation tables (#719): one call per operation in its own
-/// method, so a reader keeps its own site, and the same sides in all three languages.
 #[test]
 fn aws_sdk_operation_matrix_covers_java_go_and_dotnet() {
     let repo = fixture_repo(
@@ -905,7 +886,6 @@ fn aws_sdk_operation_matrix_covers_java_go_and_dotnet() {
     let export: Value = serde_json::from_str(&engine.export().unwrap()).unwrap();
     let providers = export["providers"].as_array().unwrap();
     let consumers = export["consumers"].as_array().unwrap();
-    // Per language: 22 writers and 16 readers, and .NET's blocking `GetObjectMetadata` reader.
     assert_eq!(providers.len(), 66, "{export}");
     assert_eq!(consumers.len(), 49, "{export}");
     let mut actual = Vec::new();
@@ -943,7 +923,6 @@ fn aws_sdk_operation_matrix_covers_java_go_and_dotnet() {
     );
     assert_eq!(sets[0].1, sets[1].1, "C# and Go name different sides");
     assert_eq!(sets[1].1, sets[2].1, "Go and Java name different sides");
-    // A hierarchy path is no parameter name: the reader stays unresolved.
     let by_path: Vec<_> = consumers
         .iter()
         .filter(|s| {
@@ -958,10 +937,6 @@ fn aws_sdk_operation_matrix_covers_java_go_and_dotnet() {
     assert_eq!(by_path, ["resource::ssm"; 3], "{export}");
 }
 
-/// A DynamoDB transaction in Java, Go and .NET (#719): each `Put`, `Update` and `Delete` entry
-/// writes its own table, each `ConditionCheck` and `Get` reads its own, and a name that is not a
-/// literal follows the other name arguments: an environment read keeps its variable, a computed
-/// name stays unresolved.
 #[test]
 fn dynamodb_transactions_keep_every_entry_table_and_direction_in_java_go_and_dotnet() {
     let repo = fixture_repo("aws_sdk_transactions", "aws-sdk-transactions", None);
@@ -973,7 +948,6 @@ fn dynamodb_transactions_keep_every_entry_table_and_direction_in_java_go_and_dot
             let site = side["site"].as_str().unwrap();
             let mut parts = site.split("::").skip(1);
             let file = parts.next().unwrap();
-            // The enclosing method, spelled `Transactions.write()`, `write` or `Transactions.Write()`.
             let method = parts.next().unwrap().trim_end_matches("()");
             let method = method.rsplit('.').next().unwrap().to_lowercase();
             by_language
@@ -1005,13 +979,6 @@ fn dynamodb_transactions_keep_every_entry_table_and_direction_in_java_go_and_dot
     }
 }
 
-/// A transaction's request, list, item and entry held in a name change in place through any
-/// name that holds them (Go and C#): a write past the first member, an element replaced, a
-/// method of the list, a helper. A name on the path to an entry's table is followed only when
-/// its function writes it twice, where it is declared and where the path reads it, and every
-/// other mention leaves the transaction's entries unresolved. The same values left alone keep
-/// their tables, and so do values Go's `len` or `cap` reads (#774), unless the package hides the
-/// builtin. Their twins changed in place stay unresolved.
 #[test]
 fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
     let repo = fixture_repo(
@@ -1071,7 +1038,6 @@ fn dynamodb_transaction_values_held_in_a_name_mentioned_again_name_no_table() {
     );
 }
 
-/// The sides of an export as `method role contract`, sorted, by the extension of their file.
 fn sides_by_extension(export: &Value) -> std::collections::BTreeMap<String, Vec<String>> {
     let mut by_extension: std::collections::BTreeMap<String, Vec<String>> = Default::default();
     for (role, sides) in [("writer", "providers"), ("reader", "consumers")] {
@@ -1093,14 +1059,6 @@ fn sides_by_extension(export: &Value) -> std::collections::BTreeMap<String, Vec<
     by_extension
 }
 
-/// A chain of wrappers enters a function once (#886). Where the calls of a cycle hand the
-/// wrapper's parameters on as they are (a retry, two wrappers that call each other), another turn
-/// sends what the first did and adds no side. Where they hand on another value in the parameter
-/// the request reads (the second of two names, a name made from the first, the second of two
-/// lists, two wrappers that swap theirs), what that turn sends is not followed: each caller's
-/// site gets an unresolved side beside the name its own pass gives, and a wrapper nothing but its
-/// cycle calls gets it where it stands (`spin`). A list of entries no caller gives is a write and
-/// a read, as for a wrapper nobody calls (`aloneList`).
 #[test]
 fn a_recursive_wrapper_that_passes_another_value_on_is_unresolved_at_each_caller() {
     let fixture = "aws-sdk-recursive-wrappers";
@@ -1132,15 +1090,6 @@ fn a_recursive_wrapper_that_passes_another_value_on_is_unresolved_at_each_caller
     );
 }
 
-/// On a path of entries (a DynamoDB transaction's, EventBridge `PutEvents`' `Entries[]`) Go judges
-/// each name by its own mentions alone (#774): a field written through another name, in any
-/// function or package of the repository, reaches no value a local holds alone, so a request, a
-/// list or an entry held in a local mentioned twice keeps its table or bus. Its twin written
-/// through its own name or through a second local stays unresolved, and so does a named request
-/// that is no list of entries, whose `TableName` some file writes. Go's two locals of one name
-/// in one function are counted together. C# keeps the repository-wide rule as well: a class
-/// derived from an SDK type can keep `this`, and a write through that reference changes a value
-/// its local mentions twice (`trackedentry`).
 #[test]
 fn a_field_written_through_another_name_leaves_a_held_entry_its_table() {
     let repo = fixture_repo(
@@ -1193,14 +1142,6 @@ fn a_field_written_through_another_name_leaves_a_held_entry_its_table() {
     );
 }
 
-/// A Go wrapper that mentions its parameter twice, where it declares it and where a path of
-/// entries reads it, sends what each caller passes (#774): the request, list or entry the caller
-/// writes in the call or holds in a local it mentions twice keeps its table or bus, through a
-/// function, a method and two wrappers, and through a variadic parameter given a spread or one
-/// element; an entry with no bus goes to `default` there too. Each form has its twin: a third
-/// mention in the wrapper (a write, a helper, a new value), in the wrapper between two, or in the
-/// caller leaves it unresolved, and so do more arguments than parameters and a method whose name
-/// another type's method spells. C# is not followed.
 #[test]
 fn a_go_wrapper_s_parameter_is_followed_to_what_its_caller_passes() {
     let repo = fixture_repo(
@@ -1254,9 +1195,6 @@ fn a_go_wrapper_s_parameter_is_followed_to_what_its_caller_passes() {
     );
 }
 
-/// A transaction entry held in a named value and changed after it is made names no table, as
-/// the other named values on a name's path do (a Java builder is read per builder). The same
-/// entries left alone keep their tables, so the change is what unnamed them.
 #[test]
 fn dynamodb_transaction_entries_changed_after_they_are_made_name_no_table() {
     let sides = |changed: bool| {
@@ -1353,10 +1291,6 @@ fn dynamodb_transaction_entries_changed_after_they_are_made_name_no_table() {
     );
 }
 
-/// A Java builder set again before its `.build()` names no table when the built value is held in
-/// a named local first (F1 of #719; `PutItemRequest` named the old table before): the check
-/// judges the builder by what happened to it up to the `.build()`. A value built before the
-/// builder is set again is an immutable copy and keeps its table.
 #[test]
 fn java_builders_set_again_before_a_named_build_name_no_table() {
     let repo = fixture_repo("aws_sdk_named_builds", "aws-sdk-controls", None);
@@ -1461,7 +1395,6 @@ class Named {
         .iter()
         .flat_map(|(role, sides)| {
             export[sides].as_array().unwrap().iter().map(move |s| {
-                // `Named.conditional(boolean)::db.transactWriteItems#0` or the reader's method.
                 let scope = s["site"].as_str().unwrap().split("::").nth(2).unwrap();
                 let method = scope.split('(').next().unwrap().rsplit('.').next().unwrap();
                 format!("{method} {role} {}", s["contract"].as_str().unwrap())
@@ -1489,8 +1422,6 @@ class Named {
     );
 }
 
-/// A crafted chain of named values stays bounded: past the shared evaluation depth it is not
-/// followed, and the table stays unresolved rather than naming a literal it did not check.
 #[test]
 fn java_named_builds_chained_past_the_evaluation_depth_stay_unresolved() {
     let repo = fixture_repo("aws_sdk_named_chain", "aws-sdk-controls", None);
@@ -1523,21 +1454,6 @@ fn java_named_builds_chained_past_the_evaluation_depth_stay_unresolved() {
     );
 }
 
-/// A name is exact only when every mention of its builder, by any name, is a form the reader
-/// follows (R3 of #719): a method that runs caller code, a consumer copy, an alias at any depth
-/// (reassigned or not), a field builder reached through an alias. Each other mention is a change
-/// the reader cannot follow, and the side is unresolved. The builders left alone keep their table.
-/// The same holds for code that runs when its caller says (a lambda, a local or anonymous class),
-/// a parameter assigned in its helper, a request passed to a helper after its builder was set, a
-/// field hidden by a local, a field set in an initializer before another is built from it, a field
-/// builder another file calls a method on or this file reads by name, a builder `applyMutation`
-/// hands to caller code, and a request type that another type of the file, the package or an
-/// import shadows. A builder set later in a loop around the one its value is made in, in a loop
-/// inside a lambda, or declared in a `for` clause is set before the next turn builds; a setter
-/// inside the request's own expression runs before its `build()`. A list or an array on a
-/// transaction's path changes in place, so one held in a name is followed only when its method
-/// writes that name twice (`List.of` cannot change), and one that comes in a parameter never is;
-/// a shorter path keeps the name it had.
 #[test]
 fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
     let repo = fixture_repo("aws_sdk_builder_forms", "aws-sdk-builders", None);
@@ -1632,14 +1548,6 @@ fn java_builders_with_a_mention_the_reader_cannot_follow_name_no_table() {
     );
 }
 
-/// A `private` `final` field builder is named in its own file alone, so a variable of its name
-/// that another file calls a method on is another variable and leaves the field its table
-/// (#775). A field another file can name (package-private, `protected`, `public`) is still
-/// unnamed by such a call, set from there or not; a private one a nested class of its file sets,
-/// one a method hands out, and a name another class of the file declares without `private` have
-/// no table either. Nor has a private field of a file that uses Lombok (`@Getter`: the reach is
-/// not in the source), and a name that is private in its file but, where it is read, the field a
-/// class of another file declares.
 #[test]
 fn a_private_final_field_builder_keeps_its_table_beside_another_file_s_variable() {
     let repo = fixture_repo("aws_sdk_private_fields", "aws-sdk-private-fields", None);
@@ -1663,10 +1571,6 @@ fn a_private_final_field_builder_keeps_its_table_beside_another_file_s_variable(
     );
 }
 
-/// A file that reads fields by reflection reaches a `private` one and may hand it to any other
-/// file: where a Java file of the repository does, a call on the field's name counts from
-/// every file, as before the private-field rule (#775). The fixture reads the field through a
-/// method reference (`Reached.class::getDeclaredField`): no call spells the method's name.
 #[test]
 fn a_private_field_builder_has_no_table_where_a_file_reads_fields_by_reflection() {
     let fixture = "aws-sdk-private-fields-reflected";
@@ -1679,7 +1583,6 @@ fn a_private_field_builder_has_no_table_where_a_file_reads_fields_by_reflection(
     );
 }
 
-/// Each Java side of an export, as `method role contract`, sorted.
 fn java_sides(repo: &std::path::Path) -> (Value, Vec<String>) {
     let export: Value =
         serde_json::from_str(&Engine::open(repo).unwrap().export().unwrap()).unwrap();
@@ -1697,17 +1600,6 @@ fn java_sides(repo: &std::path::Path) -> (Value, Vec<String>) {
     (export, sides)
 }
 
-/// A list of transaction entries, or one entry, that a wrapper takes in a parameter and passes on
-/// (#772): its tables are named when no mention can change it before the request reads it. The
-/// builder copies the list, so a change after `build()` is not in the request, nor is one after
-/// the call; sorting keeps the tables; a wrapper of a wrapper passes it on too. A change before
-/// the read, in the caller, the wrapper or the wrapper's wrapper, in a loop around the call, a
-/// method the list is handed to first, or another parameter it is passed in too names no table,
-/// and so do an alias of the parameter and a read in a lambda; a varargs wrapper is read where it
-/// stands, a writer and a reader with no table. A wrapper that changes the list after its read
-/// keeps the tables only for a list the caller makes in the call (not one a loop above hands in
-/// again); a recursive wrapper, a getter's list and a method an override may stand for name none.
-/// A `write(table, item)` wrapper keeps its name.
 #[test]
 fn java_lists_a_wrapper_passes_on_unchanged_name_their_tables() {
     let repo = fixture_repo("aws_sdk_wrappers", "aws-sdk-wrappers", None);
@@ -1755,12 +1647,9 @@ fn java_lists_a_wrapper_passes_on_unchanged_name_their_tables() {
     );
 }
 
-/// A Java file past its qualification budget keeps no facts, so it may declare an override of
-/// any wrapper: no wrapper keeps its caller's tables (#772).
 #[test]
 fn a_java_file_past_its_budget_leaves_every_wrapper_unnamed() {
     let repo = fixture_repo("aws_sdk_wrappers_budget", "aws-sdk-wrappers", None);
-    // The Java pack's `QUALIFICATION_BYTES` (4 MiB): each node under the class repeats its name.
     let name = "N".repeat(64 * 1024);
     let methods = "void m() { f(); }\n".repeat(4 * 1024 * 1024 / name.len() + 1);
     let big = format!("class {name} {{\n{methods}}}\n");
@@ -1779,10 +1668,6 @@ fn a_java_file_past_its_budget_leaves_every_wrapper_unnamed() {
     }
 }
 
-/// A unicode escape of a line terminator ends a line comment, as javac reads it (JLS 3.3): the
-/// change written after it, to a local list, a builder, a caller's list or as an override of the
-/// wrapper, names no table; the override's own `super.store` names none either. After an odd run
-/// of backslashes it starts no escape.
 #[test]
 fn java_code_after_an_escaped_line_break_in_a_comment_is_read() {
     let repo = fixture_repo("aws_sdk_escapes", "aws-sdk-escapes", None);
@@ -2163,9 +2048,6 @@ fn aws_origin_chains_and_inline_factories_stay_bounded_at_the_file_size_ceiling(
     }
 }
 
-/// A Go wrapper whose parameters are one group of nine, ten or twenty names, the first of which
-/// names the table, is followed to its caller: tree-sitter-go parses a group of ten or more apart.
-/// The parameter hides the package constant of its name.
 #[test]
 fn a_go_wrapper_with_a_group_of_ten_parameters_or_more_names_its_callers_table() {
     let repo = fixture_repo("aws_sdk_go_grouped_parameters", "aws-sdk-controls", None);
@@ -2197,15 +2079,8 @@ fn a_go_wrapper_with_a_group_of_ten_parameters_or_more_names_its_callers_table()
     assert!(export["consumers"].as_array().unwrap().is_empty(), "{text}");
 }
 
-/// The transaction calls of a file fold on a budget of their own: however many they are, the
-/// other calls of the file keep the sides they have without them, of every kind (#719). The calls
-/// before the one where that budget ends keep their names, and that call has a writer, named or
-/// unresolved, and no reader for write entries; a reader for a `ConditionCheck` entry, unless the
-/// budget ends inside its writer row (#784).
 #[test]
 fn transaction_calls_leave_the_other_sides_of_their_file_named() {
-    // `$CHECK` declares a second entry (a `ConditionCheck` of table `c$K`, or a `Put` of table
-    // `u$K`), `$ITEM` adds it to the call.
     let repeated = |template: &str, count: usize, check: Option<(&str, &str)>| -> String {
         let (declared, item) = check.unwrap_or_default();
         let template = template.replace("$CHECK", declared).replace("$ITEM", item);
@@ -2363,8 +2238,6 @@ $CHECK        var items = new List<TransactWriteItem> { new TransactWriteItem { 
             ("csharp", "Budget.cs", csharp, 2500),
         ]
     };
-    // Measured with each value held in a name (the ceilings topic): the calls named in each
-    // language before the budget ends, `Put` entries only.
     let measured = [("java", 1725), ("go", 1928), ("csharp", 2185)];
     for entries in ["put", "check", "pair"] {
         for (language, file, source, calls) in sources(entries) {
@@ -2387,7 +2260,6 @@ $CHECK        var items = new List<TransactWriteItem> { new TransactWriteItem { 
                     (export[sides].as_array().unwrap().iter()).any(|s| s["contract"] == contract);
                 assert!(named, "{language}: no {contract} in {sides}");
             }
-            // The tables named on one side, by number, and its unresolved sides.
             let listed = |kind: &str, table: &str| -> (Vec<usize>, usize) {
                 let contracts = (export[kind].as_array().unwrap().iter())
                     .map(|s| s["contract"].as_str().unwrap());
@@ -2401,7 +2273,6 @@ $CHECK        var items = new List<TransactWriteItem> { new TransactWriteItem { 
             let case = format!("{language}, entries {entries}");
             let (writers, unnamed_writers) = listed("providers", "resource::dynamodb::t");
             let (readers, unnamed_readers) = listed("consumers", "resource::dynamodb::c");
-            // The calls before the one where the budget ends keep their names.
             assert!(
                 writers.iter().copied().eq(0..writers.len()),
                 "{case}: {writers:?}"
@@ -2418,15 +2289,12 @@ $CHECK        var items = new List<TransactWriteItem> { new TransactWriteItem { 
                 unnamed_readers,
             );
             if entries == "check" {
-                // A call whose rows the budget read whole has its reader named; the one where it
-                // ends inside the writer row has a writer, named or unresolved, and no reader.
                 let read = readers.len() + 1 >= writers.len() && readers.len() <= writers.len();
                 assert!(
                     read && unnamed_writers <= 1 && unnamed_readers == 0,
                     "{case}: {sides:?}"
                 );
             } else if entries == "pair" {
-                // Write entries only: a writer per entry, named or unresolved, and no reader.
                 let (seconds, _) = listed("providers", "resource::dynamodb::u");
                 assert!(
                     seconds.iter().copied().eq(0..seconds.len()),
@@ -2707,7 +2575,6 @@ fn python_sdk_return_lattices_remain_bounded_across_repeated_operations() {
     assert!(json["consumers"].as_array().unwrap().is_empty(), "{text}");
 }
 
-/// The contracts of the providers of the repository at `repo`, its export timed against `bound`.
 fn timed_providers(repo: &std::path::Path, label: &str, bound: u64) -> Vec<String> {
     let started = std::time::Instant::now();
     let text = Engine::open(repo).unwrap().export().unwrap();
@@ -2724,10 +2591,6 @@ fn timed_providers(repo: &std::path::Path, label: &str, bound: u64) -> Vec<Strin
         .collect()
 }
 
-/// Thousands of operations on a client a factory of thousands of returns gives, and thousands on
-/// a client thousands of call sites pass a parameter: the file keeps the answers no limit cut, so
-/// each operation after the first reads the returns and the call sites in a step, where reading
-/// them again took minutes and would spend the file's budget (`FACTORY_FILE_BUDGET`).
 #[test]
 fn python_sdk_factory_answers_are_read_once_per_file() {
     let repo = fixture_repo("sdk_python_factory_answers", "aws-sdk-controls", None);
@@ -2760,10 +2623,6 @@ fn python_sdk_factory_answers_are_read_once_per_file() {
     assert_eq!(passed.count(), n);
 }
 
-/// One factory question may spend all its file has left of `FACTORY_FILE_BUDGET`: five factories
-/// of 2,000 returns, each return calling the factory below it, resolve on the file's only
-/// operation, where a question held to `EVAL_BUDGET` stopped short and only a second operation,
-/// reading what the first one kept, resolved.
 #[test]
 fn python_sdk_factory_question_may_spend_what_its_file_has_left() {
     let repo = fixture_repo("sdk_python_factory_lattice", "aws-sdk-controls", None);
@@ -2792,11 +2651,6 @@ fn python_sdk_factory_question_may_spend_what_its_file_has_left() {
     );
 }
 
-/// Factory questions share a budget per file (`FACTORY_FILE_BUDGET`), every visit of a value a
-/// step: thousands of operations, each walking thousands of call sites whose answer a cycle keeps
-/// from being kept, spend it, whether each call site is read anew or is the same default visited
-/// again. A client 22 steps from its operation resolves before them and not after them, and one 4
-/// steps away still does (`FACTORY_QUESTION_FLOOR`).
 #[test]
 fn python_sdk_factory_questions_share_a_budget_per_file() {
     let chain = |name: &str| {
@@ -2807,8 +2661,6 @@ fn python_sdk_factory_questions_share_a_budget_per_file() {
         s + &format!("    c20.publish(TopicArn='{name}')\n\n\n")
     };
     let operations = "    x.publish(TopicArn='cycle')\n".repeat(2000) + "    return x\n\n\n";
-    // Call sites each passing a client, the last of them in a cycle; then call sites leaving out
-    // an argument whose default a cycle reaches, the last passing another client.
     let read_anew = format!(
         "def g(x):\n{operations}{}\n\ndef h():\n    return g(h())\n\n\n",
         "g(boto3.client('sns'))\n".repeat(5000)
@@ -2842,10 +2694,6 @@ fn python_sdk_factory_questions_share_a_budget_per_file() {
     }
 }
 
-/// A factory answer kept for the file's later questions is read again only where its walk still
-/// fits `EVAL_DEPTH`. A chain of 300 names stays unresolved whether it is asked before or after
-/// the chains of 100 and 200 names that reach the same client; so does a chain of 150 names to a
-/// factory returning a chain of 120, after the factory and the chain's first name were asked.
 #[test]
 fn python_sdk_factory_answers_kept_for_later_questions_keep_the_depth_ceiling() {
     let chain = |name: &str, n: usize| {

@@ -1,5 +1,3 @@
-//! Direct workload paths are checked during indexing. Queries use only these stored facts.
-
 use crate::contract::{Probe, probe};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -11,8 +9,6 @@ pub(super) struct Code {
     pub root: String,
     pub path: String,
     pub reason: String,
-    /// Whether the execution is `inferred`: the path went through a value a deployer can
-    /// override, or a Compose build's Dockerfile was not read (#744).
     #[serde(default)]
     pub inferred: bool,
 }
@@ -38,7 +34,6 @@ fn safe(root: &Path, path: &str) -> bool {
     matches!(last, Probe::Dir | Probe::File)
 }
 
-/// Only an unambiguous existing file gives a handler source. Archives are never opened.
 fn module(root: &Path, base: &str, handler: &str, only: Option<&str>) -> Option<String> {
     let (module, function) = handler.rsplit_once('.')?;
     if function.is_empty()
@@ -73,7 +68,6 @@ fn handler(root: &Path, node: &crate::iac::Node) -> Option<String> {
     )
 }
 
-/// A safe unique handler module and its member, checked only while indexing. A ZIP is opaque.
 pub(crate) fn checked_handler(
     root: &Path,
     node: &crate::iac::Node,

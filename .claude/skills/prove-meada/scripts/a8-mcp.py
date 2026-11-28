@@ -79,8 +79,6 @@ def check_proxy_answers(workspace, context, trace, control):
 
 def refresh(binary, source, folder):
     root = scope(source, folder / 'work', 'g10b')
-    # Map the second neutral peer explicitly, then edit ONLY the include. Same-size API/ALT
-    # tokens force content freshness, rather than a convenient size change or source edit.
     manifest = root / 'meada.toml'
     manifest.write_text(manifest.read_text().replace('repo = "example.com/acme/other"\npath = "../other"',
         'repo = "example.com/acme/other"\npath = "../other"\nbase_url_env = ["ALT_URL"]'))
@@ -96,8 +94,6 @@ def refresh(binary, source, folder):
     observations = {'query_order': ['context', 'trace'], 'queries': queries}
 
     def read(phase):
-        # Context must be the first reader of edited content. Trace cannot warm an index
-        # and hide a context-specific freshness regression. Both answers use source keys.
         observed = {q['name']: answer(client.call('tools/call', q)) for q in queries}
         observations[phase] = observed
         save(folder / 'answers.json', observations)
@@ -181,8 +177,6 @@ def main():
                         check_proxy_answers(workspace, context, trace, proxy_key)
                     else:
                         assert reason in context, (workspace, symbol, 'context reason', reason, context)
-            # Table and complete-export comparison remain independent drivers. Here the
-            # closed-item assertion is over precisely the expected linked source sites.
         listed = subprocess.run([binary, 'decide', '--list'], cwd=root, capture_output=True, timeout=90)
         (folder / 'open-items.stdout').write_bytes(listed.stdout)
         (folder / 'open-items.stderr').write_bytes(listed.stderr)

@@ -1,18 +1,3 @@
-//! The module cases of `tests/terraform-oracle/modules/`: directories of Terraform files whose
-//! `for_each` keys (`want`) the oracle computes with HashiCorp's libraries and Terraform's rules
-//! at the boundaries a name crosses (a variable's declared type, a module argument, an override
-//! file). An exact name must be the one Terraform gives, and a case marked `=` must be exact.
-//!
-//! The recorded cases of `tests/terraform-oracle/recorded.jsonl` hold the tools' own answers: the
-//! names `console` gives each resource from its `count`, `for_each` and `name`, in Terraform
-//! 1.17.1 for a directory of `.tf` files and in OpenTofu 1.13.9 for one with a `.tofu` file, run
-//! on 2026-11-10 by the black-box verifiers of #754. A case or a resource the tool refuses is left
-//! out, also where a plan would then refuse the whole directory. Each line is a case: `files`, and
-//! per reader (a resource of `aws_sqs_queue`, or `""` for all of them) those names in `want` and a
-//! `mark`. An OpenTofu case whose variable is declared in a `.tf` file and changed by a `.tofu`
-//! block is `~` where Terraform, reading the directory without that block, gives the variable
-//! another value or type (#767).
-
 use super::*;
 use std::path::Path;
 
@@ -61,9 +46,6 @@ fn module_cases_agree_with_the_terraform_oracle() {
     assert!(wrong.is_empty(), "{wrong:#?}");
 }
 
-/// Whether Meada's lines for `a.q` agree with Terraform's `keys` (`!` and a reason: it refuses; no
-/// key: no instance). Every exact line must be a name Terraform gives; a line that is a pattern
-/// leaves the others partial, and `must` `=` allows none.
 fn judge(must: &str, keys: &str, lines: &[String]) -> bool {
     assert!(matches!(must, "=" | "~"), "not a marker: {must:?}");
     let mut expected: Vec<String> = (keys
@@ -88,7 +70,6 @@ fn judge(must: &str, keys: &str, lines: &[String]) -> bool {
 #[test]
 fn a_case_is_judged_on_every_exact_line_it_gives() {
     let lines = |l: &[&str]| l.iter().map(|l| l.to_string()).collect::<Vec<_>>();
-    // An exact line Terraform does not give fails beside a pattern line, and in a refused case.
     let wrong = lines(&[
         "a.q[\"0\"] = \"queue-0\" [var.s main.tf:1]",
         "a.q ~ \"queue-*\"",
@@ -99,13 +80,10 @@ fn a_case_is_judged_on_every_exact_line_it_gives() {
         "!for_each is null",
         &lines(&["a.q[\"0\"] = \"queue-0\""])
     ));
-    // The right exact line passes beside a pattern line unless the case must be exact.
     let right = lines(&["a.q[\"x\"] = \"queue-x\"", "a.q ~ \"queue-*\""]);
     assert!(judge("~", "x", &right) && !judge("=", "x", &right));
-    // No instance is a case: no line, or a pattern line, and an exact line fails it.
     assert!(judge("=", "", &[]) && judge("~", "", &lines(&["a.q ~ \"queue-*\""])));
     assert!(!judge("=", "", &lines(&["a.q[\"0\"] = \"queue-0\""])));
-    // An instance missing from an all-exact answer fails.
     assert!(!judge("=", "x,y", &lines(&["a.q[\"x\"] = \"queue-x\""])));
     assert!(!judge("=", "x", &[]));
 }
@@ -157,12 +135,6 @@ fn recorded_cases_agree_with_the_tools() {
     );
 }
 
-/// Whether Meada's `exact` names, and `partial` for a node it names by a pattern or not at all,
-/// agree with the names the tool creates. Under `~` each exact name is one of the tool's, no more
-/// times than the tool creates it (an instance Meada stops giving at all still passes: only `=`
-/// holds every instance); under `=` Meada also names every instance exactly, as it did when the
-/// case was recorded; `!` is a difference recorded with its issue or ceiling in `why`, and it must
-/// still differ, so that the fix moves the case to `=`.
 fn agrees(mark: &str, want: &[&str], exact: &[&str], partial: bool) -> bool {
     let mut left = want.to_vec();
     let within = (exact.iter()).all(|name| {
@@ -180,14 +152,11 @@ fn agrees(mark: &str, want: &[&str], exact: &[&str], partial: bool) -> bool {
 
 #[test]
 fn a_recorded_case_is_judged_on_every_exact_name() {
-    // An exact name the tool does not create fails, also beside a pattern and once too many.
     assert!(!agrees("~", &["0-a", "1-b"], &["0-b"], true));
     assert!(!agrees("~", &["0-a"], &["0-a", "0-a"], false));
     assert!(agrees("~", &["0-a", "1-b"], &["0-a"], true) && agrees("~", &["0-a"], &[], true));
-    // A case recorded exact fails once an instance is a pattern or is missing.
     assert!(agrees("=", &["0-a", "0-a"], &["0-a", "0-a"], false));
     assert!(!agrees("=", &["0-a", "1-b"], &["0-a"], true));
     assert!(!agrees("=", &["0-a", "1-b"], &["0-a"], false));
-    // A recorded difference fails once Meada agrees.
     assert!(agrees("!", &["0-10"], &["0-010"], false) && !agrees("!", &["0-10"], &["0-10"], false));
 }

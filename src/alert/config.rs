@@ -1,5 +1,3 @@
-//! Monitoring configuration facts, stored once and read without checkout access by queries.
-
 use super::regexp;
 use crate::document::events::{self, Step, Syntax};
 use serde::{Deserialize, Serialize};
@@ -16,8 +14,6 @@ pub(super) struct Summary {
     pub truncated: bool,
     #[serde(default)]
     pub forwardings: Vec<super::forwarding::Receiver>,
-    /// Whether the file is a stream of several documents, whose key paths start with the
-    /// document's index.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub stream: bool,
 }
@@ -207,8 +203,6 @@ pub(super) struct Route {
     pub barrier: bool,
     #[serde(default)]
     pub unknown_scope: bool,
-    /// An AlertmanagerConfig route: prometheus-operator also matches its own namespace, which
-    /// Meada does not read, so its links are `inferred`.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub namespaced: bool,
 }
@@ -319,8 +313,6 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
         } else {
             String::new()
         };
-        // Alertmanager loads none of a configuration whose matcher holds a regular expression Go
-        // refuses, so it gives no rule, route or receiver of its own.
         if refused(doc).is_some() {
             continue;
         }
@@ -370,7 +362,6 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
                     labels.extend(own);
                     unknown.extend(unresolved);
                     if alert.is_some() {
-                        // Prometheus/Loki apply rule labels before setting the rule name.
                         labels.insert("alertname".into(), name.into());
                         unknown.remove("alertname");
                     }
@@ -433,8 +424,6 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
             && body.get("receivers").is_some_and(Value::is_array)
             && let Some(route) = body.get("route")
         {
-            // Queue only input references and indexes: copying a parent's long receiver or
-            // path across all children would allocate before the child's budget check.
             let mut pending = vec![(route, None, 0)];
             while let Some((value, parent, child_index)) = pending.pop() {
                 let (key, inherited) = match parent {
@@ -526,15 +515,12 @@ pub(super) fn read(path: &str, src: &[u8]) -> Summary {
     }
     bounded(out)
 }
-/// Whether `doc` is a prometheus-operator object.
 fn monitoring(doc: &Value) -> bool {
     doc.get("apiVersion")
         .and_then(Value::as_str)
         .is_some_and(|v| v.starts_with("monitoring.coreos.com/"))
 }
 
-/// `doc` as an Alertmanager configuration: its own body, or the spec of a prometheus-operator
-/// `AlertmanagerConfig` with the prefix of its key paths; `None` for any other object.
 fn alertmanager(doc: &Value) -> Option<(&Value, &'static str)> {
     match doc.get("kind").and_then(Value::as_str) {
         None => Some((doc, "")),
@@ -543,16 +529,12 @@ fn alertmanager(doc: &Value) -> Option<(&Value, &'static str)> {
     }
 }
 
-/// Why Alertmanager refuses to load the configuration `doc`, if one of its route matchers holds a
-/// regular expression Go's `regexp` certainly refuses (`regexp::refusal`). An expression that only
-/// Meada cannot read, or reads past its budgets, is not one.
 pub(super) fn refused(doc: &Value) -> Option<String> {
     let (body, _) = alertmanager(doc)?;
     if !body.get("receivers").is_some_and(Value::is_array) {
         return None;
     }
     let route = body.get("route")?;
-    // Alertmanager compiles the matchers of its inhibit rules as it does those of its routes.
     let inhibits = ["inhibit_rules", "inhibitRules"]
         .into_iter()
         .flat_map(|field| array(body.get(field)))
@@ -613,8 +595,6 @@ fn grafana_name(rule: &Value) -> Option<&str> {
 fn matchers(route: &Value) -> Option<Vec<Matcher>> {
     matchers_in(route, ["match", "match_re"], "matchers")
 }
-/// The matchers `route` writes in the maps `equal` and `regex` (names to values) and in the list
-/// `list` (strings, or objects with a `name`, a `value` and a `matchType` or `regex`).
 fn matchers_in(route: &Value, [equal, regex]: [&str; 2], list: &str) -> Option<Vec<Matcher>> {
     let mut out = Vec::new();
     for (field, op) in [(equal, Op::Equal), (regex, Op::Regex)] {
@@ -662,8 +642,6 @@ fn matchers_in(route: &Value, [equal, regex]: [&str; 2], list: &str) -> Option<V
         .then_some(out)
 }
 
-// A quoted key or value uses Alertmanager's escapes (see `token`). Commas inside strings are
-// literal.
 fn expressions(text: &str) -> Option<Vec<Matcher>> {
     let text = text.trim();
     let text = if text.starts_with('{') {
@@ -733,7 +711,6 @@ fn expression(text: &str) -> Option<Matcher> {
 }
 fn token(text: &str) -> Option<String> {
     if let Some(quoted) = text.strip_prefix('"') {
-        // Alertmanager's escapes: `\n`, `\"` and `\\`; any other keeps its backslash.
         let mut out = String::with_capacity(quoted.len());
         let mut chars = quoted.strip_suffix('"')?.chars();
         while let Some(c) = chars.next() {
@@ -749,8 +726,6 @@ fn token(text: &str) -> Option<String> {
         }
         Some(out)
     } else {
-        // Alertmanager's classic parser unescapes `\\` in an unquoted value too, which this does
-        // not: such a value is not read, and so cannot refuse a file by what Go never sees.
         (!text.is_empty()
             && !text.contains(['"', '=', '!', '{', '}'])
             && !text.contains("\\\\")
@@ -764,8 +739,6 @@ pub(super) fn charge(item: &impl Serialize, bytes: &mut usize) -> bool {
     *bytes = bytes.saturating_add(cost);
     *bytes <= ALERT_STORED_MAX.saturating_sub(64)
 }
-/// Charge the side fields a summary will materialize as well as its serialized bytes.
-/// Ancestors are stored once but can contribute a matcher to many descendant routes.
 fn fields(bytes: &mut usize, parts: &[usize]) -> bool {
     for part in parts {
         *bytes = bytes.saturating_add(*part);
@@ -1050,7 +1023,6 @@ mod tests {
 
     #[test]
     fn repeated_grafana_groups_helm_values_and_matcher_escapes_read_as_their_tools_do() {
-        // A rule group Terraform makes any number of times, zero included, declares no rule.
         let group = |meta: &str| {
             format!(
                 "resource \"grafana_rule_group\" \"g\" {{\n{meta}  rule {{\n    name = \"A\"\n    \
@@ -1076,7 +1048,6 @@ mod tests {
                 .rules
                 .is_empty()
         );
-        // Helm values go by a `values` word anywhere in the file name.
         for helm in [
             "values.yaml",
             "values-prod.yaml",
@@ -1086,7 +1057,6 @@ mod tests {
             assert!(!is_file(helm), "{helm}");
         }
         assert!(is_file("rules.yaml") && is_file("alert-valuesets.yaml"));
-        // Alertmanager's escapes: `\n`, `\"` and `\\`; any other keeps its backslash.
         let read = expressions(r#"{a=~"db\.prod", b="say \"hi\"", c="x\\y", d="l\nm"}"#).unwrap();
         assert_eq!(
             read.iter().map(|m| m.value.as_str()).collect::<Vec<_>>(),
@@ -1095,9 +1065,6 @@ mod tests {
         assert!(expressions(r#"a="open"#).is_none());
     }
 
-    /// Alertmanager loads none of a configuration with a regex Go refuses, but the objects
-    /// beside it in a manifest bundle are other configurations: only its own document gives no
-    /// route and no receiver (#718).
     #[test]
     fn a_document_go_refuses_gives_no_facts_but_its_neighbours_keep_theirs() {
         let rules = "apiVersion: monitoring.coreos.com/v1\nkind: PrometheusRule\nmetadata: {name: r}\n\
@@ -1119,15 +1086,12 @@ mod tests {
         };
         assert_eq!(counts("a.*"), (1, 2));
         assert_eq!(counts("a["), (1, 0));
-        // Past a budget of Meada's own, Go reads it.
         assert_eq!(
             counts(&"a".repeat(super::super::ALERT_REGEX_MAX + 1)),
             (1, 2)
         );
     }
 
-    /// Alertmanager compiles the regexes of its inhibit rules too, and unescapes `\\` in an
-    /// unquoted matcher value, which a regex judged as written would read differently.
     #[test]
     fn inhibit_rule_regexes_refuse_a_configuration_and_unquoted_escapes_are_not_judged() {
         let refused = |text: &str| {
@@ -1153,7 +1117,6 @@ mod tests {
             refused(&format!("{operator}{}\n", inhibit.replace("a(", "a"))),
             0
         );
-        // A valid regex among inhibit rules, and equality values that are no regex.
         assert_eq!(
             refused(&config(
                 "",
@@ -1161,7 +1124,6 @@ mod tests {
             )),
             0
         );
-        // `\\(` is a literal backslash and a group for Go as written, and `\(` once unescaped.
         let unquoted = config(", routes: [{receiver: a, matchers: ['x=~a\\\\(b']}]", "");
         assert_eq!(refused(&unquoted), 0);
         assert!(
@@ -1169,8 +1131,6 @@ mod tests {
                 .iter()
                 .all(|r| !r.valid)
         );
-        // Quoted, `\\` is unescaped as Alertmanager does: `a\\(b` reaches Go as `a\(b`, which is valid,
-        // and `a\\\\(b` as `a\\(b`, which is not.
         let quoted = |value: &str| {
             config(
                 &format!(", routes: [{{receiver: a, matchers: ['x=~\"{value}\"']}}]"),

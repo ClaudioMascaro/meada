@@ -43,13 +43,11 @@ test('the first sign-in of the default account goes through the forced change to
   });
   vi.stubGlobal('fetch', fetch);
   await mount(new LocalAuth(config));
-  // Signed out: the sign-in page, and no session was asked for.
   expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe(t.signInTitle);
   expect(queryByRole(host, 'navigation')).toBeNull();
   expect(fetch).not.toHaveBeenCalled();
   type(t.username, 'admin'); type(t.password, 'first password here');
   await submit();
-  // Change required: the forced page, with nothing to navigate to and no other request.
   await waitFor(() => expect(getByRole(host, 'heading', { level: 1 }).textContent).toBe(t.forcedTitle));
   expect(queryByRole(host, 'navigation')).toBeNull();
   expect(queryByRole(host, 'link', { name: copy.en.workspace })).toBeNull();
@@ -131,7 +129,6 @@ test('the profile generates an agent token for the nodes, shown once with its ex
   await act(() => { fireEvent.click(getByRole(host, 'link', { name: copy.en.profile })); });
   expect(getByRole(host, 'heading', { level: 2, name: t.tokensTitle })).toBeDefined();
   expect((getByLabelText(host, t.surface) as HTMLSelectElement).value).toBe('nodes');
-  // Without a proposal server, the nodes are the one surface offered.
   expect([...(getByLabelText(host, t.surface) as HTMLSelectElement).options].map(o => o.value)).toEqual(['nodes']);
   expect((getByLabelText(host, t.validity) as HTMLInputElement).value).toBe('8');
   type(t.validity, '24');
@@ -142,11 +139,9 @@ test('the profile generates an agent token for the nodes, shown once with its ex
   await act(async () => { fireEvent.click(getByRole(host, 'button', { name: t.copyToken })); });
   expect(writeText).toHaveBeenCalledWith(agent.token);
   expect(host.textContent).toContain(t.copied);
-  // Never stored: neither the tab's storage nor the browser's holds it.
   expect(JSON.stringify(sessionStorage)).not.toContain(agent.token);
   expect(sessionStorage.getItem(SESSION_KEY)).not.toContain('agent');
   expect(localStorage.length).toBe(0);
-  // Leaving the page clears it; coming back shows the form alone.
   await act(() => { fireEvent.click(getByRole(host, 'link', { name: copy.en.manifest })); });
   expect(host.textContent).not.toContain(agent.token);
   await act(() => { fireEvent.click(getByRole(host, 'link', { name: copy.en.profile })); });
@@ -193,7 +188,6 @@ test('a refused agent token says why, in Portuguese too, and shows no token', as
     await waitFor(() => expect(getByRole(host, 'alert').textContent).toBe(expected));
     expect(queryByRole(host, 'region', { name: pt.issuedToken })).toBeNull();
   }
-  // A refusal of the token keeps the session.
   expect(sessionStorage.getItem(SESSION_KEY)).toContain('live');
 });
 

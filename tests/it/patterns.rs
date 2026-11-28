@@ -1,5 +1,3 @@
-//! Anchored names and their human decisions (#674), observed through Engine answers.
-
 use std::{fs, path::PathBuf};
 
 use meada::engine::{Direction, Engine, Start};
@@ -728,7 +726,6 @@ fn config_key_pattern_items_and_model_previews_keep_redacted_and_cut_payloads_ou
     fs::write(infra.join("main.tf"), "resource \"aws_s3_bucket\" \"east\" { bucket = \"receipts-east\" }\nresource \"aws_s3_bucket\" \"west\" { bucket = \"receipts-west\" }\n").unwrap();
     fs::remove_file(app.join("app.ts")).unwrap();
     let secret = "pattern-secret-never-send";
-    // The ordinary metadata key shares a physical JSON line with the Secret scalar.
     fs::write(
         app.join("private.json"),
         serde_json::to_string(&serde_json::json!({
@@ -811,8 +808,6 @@ fn many_config_key_sources_keep_indexed_locations_in_bounded_time() {
     let (infra, app) = workspace("pattern_config_source_growth");
     fs::write(infra.join("main.tf"), "resource \"aws_s3_bucket\" \"east\" { bucket = \"receipts-east\" }\nresource \"aws_s3_bucket\" \"west\" { bucket = \"receipts-west\" }\n").unwrap();
     fs::remove_file(app.join("app.ts")).unwrap();
-    // 10,000 sources in 20 files of 500 entries: each file holds 1,000 values, the most a
-    // generic config file keeps (#817).
     let (files, per_file) = (20, 500);
     let path = |f: usize| format!("settings-{f:02}.json");
     let via: Vec<String> = (0..files)

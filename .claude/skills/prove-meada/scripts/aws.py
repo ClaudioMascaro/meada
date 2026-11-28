@@ -20,7 +20,6 @@ from prove import git, free_port, Http, answer, mcp_answers, status_before_855
 
 REMOTE = 'example.com/zz-prove-aws/'
 SECRET = 'zz-prove-secure-must-never-appear'
-# Terraform type, physical-name attribute, contract prefix, literal, ARN.
 CASES = [
     ('aws_sns_topic', 'name', 'channel::sns', 'signal', 'arn:aws:sns:eu-west-1:123456789012:signal'),
     ('aws_cloudwatch_event_bus', 'name', 'channel::eventbridge', 'hub', 'arn:aws:events:eu-west-1:123456789012:event-bus/hub'),
@@ -58,10 +57,6 @@ def orphan_set_matches(text, expected):
 
 
 def expected_orphans(provisioners, config_uses):
-    # Derived solely from the generated neutral source: each AWS group has one
-    # explicit unused provisioner and missing use. The default EventBridge source
-    # intentionally has no bus provisioner. #661 also reads non-defining literal ARNs
-    # in the subscription config, independently of whether the route is accepted.
     expected = {}
     for prefix in dict.fromkeys(case[2] for case in CASES):
         kind = prefix.split('::')[1]
@@ -114,9 +109,6 @@ def seed(run):
     code = 'import boto3\nqueue = boto3.client("sqs")\n'
     tf, expected, bindings, config_uses = '', {}, [], []
     def reference_block(typ, label, body):
-        # Read only literal ARN fields in these neutral subscription/target blocks. Defining
-        # physical-name attributes are intentionally outside this source key. Expressions
-        # such as aws_sqs_queue.sns_refs.arn are not stored literal config identifiers.
         for key, quoted in re.findall(r'^\s*(\w+)\s*=\s*("arn:[^"\n]+")\s*$', body, re.M):
             value = json.loads(quoted)
             channel = re.fullmatch(r'arn:aws:(sqs|sns):[^:]+:\d{12}:([A-Za-z0-9_-]+)', value)
@@ -126,12 +118,10 @@ def seed(run):
                 contract = 'resource::s3::' + value.removeprefix('arn:aws:s3:::').split('/', 1)[0]
             else:
                 raise ValueError('Unkeyed neutral ARN fixture: ' + value)
-            # A literal ARN is a structured identifier: an `exact` use, the level `meada export` writes since #844.
             config_uses.append({'contract': contract, 'site': REMOTE + 'infra',
                                 'at': f'main.tofu#resource.{typ}.{label}.{key}', 'level': 'exact'})
         return block(typ, label, body)
     channel_names = {kind: [] for kind in ['sns', 'eventbridge', 'kinesis']}
-    # Two provisioners per identity exercise ARN extraction independently of name matching.
     for i, (typ, attr, prefix, name, arn) in enumerate(CASES):
         contract = f'{prefix}::{name}'
         for label, value in [('literal', name), ('arn', arn)]:
@@ -146,7 +136,6 @@ def seed(run):
             symbol = f'read_case_{i}'
             code += f'\ndef {symbol}():\n    return "reader-{i}"\n'
             manifest += f'\n[[resource]]\nkind = "{kind}"\nid = "{name}"\nrole = "read"\nvia = ["app.py::{symbol}"]\n'
-    # Every new kind has a provisioned-but-unused and a used-but-unprovisioned name.
     for prefix in dict.fromkeys(case[2] for case in CASES):
         typ, attr, _, _, _ = next(case for case in CASES if case[2] == prefix)
         kind = prefix.split('::')[1]
@@ -157,13 +146,11 @@ def seed(run):
             channel_names[kind].append('missing-' + kind)
         else:
             manifest += f'\n[[resource]]\nkind = "{kind}"\nid = "missing-{kind}"\nrole = "read"\n'
-    # Refused forms remain searchable IaC nodes, but hold no provisioned contract.
     tf += 'data "aws_sns_topic" "read_only" { name = "signal" }\n'
     tf += block('aws_unrecognized_service', 'unknown', '  name = "signal"')
     tf += block('aws_sns_topic', 'wrong_service', '  name = "arn:aws:sqs:eu-west-1:123456789012:signal"')
     tf += block('aws_dynamodb_table', 'wrong_service', '  name = "arn:aws:s3:::ledger"')
     tf += block('aws_kinesis_stream', 'unresolved', '  name = terraform.workspace')
-    # Filtered and unfiltered subscriptions must preserve source, consumer and level.
     queues = ['sns_open', 'sns_filter', 'sns_refs', 'bus_open', 'bus_filter', 'bus_default', 'bus_other',
               'bad_protocol', 'bad_topic', 'bad_rule', 'bad_bus', 'bad_target', 'timer_only', 'ambiguous_rule']
     for queue in queues:
@@ -182,8 +169,6 @@ def seed(run):
         tf += reference_block('aws_sns_topic_subscription', label, body)
         bindings.append((f'channel::sns::signal', f'channel::sqs::{queue}', address,
                          'inferred' if filtered else 'exact', 'sns.asyncapi.json'))
-    # A second bus with the SAME physical rule name must select its own producer.
-    # This is a positive counterpart to the missing-other-bus refusal below.
     tf += block('aws_cloudwatch_event_bus', 'distinct_bus', '  name = "edge"')
     expected['aws_cloudwatch_event_bus.distinct_bus'] = 'channel::eventbridge::edge'
     channel_names['eventbridge'].append('edge')
@@ -191,7 +176,6 @@ def seed(run):
                                       ('filter', 'bus_filter', 'hub', True),
                                       ('default', 'bus_default', None, False),
                                       ('other', 'bus_other', 'edge', False)]:
-        # A no-pattern/no-schedule rule is a synthetic unfiltered representation.
         rule_name = 'rule-open' if label == 'other' else f'rule-{label}'
         body = f'  name = "{rule_name}"'
         if bus:
@@ -213,14 +197,11 @@ def seed(run):
     tf += reference_block('aws_cloudwatch_event_target', 'bad_target', '  rule = "rule-open"\n  event_bus_name = "hub"\n  arn = "arn:aws:s3:::bad_target"')
     tf += block('aws_cloudwatch_event_rule', 'timer_only', '  name = "timer-only"\n  event_bus_name = "hub"\n  schedule_expression = "rate(5 minutes)"')
     tf += reference_block('aws_cloudwatch_event_target', 'timer_only', '  rule = aws_cloudwatch_event_rule.timer_only.name\n  event_bus_name = "hub"\n  arn = "arn:aws:sqs:eu-west-1:123456789012:timer_only"')
-    # Two declarations with the same bus/name make a literal target ambiguous.
-    # Certain or absent forbids selecting the first declaration arbitrarily.
     for label in ['ambiguous_first', 'ambiguous_second']:
         tf += block('aws_cloudwatch_event_rule', label, '  name = "rule-ambiguous"\n  event_bus_name = "hub"')
     tf += reference_block('aws_cloudwatch_event_target', 'ambiguous_rule', '  rule = "rule-ambiguous"\n  event_bus_name = "hub"\n  arn = "arn:aws:sqs:eu-west-1:123456789012:ambiguous_rule"')
     channel_names['eventbridge'].append('default')
     write(infra, 'main.tofu', tf)
-    # OpenTofu overrides a same-basename .tf. A stale or duplicate .tf must not provision.
     write(infra, 'main.tf', block('aws_sns_topic', 'shadowed', '  name = "shadowed-must-not-provision"'))
     write(app, 'meada.toml', manifest)
     write(app, 'app.py', code)
@@ -492,7 +473,6 @@ def main():
             server.terminate()
             server.wait(timeout=30)
             write(run, 'http.stopped', str(server.returncode))
-        # Same-size content edit: rename both topic and routes, keep app unchanged.
         path = infra / 'main.tofu'
         original = path.read_text()
         path.write_text(original.replace('signal', 'silent'))
@@ -509,8 +489,6 @@ def main():
         fields = ['provisioners', 'provisions', 'subscriptions', 'links']
         probe.check('restore round trip', all(restored.get(f) == data.get(f) for f in fields)
                     and all(restored_app.get(f) == app_data.get(f) for f in fields))
-        # The infra file now has legitimate #661 config uses, so isolation is a mixed
-        # SNS/SQS scope. It must not be mislabeled as provision-only or blessed with no rows.
         for name, source in [('infra-config-only', infra), ('only-uses', app)]:
             isolated = run / 'work' / name
             shutil.copytree(source, isolated, ignore=shutil.ignore_patterns('.git', '.meada'))
@@ -540,8 +518,6 @@ def main():
                             canonical_rows(isolated_export.get('provisions', [])) == canonical_rows(isolated_config_links), isolated_export.get('provisions'))
             probe.check('orphan gate ' + name, 'not indexed' not in isolated_status
                         and orphan_set_matches(isolated_status, config_only_orphans(expected, config_uses) if source == infra else {}), isolated_status)
-        # A genuinely one-sided source remains required. Defining ARN attributes create
-        # provisioners without creating config uses of themselves (ADR 0026).
         isolated = run / 'work/only-provisioners'
         isolated.mkdir()
         write(isolated, 'meada.toml', '')
@@ -555,7 +531,6 @@ def main():
                     and not any(isolated_export.get(field) for field in ['uses', 'providers', 'consumers']), isolated_export)
         isolated_status = probe.command(head, isolated, 'only-provisioners-status', 'status')
         probe.check('orphan gate only-provisioners', 'not indexed' not in isolated_status and orphan_set_matches(isolated_status, {}), isolated_status)
-        # Unchanged code-only flow is driven on the same neutral repository with both binaries.
         clean = run / 'work/plain'
         clean.mkdir()
         git('init', '-q', cwd=clean)

@@ -1,6 +1,3 @@
-//! Mechanical SDK extraction shared by contract kinds: constructor evidence, folded request
-//! fields and call sites. Library names and operations belong to each kind's table.
-
 use super::{Found, Role, Site};
 use crate::lang::{Part, Value, literal};
 use crate::resolve::{Code, Expand, Frame};
@@ -12,8 +9,6 @@ pub(crate) mod java;
 pub(crate) mod mutations;
 pub(crate) mod origins;
 
-/// Complete normalized argument identity for the shared constructor memo. The kind
-/// projects scalar leaves; object and list structure is language-neutral syntax.
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 pub(crate) enum Identity<T> {
     #[default]
@@ -40,8 +35,6 @@ impl<T> Identity<T> {
     }
 }
 
-/// A folded SDK name, retaining verified runtime environment aliases. Physical identity
-/// projection belongs to the caller's contract kind.
 pub(crate) fn argument<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -81,31 +74,21 @@ pub(crate) fn argument<'a>(
     }
 }
 
-/// The SDK spellings of one client, supplied by its contract kind.
 pub(crate) struct Client {
     pub java: &'static str,
     pub go: &'static str,
     pub csharp: &'static str,
 }
 
-/// An operation's direction and the request field naming the contract.
 pub(crate) struct Operation {
     pub method: &'static str,
-    /// The path to the name: `.` descends, `[]` takes every element, `.*` every key of a map.
-    /// A path of three members, `Items[].Put|Update.TableName`, has its middle member name the
-    /// variants an element may set (one member, or `A|B` for either): an element setting none of
-    /// them has no use for this row. A method can have several rows, one per direction.
     pub field: &'static str,
     pub role: Role,
-    /// A hierarchy query does not identify one physical resource.
     pub hierarchy: bool,
 }
 
-/// A kind's SDK client and the operations it recognizes.
 pub(crate) struct Service {
     pub client: Client,
-    /// SDK client types whose declaration alone is the client's origin, in full: the injected
-    /// clients SQS forms took before constructor evidence (#660). Empty for the other services.
     pub declared: &'static [&'static str],
     pub kind: &'static str,
     pub operations: &'static [Operation],
@@ -150,8 +133,6 @@ impl Language {
     }
 }
 
-/// Extract the kind's SDK operations. Only a service's `declared` types stand in for
-/// construction.
 pub(crate) fn extract<'a>(
     code: &Code<'a>,
     prefix: &str,
@@ -177,8 +158,6 @@ pub(crate) fn extract<'a>(
             continue;
         }
         let mut origins = origins::Origins::new(code, language);
-        // A transaction folds a value per entry, and a file of them would spend what its other
-        // calls need: its rows have a budget of their own, here and in `Code::apart`.
         let mut apart = origins::Origins::new(code, language);
         let aliases: BTreeMap<_, _> = if language == Language::Csharp {
             facts
@@ -192,7 +171,6 @@ pub(crate) fn extract<'a>(
         for (index, stored) in facts.calls.iter().enumerate() {
             let method = crate::resolve::method(&stored.callee);
             let (budget_start, mut cut) = (code.spent_apart(path), false);
-            // A method can have several rows: a transaction's entries differ in direction.
             let operations = services.iter().flat_map(|service| {
                 (service.operations.iter())
                     .filter(|o| language.method(method, o.method))
@@ -211,12 +189,6 @@ pub(crate) fn extract<'a>(
                     {
                         return;
                     }
-                    // A path of entries judges each name by its own mentions (`held_changed`).
-                    // In Go nothing else does: a composite literal a local holds alone has no
-                    // other name, so a field written through another name reaches no such value
-                    // (#774). C# counts a write of the field in any file too: a class derived
-                    // from an SDK model type can keep `this` in its constructor or in a setter,
-                    // and a write through that reference is one.
                     let entries = language != Language::Java && reads_entries(operation.field);
                     let held = |params: Params<'_, 'a>| {
                         let field = operation.field;
@@ -240,8 +212,6 @@ pub(crate) fn extract<'a>(
                         }
                     };
                     let changed = judged.changed;
-                    // Where only parameters their Go function writes twice stand between the
-                    // path and its names, each site is judged by the calls that bind them (#774).
                     let per_site =
                         language == Language::Go && entries && changed && !held(Params::Held);
                     let read = |args: &[Value], keywords: &crate::resolve::Keywords| {
@@ -253,8 +223,6 @@ pub(crate) fn extract<'a>(
                         for value in &values {
                             names.push(match (changed && !per_site, value) {
                                 (true, _) => Name::default(),
-                                // As with a value that changed, a read through a parameter goes
-                                // on where a name is not one.
                                 (false, Some(v)) => {
                                     match name(code, path, Some(v), service.kind, &aliases) {
                                         Some(name) => name,
@@ -262,8 +230,6 @@ pub(crate) fn extract<'a>(
                                         None => return None,
                                     }
                                 }
-                                // ADR 0026: an entry without a bus sends to `default`; an SNS
-                                // phone or endpoint publish names no topic.
                                 (false, None) if service.kind == "eventbridge" => Name {
                                     literal: Some("default".into()),
                                     env: None,
@@ -277,8 +243,6 @@ pub(crate) fn extract<'a>(
                     let injected = (language == Language::Java)
                         .then_some(&inject as &crate::resolve::Inject<'a, '_>);
                     let checked = match language {
-                        // These readers preserve the request's shape and check its writes at
-                        // the relevant call. Other reads may carry a reassigned scalar.
                         Language::Go => entries,
                         Language::Java => true,
                         _ => false,
@@ -288,8 +252,6 @@ pub(crate) fn extract<'a>(
                     });
                     for expanded in expanded {
                         let (at, index) = expanded.site;
-                        // A site with no name to lose is not judged: a second answer a cut
-                        // cycle gives a site spends nothing more of the file's budget (#886).
                         let named = |n: &Name| n.literal.is_some() || n.env.is_some();
                         let passed = expanded.found.iter().any(named)
                             && match language {
@@ -343,11 +305,6 @@ pub(crate) fn extract<'a>(
                     row();
                     continue;
                 }
-                // Each row of a call reads the request on the budget the call started with, and
-                // the call spends what its rows spend together: what the writer row spent does
-                // not cut the reader row short (a call of `Put` entries only got a reader, #784).
-                // Once a row runs out of it, the call's later rows are not read, as the calls
-                // after it are not: they would read part of the request.
                 if cut {
                     continue;
                 }
@@ -363,7 +320,6 @@ pub(crate) fn extract<'a>(
     found
 }
 
-/// Whether a step sets a member of the name's path (`topicArn`, `entries`, `eventBusName`).
 fn setter(selector: &str) -> impl Fn(&str) -> bool + '_ {
     move |method| {
         selector.split(['.', '|']).any(|member| {
@@ -377,26 +333,14 @@ fn setter(selector: &str) -> impl Fn(&str) -> bool + '_ {
     }
 }
 
-/// Whether the path is a transaction's: three members. Its rows fold on a budget of their own
-/// (`Code::apart`).
 fn transaction(selector: &str) -> bool {
     selector.matches('.').count() == 2
 }
 
-/// Whether the path reads a list of entries (`Entries[].EventBusName`, a transaction's
-/// `TransactItems[]`): a request, a list, an item or an entry held in a name on it is followed by
-/// the mentions of that name (#719, #773). The other paths keep the rule they had.
 fn reads_entries(selector: &str) -> bool {
     selector.contains("[].")
 }
 
-/// Whether a wrapper's caller passes the request on as a value that changed (Java): the request
-/// the wrapper reads is what its callers hand it, and a call judged where it is made sees only
-/// the parameter. Each argument of each call climbed is judged in the scope of that call; the
-/// one at the parameter the path's list comes in (`request`), by the rule of a list the call
-/// reads (#772), and when it is a parameter of that scope in turn, the next call's argument there.
-/// A parameter changed after the read takes only a list the call makes for it (`Judged::fresh`):
-/// a caller's own list may be read again, by a loop, a lambda or recursion further up.
 fn passed_changed<'a>(
     code: &Code<'a>,
     frames: &[crate::resolve::Frame<'a>],
@@ -410,7 +354,6 @@ fn passed_changed<'a>(
             parameter = None;
             continue;
         };
-        // A call that binds its arguments to no one parameter each (varargs) is no position.
         if parameter.is_some()
             && code
                 .def(frame.def.path, frame.def.name)
@@ -425,8 +368,6 @@ fn passed_changed<'a>(
         {
             return true;
         }
-        // The list handed on twice is another name of it in the wrapper, which the read does not
-        // see: `w(l, l)` and a wrapper that sets its second parameter.
         if let Some(Value::Ref(list)) = position.and_then(|p| call.args.get(p))
             && (call.args.iter().enumerate())
                 .any(|(i, arg)| Some(i) != position && java::hands(arg, list))
@@ -456,11 +397,6 @@ fn passed_changed<'a>(
     false
 }
 
-/// A named request can change after construction, and so can a named value an inline request
-/// holds on the name's path (a Java entry builder); inline literals cannot change before the call.
-/// In C# this judges every path, and in Go the ones that read no list of entries (`held_changed`
-/// judges those alone): a named value met on one changes when any file writes the member read
-/// off it. In Java, also the parameter the path's list comes in unchanged (`java::Judged`).
 fn changed_request<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -497,13 +433,10 @@ fn changed_request<'a>(
             );
         }
     };
-    // Follow the name's path through the request as written: a named value met on it changes
-    // when a file writes the member read off it.
     let mut values: Vec<&Value> = request.into_iter().collect();
     for member in selector.split('.') {
         let mut next = Vec::new();
         for value in values {
-            // Each variant of a member is on the path.
             for field in member.split('|').map(|f| f.trim_end_matches("[]")) {
                 if let Value::Ref(_) = value {
                     if opaque(code, field, language, written) {
@@ -529,10 +462,6 @@ fn changed_request<'a>(
     judged(false)
 }
 
-/// The Go packages (directories) a file of which declares `len` or `cap` (#774): there `len(x)`
-/// and `cap(x)`, which the Go pack's counts leave out (`Mentioned::read`), may be the
-/// repository's code, so they are mentions again. A file the target does not build is not among
-/// the files, as for every Go name.
 fn hiding_builtins<'a>(code: &Code<'a>) -> BTreeSet<&'a str> {
     let mut packages = BTreeSet::new();
     for (&path, facts) in code.files() {
@@ -549,25 +478,18 @@ fn directory(path: &str) -> &str {
     path.rsplit_once('/').map_or("", |(directory, _)| directory)
 }
 
-/// How often a file's functions write their names, by function and name (`Facts::mentioned`).
 type Written<'a> = HashMap<(&'a str, &'a str), u32>;
 
-/// How often each function of a file writes its locals and its parameters, read once per file:
-/// a wrapper's callers are in other files.
 #[derive(Default)]
 struct Counts<'a> {
     files: std::cell::RefCell<HashMap<&'a str, Written<'a>>>,
-    /// `hiding_builtins`, read once.
     hiding: std::cell::OnceCell<BTreeSet<&'a str>>,
 }
 
 impl<'a> Counts<'a> {
-    /// Whether the function `scope` of `path` writes `name` twice.
     fn twice(&self, code: &Code<'a>, path: &'a str, scope: &'a str, name: &'a str) -> bool {
         let mut files = self.files.borrow_mut();
         let counts = files.entry(path).or_insert_with(|| {
-            // Where the package may declare `len` or `cap`, `len(x)` may be the repository's
-            // code: the reads left out count again.
             let hides =
                 (self.hiding.get_or_init(|| hiding_builtins(code))).contains(directory(path));
             (code.mentioned(path).iter())
@@ -582,33 +504,19 @@ impl<'a> Counts<'a> {
     }
 }
 
-/// How `held_changed` reads a parameter of a Go function that writes it twice, where it declares
-/// it and where the path reads it (#774): nothing in the function changes what a caller passes.
 #[derive(Clone, Copy)]
 enum Params<'f, 'a> {
-    /// Not followed: a parameter can hold anything.
     Unknown,
-    /// Held, whatever the callers pass.
     Held,
-    /// What the call of its frame passes, followed in the caller as any value: the call runs
-    /// that function alone (`Code::runs_alone`) and passes one argument for each parameter.
     Bound(&'f [Frame<'a>]),
 }
 
-/// Where a value on a path is written: its file and the scope inside it.
 #[derive(Clone, Copy)]
 struct Place<'a> {
     file: &'a str,
     scope: &'a str,
 }
 
-/// Whether a name on a path of entries (`reads_entries`) may hold a value that changed (Go and
-/// C#). A request, a list, an item and an entry change in place through any name that holds them:
-/// a write past the first member, an element replaced, `append`, `Add`, a helper. So a name is
-/// followed only when the function that declares it writes it twice, where it is declared
-/// and where the path reads it (`Facts::mentioned`). Any other mention is a change this reader
-/// does not follow, and a name that is no local of a function of the file (a field, a package
-/// variable, a parameter but as `params` says) can change anywhere.
 fn held_changed<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -627,7 +535,6 @@ fn held_changed<'a>(
     } else {
         call.keyword("request").or_else(|| call.args.first())
     };
-    // What a value on the path is once its names are followed, with the place it is written in.
     let followed = |mut value: &'a Value, mut at: Place<'a>| {
         for _ in 0..crate::resolve::EVAL_DEPTH {
             let Value::Ref(name) = value else {
@@ -659,7 +566,6 @@ fn held_changed<'a>(
                 Params::Bound(frames) => {
                     let frame = frames.iter().find(|f| f.def == function)?;
                     let passes = code.call(frame.path, frame.index)?;
-                    // One argument for each parameter: a variadic one takes any number.
                     let count = passes.args.len();
                     if !code.runs_alone(function)
                         || code.param(function, count).is_some()
@@ -672,7 +578,6 @@ fn held_changed<'a>(
                     else {
                         return None;
                     };
-                    // An argument left out is a default, written in the function.
                     if file != frame.path || scope != passes.scope {
                         return None;
                     }
@@ -694,7 +599,6 @@ fn held_changed<'a>(
             let Some((value, at)) = followed(value, at) else {
                 return true;
             };
-            // The last member is the name itself, which `name` reads off the entry.
             if depth + 1 == members.len() {
                 continue;
             }
@@ -711,7 +615,6 @@ fn held_changed<'a>(
                     next.push((inner, at));
                     continue;
                 }
-                // The list is a value of its own, followed before its elements.
                 let Some((list, at)) = followed(inner, at) else {
                     return true;
                 };
@@ -723,7 +626,6 @@ fn held_changed<'a>(
     false
 }
 
-/// Whether a file writes `field` of a named request value (Go and C#).
 fn opaque<'a>(
     code: &Code<'a>,
     field: &str,
@@ -738,8 +640,6 @@ fn opaque<'a>(
         || language == Language::Csharp
             && written
                 .get_or_init(|| {
-                    // C# keeps selector writes as bound paths. Index their last member once,
-                    // across files, so a write through any alias invalidates a named request.
                     code.files()
                         .keys()
                         .flat_map(|&path| code.bindings(path))
@@ -754,9 +654,6 @@ fn opaque<'a>(
                 .contains(field)
 }
 
-/// Read scalar fields, name lists, event entries, table-keyed batch requests and transaction
-/// entries. Each value is visited once; every path here is a short constant supplied by the kind, never source text.
-/// `None` is a field a request Meada sees whole leaves out.
 fn request<'v>(
     call: &'v crate::lang::Invocation,
     keywords: &'v crate::resolve::Keywords,
@@ -780,7 +677,6 @@ fn request<'v>(
             .map(|(_, v)| v))
         .or_else(|| call.args.first()),
     };
-    // `Put|Update.TableName`: the variants an element may set, then the name read off it.
     let (variants, field) = tail.map_or((None, None), |tail| match tail.rsplit_once('.') {
         Some((variants, field)) => (Some(variants), Some(field)),
         None => (None, Some(tail)),
@@ -816,7 +712,6 @@ fn request<'v>(
                     }
                     match set {
                         Some(set) => set,
-                        // A whole element that sets none of the variants has no use here.
                         None if complete(value) => {
                             skipped = true;
                             continue;
@@ -844,11 +739,6 @@ fn request<'v>(
     Some(out)
 }
 
-/// Whether a request value shows every field it sets: a Go or C# literal, or a Java builder
-/// chain started by an SDK request type's `builder()` (`PublishRequest.builder()`, not a
-/// helper or factory of the repository's own named `builder`; a transaction entry is built by
-/// `TransactWriteItem.builder()` or `TransactGetItem.builder()`). Only then does a missing field
-/// mean the request leaves it out.
 fn complete(value: &Value) -> bool {
     match value {
         Value::Object(_) => true,
@@ -950,8 +840,6 @@ fn name<'a>(
                 }
                 _ => None,
             });
-            // Queue identity is its URL's final segment, even with a dynamic account/host.
-            // This preserves the existing SQS form's custom endpoint and wrapper behavior.
             let literal = if kind == "sqs" {
                 let mut tail: Vec<_> = parts
                     .iter()
@@ -987,8 +875,6 @@ fn name<'a>(
     }
 }
 
-/// Normalize names by the same type-table forms as their provisioners. A structured name of
-/// another service stays unresolved, rather than becoming a plausible physical name.
 fn physical(kind: &str, text: &str) -> Option<String> {
     let ty = match kind {
         "sqs" => "aws_sqs_queue",

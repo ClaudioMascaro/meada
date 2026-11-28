@@ -1,4 +1,3 @@
-//! The documented Node.js GCP client forms, shared by JavaScript and TypeScript syntax.
 use super::{Argument, Code, Frame, Handle, Role, Stage, argument, field, imported};
 
 pub(super) fn constructed<'a>(

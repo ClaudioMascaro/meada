@@ -14,7 +14,6 @@ import type { WorkspaceDetail } from '../src/named';
 import { namedCopy } from '../src/named-i18n';
 import config from './fixtures/config.json';
 
-// The bundle is read from disk: a mocked `fetch` answers the page's routes, not the WebAssembly file.
 vi.mock('../src/core', async importOriginal => ({
   ...await importOriginal<typeof import('../src/core')>(),
   loadCore: async (language: 'en' | 'pt-BR') => { init(language); },
@@ -48,11 +47,9 @@ const view = (diagnostics: object[] = []) => ({
 });
 const summary = (operate: boolean) => ({ workspaces: [{ id: ID, name: 'Payments', description: 'Y', version: 'fedcba9876543210', state: 'applied', entries: 1, operate }], next: null });
 
-/** A `fetch` answering by route, the way the console does: effects of a page may ask in any order. */
 function answers(table: Record<string, () => Response>) {
   return vi.fn(async (route: string, init?: RequestInit) => {
     const key = `${init?.method ?? 'GET'} ${route}`;
-    // The versions page reads its list beside the detail: an empty list unless the test says otherwise.
     const answer = table[key] ?? Object.entries(table).find(([k]) => key.startsWith(k) && !key.includes('/versions'))?.[1]
       ?? (key.includes('/versions') ? () => Response.json({ base: 1, versions: [], next: null }) : undefined);
     if (!answer) throw new Error(`unexpected ${key}`);
@@ -109,10 +106,8 @@ test('the guided controls and the text are one canonical document, and computing
   const fetch = await open({});
   const before = fetch.mock.calls.length;
   await assemble();
-  // The form wrote exactly the text the core writes for those entries, and nothing but a route read happened.
   expect(text()).toBe(namedEntriesText(entriesJson(full)));
   expect(fetch.mock.calls.length).toBe(before);
-  // The same document typed as text fills the form with the same values.
   const typed = text();
   await type(getByLabelText(host, t.manifestText), `[[repository]]\nrepo = "${Y}"\n[repository.serve]\nhosts = ["other.example"]\n`);
   expect((entry(Y).getByLabelText(g.hosts) as HTMLTextAreaElement).value).toBe('other.example');
@@ -151,7 +146,6 @@ test('eligibility, ingestion and the effective configuration of each entry are t
   expect(list(Y)).toContain(`${g.ingestion}: ${t.ready}`);
   expect(list(A)).toContain(g.selectable);
   expect(list(A)).toContain(g.newEntry);
-  // B is typed in the text: the catalog never listed it, so it is not verified and the change cannot be saved.
   await type(getByLabelText(host, t.manifestText), `${text()}\n[[repository]]\nrepo = "${B}"\n`);
   await type(editor().getByLabelText(t.message), 'add b');
   expect(list(B)).toContain(g.notVerified);
@@ -160,7 +154,6 @@ test('eligibility, ingestion and the effective configuration of each entry are t
   await press(editor().getByRole('button', { name: g.verify }));
   await waitFor(() => expect(list(B)).toContain(g.unavailable));
   expect(JSON.parse((fetch.mock.calls.find(([r]) => r === '/api/v1/catalog/check')![1] as RequestInit).body as string)).toEqual({ identities: [B] });
-  // The effective configuration of the edits names what the repository's own file overrides, inside the entry.
   await press(entry(B).getByRole('button', { name: `${g.removeRepository} ${B}` }));
   await press(editor().getByRole('button', { name: t.checkEffective }));
   await waitFor(() => expect(list(Y)).toContain(t.diagnostic_ignored_by_repository));
@@ -183,7 +176,6 @@ test('the diff is concrete and the reviewed payload is frozen until the person c
   const dialog = getByRole(host, 'dialog');
   expect(within(dialog).getByRole('list', { name: `${g.diffTitle} (${g.payload})` }).textContent).toContain(`${g.diffAdded}: ${A}`);
   expect(dialog.textContent).toContain('link a');
-  // Whatever happens to the draft behind the dialog, only the reviewed payload is sent.
   await type(getByLabelText(host, t.manifestText), `[[repository]]\nrepo = "${B}"\n`);
   await type(editor().getByLabelText(t.message), 'changed behind the dialog');
   expect(dialog.textContent).toContain('link a');
@@ -220,7 +212,6 @@ test('a grant lost between review and apply is refused as the server words it, t
   expect(region.textContent).toContain(g.refusedHidden(1));
   expect(queryByRole(host, 'dialog')).toBeNull();
   await waitFor(() => expect(catalogReads()).toBeGreaterThan(before));
-  // The draft is kept, but A is no longer selectable and the change cannot be saved again as it is.
   await waitFor(() => expect(eligibility()).toContain(g.notVerified));
   expect(save().disabled).toBe(true);
   await press(entry(A).getByRole('button', { name: `${g.removeRepository} ${A}` }));
@@ -305,7 +296,6 @@ test('every control has a name and is reachable by keyboard', async () => {
     act(() => control.focus());
     expect(document.activeElement, control.outerHTML).toBe(control);
   }
-  // Groups are named by their legends, so a screen reader announces which entry a field belongs to.
   expect(queryAllByRole(host, 'group', { name: Y })).toHaveLength(1);
   expect(entry(Y).getByRole('group', { name: g.peer(1) })).toBeDefined();
 });

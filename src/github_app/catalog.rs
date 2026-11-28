@@ -1,22 +1,8 @@
-//! The catalog listing of the role check (#341, ADR 0021 contract 1): which repositories the
-//! Apps' installations cover and `[catalog] allow` admits, listed with the installation tokens
-//! `Run` hands out, under the same throttle marks as every other REST use of the module. It is
-//! coverage and no entitlement: the collaborators of each candidate are listed afterwards, and
-//! only a login holding an accepted role on one makes it selectable for that login.
-//!
-//! A listing that fails fails the role check and nothing is written: a partial candidate set
-//! would revoke repositories or mix two sets, and the previous set keeps aging until a run
-//! succeeds.
-
 use std::collections::BTreeSet;
 
 use super::*;
 use crate::catalog::Config as Catalog;
 
-/// The installations the role check lists the catalog through: every installation of the host's
-/// Apps whose owner some `[catalog] allow` pattern names, as owner and `Candidate`, ordered by
-/// owner, App id and installation id. Each App's installations are listed again first when due,
-/// as a `get` does; a listing that fails fails the run.
 async fn installations<'c>(
     run: &mut Run<'_>,
     apps: &[&'c Config],
@@ -28,10 +14,6 @@ async fn installations<'c>(
             let app = app.app_id;
             Msg::RolesCatalogInstallations { app, why }.text()
         };
-        // A listing that fails, or nothing held and no recent listing (the App throttled, or
-        // another run's listing unfinished at the lock's end), fails the run: skipping its
-        // installations would drop their repositories from every caller's catalog. An App
-        // listed with no installation holds nothing but is `listed`.
         run.refresh(app).await.map_err(|e| failed(&e))?;
         let held = run.app_key(app, "installations");
         let listed = run.app_key(app, "listed");
@@ -61,10 +43,6 @@ async fn installations<'c>(
     Ok(found)
 }
 
-/// The repositories of one installation, as `owner/repo` pairs in lowercase: every page of
-/// `GET /installation/repositories` with its token, up to `PAGES_MAX`. The answer is hostile: a
-/// page that is not the documented object, a name that is not `<owner>/<repo>` and a list that
-/// runs past the last page fail or are skipped, never trusted.
 fn repositories(
     agent: &ureq::Agent,
     app: &Config,
@@ -100,9 +78,6 @@ fn repositories(
     Err(Failure::Other(Msg::RolesCatalogPages(PAGES_MAX).text()))
 }
 
-/// How many of `found` the cap counts: those `selected` does not hold. `found` is lowercase
-/// (`repository`) and `selected` is folded on `host` as GitHub compares it (#508), so a selected
-/// identity written with uppercase letters is not one more.
 fn extra(host: &str, found: &BTreeSet<String>, selected: &BTreeSet<&str>) -> usize {
     let selected: BTreeSet<String> = (selected.iter())
         .map(|i| crate::modules::fold(host, i))
@@ -110,9 +85,6 @@ fn extra(host: &str, found: &BTreeSet<String>, selected: &BTreeSet<&str>) -> usi
     found.iter().filter(|i| !selected.contains(*i)).count()
 }
 
-/// The catalog's candidates on `host`: the identities the installations cover that `config`
-/// allows, sorted. A candidate set with more identities than `selected` holds, plus
-/// `[catalog] max_repositories`, fails the run (the selected identities are not counted).
 pub(super) async fn candidates(
     run: &mut Run<'_>,
     apps: &[&Config],
@@ -169,7 +141,6 @@ mod tests {
             .into();
         let selected = BTreeSet::from(["github.com/Acme/API"]);
         assert_eq!(extra("github.com", &found, &selected), 1);
-        // Another host compares exactly, as before.
         let found = BTreeSet::from(["ghe.example/acme/x".to_string()]);
         let selected = BTreeSet::from(["ghe.example/Acme/X"]);
         assert_eq!(extra("github.com", &found, &selected), 1);

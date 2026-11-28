@@ -1,16 +1,3 @@
-// Command terraform-oracle computes, with HashiCorp's HCL and cty libraries, the name Terraform
-// gives each case of cases.tsv, and rewrites the file's last column with it.
-//
-// Usage (from this directory): go run . [cases.tsv]
-//
-// A case is `<must>\t<expression>\t<terraform>`. The test in src/iac.rs indexes
-// `resource "a" "rN" { name = "q-${<expression>}" }` for each one: an exact name must equal
-// <terraform>, an error (`!<summary>`) allows none, and a row marked `=` must be exact.
-//
-// The functions are the ones Terraform takes as they are from cty's stdlib, plus the to*
-// conversions, which Terraform makes with cty's convert package. modules.go does the same for
-// the cases of modules/. Terraform's own functions
-// (length, lookup, coalesce, replace, ...) are absent, so a case calling one reads as an error.
 package main
 
 import (
@@ -68,7 +55,6 @@ func to(want cty.Type) function.Function {
 	})
 }
 
-// name is what Terraform makes of `name = "q-${expression}"`, or `!` and the first error.
 func name(expression string) string {
 	src := fmt.Sprintf("name = \"q-${%s}\"\n", expression)
 	file, diags := hclsyntax.ParseConfig([]byte(src), "case.tf", hcl.InitialPos)

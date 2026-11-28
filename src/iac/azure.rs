@@ -1,4 +1,3 @@
-//! Azure Terraform projections, using the contract kind's identity policy (#669).
 use super::*;
 
 impl<'m> Eval<'m> {
@@ -211,7 +210,6 @@ impl<'m> Eval<'m> {
         self.nodes[node].environment = candidate.environment;
     }
 
-    /// Qualify subscription identities with the complete, evaluated topic before provision/link.
     pub(super) fn azure_subscriptions(
         &mut self,
         pending: &[(usize, usize, &'m Block, Option<Each>)],

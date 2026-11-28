@@ -1,4 +1,3 @@
-//! The documented GCP Java builders and operation arguments.
 use super::{Argument, Code, Frame, Handle, Role, Stage, argument};
 
 pub(super) fn constructed<'a>(

@@ -11,10 +11,6 @@ import type { LocalAuth } from './local';
 import { sessionModel } from './models';
 import './account.css';
 
-/**
- * Under break glass (#563), before the identity provider's sign-in: its button first, and a
- * discreet link to the console's own page, which only the default account can pass.
- */
 export function SignInChoicePage({ locale, onIdentityProvider }: { locale: Language; onIdentityProvider: () => Promise<void> }) {
   const t = accountCopy[locale];
   const [busy, setBusy] = useState(false);
@@ -33,7 +29,6 @@ export function SignInChoicePage({ locale, onIdentityProvider }: { locale: Langu
   </div>;
 }
 
-/** The console's own sign-in page: two labelled fields, one generic refusal; under break glass, the default account's door with a way back to the identity provider. */
 export function SignInPage({ auth, locale, expired, breakGlass = false }: { auth: LocalAuth; locale: Language; expired: boolean; breakGlass?: boolean }) {
   const t = accountCopy[locale];
   const username = useId();
@@ -62,7 +57,6 @@ export function SignInPage({ auth, locale, expired, breakGlass = false }: { auth
   </form>;
 }
 
-/** The password change: the current password and the new one twice, sent to the server once they are filled and match. */
 export function PasswordForm({ auth, locale, title, level, intro }: {
   auth: LocalAuth; locale: Language; title: string; level: 1 | 2; intro?: string;
 }) {
@@ -86,7 +80,6 @@ export function PasswordForm({ auth, locale, title, level, intro }: {
     setBusy(true); setProblem(undefined);
     try {
       await auth.changePassword(field('current'), field('new'));
-      // On the forced page the stage flips here and the form unmounts: what follows is for the profile.
       form.reset(); setDone(true);
     } catch (error) { setProblem(changeProblem(error, t)); }
     setBusy(false);
@@ -109,17 +102,11 @@ export function PasswordForm({ auth, locale, title, level, intro }: {
   </form>;
 }
 
-/** The forced change: all a change-required session can do, and it offers nothing else. */
 export function ForcedChangePage({ auth, locale }: { auth: LocalAuth; locale: Language }) {
   const t = accountCopy[locale];
   return <PasswordForm auth={auth} locale={locale} title={t.forcedTitle} level={1} intro={t.forcedIntro} />;
 }
 
-/**
- * An agent token for the nodes (#560), or for the proposal server when the deployment runs one
- * (`proposals`, #562): the surface and the validity, then the token shown once with a copy control
- * and its expiry. It lives in this component's state alone, so leaving the page clears it.
- */
 export function AgentTokenForm({ api, locale, proposals = false }: { api: Api; locale: Language; proposals?: boolean }) {
   const t = accountCopy[locale];
   const surface = useId();
@@ -167,19 +154,12 @@ export function AgentTokenForm({ api, locale, proposals = false }: { api: Api; l
   </form>;
 }
 
-/**
- * The verified GitHub login (#561), with the GitHub grant provider of local accounts: the login the
- * session carries, a personal access token pasted to verify one (sent once, held in the form alone
- * and cleared after), and its removal. Each success swaps the session token and reads the session
- * again, so the page shows the login, the host and the grant's state at once.
- */
 export function GithubLoginForm({ api, auth, locale, session, onSession }: {
   api: Api; auth: LocalAuth; locale: Language; session: Session; onSession: (session: Session) => void;
 }) {
   const t = accountCopy[locale];
   const token = useId();
   const hint = useId();
-  // Which request runs: the verification or the removal, so each button names its own.
   const [pending, setPending] = useState<'verify' | 'remove'>();
   const busy = pending !== undefined;
   const [problem, setProblem] = useState<string>();
@@ -217,7 +197,6 @@ export function GithubLoginForm({ api, auth, locale, session, onSession }: {
   </form>;
 }
 
-/** The profile: who the session is, the voluntary password change, agent tokens and the verified GitHub login (never under break glass, which has neither) and sign-out. */
 export function ProfilePage({ api, auth, locale, session, onSession }: {
   api: Api; auth: LocalAuth; locale: Language; session: Session; onSession: (session: Session) => void;
 }) {

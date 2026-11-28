@@ -1,14 +1,3 @@
-//! Hostile input (`CODING_STANDARDS.md`): the readers of the manifests and configurations a
-//! repository holds, each fed a file built to explode (many keys, deep nesting, wide fan-out)
-//! within `lang::MAX_BYTES`, the most each of them reads. A lockfile is read up to its own cap,
-//! `lock::MAX_LOCK_BYTES`, and `a_lockfile_at_its_cap_stays_bounded` holds it to its own time
-//! and heap, `LOCK_BUDGET` and `LOCK_HEAP`. `probes` is the table a new reader adds
-//! its row to: a row reads such a file and answers the size of what the reader returned, and the
-//! test holds every row to `BUDGET` in time, to `MAX_OUT` in size and to `HEAP` in memory, the
-//! most its thread held above what it held when the row started (`heap` counts it). A file past
-//! a format's own limit (`XML_NODES`, `MAX_NESTING`) is unreadable, which is what that row proves;
-//! a row just under the limit proves the reader.
-
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
@@ -24,31 +13,18 @@ use crate::lang::csharp::CSharp;
 use crate::lang::swift::Swift;
 use crate::lang::{Facts, LanguagePack, MAX_BYTES};
 
-/// The time of one row, from its start. A row takes a few seconds at most in debug; a reader that
-/// does work per pair of nodes, or per link of a chain, misses any bound.
 const BUDGET: Duration = Duration::from_secs(30);
 
-/// What one reader may return for a file of `MAX_BYTES`: a few times its input, since a key is
-/// joined with its parents (`YAML_KEY_BUDGET`) and a summary repeats a name.
 const MAX_OUT: usize = 4 * MAX_BYTES;
 
-/// The heap one row may hold at once: a full file's parse tree and what the reader builds from
-/// it, a few times over. A reader that copies a value per reference to it passes it by far.
 const HEAP: usize = 256 << 20;
 
-/// The heap past which the allocator refuses a row, which aborts the tests (`heap`): a reader that
-/// grows without end stops there instead of taking the machine. Run the test with
-/// `--nocapture` to see the row that started last.
 const HEAP_CEILING: usize = 1 << 30;
 
-/// How deep a row nests a file whose format puts no limit of its own on its size.
 const NESTING: usize = 100_000;
 
-/// The projects of a repository a row puts under one props file.
 const PROJECTS: usize = 200;
 
-/// `unit(0)`, `unit(1)`, ... until the text reaches the `share`th part of `MAX_BYTES` less the
-/// room a row needs around it.
 fn fill(share: usize, unit: impl Fn(usize) -> String) -> String {
     let mut text = String::new();
     let mut i = 0;
@@ -59,24 +35,20 @@ fn fill(share: usize, unit: impl Fn(usize) -> String) -> String {
     text
 }
 
-/// `unit(0)` to `unit(n - 1)`.
 fn count(n: usize, unit: impl Fn(usize) -> String) -> String {
     (0..n).map(unit).collect()
 }
 
-/// A file as the reader gets it: within `MAX_BYTES`, else a row would test the size check.
 fn file(text: String) -> Vec<u8> {
     assert!(text.len() <= MAX_BYTES, "{} bytes", text.len());
     text.into_bytes()
 }
 
-/// The size of the summary the manifest at `path` reads as.
 fn manifest(path: &str, text: String) -> usize {
     let summary = read_manifest(path, &file(text));
     serde_json::to_string(&summary).unwrap().len()
 }
 
-/// The size of what the Spring configuration `name` (`application.yml`) reads as.
 fn configured(name: &str, text: String) -> usize {
     let path = format!("src/main/resources/{name}");
     let configs = spring::Configs::read(&[(&path, &file(text))], &[]);
@@ -86,7 +58,6 @@ fn configured(name: &str, text: String) -> usize {
         .sum()
 }
 
-/// The size of a project as MSBuild files read it, in the bytes of its names.
 fn project_size(project: Option<msbuild::Project>) -> usize {
     let project = project.unwrap_or_default();
     let usings = (project.usings.iter()).map(|u| match u {
@@ -98,18 +69,12 @@ fn project_size(project: Option<msbuild::Project>) -> usize {
     usings.chain(references).sum()
 }
 
-/// How many documents and scalars the event reader gives for `text` read as `syntax`, every
-/// document and every scalar with its position; a stream it cannot read gives the scalars handed
-/// out before it stopped.
 fn stream(syntax: Syntax, text: String) -> usize {
     let mut handed = 0;
     let documents = events::read(syntax, &file(text), |_| handed += 1);
     handed + documents.map_or(0, |d| d.len())
 }
 
-/// The bytes of the key paths and values config values store for `text` at `path`, read whole
-/// as a file a reader of a kind takes (`config_values::kind_file`): past `VALUES_MAX` a generic
-/// file stores none (#817).
 fn stored(path: &str, text: String) -> usize {
     let (outcome, rows) = config_values::read_with(path, &file(text), &Default::default(), || true);
     assert_ne!(outcome, config_values::Outcome::Data, "{path}");
@@ -118,14 +83,10 @@ fn stored(path: &str, text: String) -> usize {
         .sum()
 }
 
-/// The bytes of the addresses and names the IaC nodes and references of `text`, a lone
-/// `main.tf`, store.
 fn nodes(text: String) -> usize {
     tree(vec![("main.tf".into(), text)])
 }
 
-/// The bytes of the addresses and names the IaC nodes and references of the Terraform files
-/// `files` (path and text) store.
 fn tree(files: Vec<(String, String)>) -> usize {
     let files: Vec<(String, Vec<u8>)> = (files.into_iter())
         .map(|(path, text)| (path, file(text)))
@@ -144,8 +105,6 @@ fn tree(files: Vec<(String, String)>) -> usize {
     nodes.chain(references).sum()
 }
 
-/// The bytes of the addresses the IaC nodes and references of `text`, a lone `compose.yaml`,
-/// store.
 fn compose(text: String) -> usize {
     let (nodes, references) = crate::iac::evaluate(&[("compose.yaml".into(), file(text))]);
     let nodes = nodes.iter().map(|n| {
@@ -160,8 +119,6 @@ fn compose(text: String) -> usize {
     nodes.chain(references).sum()
 }
 
-/// The bytes of the addresses, names and references the IaC nodes of `text`, a lone
-/// `template.yaml` of CloudFormation (#653), store.
 fn template(text: String) -> usize {
     let head = "AWSTemplateFormatVersion: x\n";
     let (nodes, references) =
@@ -178,9 +135,6 @@ fn template(text: String) -> usize {
     nodes.chain(references).sum()
 }
 
-/// A template whose parameter `Long` defaults to half of `MAX_BYTES`, with a bucket `B` named by
-/// it, and a queue named by `name` with `REFS` replaced by `reference` repeated, joined by
-/// `between`, to fill the rest of the file.
 fn cloudformation_long(name: &str, reference: &str, between: &str) -> usize {
     let long = "x".repeat(MAX_BYTES / 2);
     let room = MAX_BYTES / 2 - (1 << 12);
@@ -191,8 +145,6 @@ fn cloudformation_long(name: &str, reference: &str, between: &str) -> usize {
     ))
 }
 
-/// The bytes of the addresses, names, selectors, passed and hollow keys and references the CI
-/// nodes of `text`, a lone pipeline (#823), store.
 fn pipeline(text: String) -> usize {
     let (nodes, references) =
         crate::iac::actions::evaluate(".github/workflows/ci.yml", &file(text));
@@ -213,8 +165,6 @@ fn pipeline(text: String) -> usize {
     nodes.chain(references).sum()
 }
 
-/// The bytes of the addresses, names, handlers, events and references the IaC nodes of `text`, a
-/// lone `serverless.yml` (#654), store.
 fn service(text: String) -> usize {
     let head = "service: s\nprovider:\n  stage: ${opt:stage, 'dev'}\n";
     let (nodes, references) =
@@ -229,8 +179,6 @@ fn service(text: String) -> usize {
     nodes.chain(references).sum()
 }
 
-/// The bytes of the addresses, references, images and unresolved entries `kube::evaluate` stores
-/// for the files `files` (path and text) of one repository.
 fn objects(files: Vec<(&str, String)>) -> usize {
     let files: Vec<(String, Vec<u8>)> = (files.into_iter())
         .map(|(path, text)| (path.to_string(), file(text)))
@@ -261,13 +209,11 @@ fn objects(files: Vec<(&str, String)>) -> usize {
         .sum()
 }
 
-/// A ConfigMap `m` whose data fills half of `MAX_BYTES`.
 fn config_map() -> String {
     let data = fill(2, |i| format!("  k{i}: v\n"));
     format!("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: m\ndata:\n{data}")
 }
 
-/// A large shared host must not expand once for every path before its budget is checked.
 fn ingress_fanout() -> usize {
     let paths = fill(2, |i| {
         format!(
@@ -290,24 +236,18 @@ fn ingress_host_path_fanout_stays_bounded() {
     assert!(size <= MAX_OUT);
 }
 
-/// A kustomization file naming `entries`.
 fn kustomization(entries: impl Iterator<Item = String>) -> String {
     entries
         .map(|e| format!("  - {e}\n"))
         .fold("resources:\n".into(), |a, e| a + &e)
 }
 
-/// An SDK-style project file with `body` in it.
 fn project(body: &str) -> String {
     format!("<Project Sdk=\"Microsoft.NET.Sdk\">{body}</Project>")
 }
 
-/// How many imports a row resolves from the files of one project: `entries` is asked again for
-/// each, so a walk of the project's references per import costs the imports times the walk.
 const IMPORTS: usize = 1000;
 
-/// The size of the entries `Nuget.entries` gives a file of the project `App`, asked for each of
-/// `IMPORTS` files of it, in a repository of the projects `projects` (`(name, project file)`).
 fn referenced(projects: Vec<(String, String)>) -> usize {
     let manifests = (projects.into_iter())
         .map(|(name, text)| {
@@ -331,8 +271,6 @@ fn referenced(projects: Vec<(String, String)>) -> usize {
     sizes.max().unwrap_or(0)
 }
 
-/// The size of the entries `Maven.entries` gives a file of the module `app`, asked for each of
-/// `IMPORTS` files of it, in a repository of the modules `poms` (`(name, pom.xml)`).
 fn modules(poms: Vec<(String, String)>) -> usize {
     let manifests = (poms.into_iter())
         .map(|(name, text)| {
@@ -367,8 +305,6 @@ fn pom(artifact: &str, body: &str) -> String {
     format!("<project><groupId>g</groupId><artifactId>{artifact}</artifactId>{body}</project>")
 }
 
-/// A probe: its name, and a row that reads one file built to explode and answers the size of what
-/// the reader returned.
 type Probe = (&'static str, fn() -> usize);
 
 fn probes() -> Vec<Probe> {
@@ -560,7 +496,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 let entries = fill(1, |i| format!("    E{i}: v{i}\n"));
                 let mut keys: Vec<String> = (0..1000).map(|i| format!("lib-chart.k{i}")).collect();
                 keys.push("lib-chart.envs".into());
-                // The fixture's chart: its `values.yaml` lies under the file.
                 crate::image::Image
                     .config_summary(
                         "svc/chart/api/values-stg.yaml",
@@ -622,7 +557,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 .to_string()
                 .len()
         }),
-        // npm: `package.json`
         ("npm: many dependencies", || {
             let deps = fill(1, |i| format!("\"p{i}\":\"^1.0.{i}\","));
             let text = format!("{{\"dependencies\":{{{deps}\"z\":\"1\"}}}}");
@@ -641,7 +575,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             let nest = "{\"a\":".repeat(NESTING) + "1" + &"}".repeat(NESTING);
             manifest("package.json", format!("{{\"exports\":{nest}}}"))
         }),
-        // tsconfig.json
         ("tsconfig: many options and comments", || {
             let options = fill(1, |i| {
                 format!("/* c{i} */ \"o{i}\": {{\"a\": [1, 2,],}},\n")
@@ -649,7 +582,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             let text = format!("{{\"compilerOptions\":{{{options}\"outDir\":\"d\"}}}}");
             format!("{:?}", super::read_tsconfig(&file(text))).len()
         }),
-        // PyPI: `pyproject.toml`, `requirements.txt`
         ("pyproject: many dependencies", || {
             let deps = fill(1, |i| format!("\"dep{i} >=1.{i}; python_version>'3'\",\n"));
             let text = format!("[project]\nname=\"p\"\ndependencies=[{deps}]\n");
@@ -684,7 +616,6 @@ resource "aws_apigatewayv2_route" "wide" {{
         ("requirements: one continued line", || {
             manifest("requirements.txt", fill(1, |_| "dep>=1,\\\n".into()))
         }),
-        // Cargo: `Cargo.toml`
         ("cargo: many dependencies", || {
             let deps = fill(1, |i| {
                 format!("dep{i} = {{ version = \"1\", features = [\"a\"] }}\n")
@@ -710,7 +641,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             let nest = "[".repeat(NESTING) + &"]".repeat(NESTING);
             manifest("Cargo.toml", format!("[package]\nname=\"p\"\nx={nest}\n"))
         }),
-        // Go: `go.mod`
         ("go.mod: many requires and replaces", || {
             let requires = fill(2, |i| format!("\texample.com/m{i} v1.{i}.0\n"));
             let replaces = fill(4, |i| format!("\texample.com/m{i} => ../r{i}\n"));
@@ -724,7 +654,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 fill(1, |i| format!("require (\nexample.com/m{i} v1.0.0\n")),
             )
         }),
-        // Maven: `pom.xml`
         ("pom: many dependencies", || {
             let deps = fill(1, |i| dependency(&format!("a{i}")));
             manifest(
@@ -754,8 +683,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             manifest("pom.xml", pom("app", &nest))
         }),
         ("pom: modules passing on to each other", || {
-            // `app` depends on thousands of modules, the first two hundred of which exist and
-            // depend on each other.
             let deps = count(9000, |i| dependency(&format!("m{i}")));
             let mut poms = vec![(
                 "app".to_string(),
@@ -771,7 +698,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             }
             modules(poms)
         }),
-        // Gradle: `build.gradle`, `settings.gradle`
         ("gradle: many dependencies", || {
             let deps = fill(1, |i| format!("  implementation 'g:a{i}:1.{i}'\n"));
             manifest("build.gradle", format!("dependencies {{\n{deps}}}\n"))
@@ -829,7 +755,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 manifest("build.gradle", format!("dependencies {{\n{deps}}}\n"))
             },
         ),
-        // NuGet: `*.csproj`, `Directory.Build.props`
         ("csproj: many references", || {
             let refs = fill(1, |i| {
                 format!(
@@ -863,7 +788,6 @@ resource "aws_apigatewayv2_route" "wide" {{
         (
             "gradle: properties and a catalog filling many builds",
             || {
-                // Each build asks the one catalog and `gradle.properties` for every dependency.
                 let properties = fill(2, |i| format!("p{i}=v{i}\n"));
                 let libraries = fill(2, |i| format!("a{i} = \"g:a{i}:1\"\n"));
                 let build = count(100, |i| {
@@ -895,7 +819,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             },
         ),
         ("nuget: a props file inherited by many projects", || {
-            // Each project takes the props file's references: the size is all of theirs.
             let refs = fill(1, |i| format!("<PackageReference Include=\"P{i}\"/>"));
             let props = format!("<Project><ItemGroup>{refs}</ItemGroup></Project>");
             let path = "Directory.Build.props".to_string();
@@ -914,8 +837,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 .sum()
         }),
         ("nuget: projects passing on to each other", || {
-            // `App` references thousands of projects, the first two hundred of which exist and
-            // reference each other.
             let refs = |n: usize, to: &dyn Fn(usize) -> usize| {
                 count(n, |i| {
                     format!(
@@ -937,7 +858,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             }
             referenced(projects)
         }),
-        // MSBuild: `msbuild::read`, `msbuild::props`
         ("msbuild: usings added and removed in one file", || {
             let added = fill(2, |i| format!("N{i};"));
             let removed = fill(2, |i| format!("N{};", 2 * i));
@@ -947,8 +867,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             project_size(msbuild::read(&file(text), &[]))
         }),
         ("msbuild: a chain of props files of many usings", || {
-            // The most props files `chain` follows, each of the most usings one adds, and a
-            // project removing thousands: the average is per file.
             let names = count(msbuild::PROPS_ITEMS, |i| format!("N{i};"));
             let added =
                 format!("<Project><ItemGroup><Using Include=\"{names}\"/></ItemGroup></Project>");
@@ -973,9 +891,6 @@ resource "aws_apigatewayv2_route" "wide" {{
         (
             "msbuild: a props file of many elements over many projects",
             || {
-                // The C# pack's `join` reads every project under the props files above it: a props
-                // file read again for each project costs its bytes times the projects, past `BUDGET`
-                // at a thousand.
                 let elements = count(60000, |i| format!("<A{i}/>"));
                 let props = file(format!(
                     "<Project><PropertyGroup>{elements}</PropertyGroup></Project>"
@@ -996,9 +911,7 @@ resource "aws_apigatewayv2_route" "wide" {{
                     .sum()
             },
         ),
-        // Backstage: `app-config.yaml`, its proxy table (#616)
         ("app-config: many proxy endpoints and rewrite rules", || {
-            // A quarter of the file stays under `YAML_KEY_BUDGET`, so the endpoints are read.
             let endpoints = fill(4, |i| {
                 format!(
                     "    '/e{i}':\n      target: https://h{i}\n      pathRewrite:\n        '^/api/proxy/e{i}': ''\n        '^/r{i}': '/'\n"
@@ -1007,8 +920,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             let root = file(format!("proxy:\n  endpoints:\n{endpoints}"));
             crate::http::app_config_probe(&[("app-config.yaml", root)])
         }),
-        // Backstage's `$include` (#689): one partial named from far more keys than
-        // `includes::INCLUDES`, each grafting it, so the count stops it.
         ("app-config: an include fanned out to many keys", || {
             let root = fill(8, |i| format!("k{i}: {{ $include: p.yaml }}\n"));
             let partial = fill(256, |i| format!("p{i}: {{ url: '${{U{i}}}' }}\n"));
@@ -1017,7 +928,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 ("p.yaml", file(partial)),
             ])
         }),
-        // A chain of partials far past `includes::DEPTH`, each a mapping of many keys.
         ("app-config: a chain of includes past the depth", || {
             let mut files = vec![(
                 "app-config.yaml".to_string(),
@@ -1034,9 +944,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 files.iter().map(|(p, s)| (p.as_str(), s.clone())).collect();
             crate::http::app_config_probe(&files)
         }),
-        // Two partials that include each other from many keys each: past `includes::INCLUDES`
-        // grafts (or `MAX_BYTES` grafted, for larger ones) the count stops what the cycle check
-        // does not.
         ("app-config: a cycle of includes", || {
             let root = "a: { $include: a.yaml }\nb: { $include: b.yaml }\n".to_string();
             let a = fill(256, |i| format!("a{i}: {{ $include: b.yaml }}\n"));
@@ -1047,8 +954,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 ("b.yaml", file(b)),
             ])
         }),
-        // Many values left unread (an `$env` beside another key) under one key of half the file:
-        // where each sits is compared with the proxy table's key paths (#709), never copied.
         (
             "app-config: many values left unread under a long key",
             || {
@@ -1058,8 +963,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 crate::http::app_config_probe(&[("app-config.yaml", file(root))])
             },
         ),
-        // Hundreds of small roots each including one large partial: the roots of one reading graft
-        // `includes::READING_MAX` together, where each parsed and grafted the partial again.
         ("app-config: many roots including one large partial", || {
             let partial = fill(1, |i| {
                 format!("k{i}:\n  url: https://h{i}.example.com/{i}\n")
@@ -1073,8 +976,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 files.iter().map(|(p, s)| (p.as_str(), s.clone())).collect();
             crate::http::app_config_probe(&files)
         }),
-        // Thousands of roots each giving every key a value of its own: the channel kind keeps
-        // every value of a key (`Config::literals`, front 6), so all of them are held at once.
         (
             "app-config: many roots each giving every key its own value",
             || {
@@ -1090,8 +991,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 crate::http::app_config_probe(&files)
             },
         ),
-        // Hundreds of roots each including, from many keys, a partial of 335 bytes whose aliases
-        // expand it to 48 KB: an include is charged its value's size, not its file's bytes.
         (
             "app-config: many roots including a partial its aliases expand",
             || {
@@ -1116,9 +1015,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 crate::http::app_config_probe(&files)
             },
         ),
-        // Hundreds of roots each naming 64 distinct partials of 335 bytes whose aliases expand
-        // them to 48 KB: what a root has no room for is parsed too, so it counts against
-        // `includes::READING_MAX`, past which no file is read.
         (
             "app-config: many roots including distinct partials their aliases expand",
             || {
@@ -1146,8 +1042,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 crate::http::app_config_probe(&files)
             },
         ),
-        // Hundreds of roots each naming, from 64 keys, a partial whose aliases expand past the
-        // YAML reader's budget: a file that does not parse is parsed once a reading.
         (
             "app-config: many roots including a partial that does not parse",
             || {
@@ -1173,7 +1067,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 crate::http::app_config_probe(&files)
             },
         ),
-        // Spring: `application.properties`, `application.yml`
         ("spring: many properties", || {
             configured(
                 "application.properties",
@@ -1184,7 +1077,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             configured("application.properties", fill(1, |_| "k=a\\\n".into()))
         }),
         ("spring: placeholders doubling each other", || {
-            // 40 keys, each two of the next: 2^40 copies of the last, were each read.
             let keys = count(40, |i| format!("k{i}=${{k{0}}}${{k{0}}}\n", i + 1));
             let text = keys + "k40=" + &"x".repeat(1000) + "\n";
             let path = "src/main/resources/application.properties";
@@ -1199,14 +1091,12 @@ resource "aws_apigatewayv2_route" "wide" {{
             )
         }),
         ("spring: deep yaml", || {
-            // One space more for each level, as deep as the file allows.
             configured(
                 "application.yml",
                 fill(1, |i| format!("{}a:\n", " ".repeat(i))),
             )
         }),
         ("spring: a long yaml key over many children", || {
-            // Joined with each child's, the keys would weigh gigabytes (`YAML_KEY_BUDGET`).
             let children = count(3000, |n| format!("  c{n}: v\n"));
             configured(
                 "application.yml",
@@ -1214,7 +1104,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             )
         }),
         ("spring: yaml aliases expanding", || {
-            // Nine levels of ten aliases each: 10^9 nodes from a few hundred bytes.
             let first = "a0: &a0 [x, x, x, x, x, x, x, x, x, x]\n".to_string();
             let levels = count(9, |n| {
                 format!(
@@ -1225,7 +1114,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             });
             configured("application.yml", first + &levels)
         }),
-        // YAML and JSON: the event reader (`document::events`), every document and scalar
         ("events: many documents", || {
             stream(
                 Syntax::Yaml,
@@ -1233,7 +1121,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             )
         }),
         ("events: deep and wide", || {
-            // At the nesting limit, every scalar is handed out at the full depth.
             let wide = fill(1, |_| "1, ".into());
             stream(Syntax::Yaml, format!("{}[{wide}1]\n", "- ".repeat(127)))
         }),
@@ -1242,7 +1129,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             stream(Syntax::Yaml, anchor + &fill(1, |i| format!("b{i}: *a\n")))
         }),
         ("events: aliases one level deeper each", || {
-            // Each anchor holds the one before: the nesting limit stops it, not the stack.
             let first = "a0: &a0 [x]\n".to_string();
             stream(
                 Syntax::Yaml,
@@ -1259,12 +1145,10 @@ resource "aws_apigatewayv2_route" "wide" {{
             stream(Syntax::Json, format!("{}1{}", nest("["), nest("]")))
         }),
         ("events: anchors nested around a long list", || {
-            // Each anchor would keep its own copy of the list.
             let open: String = (0..100).map(|i| format!("&a{i} [")).collect();
             let list = fill(2, |_| "1,".into());
             stream(Syntax::Yaml, format!("{open}{list}1{}", "]".repeat(100)))
         }),
-        // Config values (#639): the rows a YAML or JSON file stores
         ("config values: long keys nested deep", || {
             let key = "k".repeat(1000);
             let deep = format!("{{\"{key}\": ").repeat(100);
@@ -1322,7 +1206,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             let keys = fill(1, |i| format!("k{i} = 1\n"));
             stored("a.tf", format!("x = [<<EOT\nfoo\nEOT, {{\n{keys}}}]\n"))
         }),
-        // IaC nodes (#649): what the evaluation of one root module stores
         ("iac json: many repeated blocks with long labels", || {
             let label = "a".repeat(1000);
             let blocks = fill(1, |i| {
@@ -1372,8 +1255,6 @@ resource "aws_apigatewayv2_route" "wide" {{
         (
             "iac: Azure subscription rules and Function app settings",
             || {
-                // As many settings as `OBJECT_WORK_MAX` lets one object read, values long
-                // enough to fill half the file.
                 let value = "v".repeat(110);
                 let attributes = count(4000, |i| format!(" K{i} = \"{value}\"\n"));
                 let subscriptions = fill(3, |i| {
@@ -1422,7 +1303,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 format!("module \"m{i}\" {{ source = \"./\" }}\n")
             }))
         }),
-        // Static evaluation (#650): what the names and instances one root evaluates store
         (
             "iac eval: a list doubled by locals under a for_each",
             || {
@@ -1556,7 +1436,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             ))
         }),
         ("iac eval: toset of many numbers", || {
-            // As many numbers as `EVAL_COST_MAX` lets evaluate (8 bytes each).
             let items = count(125_000, |i| format!("{i}, "));
             nodes(format!(
                 "resource \"a\" \"r\" {{ name = \"${{length(toset([{items}]))}}\" }}\n"
@@ -1600,7 +1479,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 "x: &base {{image: a, depends_on: [s0]}}\nservices:\n{services}"
             ))
         }),
-        // CloudFormation and SAM (#653): what one template's evaluation stores
         (
             "cloudformation: tagged intrinsics nested to the limit",
             || {
@@ -1754,7 +1632,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 ))
             },
         ),
-        // Serverless (#654): what one service file's evaluation stores
         ("serverless: functions with many events", || {
             let events = "      - sqs: arn:aws:sqs:eu:1:queue-name\n".repeat(200);
             let functions = fill(4, |i| {
@@ -1821,9 +1698,7 @@ resource "aws_apigatewayv2_route" "wide" {{
                 "functions:\n{functions}resources:\n  Resources:\n{resources}"
             ))
         }),
-        // GitHub Actions (#823): what one pipeline file's evaluation stores
         ("pipeline: thousands of steps under long job ids", || {
-            // Each step's address repeats its job's id: a hundred times the bytes written.
             let steps = "      - run: x\n".repeat(500);
             let id = "j".repeat(2000);
             let jobs = fill(1, |i| format!("  {id}{i}:\n    steps:\n{steps}"));
@@ -1851,9 +1726,6 @@ resource "aws_apigatewayv2_route" "wide" {{
         (
             "pipeline: run scripts of a variable a long literal gives",
             || {
-                // #831: the gate of the command table reads each stored script, a value within
-                // `VALUE_MAX`, and the literals it reads add at most the script's own length and
-                // one value's.
                 use crate::iac::actions::run::{Part, commands};
                 let script = "pip install $A$A ".repeat(crate::config_values::VALUE_MAX / 17);
                 let literal = "a".repeat(100);
@@ -1862,12 +1734,10 @@ resource "aws_apigatewayv2_route" "wide" {{
                 let bytes: usize = parts.map(|(Part::Text(t) | Part::Open(t))| t.len()).sum();
                 let most = 2 * script.len() + crate::config_values::VALUE_MAX;
                 assert!(bytes <= most, "{bytes}");
-                // As many such CI steps as one file holds.
                 bytes * (MAX_BYTES / script.len())
             },
         ),
         ("pipeline: calls that pass long keys", || {
-            // #824: a call keeps the keys of `with` and of `secrets`, never their values.
             let keys = |section: &str| {
                 let keys = (0..20).map(|i| format!("      key-{i:060}: v\n"));
                 format!("    {section}:\n{}", keys.collect::<String>())
@@ -1889,7 +1759,6 @@ resource "aws_apigatewayv2_route" "wide" {{
         (
             "pipeline: an unread permissions block above every job",
             || {
-                // #834: a CI job takes its pipeline's block only when that block is read.
                 let block = fill(2, |i| format!("  - p{i}\n"));
                 let jobs = fill(2, |i| format!("  j{i}: {{}}\n"));
                 pipeline(format!("permissions:\n{block}jobs:\n{jobs}"))
@@ -1903,7 +1772,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 "i".repeat(1000)
             ))
         }),
-        // Kubernetes and Kustomize (#651): what one repository's evaluation stores
         ("kustomize: a chain of bases", || {
             let mut files: Vec<(String, String)> = Vec::new();
             for i in 0..4000 {
@@ -1965,8 +1833,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             files.extend(overlays.iter().map(|(p, t)| (p.as_str(), t.clone())));
             objects(files)
         }),
-        // Components that each list the next level's ten, five deep, each adding a prefix, over
-        // 900 objects: each object a component is handed counts against `kube::WALK_MAX`.
         (
             "kustomize: components reaching one another along many paths",
             || {
@@ -2058,7 +1924,6 @@ resource "aws_apigatewayv2_route" "wide" {{
         (
             "kustomize: a diamond of bases over a large config map",
             || {
-                // Each level names the next through two bases: the map is reached along 4,096 paths.
                 let mut files = vec![
                     ("d12/map.yaml".to_string(), config_map()),
                     (
@@ -2109,7 +1974,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 objects(vec![("pod.yaml", text)])
             },
         ),
-        // Crossplane (#655): compositions, their patch sets, and the kinds XRDs define
         ("crossplane: resources naming many patch sets", || {
             let sets = fill(2, |i| {
                 format!(
@@ -2142,7 +2006,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 .collect();
             objects(files.iter().map(|(p, t)| (p.as_str(), t.clone())).collect())
         }),
-        // .NET: `appsettings.json`
         ("appsettings: many keys", || {
             let keys = fill(1, |i| format!("\"Key{i}\": {{\"A\": \"v{i}\"}}, // c\n"));
             let text = format!("{{{keys}\"Z\": \"1\",}}");
@@ -2151,7 +2014,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 + settings.get("", "Z").map_or(0, str::len)
         }),
         ("appsettings: deep nesting", || {
-            // Past `serde_json`'s limit the file is not read, within it a key reads to the end.
             let nest = |n: usize| "{\"A\":".repeat(n) + "\"x\"" + &"}".repeat(n);
             let key = "A:".repeat(NESTING);
             let size = |n: usize| {
@@ -2166,7 +2028,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             let settings = appsettings::Settings::read(&[("appsettings.json", &file(text))]);
             settings.get("", "A").map_or(0, str::len)
         }),
-        // Swift: `Package.swift`, read by the pack's `join` for every file of the repository.
         ("Package.swift: many targets", || {
             let targets = fill(1, |i| {
                 format!(".target(name: \"T{i}\", path: \"S/T{i}\"),\n")
@@ -2198,8 +2059,6 @@ resource "aws_apigatewayv2_route" "wide" {{
             let nest = "[".repeat(NESTING) + ".target(name: \"T\")" + &"]".repeat(NESTING);
             swift_modules(format!("let package = Package(targets: {nest})"))
         }),
-        // Python: the factory reader of boto3 clients, walking the returns of a function in the
-        // frame of each call that reaches it.
         (
             "python factories: a frame of many clients read by many returns",
             || {
@@ -2217,8 +2076,6 @@ resource "aws_apigatewayv2_route" "wide" {{
                 found
             },
         ),
-        // Google Cloud: the constructor walk of `contract/sdk/origins.rs`, reading a call through
-        // a wrapper that forwards thousands of clients to a function returning each of them.
         (
             "gcp origins: a frame of many clients forwarded through a wrapper",
             || {
@@ -2244,7 +2101,6 @@ resource "aws_apigatewayv2_route" "wide" {{
     ]
 }
 
-/// What `read` answers of the Python file `text`, alone in its repository.
 fn python<T>(text: String, read: impl FnOnce(&crate::resolve::Code<'_>) -> T) -> T {
     use crate::lang::python::Python;
     use crate::resolve::{Code, Resolver};
@@ -2255,8 +2111,6 @@ fn python<T>(text: String, read: impl FnOnce(&crate::resolve::Code<'_>) -> T) ->
     read(&Code::new(&resolver, &files, &Python))
 }
 
-/// How many calls of the Python file `text` the factory reader of boto3 clients traces to a
-/// constructor.
 fn python_factories(text: String) -> usize {
     python(text, |code| {
         let mut factories =
@@ -2267,8 +2121,6 @@ fn python_factories(text: String) -> usize {
     })
 }
 
-/// The size of the imports the Swift pack's `join` gives each of `IMPORTS` files under the
-/// manifest `text`, deep in the tree.
 fn swift_modules(text: String) -> usize {
     let manifest = file(text);
     let join = Swift.join(&[("Package.swift", &manifest)], &BTreeMap::new());
@@ -2323,10 +2175,6 @@ fn http_iac_route_reader_stays_bounded_on_a_full_file() {
     assert!(elapsed < BUDGET, "{elapsed:?}");
 }
 
-/// A Berry lockfile at `lock::MAX_LOCK_BYTES`, with a dependency chain through every entry, each
-/// with wide keys and an edge that matches no key (so it reaches by name every entry of a name
-/// half the file holds), read twice as `trace --affected` reads base and head, then diffed,
-/// walked from the deepest entry and from one of that name, and listed.
 fn lockfile_probe() -> usize {
     use super::lock;
     let text = |bumped: bool| {
@@ -2367,15 +2215,10 @@ fn lockfile_probe() -> usize {
     format!("{moved:?}{reached:?}").len() + lock::direct(&head).len()
 }
 
-/// The heap `lockfile_probe` may hold: two parse trees of a full lockfile and the entries read
-/// from them. A reader that copies the keys of every entry of a name per edge passes it by far.
 const LOCK_HEAP: usize = 768 << 20;
 
-/// The time `lockfile_probe` may take: two full parses of 16 MiB in a debug build.
 const LOCK_BUDGET: Duration = Duration::from_secs(120);
 
-/// Entries that all list one descriptor in their key and all depend on it: the walk takes that
-/// descriptor's dependents once, not once per entry that lists it.
 #[test]
 fn a_lockfile_of_shared_keys_stays_bounded() {
     use super::lock;
@@ -2413,8 +2256,6 @@ fn a_lockfile_of_shared_keys_stays_bounded() {
     assert!(peak < LOCK_HEAP, "{} MiB", peak >> 20);
 }
 
-/// A lockfile built to explode, at its own cap (16 MiB, past `MAX_BYTES`), stays within its own
-/// time and heap bounds and returns a bounded size.
 #[test]
 fn a_lockfile_at_its_cap_stays_bounded() {
     let start = Instant::now();
@@ -2431,11 +2272,6 @@ fn a_lockfile_at_its_cap_stays_bounded() {
     assert!(peak < LOCK_HEAP, "{} MiB", peak >> 20);
 }
 
-/// Every reader, given a file built to explode, returns within `BUDGET` of its start, holds no
-/// more than `HEAP` and gives back no more than `MAX_OUT`. The rows run on a pool of as many threads as the machine has
-/// cores, so a row's time is its reader's, not the wait of a hundred rows started at once beside
-/// the rest of the suite (CI's `cloud` job missed the budget that way); the test names the rows
-/// that missed.
 #[test]
 fn every_reader_stays_bounded_on_a_file_built_to_explode() {
     let rows = probes();
@@ -2464,8 +2300,6 @@ fn every_reader_stays_bounded_on_a_file_built_to_explode() {
         });
     }
     drop(tx);
-    // The start of each running row, the rows that ended or missed, and the threads a row past
-    // the budget still holds.
     let (mut running, mut ended) = (BTreeMap::new(), vec![false; names.len()]);
     let (mut late, mut failed) = (Vec::new(), Vec::new());
     while ended.contains(&false) && late.len() < workers {
@@ -2519,35 +2353,26 @@ fn every_reader_stays_bounded_on_a_file_built_to_explode() {
     assert!(failed.is_empty(), "{failed:#?}");
 }
 
-/// What a thread of the pool says about a row: its index and when it started, then its index,
-/// the size it answered (none for a panic), the time it took and the most heap it held.
 enum Run {
     Started(usize, Instant),
     Ended(usize, Option<usize>, Duration, usize),
 }
 
-/// The heap each thread of the unit tests holds, counted by their allocator: a row of `probes` is
-/// held to `HEAP` above what its thread held when it started, and past `HEAP_CEILING` the
-/// allocator refuses it, which aborts the tests rather than exhaust the machine.
 mod heap {
     use std::alloc::{GlobalAlloc, Layout, System};
     use std::cell::Cell;
 
     thread_local! {
-        /// The bytes this thread holds, the most it held since `watch`, and the most it may hold.
         static HELD: Cell<usize> = const { Cell::new(0) };
         static PEAK: Cell<usize> = const { Cell::new(0) };
         static LIMIT: Cell<usize> = const { Cell::new(usize::MAX) };
     }
 
-    /// The system's allocator, counting what each thread takes and gives back. A block another
-    /// thread frees lowers that thread's count, never below zero.
     struct Counted;
 
     #[global_allocator]
     static COUNTED: Counted = Counted;
 
-    /// Counts `bytes` more on this thread: false, counting nothing, past its limit.
     fn take(bytes: usize) -> bool {
         let taken = HELD.try_with(|held| {
             let now = held.get().saturating_add(bytes);
@@ -2610,8 +2435,6 @@ mod heap {
         }
     }
 
-    /// Starts watching this thread, answering what it holds: its peak starts there, and it may
-    /// hold `ceiling` more.
     pub(super) fn watch(ceiling: usize) -> usize {
         let held = HELD.with(Cell::get);
         PEAK.with(|peak| peak.set(held));
@@ -2619,7 +2442,6 @@ mod heap {
         held
     }
 
-    /// Stops watching this thread, answering the most it held since `watch`.
     pub(super) fn unwatch() -> usize {
         LIMIT.with(|limit| limit.set(usize::MAX));
         PEAK.with(Cell::get)

@@ -1,10 +1,3 @@
-# The local accounts proof of concept (ADR 0024): one command after .env is filled in.
-#   cp .env.accounts.example .env && docker compose up -d
-# .env.accounts.example sets COMPOSE_FILE to compose.yaml, compose.console.yaml,
-# compose.postgres.yaml and this file, and COMPOSE_PROFILES to generations,console. It adds the
-# signing key pair (made once by the certificates step), a console with [accounts] and
-# operations = true, nodes that admit the console's agent tokens, a node proxy without the static
-# bearer, and a one-shot seed of the first workspace version. The other profiles are unchanged.
 x-accounts-node: &accounts-node
   depends_on:
     certificates:
@@ -19,7 +12,6 @@ services:
       - accounts-private:/accounts-private
       - accounts-public:/accounts-public
 
-  # The private key is mounted here and nowhere else; the nodes mount the public one.
   console:
     environment:
       MEADA_ADMIN_PASSWORD: ${MEADA_ADMIN_PASSWORD:-}
@@ -35,14 +27,11 @@ services:
 
   generation-two: *accounts-node
 
-  # The Caddyfile of this profile forwards Authorization and admits nothing itself.
   proxy:
     environment: !reset {}
     volumes:
       - ./Caddyfile.accounts:/etc/caddy/Caddyfile:ro
 
-  # The job needs a workspace version and the console needs the job's first generation: this step
-  # imports the first one, only while the store has none.
   seed:
     image: ghcr.io/claudiomascaro/meada:${MEADA_VERSION:-1.6.0}-cloud
     profiles: [console]

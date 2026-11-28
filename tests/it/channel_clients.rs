@@ -1,7 +1,3 @@
-//! A Client declaration (`[[channel_client]]`): a call that resolves to a declared function or
-//! method makes a Kafka side of its role, named by the value at its topic position (front 6,
-//! Task 5).
-
 use std::path::{Path, PathBuf};
 
 use meada::engine::{self, Engine};
@@ -14,7 +10,6 @@ const CONSUMER: &str = "[[channel_client]]\ncall = \"pkg/kafkaclient/client.go::
 const PRODUCER: &str = "[[channel_client]]\ncall = \"example.com/acme/flow.NewProducer\"\n\
                         role = \"producer\"\nbroker = \"kafka\"\n";
 
-/// The `channel-clients` fixture, copied for `case`.
 fn fixture(case: &str) -> PathBuf {
     fixture_repo(
         case,
@@ -33,7 +28,6 @@ fn export(case: &str, change: impl FnOnce(&Path)) -> Value {
     export_of(&Engine::open(&repo).unwrap())
 }
 
-/// A `meada.toml` with the chart declaration and the two clients at `consumer` and `producer`.
 fn toml(consumer: &str, producer: &str) -> String {
     format!(
         "[[helm_env]]\nkey = \"lib-chart.envs\"\n\n{CONSUMER}topic = \"{consumer}\"\n\n\
@@ -41,7 +35,6 @@ fn toml(consumer: &str, producer: &str) -> String {
     )
 }
 
-/// The channel contracts of the `role` (`providers` or `consumers`) sides whose site holds `at`.
 fn sides(export: &Value, role: &str, at: &str) -> Vec<String> {
     let mut found: Vec<String> = (export[role].as_array().unwrap().iter())
         .filter(|s| s["site"].as_str().unwrap().contains(at))
@@ -53,7 +46,6 @@ fn sides(export: &Value, role: &str, at: &str) -> Vec<String> {
     found
 }
 
-/// The level of the link of `contract` whose consumer holds `consumer` and provider `provider`.
 fn level(export: &Value, contract: &str, consumer: &str, provider: &str) -> String {
     let found = (export["links"].as_array().unwrap().iter()).find(|l| {
         l["contract"] == contract

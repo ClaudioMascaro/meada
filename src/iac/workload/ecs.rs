@@ -1,5 +1,3 @@
-//! ECS container definitions use the shared Terraform evaluator and its JSON encoder.
-
 use super::super::environment::{self, Entry};
 use super::super::{Block, Each, Eval, Evaluated, Node, Resolved, Val, WorkloadImage};
 use hcl::Value;
@@ -23,8 +21,6 @@ fn field<'a>(expr: &'a Expression, key: &str) -> Option<&'a Expression> {
     matches.next().is_none().then_some(found)
 }
 
-/// Charges repeated strings before copying them. An incomplete environment never picks a
-/// partial name; images remain useful independently of unknown or oversized environments.
 struct Facts {
     node: Node,
     entries: BTreeMap<(String, String), Entry>,
@@ -91,7 +87,6 @@ impl Facts {
         if self.env_unread {
             return;
         }
-        // The temporary map owns a second copy of the container and variable keys.
         let cost = 2 * (container.len() + name.len())
             + image.map_or(0, str::len)
             + target.len()
@@ -324,7 +319,6 @@ impl<'m> Eval<'m> {
             self.nodes[node].environment = facts.environment;
         }
     }
-    /// The registry service module declares a map keyed by container name, not encoded JSON.
     pub(in crate::iac) fn ecs_module(
         &mut self,
         node: usize,

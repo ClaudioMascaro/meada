@@ -171,7 +171,6 @@ export function wrongMethod(plot: string) { return fetch(`https://gardens.exampl
 export function wrongPath() { return fetch('https://arcs.example.test/arcs'); }
 export function wrongHost(id: string) { return fetch(`https://unknown.example.test/arcs/${id}`); }
 ''')
-    # These expectations come from the declarations above and #666, never an observed export.
     expected_providers = {
         'consumer': [],
         'sam': [provider('http::GET::/gardens/{}', 'sam::runtime/handler.ts::serveGarden'),
@@ -210,7 +209,6 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
         comparisons.compare(f'{name} providers', expected_providers[name], data['providers'], oracle=True)
     comparisons.compare('consumer links', sorted(expected_links), sorted(links(results['consumer'])), oracle=True)
 
-    # An unread conditional with two possible Lambda targets cannot select either one.
     ambiguous = TF.replace('integration_uri = aws_lambda_function.arc.invoke_arn',
                            'integration_uri = var.unread ? aws_lambda_function.arc.invoke_arn : aws_lambda_function.other.invoke_arn')
     ambiguous += '\nresource "aws_lambda_function" "other" { function_name = "other" }\n'
@@ -224,7 +222,6 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
     comparisons.compare('ambiguous target providers', [], ambiguous_provider['providers'], oracle=True)
     write(repos['terraform'], 'main.tf', TF)
 
-    # Safe route facts survive an opaque code input, with repository fallback on both sides.
     write(repos['sam'], 'opaque.zip', 'opaque archive, never inspected')
     write(repos['sam'], 'template.yaml', SAM.replace('CodeUri: runtime/', 'CodeUri: opaque.zip'))
     fallback = export(binary, repos['consumer'])
@@ -241,7 +238,6 @@ export function wrongHost(id: string) { return fetch(`https://unknown.example.te
                         sorted(links(export(binary, repos['consumer']))), oracle=True)
 
     if args.base_bin:
-        # A standalone code HTTP flow must retain every existing export field and query byte.
         control = run / 'work' / 'existing-head' / 'control'
         control.mkdir(parents=True)
         git('init', '-q', cwd=control)

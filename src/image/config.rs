@@ -1,5 +1,3 @@
-//! Build configurations, read during indexing; no query reads a checkout or an environment.
-
 use super::evaluated;
 
 // ponytail: a file's repeated long key paths cannot expand its stored image facts without bound.
@@ -17,19 +15,14 @@ pub(super) struct Summary {
     pub runners: Vec<Runner>,
     #[serde(default)]
     pub code: Vec<super::code::Code>,
-    /// What each Chart environment declaration gives this values file when it is one of its
-    /// chart's environments (`helm_env`, `chart_envs`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub envs: Vec<ChartEnv>,
-    /// The values files that are its chart's environments, when `envs` holds any.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub chart: Vec<String>,
     #[serde(skip)]
     bytes: usize,
 }
 
-/// The environment a declared key gives one chart environment: its scalar entries, name to
-/// YAML text, the file laid over the chart's `values.yaml`.
 #[derive(Serialize, Deserialize)]
 pub(super) struct ChartEnv {
     pub key: String,
@@ -62,9 +55,6 @@ fn legacy_file(path: &str) -> bool {
             && (name.ends_with(".yaml") || name.ends_with(".yml")))
 }
 
-/// Whether the file at `path` is, by its name alone, a GitHub workflow, a Compose or Skaffold
-/// file, or a Maven or Gradle build: the image reader reads each whole. A Helm values file it
-/// reads too (`legacy_file`), for its `image` key alone.
 pub(crate) fn named_file(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
     (path.starts_with(".github/workflows/") && (path.ends_with(".yml") || path.ends_with(".yaml")))
@@ -143,7 +133,6 @@ pub(super) fn read(
     }) else {
         return out;
     };
-    // An empty or comment-only file holds no document: Helm reads it as an empty map.
     let empty = Value::Object(Default::default());
     let lines = &key_lines;
     chart_envs(
@@ -170,7 +159,6 @@ pub(super) fn read(
             Some(registry)
                 if !registry.is_empty() && !repository.starts_with(&format!("{registry}/")) =>
             {
-                // A templated registry is an unresolved segment, as `${REGISTRY}` is.
                 let registry = if registry.contains("{{") {
                     "${registry}"
                 } else {
@@ -216,7 +204,6 @@ pub(super) fn read(
     out
 }
 
-/// Every dotted prefix of the declared keys, each with whether it is a key itself.
 fn prefixes(keys: &[String]) -> std::collections::HashMap<&str, bool> {
     let mut out = std::collections::HashMap::new();
     for key in keys {
@@ -228,9 +215,6 @@ fn prefixes(keys: &[String]) -> std::collections::HashMap<&str, bool> {
     out
 }
 
-/// Records `line` for each declared key the scalar at `steps` lies inside, first seen first.
-/// The walk stops at the first prefix no key has, so its cost is a key's length, whatever the
-/// keys or the file.
 fn key_line(
     (prefixes, longest): (&std::collections::HashMap<&str, bool>, usize),
     steps: &[Step],
@@ -259,8 +243,6 @@ fn key_line(
     }
 }
 
-/// The values file `name`'s environment, when it is a chart's: `values-<env>.yaml` (or `.yml`),
-/// or `values.yaml` itself (`None` for the environment name then).
 fn environment(name: &str) -> Option<Option<&str>> {
     let stem = name
         .strip_suffix(".yaml")
@@ -272,12 +254,6 @@ fn environment(name: &str) -> Option<Option<&str>> {
     }
 }
 
-/// Goal 2 of the Chart environment declaration: a chart is the directory of a `Chart.yaml`, its
-/// environments its `values-<env>.yaml` files, each laid over the chart's `values.yaml`, or
-/// `values.yaml` alone when it has no other. When the values file at `path` (document `doc`) is
-/// one, each declared key holding a mapping gives its scalar entries, and the summary lists the
-/// chart's environments. The directory listing and the base file are inputs of the summary, so
-/// a sibling that comes or goes, or a base edit, summarizes it again.
 fn chart_envs(
     path: &str,
     doc: &Value,
@@ -316,7 +292,6 @@ fn chart_envs(
     if !chart.iter().any(|c| c == path) {
         return;
     }
-    // A chart whose base does not read cannot be rendered; it gives no environment.
     let base = match base.filter(|b| b != path) {
         None => None,
         Some(base) => {
@@ -325,7 +300,6 @@ fn chart_envs(
             let Some(docs) = read else {
                 return;
             };
-            // An empty or comment-only base is Helm's empty map.
             Some(
                 docs.into_iter()
                     .next()
@@ -343,7 +317,6 @@ fn chart_envs(
             .sum::<usize>()
             + key.len();
         bytes = bytes.saturating_add(cost);
-        // All or nothing: an environment missing one key would agree vacuously with the others.
         if bytes > IMAGE_STORED_MAX {
             return;
         }
@@ -358,22 +331,16 @@ fn chart_envs(
     }
 }
 
-/// The scalar entries of the mapping at the dotted `key` in `over` laid on `base` as Helm
-/// merges values files: an absent key keeps the base's, a null removes it, anything else
-/// replaces it, and mappings merge by key. A key through a list or a scalar holds nothing; a
-/// nested mapping or a list at a name is skipped.
 fn laid(base: Option<&Value>, over: &Value, key: &str) -> Option<Vec<(String, String)>> {
     let (mut base, mut over) = (base, Some(over));
     for step in key.split('.') {
         match over {
-            // The file replaced what would hold the key with a scalar, a list or a null.
             Some(value) if !value.is_object() => return None,
             Some(value) => over = value.get(step),
             None => {}
         }
         base = base.and_then(|b| b.get(step));
     }
-    // Where the file does not reach the key, the base stands.
     let held = over.or(base)?.as_object()?;
     let mut merged = std::collections::BTreeMap::<&str, &Value>::new();
     let base = base
@@ -397,8 +364,6 @@ fn laid(base: Option<&Value>, over: &Value, key: &str) -> Option<Vec<(String, St
 }
 
 fn workflow(path: &str, doc: &Value, out: &mut Summary) {
-    // A `run` script that binds `KO_DOCKER_REPO` (an assignment, `export`, `unset`, a line for
-    // the environment file) may give ko another destination than the `env` of the document.
     let rebound = (doc.get("jobs").and_then(Value::as_object).into_iter())
         .flat_map(|jobs| jobs.values())
         .flat_map(|job| job.get("steps").and_then(Value::as_array))
@@ -428,12 +393,9 @@ fn workflow(path: &str, doc: &Value, out: &mut Summary) {
                     .as_str()
                     .is_some_and(|shell| matches!(shell, "bash" | "sh"))
             });
-            // The gate of the command table says which lines are commands (ADR 0028).
             let commands = (step.get("run").and_then(Value::as_str))
                 .filter(|script| known_shell && script.len() <= config_values::VALUE_MAX)
                 .and_then(|script| run::commands(script, |_| None));
-            // --bare makes the configured destination the complete image name. Other ko
-            // naming modes add import paths and hashes, so an unresolved command is absent.
             for command in commands.iter().flatten() {
                 let words: Option<Vec<&str>> = command.iter().map(|w| run::literal(w)).collect();
                 let Some(words) = words else {
@@ -464,7 +426,6 @@ fn workflow(path: &str, doc: &Value, out: &mut Summary) {
                         ])
                     );
                     builder(out, image, &at, false);
-                    // Every ko command of a step pushes to the one destination: one side.
                     break;
                 }
             }
@@ -572,8 +533,6 @@ fn maven(path: &str, src: &[u8], out: &mut Summary) {
 mod tests {
     use super::*;
 
-    /// A chart environment is stored whole or not at all: one missing a key past the ceiling
-    /// would agree vacuously with the environments that set it.
     #[test]
     fn a_chart_environment_past_the_storage_ceiling_is_dropped_whole() {
         let root = Path::new("tests/fixtures/helm-env");

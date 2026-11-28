@@ -79,7 +79,6 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
     const wanted = teamRole && listing ? listing.versions.map(version => version.id) : [];
     const ids = [...new Set([from, to, ...wanted])].filter(id => id && !cache[id]);
     if (!ids.length) return;
-    // One version failing to read leaves the others cached: a team operator is offered an apply per readable version.
     // ponytail: two reads at a time keep a long version list inside the console's four readers; page the list if it grows.
     const queue = [...ids];
     const results: PromiseSettledResult<WorkspaceVersion>[] = [];
@@ -113,7 +112,6 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
     setDraft(previous => previous ?? initial);
   }, [workspace, ready, locale]);
 
-  // The owner picker is the global operator's alone: no other role asks the directory anything.
   const typing = global && allowed && draft !== undefined ? ownerAt(draft, caret) : undefined;
   const wanted = typing?.prefix;
   useEffect(() => {
@@ -268,7 +266,6 @@ export function WorkspacePage({ api, locale, session: admitted, config, onSessio
 }
 
 function EntriesTable({ entries, t, label, state, missing, excluded }: { entries: (Entry | EntryRow)[]; t: WorkspaceCopy; label: string; state?: boolean; missing?: Set<string>; excluded?: Set<string> }) {
-  // Who added each entry, once any has `added_by` (under the GitHub grant provider, #333).
   const adders = entries.some(entry => entry.added_by !== undefined);
   return <div role="region" aria-label={label} tabIndex={0} className="table-scroll"><h3>{label}</h3>
     <table><thead><tr><th>{t.entry}</th><th>{t.owner}</th>{adders && <th>{t.addedBy}</th>}{state && <th>{t.state}</th>}</tr></thead><tbody>

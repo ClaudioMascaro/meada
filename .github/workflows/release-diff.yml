@@ -1,11 +1,5 @@
 name: Release diff
 
-# ADR 0029, "The release diff" (#852): on the release pull request, the links and orphan lines of the
-# candidate built from its head against the previous tag's release binary, over prove-meada's pinned public
-# corpora. The release pull request is the one titled `chore(release): <version>`, as the release notes'
-# checklist names it: the title is in the event, so every other pull request skips the job without a runner.
-# A pull request retitled after it opened runs the job on its next push. The job also leaves the candidate
-# binary, which the release's smoke slices run: the release workflow only plans on a pull request.
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
@@ -17,7 +11,6 @@ concurrency:
 permissions:
   contents: read
 
-# The image is pinned as in `proof.yml`: a new image is a change of its own.
 jobs:
   release-diff:
     if: "startsWith(github.event.pull_request.title, 'chore(release): ')"
@@ -51,7 +44,6 @@ jobs:
           echo "BASE_BIN=$bin" >> "$GITHUB_ENV"
           echo "BASE_LABEL=release $base at $(git rev-list -n 1 "$base"), $("$bin" --version)" >> "$GITHUB_ENV"
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      # The profile and the default features the release workflow (cargo-dist) builds with.
       - name: Build the candidate
         run: |
           cargo build --locked --profile dist

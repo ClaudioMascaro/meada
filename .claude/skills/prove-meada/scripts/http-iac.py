@@ -23,7 +23,6 @@ def main():
     run = Path(args.run).resolve()
     run.mkdir(parents=True, exist_ok=False)
     comparisons = Comparisons(run)
-    # The binaries this evidence came from, as iac-http-routes.py records them.
     identity = lambda path: {'path': path, 'sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest(),
                              'version': subprocess.check_output([path, '--version'], text=True).strip()}
     (run / 'binary.json').write_text(json.dumps({**identity(binary), **(
@@ -153,8 +152,6 @@ spec:
         (run / 'baseline.json').write_text(json.dumps(baseline, indent=2))
         direct = lambda value: [link for link in value['links'] if '::directCall::' in link['consumer']]
         comparisons.compare('direct host links', direct(baseline), direct(data))
-        # Processes walk links too: compare their direct-host control and check new hops
-        # against the same complete source-derived link set, keeping every other field exact.
         controls = lambda value: {k: v for k, v in value.items() if k not in {'links', 'processes'}}
         comparisons.compare('whole export outside route links and processes', controls(baseline), controls(data))
         direct_process = lambda value: [p for p in value.get('processes', []) if p['entry_point'].endswith('::directCall')]
@@ -186,7 +183,6 @@ spec:
         replies = [answer(client.call('tools/call', {'name': q['tool'], 'arguments': q['arguments']})) for q in queries]
         (run / 'http.json').write_text(json.dumps(replies, indent=2))
         assert replies == texts
-        # Delete every source of new routing facts, keeping code for unchanged display locations.
         for path in (infra/'workloads.yaml', app/'compose.yaml', app/'app-config.yaml'):
             path.unlink()
         deleted = [answer(client.call('tools/call', {'name': q['tool'], 'arguments': q['arguments']})) for q in queries]

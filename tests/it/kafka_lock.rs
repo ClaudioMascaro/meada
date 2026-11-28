@@ -1,6 +1,3 @@
-//! The lock (front 6, criterion 1): `trace --affected` over a change to a Kafka producer lists
-//! the files of its consumers, in a peer repository too, at the tier of the link's level.
-
 use std::path::{Path, PathBuf};
 
 use meada::engine::Engine;
@@ -9,38 +6,31 @@ use serde_json::Value;
 use crate::common::{commit_all, edited, fixture_repo, in_repo};
 
 const PEER: &str = "example.com/acme/peer-worker";
-/// The peer's consumer of `events.published`.
 const PEER_CONSUMER: &str = "src/consumer.ts";
-/// `main`'s producer of `events.published`, through the declared client.
 const MAIN: (&str, &str) = ("main.go", "\tcfg, err := config.NewConfig()\n");
 
-/// The peer worker as a sibling of the workspace of `case`.
 fn peer(case: &str) {
     let origin = Some("https://example.com/acme/peer-worker.git");
     fixture_repo(case, "kafka-peer-worker", origin);
 }
 
-/// The `channel-clients` workspace with the peer beside it.
 fn clients(case: &str) -> PathBuf {
     peer(case);
     let origin = Some("https://example.com/acme/clients.git");
     fixture_repo(case, "channel-clients", origin)
 }
 
-/// The `kafkajs-plugins` workspace with the peer beside it.
 fn plugins(case: &str) -> PathBuf {
     peer(case);
     let origin = Some("https://example.com/acme/plugins.git");
     fixture_repo(case, "kafkajs-plugins", origin)
 }
 
-/// The answer of a commit that adds a comment line before `main`'s first statement.
 fn main_edited(repo: &Path) -> Value {
     let (path, line) = MAIN;
     edited(repo, path, line, &format!("\t// edited\n{line}"))
 }
 
-/// The tier and level of the file `path` of `repo` in an affected answer.
 fn tier(answer: &Value, repo: &str, path: &str) -> (String, String) {
     let file = in_repo(answer, repo, path);
     let file = file.unwrap_or_else(|| panic!("{repo} {path} is not affected: {answer}"));
@@ -48,7 +38,6 @@ fn tier(answer: &Value, repo: &str, path: &str) -> (String, String) {
     (text("tier"), text("level"))
 }
 
-/// The level of the link of `contract` whose provider holds `provider` and consumer `consumer`.
 fn level(export: &Value, contract: &str, provider: &str, consumer: &str) -> String {
     let found = (export["links"].as_array().unwrap().iter()).find(|l| {
         l["contract"] == contract
@@ -105,8 +94,6 @@ fn a_plugin_publish_change_reaches_the_other_plugin_at_certain() {
     assert_eq!(found, ("certain".into(), "exact".into()));
 }
 
-/// `EVENTS_TOPIC` names another topic in prd: `main` produces both at `inferred`, and the peer's
-/// consumer of `events.published` is affected below certain.
 #[test]
 fn an_inferred_topic_reaches_the_consumer_below_certain() {
     let repo = clients("lock_inferred");

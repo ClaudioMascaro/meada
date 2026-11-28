@@ -1,5 +1,3 @@
-//! Alert emitters, receiver forwarding and native incident matchers (#672, #673).
-
 use crate::common::{assert_golden, fixture_repo};
 use meada::engine::Engine;
 
@@ -149,7 +147,6 @@ spec:
     assert_eq!(export["consumers"].as_array().unwrap().len(), 8, "{text}");
     let links = export["links"].as_array().unwrap();
     assert_eq!(links.len(), 13, "{text}");
-    // An AlertmanagerConfig route also matches its own namespace, which Meada does not read.
     assert_eq!(
         links.iter().filter(|l| l["level"] == "exact").count(),
         3,
@@ -400,7 +397,6 @@ receivers: [{name: fallback}, {name: team-d}, {name: not-e}, {name: not-ef}]
             .all(|p| p["contract"] == "alert::support::team-d"),
         "{text}"
     );
-    // The negative routes only filter: they declare no consumer and take no link.
     assert_eq!(export["consumers"].as_array().unwrap().len(), 1, "{text}");
     let links = export["links"].as_array().unwrap();
     assert_eq!(links.len(), 3, "{text}");
@@ -560,9 +556,6 @@ fn uninterpretable_route_matchers_do_not_guess_a_destination() {
     }
 }
 
-/// Alertmanager compiles every matcher regex while it reads its file (`matchers` and `match_re`
-/// alike) and loads none of it when Go's `regexp` refuses one (#718): Meada links nothing from
-/// such a file and counts it as unreadable, as it does for a file it cannot parse.
 #[test]
 fn an_alertmanager_config_with_a_regex_go_refuses_is_unreadable_and_links_nothing() {
     use meada::engine::{Direction, Start};
@@ -591,7 +584,6 @@ fn an_alertmanager_config_with_a_regex_go_refuses_is_unreadable_and_links_nothin
     let configs =
         |line: &str| format!("config files: 2 read, 0 skipped (lockfiles: 0, unreadable: 0){line}");
 
-    // The same configuration with the regex fixed links as before.
     write(&broken("(closed)"));
     let linked = export();
     assert_eq!(linked["links"].as_array().unwrap().len(), 1, "{linked}");
@@ -604,7 +596,6 @@ fn an_alertmanager_config_with_a_regex_go_refuses_is_unreadable_and_links_nothin
         "{report}"
     );
 
-    // The issue's repro: the route that would link `support=team-b` is not loaded either.
     write(&broken("(unclosed"));
     let refused = export();
     assert!(
@@ -630,12 +621,9 @@ fn an_alertmanager_config_with_a_regex_go_refuses_is_unreadable_and_links_nothin
         "{report}"
     );
     assert!(!report.contains("orphan alert::other::"), "{report}");
-    // Its values stay searchable.
     let found = engine.search("(unclosed", Some("value"), None).unwrap();
     assert!(found.contains("alertmanager.yaml"), "{found}");
 
-    // Each form that reaches Go: `match_re`, a matcher of an `AlertmanagerConfig` object, a
-    // regex deeper in the tree and one in an inhibit rule, beside valid routes.
     for config in [
         r#"{"route":{"receiver":"a","routes":[{"receiver":"b","match":{"support":"team-b"}},{"receiver":"c","match_re":{"x":"*prod"}}]},"receivers":[{"name":"a"}]}"#,
         r#"{"apiVersion":"monitoring.coreos.com/v1alpha1","kind":"AlertmanagerConfig","metadata":{"name":"m"},"spec":{"receivers":[{"name":"a"}],"route":{"receiver":"a","routes":[{"receiver":"a","matchers":[{"name":"support","value":"team-b"}]},{"receiver":"a","matchers":[{"name":"x","value":"a[","matchType":"=~"}]}]}}}"#,
@@ -656,8 +644,6 @@ fn an_alertmanager_config_with_a_regex_go_refuses_is_unreadable_and_links_nothin
     }
 }
 
-/// An expression Meada leaves unmatched for its own budgets is valid for Alertmanager: the
-/// other routes of the file keep linking at `exact` (#718).
 #[test]
 fn a_regex_past_the_budgets_leaves_the_other_routes_of_its_config_linked() {
     let repo = fixture_repo(
@@ -1386,7 +1372,6 @@ resource "datadog_monitor" "unknown" {
         let v: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert!(v["links"].as_array().unwrap().is_empty(), "{text}");
     }
-    // A negated condition only filters the rule: the tag it refuses is no side of its own.
     let source = format!(
         "resource \"opsgenie_team_routing_rule\" \"test\" {{\n team_id = \"team\"\n criteria {{\n type = \"match-all-conditions\"\n {}conditions {{\n field = \"tags\"\n operation = \"equals\"\n expected_value = \"region:us\"\n not = true\n}}\n }}\n notify {{ type = \"none\" }}\n}}\n",
         condition("tags", "equals", "support:team-b")
@@ -1452,7 +1437,6 @@ fn pagerduty_conditions_keep_native_field_paths_boolean_groups_and_first_match_o
             "event.custom_details.support matches 'team-a' or event.custom_details.owner matches 'team-c'",
             vec![("alert::owner::team-c", "exact")],
         ),
-        // A negated condition only filters the route: it names no value of its own.
         ("not event.custom_details.owner matches 'team-z'", vec![]),
         (
             "not (event.custom_details.support matches 'team-a' or event.custom_details.owner matches 'team-z')",

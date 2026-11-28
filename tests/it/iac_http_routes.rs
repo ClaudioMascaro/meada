@@ -1,5 +1,3 @@
-//! Literal IaC routes share ordinary HTTP providers and cross-repository links (#666).
-
 use crate::common::{assert_golden, fixture_repo};
 use meada::engine::Engine;
 use meada::engine::{Direction, Start, with_every_row};
@@ -237,7 +235,6 @@ fn sam_global_handler_resolves_and_explicit_unknown_override_stays_at_the_reposi
         {"contract": "http::POST::/orchards", "site": "example.com/route-oracle/sam::runtime/app.ts::orchard"}
     ]);
     assert_eq!(providers(&repo), resolved);
-    // A global `CodeUri` is where the handler's file lives too.
     std::fs::write(
         repo.join("template.yaml"),
         (global.replace("      CodeUri: runtime/\n", "")).replace(
@@ -403,7 +400,6 @@ fn all_declared_routes_link_across_repositories_and_queries_match_every_row() {
     assert_golden("iac-http-consumer.context.txt", &context());
     assert_golden("iac-http-consumer.trace.txt", &trace());
     assert_golden("iac-http-consumer.search.txt", &search());
-    // Aliases use the same stored export projection in answer-sized and full reads.
     std::fs::write(
         repos[2].join("runtime/index.ts"),
         "function localOrbit() { return {}; }\nexport { localOrbit as handleOrbits };\n",
@@ -435,7 +431,6 @@ fn all_declared_routes_link_across_repositories_and_queries_match_every_row() {
         data["links"][1]["provider"],
         "example.com/route-oracle/serverless"
     );
-    // The target repository must export its incoming fallback link too.
     let exported = Engine::open(&repos[1]).unwrap().export().unwrap();
     let data: Value = serde_json::from_str(&exported).unwrap();
     assert_eq!(data["links"].as_array().unwrap().len(), 1, "{exported}");
@@ -564,7 +559,6 @@ resource "aws_apigatewayv2_route" "read" {
             {"contract": "http::GET::/orbits/{}", "site": "example.com/route-oracle/terraform::runtime/index.ts::handleOrbits"}
         ])
     );
-    // A different instance owns a different API, even though the declarations have one path.
     std::fs::write(
         repo.join("main.tf"),
         root.replace(

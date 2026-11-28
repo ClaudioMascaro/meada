@@ -1,4 +1,3 @@
-//! Go imported constructor functions and input composite literals.
 use crate::lang::{Invocation, Value, property};
 use crate::resolve::Code;
 
@@ -34,7 +33,6 @@ pub(super) fn field_of<'v>(value: &'v Value, field: &str) -> Option<Option<&'v V
     }
 }
 
-/// The SDK's string pointer helper preserves its argument. A same-named local does not.
 fn string_pointer(value: &Value) -> &Value {
     if let Value::Call(call) = value
         && crate::resolve::method(&call.callee) == "String"
@@ -46,7 +44,6 @@ fn string_pointer(value: &Value) -> &Value {
     value
 }
 
-/// Import aliases remain verified runtime reads after the pack leaves them as a call.
 pub(super) fn environment(call: &Invocation) -> Option<String> {
     if crate::resolve::method(&call.callee) != "Getenv"
         || !matches!(call.receiver.as_deref(), Some(Value::External(names)) if crate::names::one(names, |s| s == "os").is_some())

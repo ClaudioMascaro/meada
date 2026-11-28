@@ -1,20 +1,12 @@
-//! The loopback decider stub (spec #18): an HTTP server on `127.0.0.1` that speaks both decider
-//! protocols, answers from a script each test provides and records every request it receives.
-//! Tests point `MEADA_DECIDER_URL` at `Stub::url`, so decider mode runs with no network and no
-//! real key, and a test can prove that a command sent nothing.
-
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-/// A request as the stub received it.
 #[derive(Clone, Debug)]
 pub struct Request {
     pub method: String,
-    /// The request target, such as `/v1/chat/completions`.
     pub path: String,
-    /// Header names in lower case, in the order received.
     pub headers: Vec<(String, String)>,
     pub body: String,
 }
@@ -32,7 +24,6 @@ impl Request {
     }
 }
 
-/// One scripted answer.
 pub struct Reply {
     pub status: u16,
     pub body: String,
@@ -53,7 +44,6 @@ impl Reply {
         }
     }
 
-    /// A `chat` answer whose message content is `content`, from `model`.
     pub fn chat(model: &str, content: serde_json::Value) -> Self {
         Self::ok(serde_json::json!({
             "id": "stub",
@@ -68,19 +58,14 @@ impl Reply {
     }
 }
 
-/// The paths of the two protocols: `chat` (`<url>/chat/completions`) and `decisions`
-/// (`<url>/api/alpha/decisions`). Any other path gets a 404 and uses no script entry.
 const PATHS: [&str; 2] = ["/chat/completions", "/api/alpha/decisions"];
 
 pub struct Stub {
-    /// `http://127.0.0.1:<port>`, the base URL to set as `MEADA_DECIDER_URL`.
     pub url: String,
     received: Arc<Mutex<Vec<Request>>>,
 }
 
 impl Stub {
-    /// Starts a stub that answers the n-th protocol request with `script[n]`, and with a 500
-    /// once the script has run out. The server lives until the test process ends.
     pub fn start(script: Vec<Reply>) -> Self {
         Self::observed(script, |_| {})
     }
@@ -102,7 +87,6 @@ impl Stub {
                 } else {
                     Reply::status(404, "not a decider path")
                 };
-                // Recorded before answering, so a client that got its answer finds it here.
                 let count = {
                     let mut log = log.lock().unwrap();
                     log.push(request);
@@ -115,7 +99,6 @@ impl Stub {
         Self { url, received }
     }
 
-    /// Every request received so far, in order.
     pub fn requests(&self) -> Vec<Request> {
         self.received.lock().unwrap().clone()
     }

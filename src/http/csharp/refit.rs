@@ -1,15 +1,3 @@
-//! Refit interfaces (spec #28, #113): an interface whose methods carry Refit's `[Get("/x")]`,
-//! `[Post]`, `[Put]`, `[Patch]`, `[Delete]` or `[Head]` (bound through the usings, as the
-//! controllers' attributes are, `Get` and `GetAttribute` one name) is a declarative client. A
-//! method of one has no call of its own, so it is the consumer (`Site::Def`), and a caller of it
-//! reaches it like any call, as Retrofit's do (`http/java/declarative.rs`).
-//!
-//! The base comes from each `RestService.For<Api>(base)` that makes the interface, read whole
-//! (`Expand::Call`, so a wrapper's callers pass it), with its environment and configuration
-//! reads decided where `For` is written; one consumer per base. Refit appends the method's path to
-//! the base's own path, so an interface no `For` names, whose base Meada did not read, has
-//! consumers that are open items naming the client's base (#801). A path that does
-//! not start with `/` is none Refit accepts. `AddRefitClient<Api>()` is not read.
 // ponytail: `For` given an `HttpClient` has an unknown base; read its `BaseAddress` as
 // `clients.rs` does if such clients matter.
 
@@ -25,7 +13,6 @@ use std::collections::BTreeMap;
 
 const REFIT: &str = "Refit.";
 const REST_SERVICE: &str = "Refit.RestService";
-/// Refit's method attributes and the method each sends.
 const VERBS: &[(&str, &str)] = &[
     ("Get", "GET"),
     ("Post", "POST"),
@@ -35,21 +22,18 @@ const VERBS: &[(&str, &str)] = &[
     ("Head", "HEAD"),
 ];
 
-/// The method a Refit attribute `spelled` (through its `using`) sends.
 fn verb(spelled: &str) -> Option<&'static str> {
     let name = spelled.strip_prefix(REFIT)?;
     let name = name.strip_suffix("Attribute").unwrap_or(name);
     VERBS.iter().find(|(a, _)| *a == name).map(|(_, v)| *v)
 }
 
-/// A method of a Refit interface: its definition, the method it sends and its path.
 struct Endpoint<'a> {
     target: &'a str,
     verb: &'static str,
     route: String,
 }
 
-/// Refit consumers: see the module.
 pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
     let files: Vec<(&'a str, &'a Facts)> = (code.files().iter())
         .filter(|(p, _)| p.ends_with(".cs"))
@@ -65,7 +49,6 @@ pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
             if !facts.interfaces.contains(&c.scope) || !is_method(facts, target) {
                 continue;
             }
-            // Read around the interface: a method of it named like the attribute is no type.
             let around = (path, crate::parent(&c.scope));
             let spelled = hiding.spelled(code, around, c, REFIT, |s| verb(s).is_some());
             let Some(verb) = spelled.as_deref().and_then(verb) else {
@@ -116,8 +99,6 @@ pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
     found
 }
 
-/// The bases each interface is made with by `RestService.For<Api>(base)`, by the interface's
-/// file and name.
 fn bases<'a>(
     code: &Code<'a>,
     files: &[(&'a str, &'a Facts)],
@@ -154,7 +135,6 @@ fn bases<'a>(
             if served.is_empty() {
                 continue;
             }
-            // A base a wrapper's caller passes is read at each caller (`None` climbs).
             let read = |values: &[Value], _: &[(String, Value)]| match values.first() {
                 Some(Value::Str(p)) if p.iter().any(|p| matches!(p, Part::Ref(_))) => None,
                 Some(Value::Ref(_)) => None,
@@ -178,13 +158,9 @@ fn bases<'a>(
     out
 }
 
-/// How many levels of written bases `For<Api>` reaches.
 // ponytail: real interfaces extend a few others; this bounds a crafted chain.
 const BASE_DEPTH: usize = 32;
 
-/// The interface `name` of `path` and the repository interfaces it extends, directly or through
-/// others, by file and name: bounded by `BASE_DEPTH`, each once (a cycle ends). A base outside
-/// the repository resolves to no definition and adds nothing.
 fn inherited<'a>(code: &Code<'a>, path: &'a str, name: &'a str) -> Vec<(&'a str, &'a str)> {
     let mut seen = vec![(path, name)];
     let mut level = vec![(path, name)];
@@ -210,8 +186,6 @@ fn inherited<'a>(code: &Code<'a>, path: &'a str, name: &'a str) -> Vec<(&'a str,
     seen
 }
 
-/// The URL of the path `route` (from the root) of a Refit with `base`: the base, its own path
-/// kept, then the route.
 fn url(base: &[Part], route: &str) -> Value {
     let trim = |parts: &mut Vec<Part>| {
         if let Some(Part::Text(t)) = parts.last_mut() {
@@ -220,7 +194,6 @@ fn url(base: &[Part], route: &str) -> Value {
     };
     let mut out = base.to_vec();
     match out.as_mut_slice() {
-        // A base read from configuration joins on the literal it defaults to.
         [Part::EnvOr(_, default)] => trim(default),
         _ => trim(&mut out),
     }
@@ -236,7 +209,6 @@ mod tests {
     use crate::lang::{LanguagePack, Limit};
     use crate::resolve::Resolver;
 
-    /// A consumer as `(contract, via, the definition it is at)`.
     type Sent = (Option<String>, Option<String>, String);
 
     const API: &str = "using Refit;\nusing System.Threading.Tasks;\nnamespace A;\n\
@@ -249,7 +221,6 @@ mod tests {
                        [HeadAttribute(\"/items\")] Task Head();\n\
                        Task Plain();\n}\n";
 
-    /// The consumers of the files (`(path, source)`), with `configs` beside them, sorted.
     fn sent(sources: &[(&str, &str)], configs: &[(&str, &[u8])]) -> Vec<Sent> {
         let mut found: Vec<Sent> = (found(sources, configs).into_iter())
             .map(|f| {
@@ -264,7 +235,6 @@ mod tests {
         found
     }
 
-    /// `sent`'s consumers as they are found.
     fn found(sources: &[(&str, &str)], configs: &[(&str, &[u8])]) -> Vec<Found> {
         let parsed: Vec<_> = (sources.iter())
             .map(|(p, s)| (*p, CSharp.parse(p, s.as_bytes()).unwrap()))
@@ -293,7 +263,6 @@ mod tests {
         )
     }
 
-    /// `body`, a static class's method that makes the client, beside `API`.
     fn made(body: &str) -> Vec<Sent> {
         let maker = format!(
             "using Refit;\nnamespace A;\npublic static class Make {{\n\
@@ -318,7 +287,6 @@ mod tests {
         );
     }
 
-    /// The consumers of `IApi.Item(int)` alone.
     fn item(found: Vec<Sent>) -> Vec<(Option<String>, Option<String>)> {
         (found.into_iter())
             .filter(|(.., at)| at == "A.IApi.Item(int)")
@@ -362,21 +330,17 @@ mod tests {
 
     #[test]
     fn an_interface_no_rest_service_makes_has_an_unknown_base() {
-        // `AddRefitClient` is not read: the path follows a base Meada did not read (#801).
         let registered = "services.AddRefitClient<IApi>()\
                           .ConfigureHttpClient(c => c.BaseAddress = new Uri(\"https://x.example.com\"));\n\
                           return null;";
         let unknown = [(None, None)];
         assert_eq!(item(made(registered)), unknown);
-        // Another `For`, or one of another interface.
         assert_eq!(
             item(made("return Other.For<IApi>(\"https://x.example.com\");")),
             unknown
         );
     }
 
-    /// Refit appends the path to the base, so over a base Meada did not read (a `For` it cannot
-    /// fold, or none) each endpoint is an open item that names the client's base (#801).
     #[test]
     fn an_endpoint_on_a_base_meada_did_not_read_names_the_client_base() {
         let maker = "using Refit;\nnamespace A;\npublic static class Make {\n\
@@ -406,7 +370,6 @@ mod tests {
             )
         };
         let none: Vec<Sent> = Vec::new();
-        // No `using Refit`, a class of the repository named like it, a relative path.
         assert_eq!(sent(&[("A/IApi.cs", &api("", "Get(\"/a\")"))], &[]), none);
         let own = format!(
             "{}\npublic class GetAttribute : System.Attribute {{ public GetAttribute(string p) {{}} }}\n",
@@ -417,14 +380,12 @@ mod tests {
             sent(&[("A/IApi.cs", &api("using Refit;", "Get(\"a\")"))], &[]),
             none
         );
-        // Written in full, it binds without a using.
         assert_eq!(
             sent(&[("A/IApi.cs", &api("", "Refit.Get(\"/a\")"))], &[]),
             [(None, None, "A.IApi.Item(int)".into())]
         );
     }
 
-    /// The consumers of `ping` by `(host, the interface that declares it)`.
     fn pings(sources: &[(&str, &str)]) -> Vec<(Option<String>, String)> {
         (sent(sources, &[]).into_iter())
             .filter(|(c, ..)| c.as_deref() == Some("http::GET::/ping"))
@@ -457,7 +418,6 @@ mod tests {
             pings(&[("A/A.cs", &src)]),
             [(host("o.example.com"), "A.IBase.Ping()".into())]
         );
-        // No endpoint of its own, and a base from outside the repository adds nothing.
         let src = files(
             &ifaces,
             "RestService.For<IEmpty>(\"https://e.example.com\"); RestService.For<IOut>(\"https://x.example.com\");",
@@ -466,7 +426,6 @@ mod tests {
             pings(&[("A/A.cs", &src)]),
             [(host("e.example.com"), "A.IBase.Ping()".into())]
         );
-        // Two interfaces sharing a base: one consumer per base.
         let src = files(
             &ifaces,
             "RestService.For<IOrders>(\"https://o.example.com\"); RestService.For<IEmpty>(\"https://e.example.com\");",
@@ -484,7 +443,6 @@ mod tests {
     fn the_walk_over_bases_ends_on_a_cycle_and_at_the_bound() {
         let host = Some("host:o.example.com".to_string());
         let make = "RestService.For<I0>(\"https://o.example.com\");";
-        // `IBase : I0` would close a cycle: it ends, with the base kept.
         let cyclic = "public interface IBase : I0 { [Get(\"/ping\")] Task Ping(); }\n\
              public interface I0 : IBase { }\n";
         let src = files(cyclic, make);
@@ -492,7 +450,6 @@ mod tests {
             pings(&[("A/A.cs", &src)]),
             [(host.clone(), "A.IBase.Ping()".into())]
         );
-        // A chain `I0 : I1 : ... : In` whose last link declares the endpoint.
         let chain = |n: usize| {
             let mut s = String::new();
             for i in 0..n {
@@ -505,7 +462,6 @@ mod tests {
             pings(&[("A/A.cs", &reached)]),
             [(host, format!("A.I{BASE_DEPTH}.Ping()"))]
         );
-        // Past it, the endpoint has no base Meada read: an open item.
         let past = files(&chain(BASE_DEPTH + 1), make);
         assert_eq!(
             sent(&[("A/A.cs", &past)], &[]),

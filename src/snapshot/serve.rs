@@ -17,8 +17,6 @@ use crate::msg::Msg;
 use crate::workspace::Manifest;
 use crate::{Result, config};
 
-/// How long the status probe waits for the current generation's id (from the store, or from
-/// Valkey and then the store) before it calls the service unreachable.
 const CURRENT_ID_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// A generation a node holds, as its document records it.
@@ -30,16 +28,11 @@ pub struct Held {
     /// directory. The repositories only named workspaces select are not here: the plain route
     /// serves the deployment workspace alone.
     pub listed: Manifest,
-    /// The document, for the named workspaces it records (#342, ADR 0021).
     document: Document,
-    /// The workspace of each context read so far, by id: built when a request first names the
-    /// context and kept with the generation, which never changes.
     built: Mutex<HashMap<String, Arc<Manifest>>>,
 }
 
 impl Held {
-    /// The commit the generation records for the repository `identity` (its indexed commit:
-    /// the pull refused a mirror that was not clean at it), if the generation holds it.
     pub(crate) fn head(&self, identity: &str) -> Option<String> {
         (self.document.repositories.iter())
             .chain(&self.document.members)
@@ -69,10 +62,6 @@ impl Held {
         )
     }
 
-    /// Whether a caller whose grant is `grant` sees `context` (ADR 0020's discovery rule, #510):
-    /// the grant reads every entry of its version, the identities it records and those the
-    /// sponsor rule excluded alike. It decides with the console's function, with no operator
-    /// exemption: a node knows no operators.
     fn sees(context: &Context, grant: &meada_core::authorize::Grant) -> bool {
         let recorded = context.repositories.iter().map(|r| r.repo.clone());
         let entries: Vec<String> = recorded.chain(context.excluded.iter().cloned()).collect();
@@ -232,9 +221,6 @@ pub fn held(local: &Path) -> Result<Held> {
     load(local, pointer(local)?)
 }
 
-/// `loaded`, the generation `id` of `local` as `load` read it, or `None` when it failed because
-/// its directory is gone: a pull deleted it between the listing and the read, so it is no longer
-/// held.
 fn unless_gone(local: &Path, id: &str, loaded: Result<Held>) -> Result<Option<Held>> {
     match loaded {
         Err(_) if fs::symlink_metadata(local.join(id)).is_err() => Ok(None),
@@ -242,7 +228,6 @@ fn unless_gone(local: &Path, id: &str, loaded: Result<Held>) -> Result<Option<He
     }
 }
 
-/// The id `<local_dir>/current` names; without one, an error naming the pull.
 fn pointer(local: &Path) -> Result<String> {
     match pull::current(local)? {
         Some((id, _)) => Ok(id),
@@ -252,7 +237,6 @@ fn pointer(local: &Path) -> Result<String> {
     }
 }
 
-/// The generation `id` of `local`, its document read and checked as the pull stored it.
 fn load(local: &Path, id: String) -> Result<Held> {
     let dir = local.join(&id);
     let file = dir.join(pull::DOCUMENT);
@@ -343,7 +327,6 @@ mod tests {
         dir
     }
 
-    /// The document of generation `id` as a pull stores it: one repository, `REPO`.
     fn document(id: &str) -> serde_json::Value {
         serde_json::json!({"generation": id, "repositories": [{
             "identity": REPO, "head": "0".repeat(40),
@@ -351,8 +334,6 @@ mod tests {
             "size": 0, "blake3": "0".repeat(64)}]})
     }
 
-    /// Generation `id` of `local` made by hand, as a pull leaves it: `document`, with `REPO`'s
-    /// mirror holding `files` and its index built over them. Returns the mirror.
     fn generation(local: &Path, id: &str, files: &[(&str, &str)]) -> PathBuf {
         let bundle = local.join(id).join(BUNDLE);
         let mirror = bundle.join("mirror");
@@ -375,7 +356,6 @@ mod tests {
         fs::write(local.join(pull::POINTER), format!("{id} 0\n")).unwrap();
     }
 
-    /// Why `held` refuses what `local` holds.
     fn refused(local: &Path) -> String {
         match held(local) {
             Ok(_) => panic!("{} was served", local.display()),
@@ -391,19 +371,15 @@ mod tests {
         point(&local, A);
         let current = Current::new(local.clone());
         let routed = current.get().unwrap();
-        // The pointer moves between the route and the answer.
         point(&local, B);
         let engine = Engine::open_held(&routed, REPO, &|_| true).unwrap();
         assert!(engine.search("alpha", None, None).unwrap().contains("a.ts"));
         let beta = engine.search("beta", None, None).unwrap();
         assert!(beta.starts_with("no matches"), "{beta}");
         assert_eq!(current.get().unwrap().id, B);
-        // The cache let go of the generation no longer current: only the call holds it.
         assert_eq!(Arc::strong_count(&routed), 1);
     }
 
-    /// An export at a generation names the commit its document records, which the pull checked
-    /// the mirror was clean at (#512).
     #[test]
     fn an_export_at_a_generation_names_the_head_it_records() {
         let local = scratch("head");
@@ -444,8 +420,6 @@ mod tests {
         assert!(current.pinned("00000000000000cc").unwrap().is_none());
     }
 
-    /// A pin is read once while held, and let go of once the node no longer holds it: what the
-    /// server keeps is bounded by what the node holds.
     #[test]
     fn a_pin_is_read_once_and_dropped_once_its_generation_is_gone() {
         let local = scratch("pin-once");
@@ -459,13 +433,10 @@ mod tests {
         fs::remove_dir_all(local.join(A)).unwrap();
         assert!(current.pinned(A).unwrap().is_none());
         assert_eq!(Arc::strong_count(&first), 1);
-        // A held generation whose document no longer reads is an error, not a 404.
         fs::remove_file(local.join(B).join(pull::DOCUMENT)).unwrap();
         assert!(current.pinned(B).is_err());
     }
 
-    /// A pin whose read fails because a pull deleted its directory after the listing is a
-    /// generation no longer held (the 404), not an unservable node (the 503).
     #[test]
     fn a_pin_deleted_between_the_listing_and_the_read_is_no_longer_held() {
         let local = scratch("pin-gone");
@@ -478,8 +449,6 @@ mod tests {
         assert_eq!(loaded.unwrap().id, A);
     }
 
-    /// A held generation is as hostile as the store it came from: a document that does not
-    /// hold what the pull checked is refused before any path is built from it.
     #[test]
     fn a_held_document_the_pull_would_refuse_is_not_served() {
         let local = scratch("hostile");
@@ -522,8 +491,6 @@ mod tests {
         }
     }
 
-    /// A pull of the generation already current changes nothing: the fix of a missing index
-    /// removes the generation's directory first, or publishes another one.
     #[test]
     fn a_missing_index_names_the_generation_directory_to_remove() {
         let local = scratch("missing");
@@ -559,9 +526,6 @@ mod tests {
         }
     }
 
-    /// A mirror's `meada.toml` or `meada.decisions.toml` that is a symbolic link to a file on
-    /// the node fails the generation naming the file, and the target is never read: its content
-    /// would parse.
     #[cfg(unix)]
     #[test]
     fn a_mirror_config_through_a_symbolic_link_fails_the_generation_naming_the_file() {
@@ -592,8 +556,6 @@ mod tests {
         }
     }
 
-    /// The view's facts read a linked `meada.toml` as a file of its own that cannot be read,
-    /// never as the target's `[serve]`.
     #[cfg(unix)]
     #[test]
     fn the_facts_of_a_linked_mirror_config_declare_no_documents() {
@@ -603,7 +565,6 @@ mod tests {
         let outside = local.join("outside.toml");
         fs::write(&outside, "[serve]\n").unwrap();
         fs::copy(&outside, mirror.join("meada.toml")).unwrap();
-        // `facts` reads the mirror's file at each call, not once with the generation.
         let loaded = held(&local).unwrap();
         assert!(loaded.facts(REPO).unwrap().documents);
         fs::remove_file(mirror.join("meada.toml")).unwrap();
@@ -612,10 +573,6 @@ mod tests {
         assert!(facts.own && !facts.documents);
     }
 
-    /// The node gate's rule on a named workspace's route (#510): a context recording `REPO`
-    /// with `GONE` excluded is seen only by a grant that reads both, on the current generation
-    /// and on a pin alike; the excluded identity is admitted to no one, and the 404's list holds
-    /// only the contexts the grant sees. A context without `excluded` reads as none excluded.
     #[test]
     fn a_context_is_admitted_only_to_a_grant_reading_its_excluded_identities_too() {
         use meada_core::authorize::Grant;
@@ -639,7 +596,6 @@ mod tests {
         let only =
             |identities: &[&str]| Grant::Only(identities.iter().map(|i| i.to_string()).collect());
         let (reads_y, reads_both) = (only(&[REPO]), only(&[REPO, GONE]));
-        // The current generation, then a pin of it while the pointer names another.
         let now = current.get().unwrap();
         point(&local, B);
         let pinned = current.pinned(A).unwrap().unwrap();

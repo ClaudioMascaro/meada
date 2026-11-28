@@ -22,7 +22,6 @@ from proof_result import Comparisons, run_driver
 from prove import Http, Stdio, answer, free_port, git, fetch, infra
 
 PREFIX = 'example.com/image-proof/'
-# The CI step of `decision-app` that builds every candidate, the builder's site since #860.
 DECISION_BUILDER = PREFIX+'decision-app::.github/workflows/publish.yml::jobs.publish.steps[0]'
 
 
@@ -57,8 +56,6 @@ def boutique_non_image_key(source, base):
         consumers.append({'contract': 'resource::gcpsecretmanager',
                           'site': f'{repository}::{file}::{symbol}::client.AccessSecretVersion#0',
                           'via': None})
-    # `httpGetPackagingInfo` appends the product id to a package variable that `init` fills from the
-    # environment: a path appended to an unread base, an open item and no longer a consumer of `GET /{}`.
     packaging = (source/'src/frontend/packaging_info.go').read_text()
     handlers = (source/'src/frontend/handlers.go').read_text()
     if not all(packaging.count(witness) == 1 for witness in [
@@ -205,8 +202,6 @@ images:
     build: linked-src
 ''')
     write(repos['direct'], 'src/local.py', 'def inside_entry():\n    return 1\n')
-    # ADR 0026 (#755, #782): `COPY . .` keeps worker's whole context at `exact`; `src` holds no
-    # Dockerfile, so noimage runs its context at `inferred` and the reason says it was not read.
     write(repos['direct'], 'Dockerfile', 'FROM scratch\nCOPY . .\n')
     (repos['direct'] / 'linked-src').symlink_to('src', target_is_directory=True)
     write(repos['builder-only'], '.github/workflows/publish.yml', '''jobs:
@@ -421,8 +416,6 @@ class Probe:
         got = {p['contract'].removeprefix('image::') for p in app['providers'] if p['contract'].startswith('image::')}
         self.check('all named builders, normalization and no base-image false builder', got == expected, repr(sorted(got)))
         links = [l for l in deploy['links'] if l['contract'].startswith('image::')]
-        # A builder read in a pipeline is its CI step, in the order `publish.yml` lists them (#860); Skaffold
-        # and both Jib forms keep the repository.
         step = lambda n: f'{PREFIX}app::.github/workflows/publish.yml::jobs.publish.steps[{n}]'
         builder = {'image::ghcr.io/parcel/'+n: PREFIX+'app' for n in ['skaffold', 'jib-maven', 'jib-gradle']}
         builder |= {'image::ghcr.io/parcel/meta': step(1), 'image::ghcr.io/parcel/ko': step(2)}
@@ -458,9 +451,7 @@ class Probe:
         for name in ['app', 'deploy']:
             status = (self.run/f'head/{name}/status.out').read_text()
             rows = [r.strip() for r in status.splitlines() if r.strip().startswith('orphan image::')]
-            # The scope each line names (#849) is cut: a row without one keeps its `; place`.
             got = {r.split(' in ', 1)[0] for r in rows}
-            # CLI status reports every repository of the discovered workspace.
             expected_orphans = {'orphan image::ghcr.io/parcel/idle: no runner',
                                 'orphan image::ghcr.io/parcel/lost: no builder'}
             self.check(name+' exact mixed-scope image orphan set', got == expected_orphans and len(rows)==len(got), repr(rows))
@@ -506,7 +497,6 @@ class Probe:
         if self.ui_bin:
             self.console(heads, records, ['app','deploy'])
             self.console(heads, records, ['direct'])
-        # Same-byte-length image edit must refresh image facts in a warm index.
         p = heads['deploy']/'compose.yaml'
         original = p.read_text()
         (self.run/'refresh').mkdir(exist_ok=True)
@@ -559,8 +549,6 @@ class Probe:
             current_init=[l for l in dual(after) if '/init-' in l['contract']]
             chosen=[l for l in dual(after) if '/app-' in l['contract']]
             self.check('deciding app leaves independent init-container candidates unchanged',len(initial_init)==2 and current_init==initial_init,repr(current_init))
-            # Base decision semantics retain the contract the consumer uses, even when
-            # the manual target names a literal candidate of its pattern.
             self.check('selected app candidate alone becomes decided',len(chosen)==1 and chosen[0]['level']=='decided' and chosen[0]['contract']=='image::ghcr.io/decision-probe/app-*' and chosen[0]['provider']==DECISION_BUILDER and chosen[0].get('by')=='human' and not after.get('stale_decisions'),repr(chosen))
             original_roots=[l for l in before['links'] if 'shared/pod.yaml' in l['consumer']]
             retained_roots=[l for l in after['links'] if 'shared/pod.yaml' in l['consumer']]
@@ -597,7 +585,6 @@ class Probe:
         self.check('boutique pinned source SHA',git('rev-parse','HEAD',cwd=source).strip()==pin)
         docs = list(yaml.safe_load_all((source/'skaffold.yaml').read_text()))
         artifacts = [a['image'] for doc in docs for a in doc['build']['artifacts']]
-        # All twelve source spellings at this pin are single-component short names.
         assert all('/' not in a and ':' not in a for a in artifacts)
         expected = {'image::docker.io/library/'+a for a in artifacts}
         write(self.run,'boutique/source-key.json',json.dumps({'pin':pin,'artifacts':artifacts,'expected_builders':sorted(expected)},indent=2))
@@ -618,8 +605,6 @@ class Probe:
         self.check('boutique no short-name match to unrelated registry',not any(l['contract'].startswith('image::us-central1-docker.pkg.dev/') for l in links))
         self.check('boutique plural Helm images key is not singular repository runner',not any(str(c.get('contract') or '').startswith('image::') and 'helm-chart/values.yaml' in c['site'] for c in head['consumers']))
         self.check('boutique busybox init image retained as runner',any(c.get('contract')=='image::docker.io/library/busybox' for c in head['consumers']))
-        # Full original exports remain attached; inspect every top-level delta, including
-        # unknown fields, rather than letting the generic comparator silently omit fields.
         allowed={'providers','consumers','links','iac_nodes','executions','processes','provisioners','uses'}
         changes={k:{'base':base.get(k),'head':head.get(k)} for k in sorted(set(base)|set(head)) if base.get(k)!=head.get(k)}
         write(self.run,'boutique/full-field-deltas.json',json.dumps(changes,indent=2))
@@ -627,8 +612,6 @@ class Probe:
         raw_head=(self.run/'boutique/head/export.out').read_text()
         write(self.run,'boutique/export.diff',''.join(difflib.unified_diff(raw_base.splitlines(True),raw_head.splitlines(True),fromfile='base',tofile='head')))
         outside_images = lambda doc: {key: value for key, value in doc.items() if key not in allowed}
-        # Fields outside the image model move with every later release (#967, #969, #973): with the
-        # PR's base binary they answer to it, so only this change's own rows differ.
         if self.pr_base:
             self.comparisons.compare('boutique unchanged whole fields outside new image model, against the PR base',
                                      outside_images(exports['pr-base']), outside_images(head))
@@ -654,8 +637,6 @@ class Probe:
         self.check('boutique frontend context carries literal image and builder','image::docker.io/library/frontend' in texts[0] and head['repository'] in texts[0],texts[0])
         self.check('boutique frontend trace reaches actual code','src/frontend/' in texts[1],texts[1][:2000])
         if self.http:
-            # HTTP helper has a neutral identity prefix; use a dedicated same-scope
-            # manifest with the public identity, preserving every byte of each answer.
             self.public_http(repos['head'],head['repository'],qs,tools,texts)
 
     def public_http(self,repo,identity,qs,tools,texts):
@@ -689,7 +670,6 @@ class Probe:
         self.command(self.head,folder,['index','--workspace','workspace.toml'],'filtered-scope/index')
         exp = json.loads(self.command(self.head,folder,['export','--workspace','workspace.toml','--repo',PREFIX+'deploy'],'filtered-scope/export'))
         self.check('server filtered workspace contains no hidden builder links',not exp['links'] and PREFIX+'app' not in json.dumps(exp))
-        # A same-repository peer configuration must never expand server-mode grants.
         if self.http:
             port = free_port()
             with open(folder/'server.log','w') as log:
@@ -773,7 +753,6 @@ def main():
     args = p.parse_args()
     if bool(args.ui_bin) != bool(args.ui_dir):
         p.error('--ui-bin and --ui-dir must be supplied together')
-    # These deliberately disagree with checked-in values. Never resolve process environment.
     os.environ.update(REGISTRY='runtime.invalid',KO_DOCKER_REPO='runtime.invalid/phantom',STAGE='runtime',IMAGE='busybox')
     probe = Probe(args)
     try:

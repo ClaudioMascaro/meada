@@ -22,14 +22,9 @@ use rmcp::{
 )]
 use rmcp::model::{ListRootsResult, Root};
 
-/// The eras the server tells apart: before 2026-07-28 it sends `roots/list`; from there on it
-/// answers the call with `InputRequiredResult` (SEP-2322).
 const LEGACY: ProtocolVersion = ProtocolVersion::V_2025_11_25;
 const MODERN: ProtocolVersion = ProtocolVersion::V_2026_07_28;
 
-/// Serves `handler` in the era its config names: the `initialize` handshake before 2026-07-28
-/// (rmcp's `serve` always does that, whatever version the config says), `server/discover` from
-/// there on.
 async fn connect<H: ClientHandler>(
     handler: H,
     transport: TokioChildProcess,
@@ -47,7 +42,6 @@ async fn connect<H: ClientHandler>(
         .unwrap()
 }
 
-/// A config declaring the roots capability, speaking `version`.
 #[expect(
     deprecated,
     reason = "roots are deprecated by SEP-2577; still how Claude Code gives the session's directory"
@@ -61,9 +55,6 @@ fn roots_config(version: ProtocolVersion) -> ClientConfig {
     config
 }
 
-/// `meada mcp` in a fixture repository: the tools it lists stay within 1,000 tokens (one per
-/// four bytes of description and parameter schema, ADR 0008), the list matches its golden
-/// (names, parameter schemas and descriptions: the surface 1.0 freezes), and `trace` answers.
 #[tokio::test]
 async fn serves_three_tools_over_stdio_within_the_description_budget() {
     let repo = fixture_repo(
@@ -101,10 +92,8 @@ async fn serves_three_tools_over_stdio_within_the_description_budget() {
         "tool list costs {} tokens",
         bytes.div_ceil(4)
     );
-    // The defaults 1.0 freezes, which the tool list only states in its descriptions.
     assert_eq!(meada_core::render::DEFAULT_BUDGET, 2_000);
 
-    // No `direction`: the default walks down.
     let answer = client
         .call_tool(
             CallToolRequestParams::new("trace").with_arguments(
@@ -125,10 +114,6 @@ async fn serves_three_tools_over_stdio_within_the_description_budget() {
     client.cancel().await.unwrap();
 }
 
-/// Calls a client sends without waiting for each reply (#704) all get a result: each call
-/// refreshes the index, and a refresh that finds a changed file writes, so pipelined calls
-/// meet one another's writes and must wait for them rather than answer `database is locked`.
-/// Each round changes a file first, so every round's refreshes have something to write.
 #[tokio::test]
 async fn pipelined_calls_all_get_a_result() {
     let repo = fixture_repo(
@@ -165,10 +150,6 @@ async fn pipelined_calls_all_get_a_result() {
     client.cancel().await.unwrap();
 }
 
-/// One stdio server answers at most four calls at once (`CALLS_IN_FLIGHT`, #756), and the others
-/// wait their turn. Twelve calls sent together while another process holds the index under a
-/// commit in progress: the four in flight wait out the busy timeout (10 s) and fail, then the
-/// eight that waited for a turn meet the index free and each answers what it answers alone.
 #[tokio::test]
 async fn calls_past_the_bound_wait_their_turn_and_each_gets_its_own_reply() {
     let repo = fixture_repo(
@@ -200,7 +181,6 @@ async fn calls_past_the_bound_wait_their_turn_and_each_gets_its_own_reply() {
     let held = rusqlite::Connection::open(repo.join(".meada/index.db")).unwrap();
     held.execute_batch("BEGIN EXCLUSIVE").unwrap();
     let release = tokio::spawn(async move {
-        // Past the busy timeout of the first four, well within that of the next ones.
         tokio::time::sleep(Duration::from_secs(12)).await;
         held.execute_batch("ROLLBACK").unwrap();
     });
@@ -231,9 +211,6 @@ async fn calls_past_the_bound_wait_their_turn_and_each_gets_its_own_reply() {
     client.cancel().await.unwrap();
 }
 
-/// The client's first `file://` root wins over the server's cwd (#192): a client that answers
-/// `roots/list` with another repository, under a directory with a space in its name, gets
-/// answers about that repository.
 #[tokio::test]
 async fn answers_about_the_clients_first_root_not_its_cwd() {
     let cwd = fixture_repo(
@@ -276,9 +253,6 @@ async fn answers_about_the_clients_first_root_not_its_cwd() {
     client.cancel().await.unwrap();
 }
 
-/// A client that stops answering `roots/list` (#282) must not hang the call: the server waits
-/// 5 s, then returns a tool error that names `roots/list` (no root was ever sent, and the
-/// server's own directory could be another checkout), with one line on stderr.
 #[tokio::test]
 async fn a_silent_client_gets_a_tool_error_naming_roots_list() {
     let cwd = fixture_repo(
@@ -305,8 +279,6 @@ async fn a_silent_client_gets_a_tool_error_naming_roots_list() {
     );
 }
 
-/// A client that answers `roots/list` once and then goes quiet (#282) keeps its last root: the
-/// call that times out answers about it, not about the server's cwd, with one line on stderr.
 #[tokio::test]
 async fn a_client_that_goes_quiet_keeps_its_last_root() {
     let cwd = fixture_repo(
@@ -343,9 +315,6 @@ async fn a_client_that_goes_quiet_keeps_its_last_root() {
     );
 }
 
-/// A client that fails `roots/list` with a JSON-RPC error (#285) is handled like one that goes
-/// quiet: with no root sent before, the call returns a tool error naming `roots/list`, with one
-/// line on stderr.
 #[tokio::test]
 async fn a_failing_client_gets_a_tool_error_naming_roots_list() {
     let cwd = fixture_repo(
@@ -372,8 +341,6 @@ async fn a_failing_client_gets_a_tool_error_naming_roots_list() {
     );
 }
 
-/// A client that answers `roots/list` once and then fails it (#285) keeps its last root: the
-/// failing call answers about it, not about the server's cwd, with one line on stderr.
 #[tokio::test]
 async fn a_client_that_fails_keeps_its_last_root() {
     let cwd = fixture_repo(
@@ -410,9 +377,6 @@ async fn a_client_that_fails_keeps_its_last_root() {
     );
 }
 
-/// A client that declares roots but answers `roots/list` with an empty list (#285) is a
-/// successful answer with no local root: it means the server's directory, as without the
-/// capability, not an error.
 #[tokio::test]
 async fn an_empty_root_list_means_the_servers_directory() {
     let cwd = fixture_repo(
@@ -442,7 +406,6 @@ async fn an_empty_root_list_means_the_servers_directory() {
     client.cancel().await.unwrap();
 }
 
-/// Serves `meada mcp` in `cwd` to a [`Stops`] client, keeping the server's stderr.
 async fn stops_client(
     cwd: &std::path::Path,
     version: ProtocolVersion,
@@ -470,8 +433,6 @@ async fn stops_client(
     (connect(stops, transport).await, stderr.unwrap())
 }
 
-/// `trace` from `sum`, down. The server waits 5 s for `roots/list`; the 15 s of slack on top
-/// make a hang fail the test instead of stalling it.
 async fn trace_sum<H: ClientHandler>(client: &RunningService<RoleClient, H>) -> CallToolResult {
     tokio::time::timeout(
         Duration::from_secs(5 + 15),
@@ -491,7 +452,6 @@ fn trace_params() -> CallToolRequestParams {
     )
 }
 
-/// The first text block of a result.
 fn text_of(answer: &CallToolResult) -> &str {
     &answer
         .content
@@ -501,12 +461,10 @@ fn text_of(answer: &CallToolResult) -> &str {
         .text
 }
 
-/// The `file://` URI of a directory.
 fn file_uri(dir: &std::path::Path) -> String {
     format!("file://{}", dir.display().to_string().replace(' ', "%20"))
 }
 
-/// One `tools/call` of `trace`, answered or not, with the retry's `roots` answer (if any).
 async fn trace_once<H: ClientHandler>(
     client: &RunningService<RoleClient, H>,
     roots: Option<serde_json::Value>,
@@ -519,7 +477,6 @@ async fn trace_once<H: ClientHandler>(
         .unwrap()
 }
 
-/// The server's stderr up to its exit; a server that never closes it fails the test.
 async fn read_all(stderr: &mut tokio::process::ChildStderr) -> String {
     let mut out = String::new();
     let read = tokio::io::AsyncReadExt::read_to_string(stderr, &mut out);
@@ -530,8 +487,6 @@ async fn read_all(stderr: &mut tokio::process::ChildStderr) -> String {
     out
 }
 
-/// A client of `version` that declares the roots capability and answers `roots/list` with one
-/// `file://` root.
 struct Roots(String, ProtocolVersion);
 
 #[expect(
@@ -551,8 +506,6 @@ impl ClientHandler for Roots {
     }
 }
 
-/// A client of `version` that declares the roots capability and answers `roots/list` with an
-/// empty list, the default of rmcp's `list_roots`.
 struct NoRoots(ProtocolVersion);
 
 impl ClientHandler for NoRoots {
@@ -561,9 +514,6 @@ impl ClientHandler for NoRoots {
     }
 }
 
-/// A client of `version` that declares the roots capability, answers `roots/list` with `root`
-/// while it has `answers` left, then never answers again, or, with `fails`, answers with an
-/// error.
 struct Stops {
     version: ProtocolVersion,
     root: String,
@@ -597,9 +547,6 @@ impl ClientHandler for Stops {
     }
 }
 
-/// On the 2026-07-28 era the client drops `roots/list` requests: the first call is answered
-/// with `InputRequiredResult` asking for `roots` (SEP-2322), and rmcp's `call_tool` fulfils it
-/// through `list_roots` and retries. The answer is about the client's first root, not the cwd.
 #[tokio::test]
 async fn a_modern_client_answers_about_its_first_root_through_the_round_trip() {
     let cwd = fixture_repo(
@@ -614,7 +561,6 @@ async fn a_modern_client_answers_about_its_first_root_through_the_round_trip() {
     );
     let (client, mut stderr) = stops_client(&cwd, MODERN, file_uri(&root), 2, false).await;
 
-    // The first call by hand: the server asks for the roots instead of answering.
     let first = trace_once(&client, None).await;
     let CallToolResponse::InputRequired(asked) = first else {
         panic!("the server answered without asking for the roots: {first:?}");
@@ -632,8 +578,6 @@ async fn a_modern_client_answers_about_its_first_root_through_the_round_trip() {
     assert_eq!(read_all(&mut stderr).await, "");
 }
 
-/// A modern client that answers with an empty list gets the server's directory, as on the
-/// legacy era.
 #[tokio::test]
 async fn a_modern_empty_root_list_means_the_servers_directory() {
     let cwd = fixture_repo(
@@ -653,9 +597,6 @@ async fn a_modern_empty_root_list_means_the_servers_directory() {
     client.cancel().await.unwrap();
 }
 
-/// rmcp's `call_tool` aborts when `list_roots` fails, so the failing retries are built by hand:
-/// a `roots` answer that is missing or malformed, with no root sent before, is a tool error
-/// naming `roots/list`, with one line on stderr.
 #[tokio::test]
 async fn a_modern_retry_without_a_usable_root_gets_a_tool_error_naming_roots_list() {
     let cwd = fixture_repo(
@@ -671,7 +612,6 @@ async fn a_modern_retry_without_a_usable_root_gets_a_tool_error_naming_roots_lis
     ] {
         let CallToolResponse::Complete(answer) = (match roots.get("roots") {
             Some(bad) => trace_once(&client, Some(bad.clone())).await,
-            // An `inputResponses` that lacks `roots`.
             None => {
                 let mut params = trace_params();
                 params.input_responses = Some([("elsewhere".to_string(), roots)].into());
@@ -695,8 +635,6 @@ async fn a_modern_retry_without_a_usable_root_gets_a_tool_error_naming_roots_lis
     );
 }
 
-/// A modern client that answered once and then sends a malformed `roots` keeps its last root:
-/// the failing call answers about it, with one line on stderr.
 #[tokio::test]
 async fn a_modern_client_that_fails_keeps_its_last_root() {
     let cwd = fixture_repo(
@@ -731,8 +669,6 @@ async fn a_modern_client_that_fails_keeps_its_last_root() {
     );
 }
 
-/// A client that does not declare roots gets the server's directory, with no round trip. The
-/// capability check comes before the era check, so one era (modern) covers both.
 #[tokio::test]
 async fn a_client_without_roots_gets_the_servers_directory() {
     let cwd = fixture_repo(
@@ -756,7 +692,6 @@ async fn a_client_without_roots_gets_the_servers_directory() {
     client.cancel().await.unwrap();
 }
 
-/// `meada mcp` in `cwd`, with its stderr piped.
 fn server_in(cwd: &std::path::Path) -> (TokioChildProcess, Option<tokio::process::ChildStderr>) {
     TokioChildProcess::builder(
         tokio::process::Command::new(env!("CARGO_BIN_EXE_meada")).configure(|c| {

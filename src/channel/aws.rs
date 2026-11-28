@@ -1,4 +1,3 @@
-//! AWS source-channel operation matrix, shared by the channel kind's language readers.
 use crate::contract::{Found, Role, Site};
 use crate::lang::{Value, property};
 use crate::names::{self, Argument};
@@ -60,7 +59,6 @@ impl Operation {
     pub fn read(&self, fields: &[(String, Value)]) -> Option<Vec<Argument>> {
         match self.broker {
             "sns" => {
-                // Phone-number and endpoint publishes do not name a topic.
                 let Some(value) = property(fields, "TopicArn").ok()? else {
                     return Some(Vec::new());
                 };
@@ -231,8 +229,6 @@ pub(super) fn extract(code: &Code, indexed: Option<&crate::index::Indexed>) -> V
     sdk::extract(code, "channel", SERVICES, indexed)
 }
 
-/// Preserve the older language-reader tests at the same message seam while the shared
-/// constructor-backed extractor now owns their AWS forms.
 #[cfg(test)]
 pub(super) fn test_messages(
     code: &Code,

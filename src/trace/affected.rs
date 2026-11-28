@@ -1,8 +1,3 @@
-//! The affected set of a change (`meada trace --affected`): everything a change may affect,
-//! file by file, for a merge queue to filter. A change roots the symbols, files, config sites,
-//! IaC nodes and document sides it touches; a path that roots nothing is `open`, with its
-//! reason, never dropped.
-
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet};
 
@@ -30,7 +25,6 @@ pub struct Affected {
     lockfiles: Vec<Lockfile>,
 }
 
-/// A changed lockfile: what moved in it and the packages that roots, or why it was not read.
 #[derive(Serialize, Debug)]
 pub(crate) struct Lockfile {
     repo: String,
@@ -45,7 +39,6 @@ enum LockState {
     Read {
         entries: Vec<lock::Moved>,
         packages: Vec<LockPackage>,
-        /// The member manifests of the change whose only edits this lockfile covers.
         manifests: Vec<String>,
     },
     Unread {
@@ -53,8 +46,6 @@ enum LockState {
     },
 }
 
-/// A package a lockfile change reaches: the direct dependencies that lead to what moved, and
-/// whether no file loads them, so every file of the package is rooted.
 #[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct LockPackage {
     package: String,
@@ -62,38 +53,27 @@ struct LockPackage {
     whole: bool,
 }
 
-/// What the lockfiles of a change root: each lockfile, and each file one roots with that
-/// lockfile's path.
 #[derive(Default, Debug)]
 pub(crate) struct Attributed {
     lockfiles: Vec<Lockfile>,
     pub(crate) files: BTreeMap<String, String>,
-    /// The lockfiles read whose root reaches a name no file loads: tooling of every package.
     all_packages: BTreeSet<String>,
-    /// The member manifests of the change whose only edits a lockfile read covers.
     covered: BTreeSet<String>,
-    /// What the changed lines load from outside the workspace: the lockfile that resolves each
-    /// and the package's name.
     reads: BTreeSet<(String, String)>,
 }
 
 impl Attributed {
-    /// The files a lockfile roots, each as a whole file, as `trace::starts` reads a change.
     pub(crate) fn as_changes(&self) -> Vec<(String, Change)> {
         (self.files.keys())
             .map(|p| (p.clone(), Change::Untracked))
             .collect()
     }
 
-    /// The lockfile at `path`, when the change holds one this answer reads as a lockfile.
     fn lockfile(&self, path: &str) -> Option<&Lockfile> {
         self.lockfiles.iter().find(|l| l.path == path)
     }
 }
 
-/// The paths a workspace root owns that affect every package under it (`all-packages`), as
-/// they sit in its folder: its manifest, the package manager's configuration and directory, the
-/// root `tsconfig.json` and the framework's version file. A lockfile there is read instead.
 // ponytail: every package, unnarrowed (a `tsconfig.json` by its `include`, `.yarn/patches` by
 // the lockfile's `patch:` entries); see `docs/agents/ceilings.md`.
 fn root_global(folder: &str, path: &str) -> bool {
@@ -110,29 +90,22 @@ fn root_global(folder: &str, path: &str) -> bool {
     ) || rel.starts_with(".yarn/")
 }
 
-/// A changed path and what changed of it.
 #[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Changed {
     repo: String,
     path: String,
-    /// `lines`, `whole` or `deleted`.
     change: &'static str,
 }
 
-/// A path that roots nothing the walk can follow, or that the walk does not follow whole.
 #[derive(Serialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Open {
     repo: String,
     path: String,
-    /// `all-packages`, `deleted`, `iac`, `manifest`, `root` or `no-symbols`, the first that
-    /// applies.
     reason: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     package: Option<String>,
 }
 
-/// An affected file, with the evidence of the edge that set the key of its best node. A touched
-/// file is a root: `certain`, at `exact`, with no edge.
 #[derive(Serialize, Debug, PartialEq)]
 struct File {
     repo: String,
@@ -152,19 +125,15 @@ struct File {
     reason: Option<String>,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     narrowed: bool,
-    /// Whether the file's package is in the manifest's reverse closure of a changed package.
     manifest: bool,
-    /// The lockfile whose change roots the file, when one does.
     #[serde(skip_serializing_if = "Option::is_none")]
     lockfile: Option<String>,
 }
 
-/// A file a changed line reads, with the evidence of its strongest edge.
 #[derive(Serialize, Debug, PartialEq)]
 struct Read {
     repo: String,
     path: String,
-    /// On a lockfile read: the package the changed line loads, whose entry it reads.
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<String>,
     tier: Tier,
@@ -173,22 +142,16 @@ struct Read {
     candidates: Option<usize>,
 }
 
-/// How certain an affected node is: the rank of the weakest edge of its strongest chain.
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Tier {
-    /// `exact`, `declared`, or `decided` by a human.
     Certain,
-    /// A name match, narrowed or not.
     Inferred,
-    /// `decided` by a model, or by no one named.
     Model,
-    /// One of several candidates.
     Ambiguous,
 }
 
 impl Tier {
-    /// The tier of an edge: its level, and for a decided link who decided it.
     pub(crate) fn of(evidence: &Evidence) -> Self {
         match evidence.level {
             Level::Exact | Level::Declared => Tier::Certain,
@@ -200,8 +163,6 @@ impl Tier {
     }
 }
 
-/// The key of an edge, a chain or a node: its tier, then its candidates (0 off `ambiguous`).
-/// A chain's key is its largest edge key; a node's, the smallest chain key reaching it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Key {
     pub(crate) tier: Tier,
@@ -209,7 +170,6 @@ pub(crate) struct Key {
 }
 
 impl Key {
-    /// A root's key, the smallest.
     const ROOT: Key = Key {
         tier: Tier::Certain,
         candidates: 0,
@@ -226,8 +186,6 @@ impl Key {
     }
 }
 
-/// A node the fan settled: its key, the weakest edge of its strongest chain (none for a root),
-/// and whether the walk ends there.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Settled<'g> {
     pub(crate) key: Key,
@@ -235,26 +193,19 @@ pub(crate) struct Settled<'g> {
     pub(crate) ends: bool,
 }
 
-/// A reached IaC node: a workload that runs the code, or a CI node that runs its program.
 #[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Reached {
     id: String,
     level: Level,
 }
 
-/// A reached node with no file of its own (`Graph::ends`): a repository-level side, a side
-/// only a document lists, or a config use.
 #[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Side {
     id: String,
-    /// `repository`, `document` or `config`.
     place: &'static str,
     level: Level,
 }
 
-/// The evidence of one edge: its level, who decided a decided link and the probability a model
-/// gave, its candidate count (0 off an ambiguous edge), the link's reason, and whether a name
-/// match was narrowed.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Evidence<'g> {
     pub(crate) level: Level,
@@ -266,7 +217,6 @@ pub(crate) struct Evidence<'g> {
 }
 
 impl<'g> Evidence<'g> {
-    /// A call or use row's evidence: a row with no level is held for the weakest.
     fn call(c: &'g CallSite) -> Self {
         Evidence {
             level: c.level.unwrap_or(Level::Ambiguous),
@@ -279,8 +229,6 @@ impl<'g> Evidence<'g> {
     }
 }
 
-/// A node that depends on another through one edge; `ends` when the walk stops there (an IaC
-/// node that runs the code or its program).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Dependent<'g> {
     pub(crate) to: &'g str,
@@ -289,13 +237,6 @@ pub(crate) struct Dependent<'g> {
 }
 
 impl<'a> Graph<'a> {
-    /// What depends on `id`, one edge each, in a fixed order: the calls and uses whose target
-    /// it is (at their holder, else their caller), the calls that list it among their
-    /// candidates, the definitions a decorator call of it decorates, the calls that consume a
-    /// link into it, the methods of a declarative client that do, the consumers of the data
-    /// that it or a call it makes provides, the workloads that run its code and the CI nodes
-    /// that run it as a program. Not what it calls, nor what writes what it reads, nor what
-    /// provisions what it uses: those are what it depends on.
     pub(crate) fn dependents(&self, id: &str) -> Vec<Dependent<'_>> {
         let mut out = Vec::new();
         let callers = self.callers.get(id).map_or(&[][..], Vec::as_slice);
@@ -360,7 +301,6 @@ impl<'a> Graph<'a> {
                 .filter(|l| !calls_on_link(l) && contract::flows_to_consumer(Some(&l.contract)))
             {
                 let to = match self.calls.get(link.consumer.as_str()) {
-                    // A call consuming a link into `id` itself is above.
                     Some(_) if provider == id => continue,
                     Some(&(_, reader)) => held(reader),
                     None => link.consumer.as_str(),
@@ -411,7 +351,6 @@ impl<'a> Graph<'a> {
         out
     }
 
-    /// A link's evidence; an ambiguous link counts the links of its consumer and contract.
     fn evidence<'g>(&'g self, link: &'g Link) -> Evidence<'g> {
         let candidates = match link.level {
             Level::Ambiguous => (self.out.get(link.consumer.as_str()).into_iter().flatten())
@@ -429,7 +368,6 @@ impl<'a> Graph<'a> {
         }
     }
 
-    /// The repository and path of a symbol, or of a file id (`<repository>::<path>`).
     fn path_of<'g>(&'g self, id: &'g str) -> Option<(usize, &'g str)> {
         if let Some(&(n, s)) = self.symbols.get(id) {
             return Some((n, &s.span.path));
@@ -440,9 +378,6 @@ impl<'a> Graph<'a> {
         })
     }
 
-    /// The CI step `node` and what holds it, as the walk up from a step writes them
-    /// (`Walk::holders_up`): its CI job, its pipeline, and the CI jobs that call that pipeline,
-    /// each once, by the identities the graph keeps.
     fn holders<'g>(
         &'g self,
         n: usize,
@@ -473,7 +408,6 @@ impl<'a> Graph<'a> {
     }
 }
 
-/// The packages per tier, by manifest directory.
 #[derive(Serialize, Debug, Default)]
 struct Packages {
     certain: Vec<String>,
@@ -481,11 +415,8 @@ struct Packages {
     manifest_only: Vec<String>,
 }
 
-/// The package that owns each path, per repository of the workspace.
 struct Owners<'g> {
     graph: &'g Graph<'g>,
-    /// Whether each manifest read is a workspace root (it lists workspace members), by
-    /// repository and path.
     workspaces: HashMap<(usize, &'g str), bool>,
 }
 
@@ -497,9 +428,6 @@ impl<'g> Owners<'g> {
         }
     }
 
-    /// Whether the manifest at `path` in repository `n` lists workspace members: an npm
-    /// `package.json` whose `workspaces` is an array or an object with `packages`. The index
-    /// stores no such field, so it is read from disk.
     fn is_workspace(&mut self, n: usize, path: &'g str) -> bool {
         let root = &self.graph.workspace.repos[n].root;
         *self.workspaces.entry((n, path)).or_insert_with(|| {
@@ -512,14 +440,11 @@ impl<'g> Owners<'g> {
         })
     }
 
-    /// The owning manifest of `path` in repository `n`, and whether it is a workspace root.
     fn owner(&mut self, n: usize, path: &str) -> Option<(&'g Manifest, bool)> {
         let manifest = package::owner_of(&self.graph.exports[n].manifests, path)?;
         Some((manifest, self.is_workspace(n, &manifest.path)))
     }
 
-    /// The directory of the manifest that owns `path` in repository `n`, unless a workspace
-    /// root owns it.
     fn package(&mut self, n: usize, path: &str) -> Option<String> {
         match self.owner(n, path)? {
             (_, true) => None,
@@ -528,25 +453,18 @@ impl<'g> Owners<'g> {
     }
 }
 
-/// The directory of a manifest path: `.` for the repository root.
 fn directory(path: &str) -> &str {
     path.rsplit_once('/').map_or(".", |(dir, _)| dir)
 }
 
-/// The bytes of a manifest of the repository: a regular file of at most `lang::MAX_BYTES`.
 fn manifest_bytes(abs: &std::path::Path) -> Option<Vec<u8>> {
     repo::regular(abs, lang::MAX_BYTES).filter(|b| b.len() <= lang::MAX_BYTES)
 }
 
-/// The `resolutions` of the manifest at `path`.
 fn resolutions(path: &std::path::Path) -> BTreeMap<String, String> {
     manifest_bytes(path).map_or_else(BTreeMap::new, |b| lock::overrides(&b))
 }
 
-/// What the changed lines of `changes` load from a package the workspace does not provide, each
-/// with the `yarn.lock` nearest above the file that loads it: a load is on a changed line when
-/// its specifier, quoted, is written there (a whole file loads everything it loads). A file with
-/// no lockfile above it reads none.
 fn lockfile_reads(
     graph: &Graph<'_>,
     changes: &[(String, Change)],
@@ -603,14 +521,12 @@ fn lockfile_reads(
     Ok(out)
 }
 
-/// The packages of `names` a file of `facts` loads.
 fn loaded_names<'n>(facts: &Facts, names: &BTreeSet<&'n str>) -> BTreeSet<&'n str> {
     (lang::loaded(facts).into_iter())
         .filter_map(|s| names.get(npm::split(s)?.0).copied())
         .collect()
 }
 
-/// The dependency tables of a `package.json`.
 const DEPENDENCY_FIELDS: [&str; 4] = [
     "dependencies",
     "devDependencies",
@@ -618,8 +534,6 @@ const DEPENDENCY_FIELDS: [&str; 4] = [
     "optionalDependencies",
 ];
 
-/// Whether the change to the member manifest `path` since `base` is one a lockfile covers:
-/// only its dependency tables changed, and only in names of `via`.
 fn covered(root: &std::path::Path, base: Option<&str>, path: &str, via: &BTreeSet<String>) -> bool {
     let json = |bytes: Option<Vec<u8>>| {
         bytes.and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
@@ -654,14 +568,6 @@ fn covered(root: &std::path::Path, base: Option<&str>, path: &str, via: &BTreeSe
     })
 }
 
-/// What the `yarn.lock` files of `changes` root in the repository where Meada runs. A lockfile
-/// beside a workspace root manifest, or a Berry one of any project, is read at `base` (from git)
-/// and on disk, and what moved between them is walked up to the workspace's packages: in each,
-/// the files that load a direct dependency leading there are rooted, or every file of a package
-/// none of whose files does. One that cannot be read (no `base`, deleted, too large, not Berry,
-/// unparsable) roots nothing and is listed with why; a non-Berry lockfile of a package that is
-/// its own root is left to the rules for any other path. `facts` gives the stored facts of the
-/// files that mention a name.
 pub(crate) fn attribute<'g>(
     graph: &'g Graph<'g>,
     changes: &[(String, Change)],
@@ -676,13 +582,11 @@ pub(crate) fn attribute<'g>(
         reads: lockfile_reads(graph, changes, facts_at)?,
         ..Attributed::default()
     };
-    // The package directory of each file of the repository, read once.
     let mut dirs: Option<Vec<(&str, &str)>> = None;
     for (path, change) in changes {
         if path.rsplit('/').next() != Some("yarn.lock") {
             continue;
         }
-        // A file that became a link (or stopped being one) is deleted and added: read it once.
         if matches!(change, Change::Deleted)
             && (changes.iter()).any(|(p, c)| p == path && !matches!(c, Change::Deleted))
         {
@@ -696,7 +600,6 @@ pub(crate) fn attribute<'g>(
         let overrides = resolutions(&repo.root.join(&manifest));
         let head = || {
             let abs = repo.root.join(path);
-            // One byte past the cap is enough to tell it is too large; a link is not followed.
             match repo::regular(&abs, lock::MAX_LOCK_BYTES) {
                 Some(bytes) => lock::read(&bytes, &overrides),
                 None if abs.symlink_metadata().is_ok() => Err(Unread::Unparsable),
@@ -726,9 +629,6 @@ pub(crate) fn attribute<'g>(
         };
         let moved = lock::diff(&before, &after);
         let reached = lock::reached(&before, &after, &moved);
-        // A hoisted import gets something else only when an entry outside the workspaces changed;
-        // a member that starts or stops depending on a name, or adds a key to an entry, changes
-        // nothing for the others.
         let outside: Vec<lock::Moved> = (moved.iter())
             .filter(|m| !after.is_workspace(&m.descriptor))
             .filter(|m| m.patched || lock::changed(&before, &after, &m.descriptor))
@@ -740,7 +640,6 @@ pub(crate) fn attribute<'g>(
         .collect();
         let names: BTreeSet<&str> = reached.values().flatten().map(String::as_str).collect();
         let loaded = facts(&names.iter().copied().collect::<Vec<_>>())?;
-        // What each file of this workspace loads among the reached names.
         let inside = |p: &str| folder.is_empty() || p.starts_with(&format!("{folder}/"));
         let loads: BTreeMap<&str, BTreeSet<&str>> = (loaded.iter())
             .filter(|(p, _)| inside(p))
@@ -757,7 +656,6 @@ pub(crate) fn attribute<'g>(
         });
         let mut packages = Vec::new();
         for (dir, via) in &reached {
-            // A workspace outside the repository holds none of its files.
             let Some(package) = repo::relative(folder, dir).filter(|p| !p.starts_with("..")) else {
                 continue;
             };
@@ -781,8 +679,6 @@ pub(crate) fn attribute<'g>(
                 whole,
             });
         }
-        // A file that loads a reached name its own package does not declare (one hoisted from
-        // another workspace, the root's tooling) depends on it all the same.
         for (file, loading) in &loads {
             let Some(manifest) = package::owner_of(&export.manifests, file) else {
                 continue;
@@ -796,7 +692,6 @@ pub(crate) fn attribute<'g>(
                     .or_insert_with(|| path.clone());
             }
         }
-        // A name the root's entry reaches that no file loads is tooling of every package.
         let loaded_anywhere: BTreeSet<&str> = loads.values().flatten().copied().collect();
         if (reached.get(".").into_iter().flatten()).any(|n| !loaded_anywhere.contains(n.as_str())) {
             out.all_packages.insert(path.clone());
@@ -839,15 +734,6 @@ pub(crate) fn attribute<'g>(
     Ok(out)
 }
 
-/// The ids a change roots in the repository where Meada runs, sorted, and the paths it leaves
-/// open. A symbol roots when its span overlaps a changed line; the file's own id and every
-/// symbol of the file root when the whole file changed or a changed line sits in no symbol (an
-/// `import` line rebinds calls in unchanged functions). Config sites and IaC nodes root by
-/// their lines, and a changed document roots every side it alone lists. An IaC or CI path is
-/// also `open` (`iac`): the walk does not follow IaC references nor pipeline calls. The files
-/// `attributed` roots for a lockfile root as a whole file does, with no `open` entry; a lockfile
-/// it could not read, and a path a workspace root owns that `root_global` names, are open as
-/// `all-packages`.
 pub(crate) fn roots<'g>(
     graph: &'g Graph<'g>,
     changes: &[(String, Change)],
@@ -873,7 +759,6 @@ pub(crate) fn roots<'g>(
     let all = (changes.iter().map(|(p, c)| (p, c, false))).chain(extra);
     for (path, change, rooted_by_lockfile) in all {
         let file = format!("{}::{path}", repo.identity);
-        // Whether a 1-based line range overlaps the change.
         let touched = |first: usize, last: usize| match change {
             Change::Untracked => true,
             Change::Deleted => false,
@@ -946,15 +831,10 @@ pub(crate) fn roots<'g>(
             None => owner.is_some_and(|(m, root)| root && root_global(directory(&m.path), path)),
         };
         let reason = match () {
-            // First: a deleted root file or one with symbols affects every package all the same.
             _ if global => Some("all-packages"),
-            // A lockfile read roots what moved in it, and covers a member manifest whose only
-            // edits are the dependencies that moved.
             _ if attributed.lockfile(path).is_some() || attributed.covered.contains(path) => None,
             _ if matches!(change, Change::Deleted) => Some("deleted"),
             _ if iac => Some("iac"),
-            // A manifest or a path the workspace root owns stays open even when it roots
-            // something (a manifest is the provider of its package's links).
             _ if owner.is_some_and(|(m, root)| m.path == *path && !root) => Some("manifest"),
             _ if owner.is_some_and(|(_, root)| root) => Some("root"),
             _ if rooted => None,
@@ -973,8 +853,6 @@ pub(crate) fn roots<'g>(
     (roots.into_iter().collect(), open)
 }
 
-/// The answer: what `changes` touched, the paths `roots` left `open`, and what the walk from
-/// `roots` reaches.
 pub(crate) fn answer<'g>(
     graph: &'g Graph<'g>,
     changes: &[(String, Change)],
@@ -996,8 +874,6 @@ pub(crate) fn answer<'g>(
         })
         .collect();
     changed.sort();
-    // A file's entry comes from its best node, smallest by `(key, id)`; a touched file is a
-    // root.
     let mut files: BTreeMap<(usize, &str), (Key, &str, Option<Evidence>)> = BTreeMap::new();
     let touched =
         (changed.iter().map(|c| c.path.as_str())).chain(open.iter().map(|o| o.path.as_str()));
@@ -1029,7 +905,6 @@ pub(crate) fn answer<'g>(
             *best = entry;
         }
     }
-    // The packages the change touches, and what depends on them through the manifests.
     let seeds = (changed.iter().map(|c| c.path.as_str()))
         .chain(open.iter().map(|o| o.path.as_str()))
         .chain(attributed.files.keys().map(String::as_str))
@@ -1075,7 +950,6 @@ pub(crate) fn answer<'g>(
             })
         })
         .collect();
-    // The packages are those of the repository where Meada runs.
     let (mut certain, mut weaker) = (BTreeSet::new(), BTreeSet::new());
     for f in files.iter().filter(|f| f.repo == *repo) {
         let tier = if f.tier == Tier::Certain {
@@ -1091,10 +965,8 @@ pub(crate) fn answer<'g>(
         certain: certain.into_iter().collect(),
     };
     sides.sort();
-    // A lockfile read is a place of its own, by the name it reads.
     let mut read: BTreeMap<(usize, &str, Option<&str>), (Key, Evidence)> = BTreeMap::new();
     for (id, evidence) in reads(graph, changes, roots) {
-        // A side only a document lists is read at the document's path.
         let document = || {
             let path = *graph.documented.get(id)?;
             let mut repos = graph.workspace.repos.iter();
@@ -1146,12 +1018,6 @@ pub(crate) fn answer<'g>(
     }
 }
 
-/// What the rows on changed lines read, one hop down, with each edge's evidence: a row's
-/// target or candidates, and the provider of every link whose consumer it is (a package link
-/// to a bare specifier, HTTP, the writer of what it reads). A row is on a changed line when its
-/// span overlaps one; every row of a file whose own id roots is (a whole file, or a changed
-/// line in no symbol, which rebinds the file's calls). Rows are read by span from the export,
-/// uses included, not through `Graph::callees`.
 pub(crate) fn reads<'g>(
     graph: &'g Graph<'g>,
     changes: &[(String, Change)],
@@ -1195,8 +1061,6 @@ pub(crate) fn reads<'g>(
             out.push((link.provider.as_str(), graph.evidence(link)));
         }
     }
-    // A root that consumes as a symbol (a handler, a reader, a client method) reads the
-    // provider of each link it consumes.
     for root in roots_in_order {
         for &link in graph.out.get(root.as_str()).into_iter().flatten() {
             out.push((link.provider.as_str(), graph.evidence(link)));
@@ -1205,9 +1069,6 @@ pub(crate) fn reads<'g>(
     out
 }
 
-/// `seeds` and the packages of `export`'s repository that depend on them through its
-/// manifests, by directory: a `Dependency` makes the package of its manifest depend on the
-/// workspace package it names.
 fn closure(export: &Export, mut packages: BTreeSet<String>) -> BTreeSet<String> {
     let named: HashMap<&str, &str> = (export.packages.iter())
         .filter(|p| p.repository == export.repository)
@@ -1230,11 +1091,6 @@ fn closure(export: &Export, mut packages: BTreeSet<String>) -> BTreeSet<String> 
 }
 
 impl<'a> Graph<'a> {
-    /// Every node reached from `roots` over `dependents`, each with its key: the smallest,
-    /// over the chains reaching it, of the largest edge key on the chain. Settles each node
-    /// once from a priority queue, equal keys in id order, so the first predecessor to offer a
-    /// key is the smallest by `(key, id)`; a root is `Certain` whatever reaches it. No depth
-    /// limit and no budget: the settled set ends cycles.
     pub(crate) fn fan<'g>(&'g self, roots: &'g [String]) -> BTreeMap<&'g str, Settled<'g>> {
         let root = |r: &'g String| {
             let settled = Settled {
@@ -1260,7 +1116,6 @@ impl<'a> Graph<'a> {
                 let edge = Key::of(&d.evidence);
                 let reached = Settled {
                     key: key.max(edge),
-                    // The edge sets the chain's key unless an earlier edge is weaker.
                     evidence: if edge >= key {
                         Some(d.evidence)
                     } else {
@@ -1282,9 +1137,6 @@ impl<'a> Graph<'a> {
 }
 
 impl<'a> Graph<'a> {
-    /// The repository and file a reached node lives in: a symbol's, a file id's, a config
-    /// site's or an IaC node's. A repository, a side only a document lists and a config use
-    /// have none.
     fn file_of<'g>(&'g self, id: &'g str) -> Option<(usize, &'g str)> {
         if let Some(found) = self.path_of(id) {
             return Some(found);
@@ -1315,13 +1167,10 @@ mod tests {
     use crate::index::{Export, Span, Symbol};
     use crate::workspace::{Repository, Workspace};
 
-    /// `r::a.ts::<name>`.
     fn id(name: &str) -> String {
         format!("r::a.ts::{name}")
     }
 
-    /// A workspace of one repository `r` whose file `a.ts` defines `names` and makes `calls`,
-    /// `(caller, target, level, candidates)` by name: an ambiguous call has no target.
     fn repository(
         names: &[&str],
         calls: &[(&str, Option<&str>, Level, &[&str])],
@@ -1382,7 +1231,6 @@ mod tests {
 
     #[test]
     fn a_node_reached_by_exact_and_inferred_chains_is_certain() {
-        // root -inferred-> x, and root -exact-> y -exact-> x: the inferred route is shorter.
         let calls = [
             ("x", Some("root"), Level::Inferred, &[][..]),
             ("y", Some("root"), Level::Exact, &[]),
@@ -1398,7 +1246,6 @@ mod tests {
 
     #[test]
     fn an_ambiguous_chain_keeps_the_fewest_candidates() {
-        // x lists root among 3 candidates; y among 2, and x calls y.
         let calls = [
             ("x", None, Level::Ambiguous, &["root", "o1", "o2"][..]),
             ("y", None, Level::Ambiguous, &["root", "o1"]),
@@ -1416,7 +1263,6 @@ mod tests {
             candidates: 2,
         };
         assert_eq!(x.key, two);
-        // The weakest edge of the chain is y's call, not x's exact one.
         let evidence = x.evidence.unwrap();
         assert_eq!((evidence.level, evidence.candidates), (Level::Ambiguous, 2));
     }
@@ -1508,8 +1354,6 @@ mod tests {
         );
     }
 
-    /// What a breadth-first walk over certain edges only reaches from `roots`: a node an
-    /// ending edge reaches is not walked on.
     fn certain_walk<'g>(graph: &'g Graph<'g>, roots: &'g [String]) -> BTreeSet<&'g str> {
         let mut seen: HashSet<&str> = roots.iter().map(String::as_str).collect();
         let mut queue: VecDeque<&str> = roots.iter().map(String::as_str).collect();
@@ -1523,7 +1367,6 @@ mod tests {
         seen.into_iter().collect()
     }
 
-    /// `tests/fixtures/<fixture>` copied under `case` as a git repository with `origin`.
     fn fixture(case: &str, fixture: &str, origin: &str) -> PathBuf {
         fn copy(from: &Path, to: &Path) {
             std::fs::create_dir_all(to).unwrap();
@@ -1570,8 +1413,6 @@ mod tests {
         dir
     }
 
-    /// The nodes `fan` settles `certain` from what `files` roots in `repo` are the nodes a
-    /// walk over certain edges reaches.
     fn assert_certain_filter_is_a_certain_walk(repo: &Path, files: &[&str]) {
         let files: Vec<String> = files.iter().map(|f| f.to_string()).collect();
         let engine = Engine::open(repo).unwrap();
@@ -1591,7 +1432,6 @@ mod tests {
         .unwrap()
         .remove(0);
         assert_eq!(certain, walked);
-        // The filter leaves something out, or the equivalence says nothing.
         assert!(all > certain.len(), "{all} nodes, all certain");
     }
 

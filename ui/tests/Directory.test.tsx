@@ -27,7 +27,6 @@ beforeAll(() => {
 afterEach(async () => { await act(() => root.render(null)); vi.unstubAllGlobals(); });
 
 const version = (id: string, repositories: object[]) => ({ id, author: 'alice', time: '2026-10-23T10:00:00Z', message: id, repositories });
-// `owner_missing` is on the wire only when true: the entry names a team no directory group carries.
 const current = version('1111111111111111', [{ repo: 'a.com/x', path: 'x', owner: 'ghosts', owner_missing: true }, { repo: 'a.com/y', path: 'y', owner: 'team-a' }]);
 const older = version('2222222222222222', [{ repo: 'a.com/x', path: 'older', owner: 'ghosts', owner_missing: true }]);
 const groups = ['alpha', 'alphabet', 'a"quoted'];
@@ -54,7 +53,6 @@ async function render(session: Session, fetch: ReturnType<typeof vi.fn>, locale:
   await waitFor(() => expect(entries.value).not.toBe(''));
   return { form, entries };
 }
-/** Types `text` at the end of the entries, the caret where a keystroke leaves it. */
 const type = (field: HTMLTextAreaElement, text: string) => act(() => {
   fireEvent.change(field, { target: { value: text } });
   field.setSelectionRange(text.length, text.length); fireEvent.select(field);
@@ -71,11 +69,9 @@ test.each(['en', 'pt-BR'] as const)('the global operator picks an owner among th
   expect([...picker.querySelectorAll('button')].map(button => button.textContent)).toEqual(['alpha', 'alphabet']);
   await act(() => fireEvent.click(getByRole(picker, 'button', { name: 'alphabet' })));
   expect(entries.value).toBe(`${head}"alphabet`);
-  // A quote in a name is escaped into the TOML string, and the prefix reaches the route decoded.
   await type(entries, `${head}"a`);
   await act(() => fireEvent.click(getByRole(form, 'button', { name: 'a"quoted' })));
   expect(entries.value).toBe(`${head}"a\\"quoted`);
-  // Leaving the owner string closes the picker.
   await type(entries, `${head}"alpha"\n`);
   await waitFor(() => expect(queryByRole(form, 'group', { name: t.ownerSuggestions })).toBeNull());
 });

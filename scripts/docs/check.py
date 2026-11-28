@@ -96,7 +96,6 @@ def site_check():
         for payload in payloads:
             graph = json.loads(payload)['graph']
             for node in graph['nodes']:
-                # Every explanatory detail is present outside the React root, even without JS.
                 from html import escape
                 if f'<span>{escape(node["detail"])}</span>' not in text:
                     errors.append(f"{path}: incomplete semantic fallback for {node['id']}")

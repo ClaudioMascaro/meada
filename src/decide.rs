@@ -50,8 +50,6 @@ pub fn open(dir: &Path, options: &Options) -> Result<Engine> {
     Engine::open(dir)
 }
 
-/// The open items of this repository to work on, in id order; with `only`, that one item,
-/// open or decided, so that a decision can be redone.
 pub(crate) fn items(engine: &Engine, only: Option<&str>) -> Result<Vec<OpenItem>> {
     let mut items = match only {
         Some(id) => vec![
@@ -67,11 +65,9 @@ pub(crate) fn items(engine: &Engine, only: Option<&str>) -> Result<Vec<OpenItem>
     Ok(items)
 }
 
-/// The maximum number of candidates shown per item in the overview.
 /// ponytail: the full item listing, prompt, export and MCP have their own output contracts.
 const LIST_CANDIDATE_LIMIT: usize = 5;
 
-/// The item as the CLI shows it, with a shortened candidate list only in the overview.
 fn show(item: &OpenItem, out: &mut impl Write, overview: bool) -> Result<()> {
     writeln!(out, "{}", item.id)?;
     writeln!(out, "{}  {}", item.location(), item.expression)?;
@@ -110,8 +106,6 @@ fn show(item: &OpenItem, out: &mut impl Write, overview: bool) -> Result<()> {
     Ok(())
 }
 
-/// Asks about each of `items` on `out` and reads the answers from `input`: a number picks that
-/// candidate, `s` or an empty line skips. End of input ends the run with the picks so far.
 pub(crate) fn ask(
     items: &[OpenItem],
     input: &mut impl BufRead,
@@ -162,9 +156,7 @@ pub fn run(
     input: &mut impl BufRead,
     out: &mut impl Write,
 ) -> Result<()> {
-    // Checked whenever it is given, whatever else the run does.
     let min_p = options.min_p.map_or(Ok(decider::MIN_P), decider::min_p)?;
-    // Before any question, request or write, whether or not the run ends up saving.
     if options.can_save() {
         decisions::writable(engine.root())?;
     }
@@ -228,14 +220,12 @@ pub fn run(
             0
         }
     };
-    // The decisions of the other items are written; the status tells a script some failed.
     match failed {
         0 => Ok(()),
         n => Err(Msg::DecideFailures(n).text().into()),
     }
 }
 
-/// `--list`: the open items, then the stale decisions and those waiting on a missing peer.
 fn list(engine: &Engine, items: &[OpenItem], overview: bool, out: &mut impl Write) -> Result<()> {
     if items.is_empty() {
         writeln!(out, "{}", Msg::DecideNoItems.text())?;
@@ -256,8 +246,6 @@ fn list(engine: &Engine, items: &[OpenItem], overview: bool, out: &mut impl Writ
     Ok(())
 }
 
-/// `--prune`: rewrites the file without its stale entries, in canonical form. It asks nothing
-/// and reads no network; a decision waiting on a missing peer stays.
 fn prune(engine: &Engine, out: &mut impl Write) -> Result<()> {
     let stale = engine.local_decisions()?.stale;
     decisions::locked(engine.root(), || {
@@ -273,7 +261,6 @@ fn prune(engine: &Engine, out: &mut impl Write) -> Result<()> {
     Ok(())
 }
 
-/// Records `picks` in the repository's decisions file, or prints what the file would be.
 pub(crate) fn finish(
     engine: &Engine,
     picks: Vec<Decision>,

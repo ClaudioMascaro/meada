@@ -19,12 +19,9 @@ import traceback
 from proof_result import Comparisons, run_driver
 from prove import Http, Stdio, answer, free_port, git, status_before_855
 
-# A queue no Terraform provisions, named by its URL: an `exact` use, so its orphan line prints.
 LOST = 'https://sqs.eu-west-2.amazonaws.com/123456789012/lost'
 UNPROVISIONED = ('channel::sqs::absent', 'channel::sqs::lost')
 PREFIX = 'example.com/config-use-proof/'
-# Curated AWS kinds in base ADR 0026, with standard structured AWS syntax.
-# type, attribute, identity, literal, structured identifier
 CASES = [
  ('aws_sqs_queue', 'name', 'channel::sqs', 'parcel', 'arn:aws:sqs:eu-west-2:123456789012:parcel'),
  ('aws_sns_topic', 'name', 'channel::sns', 'notice', 'arn:aws:sns:eu-west-2:123456789012:notice'),
@@ -104,7 +101,6 @@ def seed(root):
             oracle['provisioners'].append({'contract': prefix+'::'+name,
                 'node': PREFIX+f'infra::{env}/main.tf::{typ}.case_{i}', 'root': env,
                 'overridable': 'var.parcel_name' if env=='west' and i==0 else None})
-    # Separate, unused identity per group; every group has both sides in scope.
     for typ, attr, prefix, _, _ in {c[2]: c for c in CASES}.values():
         name = 'idle-' + prefix.split('::')[1]
         tf += f'resource "{typ}" "idle" {{ {attr} = "{name}" }}\n'
@@ -119,7 +115,6 @@ def seed(root):
                 'resource "aws_sqs_queue" "case_0" { name = "parcel" }',
                 'resource "aws_sqs_queue" "case_0" { name = var.parcel_name }')
         write(repos['infra'], f'{env}/main.tf', body)
-    # Spring configuration has every ARN kind, plus two equivalent SQS forms.
     lines = ['spring:', '  cloud:']
     for i, (_, _, prefix, name, arn) in enumerate(CASES):
         lines.append(f'    reference_{i}: {json.dumps(arn)}')
@@ -133,7 +128,6 @@ def seed(root):
         lines.append(f'    {key}: {json.dumps(value)}')
         use('resource::s3::vault','application.yml#spring.cloud.'+key,'exact',value,len(lines))
     write(repos['app'], 'application.yml', '\n'.join(lines)+'\n')
-    # Last key step, not any ancestor or a substring, must name the type.
     yaml = ('worker:\n  queue: parcel\n  topic: notice\n  bucket: vault\n  table: ledger\n'
             '  service:\n    queue:\n      name: parcel\n  queue_url: parcel\n  label: parcel\n'
             '  missing:\n    queue: absent\n  numeric:\n    queue: 17\n  flag:\n    bucket: false\n'
@@ -143,12 +137,9 @@ def seed(root):
     for key, prefix, name, line in [('queue','channel::sqs','parcel',2), ('topic','channel::sns','notice',3),
                                    ('bucket','resource::s3','vault',4), ('table','resource::dynamodb','ledger',5)]:
         use(prefix+'::'+name, f'helm/values.yaml#worker.{key}', 'inferred', name, line)
-    # Two queues no Terraform provisions. `absent` is a plain name under a typed key: a use the key-name rule
-    # only infers is never an orphan line (#844). `lost` is a queue URL, an `exact` use: its orphan line stays.
     use('channel::sqs::absent', 'helm/values.yaml#worker.missing.queue', 'inferred', 'absent', 12)
     use('channel::sqs::lost', 'helm/values.yaml#worker.lost.queue', 'exact', LOST, 19)
     oracle['orphans']['channel::sqs::lost'] = 'no provisioner'
-    # JSON, list paths and quoted keys are independent config reader branches.
     obj = {'services': [{'queue':'parcel'}, {'bucket':'vault'}], 'special.key': {'topic':'notice'},
            'bare':'ledger', 'queueName':'parcel'}
     text = dumps(obj)
@@ -159,8 +150,6 @@ def seed(root):
         needle = '"'+at.rsplit('.',1)[-1]+'": "'+value+'"'
         line = next(i for i,l in enumerate(text.splitlines(),1) if needle in l)
         use(contract, 'config.json#'+at, 'inferred', value, line)
-    # Unresolved templates and incomplete/unsupported structured-looking values are not
-    # plain names. In particular a typed key must not rescue a malformed ARN by fallback.
     negatives = {'template': {'queue': '${QUEUE_NAME}'},
                  'templated_arn': {'queue': 'arn:aws:sqs:eu-west-2:123456789012:${QUEUE_NAME}'},
                  'unknown_service': {'queue': 'arn:aws:ec2:eu-west-2:123456789012:instance/i-0123456789abcdef0'},
@@ -171,11 +160,9 @@ def seed(root):
                  'queue': ['parcel', 'notice']}
     write(repos['app'], 'negative.json', dumps(negatives))
     write(repos['app'], 'unreadable.yaml', 'queue: [parcel\nbucket: vault\n')
-    # Redacted and ignored inputs must never become uses even when identifiers are valid.
     write(repos['app'], 'secret.yaml', 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: proof\nstringData:\n  queue: "'+url+'"\n')
     write(repos['app'], 'excluded.yaml', 'queue: ignored\nbucket: "s3://ignored/key"\n')
     write(repos['app'], '.meadaignore', 'excluded.yaml\n')
-    # Real directional siblings make an accidental producer/consumer use observable.
     write(repos['app'], 'worker.py', 'import boto3\nq = boto3.client("sqs")\n'
           'def emit():\n    q.send_message(QueueUrl="'+url+'", MessageBody="probe")\n'
           'def receive():\n    return q.receive_message(QueueUrl="'+url+'")\n')
@@ -183,10 +170,9 @@ def seed(root):
     for role in ['read', 'write']:
         manifest += f'\n[[resource]]\nkind = "s3"\nid = "vault"\nrole = "{role}"\n'
     write(repos['app'], 'meada.toml', manifest)
-    # Existing no-config export and all three query tools must stay identical.
     write(repos['plain'], 'plain.py', 'def anchor():\n    return 11\ndef caller():\n    return anchor()\n')
     for repo in repos.values():
-        git('add', '.', cwd=repo)  # disposable repository only; no commit or project Git writes
+        git('add', '.', cwd=repo)
     for use_row in oracle['uses']:
         for p in oracle['provisioners']:
             if p['contract'] == use_row['contract']:
@@ -331,19 +317,14 @@ class Probe:
         expected=sorted((u['contract'],u['site'],u['at']) for u in oracle['uses']) if name=='app' else []
         self.check(name+' complete use set/count/sites',sorted(use_set(h))==expected,
                    {'expected':expected,'got':sorted(use_set(h))})
-        # `meada export` writes the level of each use since #844: `exact` for a structured identifier,
-        # `inferred` for a plain value under a typed key.
         levels={(u['contract'],u['at']):u['level'] for u in oracle['uses']}
         self.check(name+' use objects contain exactly the graph identity fields and the level of their rule',
                    all(set(row)=={'contract','site','at','level'} and row['level']==levels.get((row['contract'],row['at']))
                        for row in h.get('uses',[])),h.get('uses',[]))
         self.check(name+' format remains 1',h.get('format')==1)
-        # Existing public export order is side, provisioner, root, contract. The
-        # optional at locator has no predating promised ordering among equal tuples.
         order=[(r.get('side',''),r.get('provisioner',''),r.get('root',''),r.get('contract',''))
                for r in h.get('provisions',[])]
         self.check(name+' provisioning rows keep canonical public order',order==sorted(order),order)
-        # Existing arrays retain every field and ordering; only the new arrays may differ.
         bd={k:v for k,v in b.items() if k not in ['uses','provisions']}
         hd={k:v for k,v in h.items() if k not in ['uses','provisions']}
         self.comparisons.compare(name + ' all existing export fields', bd, hd)
@@ -359,8 +340,6 @@ class Probe:
             self.check(name+' whole export parity',b==h)
             return
         expected_links=oracle['provisions']
-        # ADR0026 locates use at repository+at. A provisioning link may carry at as an
-        # added field or in its reason; either must identify the precise originating key.
         got=[]
         for row in remaining:
             at=row.get('at')
@@ -442,7 +421,6 @@ class Probe:
             if q['tool']=='search' and args.get('query') in ['worker.numeric.queue','zz_config_use_no_match']:
                 self.comparisons.compare(f'existing default/failure search {i}', b['texts'][i], text)
             if args.get('kind')=='value':
-                # Search remains an existing flow: exact whole base answer on same input.
                 self.comparisons.compare(f'existing value query {i}', b['texts'][i], text)
             if q['tool']=='trace' and rows and contract not in UNPROVISIONED:
                 self.comparisons.compare(f'existing contract trace advisory {args["direction"]} {contract}',
@@ -471,7 +449,6 @@ class Probe:
                    if q['tool']=='context' and q['arguments'].get('symbol')=='channel::sqs::parcel')],h['texts'][-1])
         if self.a.http:
             self.http({n:h['repos'][n] for n in ['infra','app']},queries,h['tools'],h['texts'])
-            # Scope filter: on-disk peer excluded from manifest is never read.
             isolated=self.run/'visibility-local'/'app'
             shutil.copytree(self.run/'input/app',isolated)
             it,ix=self.stdio(self.head,isolated,queries,'visibility-local/stdio')
@@ -493,7 +470,6 @@ class Probe:
         q={'name':'context','arguments':{'symbol':'channel::sqs::lost','budget':200000}}
         try:
             before=answer(client.call('tools/call',q))
-            # One letter of the host: no longer a queue URL, and a URL under a typed key is no plain name.
             assert original.count(LOST)==1
             path.write_text(original.replace(LOST,LOST.replace('//sqs.','//sqx.')))
             after=answer(client.call('tools/call',q))
@@ -512,8 +488,6 @@ class Probe:
             rs=self.command(self.head,repos['app'],'restore/status','status')
             self.check('restore exact context/export/status round trip',restored==before and re==exported and rs==status)
             write(self.run,'refresh/live.json',dumps({'before':before,'after':after,'restored':restored}))
-            # The missing use above exercises contract disappearance. A second edit
-            # removes a provisioned key, so stale provisioning rows cannot hide.
             parcel={'name':'context','arguments':{'symbol':'channel::sqs::parcel','budget':200000}}
             linked_before=answer(client.call('tools/call',parcel))
             path.write_text(original.replace('  queue: parcel','  noque: parcel',1))
@@ -537,7 +511,6 @@ class Probe:
             path.write_text(original);client.close()
 
     def negative_controls(self,h,oracle):
-        # Real captured responses, mutated only in saved verifier controls.
         if not h['app']['export'].get('uses'):
             self.check('negative controls have a real use capture',False,'Product returned no uses; earlier whole-set failure is decisive.')
             return
@@ -570,7 +543,6 @@ class Probe:
             self.check('negative control rejected HTTP key loss',http!=h['texts'])
 
     def console(self,repos,qs,texts):
-        # Local stdio scope is the app + explicit peer. Console manifest includes both.
         from console import http, query_equal
         self.port=free_port()
         folder=self.workspace({n:repos[n] for n in ['infra','app']},'console',self.a.ui_dir)
@@ -593,7 +565,6 @@ class Probe:
             cli=self.command(self.head,folder,'console/infra-export','export','--workspace','workspace.toml','--repo',PREFIX+'infra')
             write(folder,'api-infra-export.json',body.decode())
             self.check('console complete infra export byte parity',status==200 and body.decode()==cli)
-            # UI is exercised by the checked-in companion, keeping browser mechanics reusable.
             env=dict(os.environ,CONFIG_USES_URL=url,CONFIG_USES_RUN=str(folder))
             browser=subprocess.run(['node',str(Path(__file__).with_name('config-uses-console.mjs'))],
                                     env=env,capture_output=True,text=True,timeout=120)

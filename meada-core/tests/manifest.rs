@@ -1,6 +1,3 @@
-//! A workspace text's validation at the crate's public seam: the errors the CLI prints for the
-//! same text, naming the file, the line and the dotted key, or the entry.
-
 use meada_core::manifest::{validate, validate_entries, validate_named};
 
 const FILE: &str = "ops/meada.workspace.toml";
@@ -53,7 +50,6 @@ fn a_text_error_names_the_file_the_line_and_the_key() {
             "ops/meada.workspace.toml:5: `repository.resource.kind`: must be a \
              lowercase identifier (ASCII letters, digits and hyphens, starting with a letter)",
         ),
-        // A workspace's text holds its entries alone.
         (
             "index_dir = \"/srv\"\n",
             "ops/meada.workspace.toml:1: `index_dir` is not a meada.workspace.toml key",
@@ -79,8 +75,6 @@ fn every_entry_whose_identity_cannot_be_served_is_named() {
     );
 }
 
-/// A whole manifest's `[[repository]]` entries, its other keys and sections unread, checked as a
-/// workspace's text is (`meada workspace import`).
 #[test]
 fn a_manifest_s_entries_are_validated_alone() {
     let src = "index_dir = \"/srv\"\n\n[snapshot]\nbucket = \"b\"\n\n\
@@ -102,8 +96,6 @@ fn a_manifest_s_entries_are_validated_alone() {
 
 const OWNED: &str = "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n";
 
-/// Each `owner` error names the line and the dotted key; the accepted names are compared as
-/// they are written. (The pt-BR texts are the CLI's `cli` cases: the language is process-wide.)
 #[test]
 fn an_owner_is_one_string_of_a_group_name_and_each_error_names_its_line_and_key() {
     let long = "g".repeat(257);
@@ -138,8 +130,6 @@ fn an_owner_is_one_string_of_a_group_name_and_each_error_names_its_line_and_key(
     assert_eq!(validate(FILE, OWNED).unwrap()[0].owner, None);
 }
 
-/// Each `added_by` error names the line and the dotted key; a login of 1 to 39 lowercase ASCII
-/// letters, digits, `-` and `_` is accepted as written (#330).
 #[test]
 fn an_added_by_is_one_lowercase_login_and_each_error_names_its_line_and_key() {
     let long = "a".repeat(40);
@@ -180,7 +170,6 @@ fn an_added_by_is_one_lowercase_login_and_each_error_names_its_line_and_key() {
     assert_eq!(validate(FILE, OWNED).unwrap()[0].added_by, None);
 }
 
-/// The time an `added_by` was written (#454) is one UTC string to the second, as a version's.
 #[test]
 fn an_added_by_time_is_one_utc_time_to_the_second() {
     let error = "must be one string, a UTC time as `YYYY-MM-DDTHH:MM:SSZ`";
@@ -228,9 +217,7 @@ fn a_named_peer_takes_an_environment_name_of_at_most_128_bytes() {
 #[test]
 fn a_value_of_the_wrong_type_is_named_by_key_and_kind_never_echoed() {
     let secret = "s3cr3t-token";
-    // A string where a table is expected.
     let table = format!("[[repository]]\nrepo = \"example.com/acme/api\"\nserve = \"{secret}\"\n");
-    // An integer where a string is expected.
     let string = "[[repository]]\nrepo = 12345678\n".to_string();
     let a = problems(&table).join("\n");
     assert!(
@@ -264,8 +251,6 @@ fn every_kind_and_an_invalid_value_are_worded_without_the_value() {
     }
 }
 
-/// `unknown variant` is worded from the schema's own variants: the written value, even one that
-/// imitates serde's text, never reaches the message (#545).
 #[test]
 fn an_unknown_variant_names_the_key_and_the_values_it_accepts() {
     let src = "[[repository]]\nrepo = \"a.com/x\"\npath = \"x\"\n[[repository.resource]]\n\

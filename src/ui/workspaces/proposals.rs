@@ -1,34 +1,4 @@
-//! The proposal server (ADR 0022, feature `proposals`): `meada workspaces mcp --listen <addr>
-//! --workspace <bootstrap manifest>` answers agents over MCP (Streamable HTTP, stateless, JSON
-//! responses) with the console's own named-workspace functions, persistence off. Four tools, each
-//! read-only: `catalog` (what the caller may select), `workspaces` and `show` (what it may see),
-//! and `propose` (manifest text validated, composed, diffed and authorized as the console would
-//! save it, stored nowhere).
-//!
-//! It is neither a node nor the console. A request goes through, in order: `Origin` refused with
-//! 403 (a browser); the protected resource metadata (RFC 9728) served without a token; admission
-//! (a bearer token for `[proposals] audience`, the nodes' OIDC module, 401 before any routing or
-//! tool name); the directory's block of a deprovisioned subject; the path (`/` only); the limit
-//! of calls in flight (503 `busy`); the body bound (413). Actor, login, groups, grant, role and
-//! the workspaces the subject operates come from the token and the permissions set alone: no
-//! tool takes an argument naming any of them, every input schema is closed, and an undeclared
-//! property is `invalid_params`.
-//!
-//! With `[accounts]` and no `[oidc]` (ADR 0024, #562), admission is instead an agent token for
-//! the proposal server's surface (`accounts::PROPOSALS`) the console signed, checked with the
-//! signing key's public half alone against the console's `[ui] public_url`: the subject
-//! (`local:<username>`), the verified login, the groups and the role are the token's, the grant
-//! the grant providers compute from them, and no account row is read. There is no protected
-//! resource metadata (no authorization server to discover), so its path is a 404 and a 401 names
-//! none. With `[oidc]` (break glass beside it) only the identity provider admits.
-//!
-//! Nothing here writes: every Postgres session is read-only (`default_transaction_read_only`),
-//! the audit is off, no store or Valkey write is called, and the only trace of a call is one
-//! stderr line, `proposals: <subject> <tool> <workspace or -> : <outcome>`, with no token,
-//! manifest, hint or identity in it.
-
 use std::path::Path;
-// The tool macros name a bare `Result`: the standard one, not the crate's alias.
 use std::result::Result;
 use std::sync::Arc;
 
@@ -59,8 +29,6 @@ const CALLS_MAX: usize = 32;
 const HINTS_MAX: usize = 50;
 const NOTE_MAX: usize = 256;
 
-/// The calls in flight this process allows: `CALLS_MAX`, or in a debug build what
-/// `MEADA_PROPOSALS_CALLS` says, so a test reaches the bound (no option or setting does).
 fn calls_max() -> usize {
     #[cfg(debug_assertions)]
     if let Some(n) = std::env::var("MEADA_PROPOSALS_CALLS")
@@ -72,13 +40,10 @@ fn calls_max() -> usize {
     CALLS_MAX
 }
 
-/// Where the protected resource metadata of the server's root lives (RFC 9728).
 const METADATA: &str = "/.well-known/oauth-protected-resource";
 
-/// The body of the 403 for a request carrying `Origin`, the nodes' own.
 const ORIGIN_REFUSED: &str = "Forbidden: Origin header is not allowed\n";
 
-/// The MCP service of the tools, stateless with JSON responses.
 type Endpoint = StreamableHttpService<Tools, NeverSessionManager>;
 
 #[derive(Deserialize, JsonSchema)]
@@ -134,8 +99,6 @@ struct Hint {
     note: Option<String>,
 }
 
-/// Why a tool gives no answer: an argument past its bound (the tool error `invalid_params`), or
-/// the error the console would answer, `{"code", "message", ...}`.
 enum Refusal {
     Arguments(String),
     Error(Value),
@@ -143,30 +106,21 @@ enum Refusal {
 
 type Outcome = Result<Value, Refusal>;
 
-/// The tools, over the console started for them.
 #[derive(Clone)]
 struct Tools {
     tool_router: ToolRouter<Self>,
     console: Arc<Console>,
 }
 
-/// The listener's state: the console started for the tools, the section, the tools' endpoint and
-/// the permits of the calls in flight.
 struct Server {
     console: Arc<Console>,
     section: crate::proposals::Config,
     endpoint: Endpoint,
     calls: Arc<tokio::sync::Semaphore>,
-    /// With `[accounts]` and no `[oidc]`: the admission of agent tokens for this surface (#562).
     #[cfg(feature = "accounts")]
     agents: Option<Arc<crate::accounts::Agents>>,
 }
 
-/// `meada workspaces mcp`: refuses to start, listing every problem, without `[proposals]` (and
-/// so `[workspaces]` and the GitHub grant provider), when the issuer's metadata or JWKS cannot be
-/// read, when the signing key's public half cannot (local accounts, #562), or when the Postgres
-/// schema is another version; then serves at `listen` until SIGINT or SIGTERM, as
-/// `meada mcp --listen` does.
 pub(in crate::ui) fn listen(listen: &str, manifest: &Path) -> crate::Result<()> {
     let address = crate::mcp::address(listen)?;
     let (console, agents) = Console::for_proposals(manifest)?;
@@ -198,18 +152,12 @@ pub(in crate::ui) fn listen(listen: &str, manifest: &Path) -> crate::Result<()> 
     })
 }
 
-/// What admits agent tokens for the proposal server (#562): `accounts::Agents` in a build with
-/// local accounts, none without.
 #[cfg(feature = "accounts")]
 type Admission = Option<crate::accounts::Agents>;
 #[cfg(not(feature = "accounts"))]
 type Admission = ();
 
 impl Console {
-    /// The console the tools answer from: the bootstrap's sections as the console reads them,
-    /// with every Postgres session read-only, the audit off, no SCIM endpoint, no front end and
-    /// no GitHub App; and with `[accounts]` and no `[oidc]`, the admission of agent tokens for
-    /// this surface, the signing key's public half read now (never the private one).
     fn for_proposals(file: &Path) -> crate::Result<(Self, Admission)> {
         let read = Manifest::read(file)?;
         let shown = file.display().to_string();
@@ -217,8 +165,6 @@ impl Console {
         if read.proposals.is_none() {
             return Err(no_section().into());
         }
-        // `[proposals]` needs `[workspaces]`, which needs `[ui]`, the GitHub grant provider and
-        // `[postgres]`.
         let ui = read.ui.clone().ok_or_else(no_section)?;
         let read = read.read_only();
         let src = fs::read_to_string(file).map_err(|e| format!("{shown}: {e}"))?;
@@ -233,7 +179,6 @@ impl Console {
                 None
             }
         };
-        // With `[oidc]` (break glass beside it) only the identity provider admits (ADR 0024).
         #[cfg(feature = "accounts")]
         let agents = match (&read.accounts, &oidc, &problems[..]) {
             (Some(accounts), None, []) => {
@@ -271,7 +216,6 @@ impl Console {
             holds: Holds::of(file, &read),
             entries: std::sync::Mutex::new(None),
             audit: crate::audit::Audit::default(),
-            // The proposal server signs no session token: it never reads `[accounts]`'s keys.
             #[cfg(feature = "accounts")]
             accounts: None,
             #[cfg(feature = "directory")]
@@ -284,7 +228,6 @@ impl Console {
 }
 
 impl Server {
-    /// A request, in the order the module's documentation gives.
     async fn route(&self, request: Request<Incoming>) -> Answer {
         if request.headers().contains_key(header::ORIGIN) {
             return plain(StatusCode::FORBIDDEN, ORIGIN_REFUSED);
@@ -321,8 +264,6 @@ impl Server {
         answer
     }
 
-    /// The protected resource metadata of the server (RFC 9728): its URL, the issuer and the
-    /// scopes its tokens carry.
     fn metadata(&self) -> Answer {
         let Some(oidc) = &self.console.oidc else {
             return not_found();
@@ -339,9 +280,6 @@ impl Server {
         json_answer(StatusCode::OK, &document)
     }
 
-    /// The session of a request's bearer token for `[proposals] audience`, checked by the nodes'
-    /// module as the console's is; a subject the directory deprovisioned is refused. Otherwise
-    /// the 401 or 403 with a challenge naming the metadata. With local accounts, `admit_agent`.
     fn admit(&self, headers: &HeaderMap) -> Result<Session, Box<Answer>> {
         #[cfg(feature = "accounts")]
         if let Some(agents) = &self.agents {
@@ -399,10 +337,6 @@ impl Server {
 }
 
 impl Server {
-    /// The session of a request's agent token for this surface (#562, ADR 0024): its subject,
-    /// verified login, groups and role from the token alone, its grant computed from them by the
-    /// grant providers (every repository with no table), no team and no account row read. A
-    /// missing or failing token is the 401 a node answers, without `resource_metadata`.
     #[cfg(feature = "accounts")]
     fn admit_agent(
         &self,
@@ -513,8 +447,6 @@ impl Tools {
 }
 
 impl Tools {
-    /// Runs a tool for the session the listener admitted, bounds its answer and leaves the one
-    /// stderr line of the call.
     fn call(
         &self,
         ctx: &RequestContext<RoleServer>,
@@ -532,8 +464,6 @@ impl Tools {
         let outcome = tokio::task::block_in_place(|| run(&self.console, &session));
         let (result, line) = match outcome {
             Ok(answer) => {
-                // A proposal the console would not accept names why: its first refusal, else
-                // its first diagnostic.
                 let why = match answer["applicable"] {
                     Value::Bool(false) => (answer["refusals"][0]["code"].as_str())
                         .or(answer["diagnostics"][0]["code"].as_str())
@@ -543,7 +473,6 @@ impl Tools {
                 let (result, line) = bounded(answer);
                 (result, why.filter(|_| line == "ok").unwrap_or(line))
             }
-            // A tool error, as rmcp answers an argument its schema refuses: the agent corrects it.
             Err(Refusal::Arguments(message)) => (
                 Ok(CallToolResult::structured_error(json!({"error": {
                     "code": "invalid_params", "message": message,
@@ -558,7 +487,6 @@ impl Tools {
                 )
             }
         };
-        // An id that fails its pattern is never printed: it is the caller's text.
         let workspace = workspace.filter(|w| meada_core::ids::is_id(w));
         eprintln!(
             "proposals: {} {tool} {}: {line}",
@@ -569,8 +497,6 @@ impl Tools {
     }
 }
 
-/// `answer` as the tool's result, or `too_large` with the size and the length of each of its
-/// lists when it is past `OUTPUT_MAX`: never a truncated answer.
 fn bounded(answer: Value) -> (Result<CallToolResult, ErrorData>, String) {
     let bytes = answer.to_string().len();
     if bytes <= OUTPUT_MAX {
@@ -589,8 +515,6 @@ fn bounded(answer: Value) -> (Result<CallToolResult, ErrorData>, String) {
     (Ok(result), "too_large".into())
 }
 
-/// A console answer as a tool's outcome: its document, a 400 or 413 as an argument refused with
-/// the console's message, any other status as the console's error.
 fn from_console(answer: Answer) -> Outcome {
     let status = answer.status();
     let bytes = (answer.into_body().collect().now_or_never())
@@ -609,9 +533,6 @@ fn from_console(answer: Answer) -> Outcome {
 }
 
 impl Console {
-    /// The console's error a creation of workspace `id` would meet in its transaction, past
-    /// eligibility: `workspace_deleted` or `limit`, as `refusal` words them, read without a
-    /// write.
     fn creation_conflict(&self, id: &str, max: usize) -> Result<Option<Value>, Refusal> {
         let Some(policy) = self.workspace_policy() else {
             return Ok(None);
@@ -634,13 +555,10 @@ impl Console {
     }
 }
 
-/// The refusal of an argument past its bound, naming what the argument takes.
 fn argument(what: &str) -> Refusal {
     Refusal::Arguments(Msg::ProposalsArgument(what).text())
 }
 
-/// A problem of manifest text `src` as a diagnostic: the CLI's text, and the line, the dotted key
-/// and the entry (counted from 1) when the problem names them (`entries:<line>: `<key>`: ...`).
 fn diagnostic(code: &str, problem: &str, src: &str) -> Value {
     let mut found = json!({"code": code, "message": problem});
     let Some(rest) = problem.strip_prefix("entries:") else {
@@ -664,7 +582,6 @@ fn diagnostic(code: &str, problem: &str, src: &str) -> Value {
     found
 }
 
-/// A row of the console's `show` (`{"repo", "ingestion", "blocks"}`) as the entry it shows.
 fn shown_entry(row: &Value) -> Value {
     let mut entry = serde_json::Map::new();
     entry.insert("repo".into(), row["repo"].clone());
@@ -675,7 +592,6 @@ fn shown_entry(row: &Value) -> Value {
 }
 
 impl Console {
-    /// `catalog`: the console's `GET catalog` with the tool's arguments as its query.
     fn tool_catalog(&self, args: &CatalogArgs, session: &Session) -> Outcome {
         let encode = |text: &str| utf8_percent_encode(text, NON_ALPHANUMERIC).to_string();
         let mut query = Vec::new();
@@ -702,7 +618,6 @@ impl Console {
         from_console(self.catalog(Some(&query.join("&")), session))
     }
 
-    /// `workspaces`: the console's list, each workspace with its `seq`.
     fn tool_workspaces(&self, args: &WorkspacesArgs, session: &Session) -> Outcome {
         let limit = match args.limit {
             None => LIST_LIMIT,
@@ -731,7 +646,6 @@ impl Console {
         Ok(json!({"workspaces": workspaces, "next": next}))
     }
 
-    /// `show`: the console's show, with the canonical text of the entries it lists and `seq`.
     fn tool_show(&self, args: &ShowArgs, session: &Session) -> Outcome {
         let mut shown = from_console(self.show(&args.workspace, session))?;
         let entries: Vec<Value> = (shown["entries"].as_array().into_iter().flatten())
@@ -742,21 +656,16 @@ impl Console {
         Ok(shown)
     }
 
-    /// `propose`: the manifest text as the console would store it for `session` (created, or
-    /// saved over the workspace's current version), checked as the console checks a creation or
-    /// a save before its transaction, and stored nowhere.
     fn tool_propose(&self, args: &ProposeArgs, session: &Session) -> Outcome {
         let Some(section) = &self.bootstrap.workspaces else {
             return from_console(Self::no_workspace());
         };
-        // Every bound before any read.
         if args.entries.len() > named::TEXT_MAX {
             let max = named::TEXT_MAX >> 10;
             return Err(argument(&format!(
                 "entries takes at most {max} KiB of manifest text"
             )));
         }
-        // A rename is the console's own operation, never part of a proposal for a change.
         if args.workspace.is_some() && (args.name.is_some() || args.description.is_some()) {
             return Err(argument(
                 "name and description are a new workspace's; leave them out with workspace",
@@ -785,7 +694,6 @@ impl Console {
             }
         };
         let invalid = |problem: String| json!({"code": "invalid_workspace", "message": problem});
-        // The base: a workspace the caller sees, under the discovery rule.
         let base = match &args.workspace {
             None => None,
             Some(id) if !meada_core::ids::is_id(id) => return from_console(Self::no_workspace()),
@@ -810,7 +718,6 @@ impl Console {
         let current = match &base {
             Some(record) => match self.version_entries(record) {
                 Ok(current) => current,
-                // The call's one stderr line says `unavailable`; the store's reason stays unsaid.
                 Err(_) => {
                     let message = Msg::WorkspacesDocumentBad(&record.id).text();
                     return Err(Refusal::Error(
@@ -821,14 +728,10 @@ impl Console {
             None => Vec::new(),
         };
         let grant = Self::read_grant(session);
-        // What a save's refusal may name: the platform administrator's management view reads
-        // every entry, anyone else what its grant reads.
         let management = match session.operator {
             true => Grant::All,
             false => grant.clone(),
         };
-        // What the console would store: the platform administrator's text whole; an operator's
-        // text composed over the entries it cannot read, which stay in place.
         let stored = submitted
             .as_ref()
             .map(|submitted| match (&base, session.operator) {
@@ -847,8 +750,6 @@ impl Console {
                 diagnostics.push(json!({"code": "invalid_entries", "message": message}));
             }
         }
-        // The refusals the console would give, in its order: authority, then the entries it adds
-        // or changes against the admission cache's eligibility.
         let mut refusals: Vec<Value> = Vec::new();
         let anonymous = session.subject.as_deref().is_none_or(str::is_empty);
         match &base {
@@ -861,8 +762,6 @@ impl Console {
             _ => {}
         }
         if let Some(stored) = &stored {
-            // As the console does: a save names a refusal by what the caller's management view
-            // reads, a creation by its grant.
             let (changed, naming) = match &base {
                 Some(_) => (named::changed(&current, stored), &management),
                 None => (named::identities(stored), &grant),
@@ -873,8 +772,6 @@ impl Console {
             {
                 refusals.push(error);
             }
-            // Then what the creation's transaction finds: the same workspace created and deleted,
-            // or the limit of workspaces.
             if let (None, true, Some(subject), Some(name)) = (
                 &base,
                 refusals.is_empty() && diagnostics.is_empty(),
@@ -885,8 +782,6 @@ impl Console {
                 refusals.extend(self.creation_conflict(&id, section.max_workspaces)?);
             }
         }
-        // Each identity the text and the hints name, once, in that order; a hint's note is
-        // discarded unread.
         let mut named_identities: Vec<String> = submitted
             .as_deref()
             .map(named::identities)
@@ -896,7 +791,6 @@ impl Console {
             Some(catalog) => checked(&catalog, &named_identities),
             None => Value::Null,
         };
-        // The text, the diff and the view name only the entries the caller reads.
         let shown = stored.map(|stored| Self::readable_entries(session, stored));
         let manifest = (shown.as_deref()).and_then(meada_core::workspace::entries_text);
         let mut diff = Value::Null;

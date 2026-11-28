@@ -1,5 +1,3 @@
-//! Alert labels and explicit incident payloads connect monitors to native routing predicates.
-
 use crate::contract::{ContractKind, Found, Level, Link, Related, Role};
 use crate::index::{Consumer, Export, Indexed, Provider};
 use crate::resolve::Code;
@@ -16,26 +14,17 @@ mod regexp;
 use config::{Matcher, Op, Route, Rule, Stream};
 pub struct Alert;
 
-/// Why Alertmanager refuses to load a configuration the file at `path` holds, if it does: a
-/// matcher holds a regular expression Go cannot compile. `meada status` counts such a file as
-/// unreadable (`config_values`), and it gives no alert side or link.
 pub(crate) fn refused(path: &str, documents: &[Value]) -> Option<String> {
     config::is_file(path)
         .then(|| documents.iter().find_map(config::refused))
         .flatten()
 }
 
-/// Whether the alert reader takes a rule, a route or a receiver from the configuration file at
-/// `path` with bytes `src`: then the file keeps every config value (`config_values::kind_file`).
 pub(crate) fn takes(path: &str, src: &[u8]) -> bool {
     let summary = config::read(path, src);
     !(summary.rules.is_empty() && summary.routes.is_empty() && summary.forwardings.is_empty())
 }
 
-/// The documents of a configuration file that the alert reader takes a rule, a route or a
-/// receiver from, each once, read from the file's stored summaries (`contract_configs`): `None`
-/// for the only document of a file, else the index of each such document of a stream (ADR 0026,
-/// "Orphan sides").
 pub(crate) fn documents(summaries: &Value) -> Vec<Option<usize>> {
     let Some(summary) = (summaries.get("alert").cloned())
         .and_then(|s| serde_json::from_value::<config::Summary>(s).ok())
@@ -57,25 +46,14 @@ pub(crate) fn documents(summaries: &Value) -> Vec<Option<usize>> {
 
 // ponytail: regex source length bounds compilation input; `ALERT_SCAN_MAX` bounds matching.
 const ALERT_REGEX_MAX: usize = 4096;
-/// The bytes the automata and search caches of one routing scope may take, shared equally by
-/// its distinct expressions.
 // ponytail: repetition must not expand a short expression into an unbounded automaton.
 const ALERT_REGEX_SIZE_MAX: usize = 1 << 20;
-/// The bytes the automata of one linking pass may take, in equal parts per routing scope that
-/// compiles an expression, each part at most `ALERT_REGEX_SIZE_MAX`.
 // ponytail: 400 route configurations compiled a megabyte each in 14.6 s (debug); 16 MiB holds
 // about 10,000 ordinary expressions of 1.5 KiB.
 const ALERT_REGEX_POOL_MAX: usize = 16 << 20;
-/// The code points case folding may visit for the expressions of one linking pass, in equal
-/// parts per routing scope and, within a scope, per distinct expression: `regex-syntax` folds a
-/// case-insensitive class by visiting every code point of its ranges that hold a cased one,
-/// before any automaton is built.
 // ponytail: 2^22 folds a thousand `(?i)\p{L}` (3,739 code points in cased ranges each) and stops
 // a pattern of hundreds of `(?i)\p{Any}` (1.1 million each), which took minutes to compile.
 const ALERT_REGEX_FOLD_MAX: usize = 1 << 22;
-/// The Unicode classes the expressions of one linking pass may hold, in the same equal parts:
-/// `regex-syntax` looks each up in its tables and joins it to the bracket around it, before any
-/// automaton is built.
 // ponytail: 4096 classes read in a fraction of a second, where one route configuration of 240
 // expressions of 1,358 `\pL` each took 55 s.
 const ALERT_REGEX_CLASSES_MAX: usize = 4096;
@@ -83,16 +61,11 @@ const ALERT_REGEX_CLASSES_MAX: usize = 4096;
 const ALERT_LINK_BYTES_MAX: usize = 4 * crate::lang::MAX_BYTES;
 // ponytail: unmatched rule/tree pairs must not run without a bound just because they emit no links.
 const ALERT_MATCH_WORK_MAX: usize = 1_000_000;
-/// The steps matching may take in one workspace pass: a condition is charged, before it reads a
-/// value, what matching it may take, `regexp::Compiled::cost` for an expression and the bytes it
-/// reads for a comparison or a substring search.
 // ponytail: `.*a.{1000}a.*` ran 84 ns a step (debug) on a label of 60,000 bytes mixing `a` and
 // `b`, where four such routes took 20.5 s; 2^26 steps take about 5.6 s at that rate, 16.5 s for
 // a class of many single characters (243 ns a step).
 const ALERT_SCAN_MAX: usize = 1 << 26;
 
-/// What one workspace pass may still spend: route visits, matcher evaluations and template bytes
-/// within `ALERT_MATCH_WORK_MAX`, matching steps within `ALERT_SCAN_MAX`.
 struct Work {
     units: usize,
     steps: usize,
@@ -194,7 +167,6 @@ impl ContractKind for Alert {
                     route.line,
                     route.end_line,
                 );
-                // A negated condition only filters the route: the value it names is refused.
                 for matcher in conditions(&summary.routes, i)
                     .into_iter()
                     .filter(|m| !m.op.negative())
@@ -232,7 +204,6 @@ impl ContractKind for Alert {
                         .is_some_and(|c| !crate::contract::unresolved(c)))
         });
     }
-    /// Never called: `workspace_links` derives every alert link at once.
     fn link(
         &self,
         _: &Consumer,
@@ -297,8 +268,6 @@ impl ContractKind for Alert {
                         }
                     }
                 } else if let Some(&(n, site)) = emitters.get(link.provider.as_str()) {
-                    // An explicit receiver can rename a label key. Its proven link still
-                    // identifies the originating monitor, without inventing an emitted label.
                     found.push((n, site, Role::Provider, "emitter"));
                 }
             } else if exact.contains(link.provider.as_str())
@@ -411,8 +380,6 @@ struct Status<'a> {
 }
 impl<'a> Status<'a> {
     fn new(exports: &'a [Export], links: &'a [Link]) -> Self {
-        // A nonempty alert result already proves the whole pass finished. Empty results
-        // need one diagnostic pass to distinguish an unmatched workspace from a limit.
         let limit = if links
             .iter()
             .any(|link| link.contract.starts_with("alert::"))
@@ -508,7 +475,6 @@ enum Limit {
     Work,
 }
 
-/// Compile each routing scope once; only explicit receiver mappings cross event streams.
 fn linked<'a>(
     exports: &[Export],
     providers: impl Iterator<Item = &'a Provider>,
@@ -550,8 +516,6 @@ fn linked<'a>(
         .sum();
     let mut pass = regexp::Pass::new(scopes);
     let mut forwarded = Vec::new();
-    // Alertmanager selects receivers using labels directly. Those receivers alone can
-    // produce known incident fields; a matching value elsewhere is no forwarding.
     for (export, configs) in &inventories {
         for (path, summary) in configs {
             if !summary.routes.iter().any(|r| r.stream == Stream::Labels) {
@@ -609,7 +573,6 @@ fn linked<'a>(
             }
         }
     }
-    // Incident rules in one repository share their native scope even across Terraform files.
     for (export, configs) in &inventories {
         let mut routes = Vec::new();
         let mut targets = Vec::new();
@@ -685,9 +648,6 @@ fn linked<'a>(
     });
     Ok(out)
 }
-/// The routing scopes of one repository's route configurations that compile an expression, as
-/// `linked` forms them: each configuration with a label route (all its routes together), and
-/// the incident routes of all of them.
 fn regex_scopes(configs: &[(String, config::Summary)]) -> usize {
     let regex = |route: &Route| route.matchers.iter().any(|m| m.op.regex());
     let labels = (configs.iter())
@@ -901,8 +861,6 @@ impl Condition<'_> {
             Op::Suffix | Op::NotSuffix => value.ends_with(expected),
         })
     }
-    /// An upper bound on the steps matching `value` takes: its expression's, or the bytes a
-    /// comparison or a substring search reads.
     fn cost(&self, value: &str) -> usize {
         match (self.matcher.op, &self.regex) {
             (Op::Regex | Op::NotRegex, Some(compiled)) => compiled.cost(value.len()),
@@ -910,8 +868,6 @@ impl Condition<'_> {
             _ => value.len().min(self.matcher.pattern().len()),
         }
     }
-    /// Whether `rule` meets the condition, `None` when unknown, charging `work` the steps matching
-    /// the values it reads may take, before reading them.
     fn matches(&self, rule: &Rule, work: &mut Work) -> Result<Option<bool>, Limit> {
         let matcher = self.matcher;
         if matcher.op.regex() && self.regex.is_none() {
@@ -942,7 +898,6 @@ impl Condition<'_> {
         if rule.unknown.contains(field) {
             return Ok(None);
         }
-        // Unwritten expression-result labels/event fields are unknown, not empty strings.
         let Some(value) = rule.labels.get(field) else {
             return Ok(None);
         };
@@ -1026,8 +981,6 @@ impl<'a> Routing<'a> {
             }
         }
         for mut group in groups.into_values() {
-            // An unread team expression might name any scope in this module. Its absence
-            // from another team's ordered list cannot prove that list receives the event.
             if routes[group[0]].stream == Stream::Opsgenie
                 && unknown_scopes.contains(routes[group[0]].group.as_str())
             {
@@ -1038,7 +991,6 @@ impl<'a> Routing<'a> {
                     .iter()
                     .filter_map(|&i| routes[i].order)
                     .collect::<BTreeSet<_>>();
-                // Without a complete, unique native order no first match is certain.
                 if order.len() != group.len() {
                     continue;
                 }
@@ -1146,8 +1098,6 @@ fn regex(pattern: &str) -> Option<regex::Regex> {
 mod tests {
     use super::*;
 
-    /// The documents the alert reader takes a rule, a route or a receiver from (#800): the only
-    /// document of a file is `None`, a document of a stream its index, a receiver's too.
     #[test]
     fn documents_are_those_a_rule_a_route_or_a_receiver_comes_from() {
         let documents = |path: &str, src: &str| {
@@ -1176,7 +1126,6 @@ mod tests {
             documents("k8s.yaml", &format!("kind: ConfigMap\n---\n{operator}")),
             [Some(1)]
         );
-        // A file past the reader's budget keeps nothing, so no document of it is the reader's.
         let wide = serde_json::json!({"route": {"receiver": "x".repeat(400_000),
             "routes": vec![serde_json::json!({}); 50_000]}, "receivers": []});
         assert_eq!(documents("alerts.json", &wide.to_string()), none);
@@ -1348,12 +1297,6 @@ mod tests {
         assert!(started.elapsed() < std::time::Duration::from_secs(30));
     }
 
-    /// Matching steps have their own ceiling: 1,000 rules tried against 400 continuing routes of
-    /// `.*-apix`, then linked by `other-.*`, spend about 805,000 visits and evaluations, as they
-    /// did before steps were charged, and 33.6 million steps (7 positions, the loop of `.*`
-    /// included, at each of the 12 offsets of an 11-byte label), below `ALERT_SCAN_MAX`, so every
-    /// rule links. Charged in units of 64 steps against the evaluation ceiling, those 84 steps
-    /// were one unit a pair, past it.
     #[test]
     fn matching_steps_leave_the_evaluation_ceiling_to_visits_and_evaluations() {
         let rules = (0..1000).map(|i| serde_json::json!({"alert":format!("R{i}"), "expr":"up", "labels":{"support":"other-thing"}})).collect::<Vec<_>>();
@@ -1396,12 +1339,6 @@ mod tests {
         );
     }
 
-    /// A route expression is charged, before it runs, a step per automaton position and offset
-    /// of the value it may start at: `.*a.{1000}a.*` may run its 1,003 positions at each offset
-    /// of a label of 300,000 bytes, past `ALERT_SCAN_MAX`, so routing stops before matching.
-    /// The label mixes `a` and `b` without a period, so the lazy DFA cannot hold its states and
-    /// gives way to the PikeVM. Measured on 2026-11-08 in a debug build: 0.05 s, where matching
-    /// took 46 s.
     #[test]
     fn a_long_label_scanned_by_a_large_expression_stops_at_the_evaluation_ceiling() {
         let mut seed = 1u64;
@@ -1450,13 +1387,6 @@ mod tests {
         assert!(took < std::time::Duration::from_secs(5), "{took:?}");
     }
 
-    /// A condition is charged, before it reads a value, the steps matching may take, and no unit
-    /// of `ALERT_MATCH_WORK_MAX`: `.*a{999}` may run its 1,001 positions (the loop of `.*`
-    /// included) at each of the 128 offsets of a label of 127 bytes, 128,128 steps, which a budget
-    /// of 128,128 pays and one of 128,127 does not. A substring search costs the bytes it reads and
-    /// the tags of a condition are charged together. On a short value, `[a-z]+-(?:prod|staging)`
-    /// runs its 15 positions at each of 12 offsets, and a literal alternation costs its characters
-    /// and its choice.
     #[test]
     fn a_condition_is_charged_what_matching_may_cost_before_it_reads_a_value() {
         let matcher = |op, key: &str, pattern: &str| Matcher {
@@ -1522,9 +1452,6 @@ mod tests {
         assert!(regex("[").is_none());
     }
 
-    /// An expression Meada leaves unmatched for its own budgets compiles in Go, so it is no
-    /// refusal of the configuration that holds it (#718): the source length, the automaton and
-    /// case folding, here as far as one expression of `ALERT_REGEX_MAX` bytes goes.
     #[test]
     fn an_expression_past_a_budget_is_valid_for_go_and_no_refusal() {
         for pattern in [
@@ -1537,12 +1464,6 @@ mod tests {
         }
     }
 
-    /// Folding the case of `\p{Any}` visits each of its 1,112,064 code points: three fit
-    /// `ALERT_REGEX_FOLD_MAX`, a fourth does not, nor do two in each of two expressions sharing
-    /// it. `\P{Any}` folds `\p{Any}` before negating it; a bracket folds all it holds, here
-    /// everything but the digits (about as many), and each Unicode class in it on its own. The
-    /// lowercase letters folding `\p{Lu}` adds join the range written after the last of them,
-    /// almost a million uncased code points that the bracket then visits.
     #[test]
     fn case_folding_past_the_fold_ceiling_leaves_a_matcher_unmatched() {
         let any = 1_112_064;
@@ -1571,9 +1492,6 @@ mod tests {
         assert!(regex(r"(?i)\p{Lu}").unwrap().is_match("a"));
     }
 
-    /// Folding visits only the ranges that hold a cased code point, of classes not folded yet:
-    /// the Perl classes `regex_source` writes as brackets of uncased characters, a bracket of
-    /// only such classes and `\p{Han}` visit nothing, where they were counted whole.
     #[test]
     fn case_folding_counts_only_ranges_that_fold() {
         let compiles = |class: &str, n: usize| regex(&format!("(?i){}", class.repeat(n))).is_some();
@@ -1588,8 +1506,6 @@ mod tests {
         assert!(regex(r"(?i)[\S]+").unwrap().is_match("ÀB"));
     }
 
-    /// The export of the repository `identity`: a rule labelled `team: payments`, and a route
-    /// configuration `am{i}.yaml` routing `team` by each of `patterns`.
     fn routed(identity: &str, patterns: &[String]) -> (Repository, Export) {
         let rule = serde_json::json!({"groups":[{"name":"g", "rules":[{"alert":"A", "expr":"up", "labels":{"team":"payments"}}]}]});
         let mut configurations = vec![(
@@ -1618,7 +1534,6 @@ mod tests {
         (repo, export)
     }
 
-    /// The route configurations a rule of `workspace` links to, as `repository::path`.
     fn matched(workspace: Vec<(Repository, Export)>) -> BTreeSet<String> {
         let (repos, exports): (Vec<_>, Vec<_>) = workspace.into_iter().unzip();
         let providers = (repos.iter().zip(&exports))
@@ -1633,10 +1548,6 @@ mod tests {
             .collect()
     }
 
-    /// Each routing scope of a linking pass compiles its expressions within an equal part of the
-    /// ceilings, so what links does not depend on the repository asking, whose scopes come first:
-    /// of two route configurations, each fits one case-insensitive `\p{Any}` (1,112,064 folds) in
-    /// its half of `ALERT_REGEX_FOLD_MAX`, and neither fits two, in either order.
     #[test]
     fn routing_scopes_compile_within_equal_parts_in_any_order() {
         let any = 1_112_064;
@@ -1654,8 +1565,6 @@ mod tests {
         }
     }
 
-    /// A pattern of hundreds of case-insensitive `\p{Any}`, whose folding took minutes, is
-    /// refused by counting what folding would visit, in linear time.
     #[test]
     fn hundreds_of_case_insensitive_classes_are_refused_in_linear_time() {
         let pattern = format!("(?i){}", r"\p{Any}".repeat((ALERT_REGEX_MAX - 4) / 7));
@@ -1666,11 +1575,6 @@ mod tests {
         assert!(took < std::time::Duration::from_secs(2), "{took:?}");
     }
 
-    /// The automata of a linking pass share `ALERT_REGEX_POOL_MAX` in equal parts per routing
-    /// scope, so many route configurations no longer compile `ALERT_REGEX_SIZE_MAX` each:
-    /// `\pL{1,24}` (1,030,136 bytes) links from one route configuration, and from none of 400,
-    /// refused in linear time. Measured on 2026-11-08 in a debug build: 0.82 s, where compiling
-    /// each in its own megabyte took 14.6 s.
     #[test]
     fn many_route_configurations_share_the_automaton_pool() {
         let patterns = (0..400)
@@ -1686,9 +1590,6 @@ mod tests {
         assert!(took < std::time::Duration::from_secs(20), "{took:?}");
     }
 
-    /// An expression holds its part of `ALERT_REGEX_CLASSES_MAX` Unicode classes, case folded or
-    /// not: a quarter of them fits one of four expressions of a routing scope, or the expression
-    /// of one of four scopes, and one more does not.
     #[test]
     fn unicode_classes_past_an_expressions_part_leave_it_unmatched() {
         let quarter = ALERT_REGEX_CLASSES_MAX / 4;
@@ -1709,9 +1610,6 @@ mod tests {
         );
     }
 
-    /// 240 expressions of 1,358 `\pL` each, a 1 MB route configuration whose classes took about a
-    /// minute to read, are refused past their parts in linear time. Measured on 2026-11-08 in a
-    /// debug build: 0.72 s, where compiling them all took 19.4 s.
     #[test]
     fn hundreds_of_expressions_of_unicode_classes_are_refused_in_linear_time() {
         let patterns = (0..240)
@@ -1760,8 +1658,6 @@ mod regexp_semantics {
         assert!(regex("a{1001}").is_none());
         assert!(regex("(?:a{1000}){2}").is_none());
         assert!(regex("a{1000}").is_some());
-        // Go refuses a repetition operator stacked on another; a group or a lazy `?` between is
-        // no stacking.
         for pattern in ["a**", "a*+", "a+*", "a{2}{3}", "a{2}*", "a*??"] {
             assert!(regex(pattern).is_none(), "{pattern}");
         }

@@ -995,7 +995,6 @@ pub fn parse(text: &str) -> Result<Export, String> {
         if !e.is_data() {
             return reason;
         }
-        // serde_json ends its reason with the line and column; the place says where instead.
         let reason = reason.rsplit_once(" at line ").map_or(&*reason, |(r, _)| r);
         match place(text, offset(text, e.line(), e.column())) {
             place if place.is_empty() => reason.to_string(),
@@ -1004,7 +1003,6 @@ pub fn parse(text: &str) -> Result<Export, String> {
     })
 }
 
-/// The byte offset just past the 1-based `line` and `column` serde_json reports.
 fn offset(text: &str, line: usize, column: usize) -> usize {
     let before: usize = (text.split_inclusive('\n').take(line.saturating_sub(1)))
         .map(str::len)
@@ -1012,10 +1010,6 @@ fn offset(text: &str, line: usize, column: usize) -> usize {
     (before + column).min(text.len())
 }
 
-/// The path to the value being read at byte `end` of the JSON `text`: each open object by the
-/// key last read in it, each open array by the index of its element (`calls[3].span.start`),
-/// empty at the top. A missing field is reported past the object lacking it, so its path is that
-/// object's.
 fn place(text: &str, end: usize) -> String {
     enum Open {
         Object(Option<String>),
@@ -1023,7 +1017,6 @@ fn place(text: &str, end: usize) -> String {
     }
     let mut stack: Vec<Open> = Vec::new();
     let bytes = text.as_bytes();
-    // Whether the next string is a key: right after `{`, or after `,` in an object.
     let mut key_next = false;
     let mut i = 0;
     while i < end.min(bytes.len()) {

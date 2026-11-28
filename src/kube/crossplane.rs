@@ -1,29 +1,9 @@
-//! Crossplane objects among the Kubernetes nodes (#655, ADR 0025). A composite resource
-//! definition (XRD) defines a composite kind and, when it offers one, a claim kind; an object of
-//! either kind anywhere in the repository is a composite resource or a claim. A composition names
-//! the composite kind it composes and the resources it creates, each read from its literal `base`
-//! (`spec.resources`, or the `input.resources` of a pipeline step that runs function
-//! patch-and-transform) into a node under the composition's address, `<composition>/<resource>`,
-//! of the base's kind. An object with a `spec.forProvider` mapping is a managed resource.
-//!
-//! References, in one unit as every Kubernetes one: a claim to the XRD of its composite kind
-//! (`composite <Kind>.<group>`), a composite resource to its XRD, a claim or a composite resource
-//! to the composition its `compositionRef` names, an XRD to its default and enforced composition,
-//! a composition to the XRD of its `compositeTypeRef` and to each resource it creates, and a
-//! composed or managed resource to the definition of its kind (an XRD, or a
-//! `CustomResourceDefinition`) when the unit holds one.
-//!
-//! Patches and functions are not evaluated: a base whose name or external name a patch sets, or
-//! that has neither, has the name `*`, a pattern; a pipeline step that runs any other function
-//! creates no node.
-
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use serde_json::Value;
 
 use super::{OBJECT_REFERENCES_MAX, Obj, Span, at, list, plain, text};
 
-/// The groups of Crossplane's own kinds, all cluster-scoped.
 const GROUPS: &[&str] = &[
     "apiextensions.crossplane.io",
     "ops.crossplane.io",
@@ -32,15 +12,12 @@ const GROUPS: &[&str] = &[
 
 const EXTENSIONS: &str = "apiextensions.crossplane.io";
 
-/// The annotation that holds a managed resource's name in the provider's API.
 const EXTERNAL_NAME: &str = "crossplane.io/external-name";
 
-/// The resources one composition creates; past it the rest create no node.
 // ponytail: real compositions create a few dozen resources; 64 is past them, and each is one
 // reference of the composition besides `kube::OBJECT_REFERENCES_MAX`.
 pub(super) const COMPOSED_MAX: usize = 64;
 
-/// The patches that write the composite or the environment, never the base.
 const OUTWARD: &[&str] = &[
     "ToCompositeFieldPath",
     "CombineToComposite",
@@ -48,12 +25,10 @@ const OUTWARD: &[&str] = &[
     "CombineToEnvironment",
 ];
 
-/// Whether the kinds of `group` are Crossplane's own, which live outside any namespace.
 pub(super) fn cluster_scoped(group: &str) -> bool {
     GROUPS.contains(&group)
 }
 
-/// A kind with its group, as `<Kind>.<group>` shows it.
 type Kind = (String, String);
 
 fn shown((group, kind): &Kind) -> String {
@@ -63,51 +38,36 @@ fn shown((group, kind): &Kind) -> String {
     }
 }
 
-/// The group of an `apiVersion`: what comes before its last `/`, none for the core group.
 fn group_of(api: &str) -> &str {
     api.rsplit_once('/').map_or("", |(g, _)| g)
 }
 
-/// One resource a composition creates, read from its base.
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct Base {
-    /// The resource's `name` in the composition, or its index when it has none.
     pub resource: String,
     pub kind: Kind,
-    /// Its physical name: the external-name annotation or `metadata.name` as written; `None`
-    /// when a patch sets either, or the base has neither.
     pub name: Option<String>,
     pub line: usize,
     pub end_line: usize,
     pub block: String,
-    /// How the composition holds it: `resources` or `pipeline <step>`.
     pub via: String,
     pub custom: Option<super::custom::Name>,
     pub topology: Option<super::topology::Facts>,
     pub namespace: Option<String>,
 }
 
-/// What a Crossplane object, or a definition of a kind, offers the roles and the references.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(super) struct Facts {
-    /// The kind an XRD or a `CustomResourceDefinition` defines.
     pub defines: Option<Kind>,
-    /// The claim kind an XRD offers.
     pub claim: Option<Kind>,
-    /// An XRD's compositions by name, with the key that names each.
     pub compositions: Vec<(&'static str, String)>,
-    /// The composite kind a composition composes.
     pub composes: Option<Kind>,
     pub bases: Vec<Base>,
-    /// The composition a claim or a composite resource names.
     pub composition: Option<String>,
-    /// Whether the object holds a `spec.forProvider` mapping, as every managed resource does.
     pub managed: bool,
-    /// Its literal external-name annotation.
     pub external: Option<String>,
 }
 
-/// The literal name at `path` of `v`.
 fn name_at(v: &Value, path: &[&str]) -> Option<String> {
     text(v, path).filter(|n| plain(n)).map(String::from)
 }
@@ -117,14 +77,11 @@ fn external(v: &Value) -> Option<String> {
     plain(name).then(|| name.to_string())
 }
 
-/// Whether the field path `path` is the name or the external name of the base.
 fn names(path: &str) -> bool {
     path == "metadata.name"
         || path.starts_with("metadata.annotations") && path.contains(EXTERNAL_NAME)
 }
 
-/// Whether the patch `p` writes the base's name or external name. A patch from a field path
-/// with no `toFieldPath` writes the same path of the base.
 fn writes(p: &Value) -> bool {
     let ty = text(p, &["type"]).unwrap_or("FromCompositeFieldPath");
     let from = matches!(ty, "FromCompositeFieldPath" | "FromEnvironmentFieldPath")
@@ -133,7 +90,6 @@ fn writes(p: &Value) -> bool {
     !OUTWARD.contains(&ty) && text(p, &["toFieldPath"]).or(from).is_some_and(names)
 }
 
-/// The names of the patch sets `sets` that write the base's name or external name.
 fn renaming(sets: &Value) -> HashSet<&str> {
     (sets.as_array().into_iter().flatten())
         .filter(|s| list(s, &["patches"]).any(writes))
@@ -141,8 +97,6 @@ fn renaming(sets: &Value) -> HashSet<&str> {
         .collect()
 }
 
-/// Whether one of `patches`, or a patch set of `renaming` they name, writes the base's name or
-/// external name.
 fn renamed(patches: &Value, renaming: &HashSet<&str>) -> bool {
     (patches.as_array().into_iter().flatten()).any(|p| match text(p, &["type"]) {
         Some("PatchSet") => text(p, &["patchSetName"]).is_some_and(|n| renaming.contains(n)),
@@ -150,8 +104,6 @@ fn renamed(patches: &Value, renaming: &HashSet<&str>) -> bool {
     })
 }
 
-/// Unknown patch sets and nested sets cannot establish a literal identity. Index the sets
-/// once per composition; their fields are inspected without copying or expanding resources.
 fn patches_affect(
     patches: &Value,
     sets: &HashMap<&str, Option<&Value>>,
@@ -187,8 +139,6 @@ fn patches_affect(
     })
 }
 
-/// The resources of the composition `value` whose block starts its key paths with `block`, each
-/// with the lines `span` gives it (its step's index in the pipeline, if any, and its own).
 fn bases(
     value: &Value,
     block: &str,
@@ -274,7 +224,6 @@ fn bases(
     out
 }
 
-/// The Crossplane facts of the object `value` of `kind` in `group`, whose block is `block`.
 pub(super) fn facts(
     value: &Value,
     kind: &str,
@@ -316,7 +265,6 @@ pub(super) fn facts(
     facts
 }
 
-/// The composite and claim kinds the XRDs of the repository define.
 #[derive(Debug, Default)]
 pub(super) struct Kinds {
     composite: HashSet<Kind>,
@@ -333,7 +281,6 @@ impl Kinds {
         kinds
     }
 
-    /// What `o` is to Crossplane, if anything.
     pub(super) fn role(&self, o: &Obj) -> Option<Role> {
         let kind = (o.group.clone(), o.kind.clone());
         Some(match () {
@@ -347,12 +294,10 @@ impl Kinds {
     }
 }
 
-/// Whether `o` is Crossplane's own `kind` of `apiextensions.crossplane.io`.
 fn own(o: &Obj, kind: &str) -> bool {
     o.group == EXTENSIONS && o.kind == kind
 }
 
-/// What a node is to Crossplane.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Role {
     Definition,
@@ -360,12 +305,10 @@ pub(super) enum Role {
     Claim,
     Composite,
     Managed,
-    /// A resource a composition creates.
     Composed,
 }
 
 impl Role {
-    /// As `context` shows it on its `role:` line.
     pub(super) fn text(self) -> &'static str {
         match self {
             Role::Definition => "crossplane composite resource definition",
@@ -378,14 +321,10 @@ impl Role {
     }
 }
 
-/// The targets the Crossplane references of a unit's objects name, by the object's index.
 pub(super) struct Targets<'o> {
     objs: &'o [Obj],
-    /// XRDs and `CustomResourceDefinition`s by the kind they define.
     defines: HashMap<&'o Kind, Vec<usize>>,
-    /// XRDs by the claim kind they offer.
     claims: HashMap<&'o Kind, Vec<usize>>,
-    /// Compositions by name as written.
     compositions: HashMap<&'o str, Vec<usize>>,
 }
 
@@ -411,19 +350,16 @@ impl<'o> Targets<'o> {
         t
     }
 
-    /// The first `OBJECT_REFERENCES_MAX` objects `map` holds under `key`.
     fn get<K: std::hash::Hash + Eq + ?Sized>(map: &HashMap<&K, Vec<usize>>, key: &K) -> Vec<usize> {
         let found = map.get(key).into_iter().flatten();
         found.take(OBJECT_REFERENCES_MAX).copied().collect()
     }
 
-    /// The objects `o`, whose role is `role`, references, each with how it names it.
     pub(super) fn of(&self, o: &Obj, role: Option<Role>, out: &mut BTreeSet<(usize, String)>) {
         let xp = &o.facts.xp;
         let kind = (o.group.clone(), o.kind.clone());
         if role == Some(Role::Claim) {
             for j in Self::get(&self.claims, &kind) {
-                // The XRD's composite kind, which the claim stands for.
                 let composite = self.composite_of(j);
                 out.insert((j, format!("composite {composite}")));
             }
@@ -451,7 +387,6 @@ impl<'o> Targets<'o> {
         }
     }
 
-    /// The composite kind the XRD at `j` defines, as shown.
     fn composite_of(&self, j: usize) -> String {
         self.objs[j]
             .facts
@@ -461,7 +396,6 @@ impl<'o> Targets<'o> {
             .map_or_else(String::new, shown)
     }
 
-    /// The objects the resource `base` of a composition references: the definitions of its kind.
     pub(super) fn of_base(&self, base: &Base) -> Vec<(usize, String)> {
         (Self::get(&self.defines, &base.kind).into_iter())
             .map(|j| (j, format!("kind {}", shown(&base.kind))))
@@ -480,7 +414,6 @@ mod tests {
             .collect()
     }
 
-    /// Each node as `<address> <type> <name>[ (pattern)] <role>`, sorted.
     fn nodes(out: &Output) -> Vec<String> {
         let mut n: Vec<String> = (out.nodes.iter())
             .map(|n| {
@@ -620,7 +553,6 @@ mod tests {
                 "other",
                 "        - fromFieldPath: spec.size\n          toFieldPath: spec.forProvider.size\n"
             ),
-            // With no `toFieldPath`, a patch writes the path it reads.
             resource(
                 "copied",
                 "        - fromFieldPath: metadata.annotations[crossplane.io/external-name]\n"
@@ -706,7 +638,6 @@ mod tests {
                 "Composition.apiextensions.crossplane.io/p -> Composition.apiextensions.crossplane.io/p/q via pipeline pt"
             ]
         );
-        // The resource's lines and block are its own within the composition.
         let q = out.nodes.iter().find(|n| n.ty == "Queue").unwrap();
         assert_eq!((q.line, q.end_line), (13, 18));
         assert_eq!(q.block, "spec.pipeline[0].input.resources[0]");
@@ -742,7 +673,6 @@ mod tests {
             )
         );
         assert!(addresses.contains(&"Composition.apiextensions.crossplane.io/dev-xdbs.aws/bucket"));
-        // The reference matches the composition's name as written, before the prefix.
         assert!(
             shown(&out)
                 .iter()
@@ -773,8 +703,6 @@ mod tests {
         ]));
         let composed = out.nodes.iter().filter(|n| n.ty == "Bucket");
         assert_eq!(composed.count(), COMPOSED_MAX);
-        // Every resource created is a reference of the composition past the object ceiling,
-        // which its `compositeTypeRef` already takes one of.
         const { assert!(COMPOSED_MAX >= super::super::OBJECT_REFERENCES_MAX) };
         let of = |source: &str| out.references.iter().filter(|r| r.source == source).count();
         assert_eq!(

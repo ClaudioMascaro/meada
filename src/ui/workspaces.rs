@@ -1,10 +1,3 @@
-//! Named workspaces in the console (#342, ADR 0021 contract 4): create, list and show under the
-//! authenticated subject, and the playground and export through a context. Identity, role and
-//! grant come from the token and the permissions set, never from the body: a caller-supplied
-//! actor or role is an unknown key and grants nothing. Everything a read returns follows the
-//! discovery rule of ADR 0020: a workspace the caller may not see is the one 404 of an id that
-//! does not exist, with the same body, so no read tells them apart.
-
 use std::collections::BTreeSet;
 
 use meada_core::authorize::Grant;
@@ -32,12 +25,9 @@ const LIST_LIMIT_MAX: usize = 100;
 const LIST_LIMIT: usize = 25;
 const AFTER_MAX: usize = 256;
 
-/// The action a creation's audit record names.
 const CREATE: &str = "workspaces.create";
 
 impl Console {
-    /// The answer at `workspaces[/...]`, or `None` when the route is not one of named workspaces
-    /// or the console has no `[workspaces]` (the route then does not exist, as before #342).
     pub(super) fn workspaces(
         &self,
         request: &Request<Body>,
@@ -54,7 +44,6 @@ impl Console {
             Some("effective") if post => Some(self.preview(request.body(), session)),
             Some(rest) if post => self.operate(rest, request.body(), session),
             Some(rest) if read => {
-                // An identity holds slashes: everything between `repositories/` and `/export`.
                 if let Some((id, tail)) = rest.split_once("/repositories/")
                     && let Some(identity) = tail.strip_suffix("/export")
                 {
@@ -69,7 +58,6 @@ impl Console {
         }
     }
 
-    /// The one 404 of a workspace that does not exist, was deleted or the caller may not see.
     fn no_workspace() -> Answer {
         error(
             StatusCode::NOT_FOUND,
@@ -78,8 +66,6 @@ impl Console {
         )
     }
 
-    /// The postgres section and the GitHub grant provider the routes read: `[workspaces]`
-    /// required both.
     fn workspace_policy(&self) -> Option<Policy<'_>> {
         let postgres = self.bootstrap.postgres.as_ref()?;
         let github = self.bootstrap.github()?;
@@ -92,8 +78,6 @@ impl Console {
         })
     }
 
-    /// Whether `session` operates workspace `record`: the platform administrator, or an operator
-    /// of it by subject, unless the subject is a local account whose row no longer stands.
     fn operates(session: &Session, record: &Record) -> bool {
         #[cfg(feature = "accounts")]
         if session.suspended {
@@ -104,7 +88,6 @@ impl Console {
                 .is_some_and(|s| record.operators.iter().any(|(subject, _)| subject == s))
     }
 
-    /// What `session` reads, as `meada-core` takes it.
     fn read_grant(session: &Session) -> Grant {
         #[cfg(feature = "oidc")]
         if let Some(grant) = &session.grant {
@@ -113,11 +96,6 @@ impl Console {
         Grant::All
     }
 
-    /// `POST workspaces`: `{"name", "description"?, "entries", "message"}`, the manifest text of
-    /// the selection. The creator is the authenticated subject; the selection must be eligible for
-    /// its login in the newest permissions set, decided again inside the transaction that inserts
-    /// the workspace. 201 `{"id", "version", "created": true}`, or 200 with `created: false`
-    /// when the same creator, name and entries made it already.
     fn create(&self, body: &Body, session: &Session) -> Answer {
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
@@ -188,8 +166,6 @@ impl Console {
         let id = meada_core::ids::workspace_id(subject, &create.name, &version);
         let authority = Authority::of(administrator);
         let arguments = json!({"workspace": id, "version": version, "authority": authority});
-        // A cheap look at the admission cache before anything is stored; the transaction below
-        // decides again from the newest set. A refusal is recorded all the same (ADR 0021).
         if let Some((answer, message)) = self.precheck(session, &selected, &grant) {
             super::write::audit(session.subject.as_deref(), None, CREATE, &id, &message);
             let actor = super::write::actor(session, None);
@@ -200,8 +176,6 @@ impl Console {
             Ok(record) => record,
             Err(answer) => return *answer,
         };
-        // The version document is the shared store's, immutable and content-addressed: written
-        // before the rows that name it, so no row ever names a document that is not there.
         if let Err(why) = self.store_version(&version, &entries) {
             let why = Msg::SnapshotStoreUnreachable(&why).text();
             return self.failed(record, session, CREATE, &id, &why);
@@ -248,9 +222,6 @@ impl Console {
         }
     }
 
-    /// The refusal of a creation by the admission cache's catalog, before anything is stored, with
-    /// the message its record carries: `None` when the cache lets the selection pass (or cannot
-    /// say: the transaction decides).
     fn precheck(
         &self,
         session: &Session,
@@ -265,7 +236,6 @@ impl Console {
         (!decided.allowed).then(|| (entries_refused(&decided), refusal_line(&decided)))
     }
 
-    /// Stores the version document `entries` is, unless the store holds it already.
     fn store_version(&self, version: &str, entries: &[Value]) -> std::result::Result<(), String> {
         let Some(snapshot) = &self.bootstrap.snapshot else {
             return Err(Msg::SnapshotNoSection(&self.file.display().to_string()).text());
@@ -273,8 +243,6 @@ impl Console {
         store::put_document(snapshot, version, entries)
     }
 
-    /// A write that could not finish: `why` is the whole log line, naming the service that
-    /// failed (Postgres or the store); the caller is told only that it is unavailable.
     fn failed(
         &self,
         record: PendingRecord,
@@ -330,9 +298,6 @@ impl Console {
         answer
     }
 
-    /// The records of the workspaces the session sees, ordered by id: every workspace for the
-    /// platform administrator, the ones it operates, and the ones whose entries its grant reads
-    /// whole. Postgres unreachable is the 503 of the audit.
     fn visible_records(
         &self,
         session: &Session,
@@ -369,8 +334,6 @@ impl Console {
             .collect())
     }
 
-    /// `GET workspaces?limit=&after=`: the workspaces the session sees, `limit` 1 to 100 (25 by
-    /// default) after the id `after`, as `{"workspaces", "next"}`.
     fn list(&self, query: Option<&str>, session: &Session) -> Answer {
         let (mut limit, mut after) = (None, None);
         for pair in query.into_iter().flat_map(|q| q.split('&')) {
@@ -409,8 +372,6 @@ impl Console {
         )
     }
 
-    /// The records of the workspaces `session` sees after the id `after`, at most `limit`, and
-    /// the cursor of the next page: the list's page, and the proposal server's (ADR 0022).
     fn page(
         &self,
         session: &Session,
@@ -427,7 +388,6 @@ impl Console {
         Ok((page, next))
     }
 
-    /// The generation the console holds now, when it keeps generations and one is servable.
     fn held_generation(&self) -> Option<Arc<crate::snapshot::serve::Held>> {
         #[cfg(feature = "snapshot")]
         if let Holds::Generations(Ok(current)) = &self.holds {
@@ -436,8 +396,6 @@ impl Console {
         None
     }
 
-    /// `state`: `live` when the current generation records the workspace at its current version,
-    /// else `applied`: stored, with its ingestion pending (ADR 0021).
     fn state(record: &Record, held: Option<&crate::snapshot::serve::Held>) -> &'static str {
         match held.and_then(|h| h.context_version(&record.id)) {
             Some(version) if version == record.current => "live",
@@ -445,7 +403,6 @@ impl Console {
         }
     }
 
-    /// One workspace as a list shows it.
     fn summary(
         &self,
         record: &Record,
@@ -473,10 +430,6 @@ impl Console {
         shown
     }
 
-    /// `GET workspaces/<id>`: the workspace, its `base` (the fact a write must still find), its
-    /// `state` and each entry's `ingestion`. Operators and the platform administrator also get
-    /// the operator list and, for an operator that cannot read every entry, the count it
-    /// cannot read (`hidden`): the entries it lists are the ones its grant reads.
     fn show(&self, id: &str, session: &Session) -> Answer {
         if !meada_core::ids::is_id(id) {
             return Self::no_workspace();
@@ -508,8 +461,6 @@ impl Console {
             .as_ref()
             .and_then(|h| h.context_repositories(&record.id))
             .unwrap_or_default();
-        // The platform administrator's management view is unfiltered; an operator edits the
-        // entries it reads (ADR 0021).
         let shown: Vec<&Value> = (entries.iter())
             .filter(|e| session.operator || e["repo"].as_str().is_some_and(|r| grant.reads(r)))
             .collect();
@@ -551,12 +502,10 @@ impl Console {
         json_answer(StatusCode::OK, &document)
     }
 
-    /// The entries of the workspace's current version from the shared store, checked.
     fn version_entries(&self, record: &Record) -> std::result::Result<Vec<Value>, String> {
         self.document(&record.current)
     }
 
-    /// The entries of the named version document `version` from the shared store, checked.
     fn document(&self, version: &str) -> std::result::Result<Vec<Value>, String> {
         let Some(snapshot) = &self.bootstrap.snapshot else {
             return Err(Msg::SnapshotNoSection(&self.file.display().to_string()).text());
@@ -564,9 +513,6 @@ impl Console {
         store::get_document(snapshot, version)
     }
 
-    /// The playground's and the export's workspace check: whether `session` may ask through
-    /// workspace `id` about `repository` (ADR 0021): the context is in the generation, holds the
-    /// repository, and the session operates it or reads every repository it records.
     pub(super) fn through_workspace(
         &self,
         id: &str,
@@ -580,17 +526,12 @@ impl Console {
         if !repos.contains(&repository) || !session.reads(repository) {
             return false;
         }
-        // The workspace must exist, not be deleted and be visible to the session (it operates it
-        // or reads it whole): the generation may retain a context Postgres no longer lists. Every
-        // answer is bounded by the grant.
         match self.visible_records(session, Some(id)) {
             Ok(records) => !records.is_empty(),
             Err(_) => false,
         }
     }
 
-    /// `GET workspaces/<id>/repositories/<identity>/export[?generation=]`: the export of the
-    /// context, under the discovery rule.
     fn export_through(
         &self,
         id: &str,
@@ -621,7 +562,6 @@ impl Console {
     }
 }
 
-/// The 409 of a platform or caller condition that stops every selection (fail closed).
 pub(super) fn pending(reason: Reason) -> Answer {
     json_answer(
         StatusCode::CONFLICT,
@@ -633,7 +573,6 @@ pub(super) fn pending(reason: Reason) -> Answer {
     )
 }
 
-/// The audit message of a refused selection: how many, the identities named, the count hidden.
 pub(super) fn refusal_line(decided: &named::Creation) -> String {
     format!(
         "{} ({}; hidden {})",
@@ -643,8 +582,6 @@ pub(super) fn refusal_line(decided: &named::Creation) -> String {
     )
 }
 
-/// The 403 `entries_refused`: the refused identities the caller's grant reads, and the count of
-/// the others, which are never named.
 pub(super) fn entries_refused(decided: &named::Creation) -> Answer {
     let refused: Vec<Value> = (decided.named.iter())
         .map(|identity| json!({"identity": identity, "change": "add", "reason": "not_eligible"}))

@@ -1,5 +1,3 @@
-//! Scoped, ordered selector effects. Syntax supplies assignments; a reader may add
-//! known library mutation calls. Exact binding/caller resolution supplies object identity.
 use super::*;
 
 pub(crate) struct MemberEffect<'a> {
@@ -37,10 +35,7 @@ struct Effect<'a> {
 pub(super) struct Index<'a> {
     effects: HashMap<Object<'a>, Vec<Effect<'a>>>,
     uncertain: Vec<(&'a str, &'a str, Effect<'a>)>,
-    // A default object can survive more than one invocation. Source order in one
-    // invocation alone cannot prove its initial fields are still present.
     defaults: HashSet<Object<'a>>,
-    /// Each file's outermost loops (`Facts::loops`).
     loops: HashMap<&'a str, &'a [std::ops::Range<usize>]>,
     cut: bool,
 }
@@ -280,17 +275,12 @@ impl<'a> Index<'a> {
                         | Value::External(_)
                         | Value::List(_)
                 ) {
-                    // An opaque actual may alias a selected object in this caller. Its
-                    // scoped uncertainty is not complete empty mutation knowledge.
                     self.unknown(code, at, within, field, route, busy, depth + 1);
                 }
             }
         }
     }
 
-    // A reassigned alias can still refer to an argument of its function. Refuse an
-    // unchanged field for those exact actual objects, with the same caller order;
-    // do not suppress sibling objects throughout the file.
     #[expect(clippy::too_many_arguments)]
     fn unknown(
         &mut self,
@@ -343,13 +333,10 @@ impl<'a> Index<'a> {
         }
     }
 
-    /// Whether one loop of `path` holds both positions: a write after a read in it comes before
-    /// the read of the next turn.
     fn looped(&self, path: &str, a: usize, b: usize) -> bool {
         let (low, high) = (a.min(b), a.max(b));
         self.loops.get(path).is_some_and(|loops| {
             let at = loops.partition_point(|l| l.end <= low);
-            // A write's moment is where it ends, which may be where its loop ends.
             (loops.get(at)).is_some_and(|l| l.start <= low && high <= l.end)
         })
     }
@@ -401,8 +388,6 @@ impl<'a> Index<'a> {
                 if !timed || self.defaults.contains(&object) {
                     return true;
                 }
-                // Compare the outermost shared invocation first. Different call sites establish
-                // order even when their callee bodies use the same source positions.
                 for before in effect.moments.iter().rev() {
                     if let Some(after) = read
                         .iter()
@@ -414,8 +399,6 @@ impl<'a> Index<'a> {
                             || self.looped(before.path, before.start, after.start);
                     }
                 }
-                // A call's arguments are read before that callee can mutate them. Sharing
-                // only an outer invocation does not establish the inner effect's order.
                 !read.first().is_some_and(|at| {
                     effect
                         .moments

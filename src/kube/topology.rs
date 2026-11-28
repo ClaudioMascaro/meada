@@ -1,5 +1,3 @@
-//! RabbitMQ topology identities and local endpoint references, prepared before queries.
-
 use crate::iac::types::{self, TopologyRole as Role};
 use serde_json::Value;
 use std::collections::HashMap;

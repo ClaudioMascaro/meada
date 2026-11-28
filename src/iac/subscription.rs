@@ -1,5 +1,3 @@
-//! Cloud subscription summaries: evaluated in their root and instance, then routed by
-//! the channel kind. Resource attributes name only a known node, never a cloud API value.
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -53,14 +51,12 @@ struct Rule {
     filtered: bool,
 }
 
-/// Root-local indexes; duplicate physical rules on the same bus remain ambiguous.
 #[derive(Default)]
 pub(super) struct Inputs {
     rules: HashMap<(String, String), Option<Rule>>,
     pub(super) azure_filters: HashMap<String, String>,
 }
 
-/// Only known identity attributes, never resource contents such as a secret's value.
 fn identity_attribute(ty: &str, attribute: &str) -> bool {
     matches!(attribute, "id" | "name")
         || (attribute == "arn" && ty.starts_with("aws_"))
@@ -102,9 +98,6 @@ impl<'m> Eval<'m> {
         }
     }
 
-    /// Resolve literals with the ordinary evaluator, and a traversal to a known resource's
-    /// name/ARN/id with its node. Other attributes, unknown expressions and ambiguous instances
-    /// remain absent. Following aliases shares the evaluator's depth and work budgets.
     pub(super) fn endpoint(
         &mut self,
         at: usize,

@@ -92,10 +92,8 @@ def assert_fetch(items):
             done = subprocess.run(args, env=env, capture_output=True, text=True)
             return done.returncode, done.stderr, log.read_text()
 
-        # $1 when given, else the operator's workspace.repositories.
         code, _, calls = run([("github.com/acme/web", "web")])
         assert code == 0 and calls == f"clone --depth 1 -- https://github.com/acme/web.git {mirrors}/web\n", calls
-        # A peer table after an entry and a comment after a value change nothing (#544).
         code, _, calls = run(text=f'[[repository]]\nrepo = "github.com/acme/web"\npath = "{mirrors}/web" # note\n\n'
                                   '[[repository.peer]]\nrepo = "github.com/other/x"\n\n'
                                   f'[[repository.resource]]\npath = "{mirrors}/other"\n')
@@ -105,10 +103,8 @@ def assert_fetch(items):
         assert code == 0 and calls == "".join(f"clone --depth 1 -- https://{r['repo']}.git "
                                               f"{r['path'].replace('/data/mirrors', str(mirrors))}\n"
                                               for r in listed), calls
-        # A failed fetch names the identity and stops the refresh.
         code, err, _ = run([("github.com/acme/web", "web")], fail="1")
         assert code == 1 and err == "refresh: fetch failed for github.com/acme/web; the refresh stops before publication\n", err
-        # A credential in the identity or in an existing mirror's origin is refused, never printed.
         code, err, calls = run([("tok@github.com/acme/web", "web")])
         assert code == 1 and calls == "" and err == "REPOSITORIES takes URLs without credentials; give git a credential helper\n", err
         (mirrors / "web/.git").mkdir(parents=True)
@@ -117,7 +113,6 @@ def assert_fetch(items):
         assert err == "refresh: the origin of github.com/acme/web takes a URL without credentials; give git a credential helper\n", err
         code, _, calls = run([("github.com/acme/web", "web")], origin="https://github.com/acme/web.git")
         assert code == 0 and "fetch --depth 1 origin HEAD" in calls, calls
-        # A path that leaves the mirrors, or is the mirrors directory itself, is refused.
         for path in ["../web", ".", "web/..", "", "a//b"]:
             code, err, calls = run([("github.com/acme/web", path)])
             assert code == 1 and calls == "" and "must stay under" in err, (path, err)
@@ -211,7 +206,6 @@ assert refresh[:2] == ["snapshot", "lock"]
 steps = refresh[-1].split(" && ")
 assert [step.split()[:3] for step in steps] == [["meada", "workspace", "pull"], ["/bin/sh", "/etc/meada/fetch.sh"],
     ["meada", "index", "--workspace"], ["meada", "snapshot", "publish"]]
-# A store-sourced bootstrap lists no repository: without $1 the fetch reads the operator's list.
 assert "[[repository]]" not in manifest(console_profile)
 assert_fetch(console_profile)
 claim = render("-f", str(CHART / "values-console.yaml"), "--set-json", "console.operatorGroups=[]",
@@ -321,7 +315,6 @@ for arguments, problem in [
     assert failed.returncode and problem in failed.stderr
 print("helm-check: named workspaces sections for the console and the job, never the nodes, passed")
 
-# The proposal server (ADR 0022): opt in, a pod of its own, read-only Postgres role, absent when off.
 assert not any(component(item) == "proposals" for item in workspaces), "the proposal server is off by default"
 assert "proposals" not in named_console
 proposals_args = ["-f", str(CHART / "values-console.yaml"), "-f", str(CHART / "values-identity.yaml"),
@@ -366,7 +359,6 @@ for arguments, problem in [
     assert failed.returncode and problem in failed.stderr, arguments
 print("helm-check: proposal server opt-in, read role, pull and bootstrap passed")
 
-# Local accounts (ADR 0024): [accounts] from values, the private key in the console only.
 accounts = render("-f", str(CHART / "values-accounts.yaml"), "--set", "modules.accounts.adminPasswordSecret=meada-admin")
 accounts_console = tomllib.loads(resource(accounts, "ConfigMap", console=True)["data"]["meada.workspace.toml"])
 accounts_nodes = tomllib.loads(manifest(accounts))
@@ -379,7 +371,6 @@ assert accounts_nodes["accounts"] == {"public_key_file": "/etc/meada-accounts/pu
 assert "oidc" not in accounts_console and "oidc" not in accounts_nodes, "local accounts need no identity provider"
 assert accounts_console["ui"]["operations"] and "operator_groups" not in accounts_console["ui"]
 assert accounts_console["postgres"] == accounts_nodes["postgres"]
-# A node reads the issuer of every token from its own [ui]: the console's public_url (#560).
 assert accounts_nodes["ui"]["public_url"] == accounts_console["ui"]["public_url"] == "https://console.example.internal"
 
 
@@ -414,7 +405,6 @@ for item in accounts_pods(accounts):
         assert not private and not public, "the refresh job and the example Postgres hold no key"
 assert "meada-accounts-private" not in yaml.dump([item for item in accounts if not (
     item["kind"] == "Deployment" and item["metadata"].get("labels", {}).get("app.kubernetes.io/component") == "console")])
-# Groups, the GitHub grant provider and the key Secrets' names come from values.
 granted = render("-f", str(CHART / "values-accounts.yaml"), "-f", str(CHART / "values-identity.yaml"), "-f", str(CHART / "values-workspaces.yaml"),
                  "--set", "modules.oidc.enabled=false", "--set", "modules.oidc.github.enabled=false", "--set", "modules.directory.enabled=false",
                  "--set-json", 'modules.accounts.groups={"readers":["github.com/acme/web"],"operators":["*"]}',
@@ -440,7 +430,6 @@ assert any(volume.get("secret", {}).get("secretName") == "priv" for volume in
            resource(granted, "Deployment", console=True)["spec"]["template"]["spec"]["volumes"])
 assert "priv" not in str(pod(granted))
 
-# Break glass: only beside the identity provider, the console alone reads [accounts], nodes get nothing.
 glass = render("-f", str(CHART / "values-console.yaml"), "--set", "modules.postgres.enabled=true",
                "--set", "modules.accounts.enabled=true", "--set", "modules.accounts.breakGlass=true")
 glass_console = tomllib.loads(resource(glass, "ConfigMap", console=True)["data"]["meada.workspace.toml"])
@@ -449,7 +438,6 @@ assert "accounts" not in tomllib.loads(manifest(glass)) and "ui" not in tomllib.
 assert "meada-accounts" not in str(pod(glass)), "a node gets no key under break glass"
 assert "accounts-private" in str(resource(glass, "Deployment", console=True)["spec"]["template"]["spec"]["volumes"])
 
-# Disabled by default: nothing of local accounts renders.
 for profile in [default, generations, console_profile, identity, workspaces]:
     text = yaml.dump(profile)
     assert "meada-accounts" not in text and "[accounts" not in text and "MEADA_ADMIN_PASSWORD" not in text

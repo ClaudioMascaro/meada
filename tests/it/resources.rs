@@ -1,7 +1,3 @@
-//! Resource queries (spec #19) over the chain fixture: the gateway writes the `postgres`
-//! resource `orders` through `cancelOrder`, the worker reads it through `settleOrders` and the
-//! catalog reads it as a whole repository.
-
 use crate::common;
 
 use common::{assert_golden, chain, loose_chain};
@@ -16,7 +12,6 @@ fn search_kind_resource_finds_a_resource_by_its_id_and_by_its_kind() {
         "chain.search-resource.txt",
         &engine.search("orders", Some("resource"), None).unwrap(),
     );
-    // The kind matches too, and `route` never lists a resource.
     let by_kind = engine.search("postgres", Some("resource"), None).unwrap();
     assert_eq!(by_kind.lines().count(), 3, "{by_kind}");
     let routes = engine.search("orders", Some("route"), None).unwrap();

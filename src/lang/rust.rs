@@ -1,9 +1,3 @@
-//! The Rust language pack (spec #30). It reads `.rs` files and the `Cargo.toml` manifests of a
-//! workspace with no Rust toolchain: crates come from `Cargo.toml` and the module tree from
-//! `mod` declarations (`crates.rs`). Calls inside macro invocations are token trees to
-//! tree-sitter and are not indexed, apart from the bodies of item macros (`macros.rs`), which
-//! are read as items.
-
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use tree_sitter::{Node, Parser};
@@ -27,49 +21,31 @@ mod values;
 use crates::{MOD, PATH, Tree};
 use values::{Reader, Where};
 
-/// How many definitions may nest in one file. Names are qualified by the definitions around
-/// them and each call resolves its names up that chain, so unbounded nesting costs cubic time.
-/// Past the limit an item is not a definition (its body belongs to the one around it).
 // ponytail: real code nests a few levels; 128 is the depth the other packs allow.
 const DEFINITION_DEPTH: usize = 128;
 
-/// How many levels deep a pattern or a `use` tree is read for the names it binds; a name
-/// deeper binds nothing.
 // ponytail: real code destructures a few levels; the recursion must stay shallow.
 const BINDING_DEPTH: usize = 64;
 
-/// How many names the `use` declarations of one file bind; the rest bind nothing.
 // ponytail: real files import a few hundred names; every lookup walks the imports, so a crafted
 // file of a million cannot be left to make each call a scan.
 const USE_BINDINGS: usize = 4096;
 
-/// The head of a path read from the file's own top (`self::`, and `super::` that stays in the
-/// file): an import of the file itself. A keyword, so no name of the code is spelled so.
 const SELF: &str = "mod";
 
-/// How many segments of a path or a member chain a callee keeps, and how many references an
-/// `impl` block's type is read through; a longer one is its node kind, or names nothing.
 // ponytail: real paths hold a handful of segments; the limit keeps a crafted one cheap.
 const PATH_DEPTH: usize = 256;
 
 const MAIN: &str = "main";
 
-/// The HTTP methods the `Method` constants of the HTTP crates name, which an actix-web
-/// `web::method(Method::X)` may be given. The pack folds them at parse time (`values.rs`), and
-/// the HTTP kind's Rust reader reads the same list: the one pack constant a kind reads.
 pub(crate) const VERBS: &[&str] = &[
     "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "CONNECT", "TRACE",
 ];
 
-/// The attributes that register the function they sit on as a route, in actix-web and Rocket:
-/// `#[get("/x")]` and its kin, and actix-web's `#[route("/x", method = "GET")]`. The pack emits
-/// them as calls that decorate the function (`Call::decorates`); any other attribute is not a
-/// call.
 const ROUTE_ATTRIBUTES: &[&str] = &[
     "get", "post", "put", "delete", "head", "connect", "options", "trace", "patch", "route",
 ];
 
-/// How many route attributes one function is read with; the rest are not calls.
 // ponytail: a handler serves a handful of routes; a crafted run of a million is not read.
 const ROUTES_PER_FUNCTION: usize = 16;
 
@@ -98,7 +74,6 @@ impl LanguagePack for Rust {
             let owns = |dir: &str| {
                 dir.is_empty() || path.strip_prefix(dir).is_some_and(|r| r.starts_with('/'))
             };
-            // The nearest package above the file.
             (crates.iter().filter(|(dir, _)| owns(dir)))
                 .max_by_key(|(dir, _)| dir.len())
                 .map(|(_, setting)| setting.clone())
@@ -118,8 +93,6 @@ impl LanguagePack for Rust {
         Some("Self")
     }
 
-    // Types are strict: a builder method hands back the type it was called on, so
-    // `Router::new().route(..)` is the router `Router::new()` made.
     fn fluent(&self) -> bool {
         true
     }
@@ -128,8 +101,6 @@ impl LanguagePack for Rust {
         true
     }
 
-    /// A type's name is its path in its file (`inner.Def`), never the module a glob names
-    /// (`super`, `crate::x`): a glob takes its types as it takes its functions.
     fn namespaced(&self) -> bool {
         false
     }
@@ -160,47 +131,31 @@ impl LanguagePack for Rust {
     }
 }
 
-/// What the items around a node make of a function in it.
 #[derive(Clone)]
 enum Body {
-    /// A module or a function body: a function is a free function.
     Items,
-    /// An `impl` block: a function is a method under this scope (`Store`, `Store.Persist`).
     Impl(String),
-    /// A trait: a function with a body is a default method under the trait.
     Trait(String),
 }
 
 struct Visit<'t> {
     node: Node<'t>,
-    /// The qualified name of the enclosing definition.
     scope: String,
-    /// The module written in place that encloses the node (`a.b`), empty at the top level.
     module: String,
-    /// Whether every scope up to the top is a module: `self::` and `super::` are read only
-    /// there.
     pure: bool,
     body: Body,
-    /// Whether every module written in place around the node is `pub`: its `pub` items are
-    /// then exported under their dotted names.
     open: bool,
-    /// Whether the node is an argument of a call: a closure there is a definition.
     arg: bool,
-    /// How many nodes are above it, and the items that may declare type parameters among them
-    /// (the node itself too, when it is one), nearest first: `parameter` reads them from here.
     depth: usize,
     items: Option<Rc<Items<'t>>>,
 }
 
-/// An item around a node, with its depth in the tree.
 struct Items<'t> {
     item: Node<'t>,
     depth: usize,
     up: Option<Rc<Items<'t>>>,
 }
 
-// Dropped one at a time: items nested thousands deep in a generated file would overflow the call
-// stack if each one dropped the next.
 impl Drop for Items<'_> {
     fn drop(&mut self) {
         let mut up = self.up.take();
@@ -210,8 +165,6 @@ impl Drop for Items<'_> {
     }
 }
 
-/// Where a type is in the tree, for `parameter`: a parent lookup walks down from the root of
-/// the tree, so it costs the depth of the node, and the walk already knows what it needs.
 #[derive(Clone, Copy)]
 struct Around<'a, 't> {
     depth: usize,
@@ -219,7 +172,6 @@ struct Around<'a, 't> {
 }
 
 impl Around<'_, '_> {
-    /// The place of a node `levels` below this one.
     fn down(self, levels: usize) -> Self {
         Around {
             depth: self.depth + levels,
@@ -228,15 +180,10 @@ impl Around<'_, '_> {
     }
 }
 
-/// What a value is read for, once the whole file is.
 enum Put {
-    /// The arguments and the receiver of the call at this index of `Facts::calls`.
     Call(usize),
-    /// A `let` binding a plain name once in its scope, by this qualified name: a constant.
     Let(String),
-    /// A `const` or a `static`, by this qualified name.
     Item(String),
-    /// What the definition at this index of `Facts::defs` returns: the node is its body.
     Returns(usize),
 }
 
@@ -246,16 +193,12 @@ struct Held<'t> {
     put: Put,
 }
 
-/// A name a `use` binds (or, with no name, the glob of its path), read once the whole file is.
 struct Use {
     path: Path,
     name: Option<String>,
     public: bool,
 }
 
-/// A path read once the whole file is: a call's callee or an `impl` block's type, or a `use`
-/// (`binds` is then the qualified name it binds, which its own head does not name: `use
-/// tokio::{self}` begins with the crate).
 struct Path {
     scope: String,
     module: String,
@@ -264,42 +207,27 @@ struct Path {
     binds: Option<String>,
 }
 
-/// Where a path's normalized callee goes.
 enum Slot {
     Call(usize),
     Type(usize),
     Trait(usize),
-    /// The class of this receiver, a type the source writes.
     Named(usize),
-    /// The class this function returns, a type the source writes.
     Result(usize),
-    /// The class `?` unwraps the written result to.
     Unwrapped(usize),
-    /// The class `.await` yields from a future signature.
     Output(usize),
 }
 
-/// What the file binds, for the paths: the qualified names of its non-method definitions
-/// (`mod` declarations included), its locals (written once each), the names its `use`
-/// declarations bind, qualified by the scope they are written in, and how many bind each.
 #[derive(Default)]
 struct Scan {
     defs: HashSet<String>,
-    /// The functions among `defs`: a path (`rocket::build()`) does not name one by its head.
     functions: HashSet<String>,
     locals: HashSet<String>,
     uses: HashMap<String, usize>,
-    /// The plain names the parameters of each function bind, as `(function, name)`.
     params: HashSet<(String, String)>,
-    /// The path each name a `use` binds imports, as written (the last of them, when it binds the
-    /// name more than once, which `uses` counts).
     targets: HashMap<String, Vec<String>>,
-    /// The macros the file defines: a `format!` it defines itself is not the standard one.
     macros: HashSet<String>,
 }
 
-/// What the paths of a file need besides its own items: imports of the file itself and of
-/// the modules around it, and the crates outside it that a path names with no `use`.
 #[derive(Default)]
 struct Heads {
     imports: BTreeSet<(String, String)>,
@@ -307,9 +235,6 @@ struct Heads {
 }
 
 impl Scan {
-    /// Whether a scope from `scope` up to `module`, `module` included, defines or imports
-    /// `name`: what a path's head may name there (a module ends the names in scope). The
-    /// `use` that `path` is does not import its own head.
     fn defines(&self, path: &Path, name: &str) -> bool {
         let head = path.segments.len() > 1;
         let (module, mut s) = (path.module.as_str(), path.scope.as_str());
@@ -351,33 +276,22 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
     let mut facts = Facts::default();
     let mut scan = Scan::default();
     let mut paths: Vec<(Slot, Path)> = Vec::new();
-    // The receivers a `let` gives by the call it holds, with the call's span.
     let mut returned: Vec<(usize, Range<usize>)> = Vec::new();
     let mut imported: Vec<Use> = Vec::new();
     let mut bound = 0;
     let mut defined = HashSet::new();
-    // The last `#n` given to the blocks of each scope.
     let mut suffixes: HashMap<String, usize> = HashMap::new();
     let mut public_names = Vec::new();
-    // The values to read once the file is, and how many bindings each local name has.
     let mut held: Vec<Held> = Vec::new();
-    // The calls made on another call (`Router::new().route(..)`) and the range of the inner one.
     let mut chains: Vec<(usize, Range<usize>, Through)> = Vec::new();
     let mut bindings: HashMap<String, usize> = HashMap::new();
-    // The names a `let mut` of a plain name declares.
     let mut mut_lets: HashSet<String> = HashSet::new();
-    // The scope and name of each assignment: it changes the nearest binding of the name, which
-    // an enclosing scope may hold (a closure given to a call is a scope of its own).
     let mut assigned = Vec::new();
-    // The Strings a function builds, by scope and name, and the names two of them share.
     let mut candidates: values::Builders = HashMap::new();
     let mut clash: HashSet<(String, String)> = HashSet::new();
     let mut spent = 0;
-    // The `#[path]` value of each item that has one, by node id.
     let mut renamed: HashMap<usize, String> = HashMap::new();
-    // The route attributes before each function, by node id.
     let mut routes: HashMap<usize, Routes> = HashMap::new();
-    // Explicit stack instead of recursion: generated code can nest deeper than the call stack.
     let mut stack = vec![Visit {
         node: tree.root_node(),
         scope: String::new(),
@@ -419,13 +333,10 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             items: items.as_deref(),
         };
         let mut inner = (scope.clone(), module.clone(), pure, body.clone(), open);
-        // Directly in a module (the file's or one written in place): not in a function, an
-        // `impl` or a trait.
         let in_module = pure && scope == module && matches!(body, Body::Items);
         let deep = levels(&scope) >= DEFINITION_DEPTH;
         let mut locals = Vec::new();
         match node.kind() {
-            // Macro bodies are token trees; attributes are read by the item they sit on.
             "macro_definition" => {
                 scan.macros
                     .extend(field(node, "name").map(|n| text(n, src).to_string()));
@@ -459,7 +370,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 }
                 continue;
             }
-            // A required method of a trait is a definition of its own; a foreign function is none.
             "function_signature_item" if deep || !matches!(body, Body::Trait(_)) => continue,
             "function_item" if deep => {
                 locals.extend(field(node, "name").map(|n| text(n, src).to_string()));
@@ -507,7 +417,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                         segments,
                         binds: None,
                     };
-                    // A type parameter as the result names no class: it is the caller's type.
                     if let Some(ty) = field(node, "return_type") {
                         let types = result_types(ty, place.down(1), src);
                         let at = facts.defs.len();
@@ -609,7 +518,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                         module: module.clone(),
                         pure,
                     };
-                    // A `static mut` is written to elsewhere: it holds no known value.
                     if let Some(value) = field(node, "value").filter(|_| !mutable(node)) {
                         let put = Put::Item(qualify(&scope, name));
                         held.push(Held {
@@ -629,7 +537,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     continue;
                 };
                 let qualified = qualify(&scope, name);
-                // A function and a type of one name live in different namespaces.
                 scan.defs.insert(qualified.clone());
                 scan.functions.remove(&qualified);
                 if defined.insert(qualified.clone()) {
@@ -716,9 +623,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 if let (Some(of), Some(n)) = (&of, trait_node) {
                     base = qualify(&base, &last(of, n));
                 }
-                // Two blocks giving one name a method (`impl From<A> for E`, `impl From<B>
-                // for E`) are two scopes: the later one is `E.From#2`.
-                // The methods an item macro gives the block count too.
                 let written = field(node, "body")
                     .map(|body| built(body, &features, src, &mut renamed, &mut routes, &expand));
                 let methods: Vec<&str> = (written.into_iter().flatten())
@@ -750,7 +654,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     facts.impls.push(Impl {
                         scope: block.clone(),
                         ty: String::new(),
-                        // A trait that cannot be read is still a trait's block.
                         of: of.as_ref().map(|_| String::new()),
                         within: scope.clone(),
                     });
@@ -820,9 +723,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     uses: Vec::new(),
                 });
             }
-            // A `let` of a plain name whose type is written, or whose value is a call, is a
-            // receiver (`Facts::receivers`), unless a parameter of the function binds the name
-            // too: the two cannot tell which a call reaches, so the name is a local.
             "let_declaration"
                 if !deep
                     && typed_let(node, place, src)
@@ -845,7 +745,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     How::Call(range) => returned.push((facts.receivers.len(), range)),
                 }
                 let class = Class::Unknown;
-                // It is a constant too, if nothing else binds the name in its scope.
                 let local = qualify(&scope, &name);
                 *bindings.entry(local.clone()).or_default() += 1 + usize::from(mutable(node));
                 if mutable(node) {
@@ -873,8 +772,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             "let_declaration" | "for_expression" | "let_condition" | "match_arm" => {
                 if let Some(pattern) = field(node, "pattern") {
                     bind(pattern, 0, &mut locals, src);
-                    // A `let` of a plain name is a constant if nothing else binds the name in
-                    // its scope: a `let mut` is a second binding, as an assignment is.
                     let value = field(node, "value");
                     if let (true, Some(value), "identifier") =
                         (node.kind() == "let_declaration", value, pattern.kind())
@@ -898,7 +795,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     }
                 }
             }
-            // A name assigned again is not a constant.
             "assignment_expression" | "compound_assignment_expr" => {
                 if let Some(left) = field(node, "left").filter(|n| n.kind() == "identifier") {
                     let operator = field(node, "operator").map_or("=", |op| text(op, src));
@@ -925,9 +821,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                     assigned.push((at, text(target, src).to_string(), "", None));
                 }
             }
-            // A closure given to a call is a definition of its own: the shared side names it
-            // when a contract kind says it is a route handler, and folds it into the one
-            // around it otherwise. Its parameters bind in it.
             "closure_expression" if arg && !deep => {
                 let name = values::inline(&scope, node);
                 facts.defs.push(def(&name, Kind::Inline, node));
@@ -943,8 +836,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                 }
                 inner = (name, module.clone(), pure, Body::Items, open);
             }
-            // Any other closure is no definition: its calls belong to the enclosing one,
-            // where its parameters bind.
             "closure_expression" => {
                 if let Some(params) = field(node, "parameters") {
                     bind(params, 0, &mut locals, src);
@@ -970,10 +861,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             }
             _ => built(node, &features, src, &mut renamed, &mut routes, &expand),
         };
-        // A `let mut` String the rest of its block only reads and appends to: the statements
-        // after it are the ones `kids` holds, read once (a sibling lookup costs the depth of the
-        // node). Two in one scope under one name are told apart by no position the Reader has:
-        // neither is kept.
         if node.kind() == "block" && !deep {
             for (at, kid) in kids.iter().enumerate() {
                 if builders::candidate(*kid)
@@ -1074,7 +961,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
         facts.calls[outer].unwraps = through.tried;
         facts.calls[outer].awaits = through.awaited;
     }
-    // The values, now that the file's `use` declarations are known.
     let mut reader = Reader::new(src, &scan, &mut heads, &candidates);
     let mut constants = HashSet::new();
     for Held { at, node, put } in held {
@@ -1120,7 +1006,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
                         continue;
                     }
                 }
-                // Declared `mut` once, and bound or assigned nowhere else.
                 if bindings.get(&name) == Some(&2) && mut_lets.contains(&name) {
                     facts.mutable.insert(name.clone(), value.clone());
                 }
@@ -1140,9 +1025,7 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             Put::Returns(def) => facts.defs[def].return_values = reader.returns(&at, node),
         }
     }
-    // A constant is a name that holds its value, not a local hiding what it is bound to.
     facts.locals.retain(|l| !constants.contains(l));
-    // A `let` holding a call: the function it names, when the call is a path or a bare name.
     let callees: HashMap<&Range<usize>, &str> = (facts.calls.iter())
         .filter(|c| c.by_path || !c.callee.contains('.'))
         .filter(|c| !c.callee.starts_with('('))
@@ -1154,7 +1037,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
             None => Class::Unknown,
         };
     }
-    // One receiver per scope and name: bindings that disagree leave its class unknown.
     let mut seen: HashMap<(String, String), usize> = HashMap::new();
     let mut receivers: Vec<Receiver> = Vec::new();
     for receiver in std::mem::take(&mut facts.receivers) {
@@ -1173,7 +1055,6 @@ fn parse(src: &[u8], setting: &str) -> Result<Facts> {
         }
     }
     facts.receivers = receivers;
-    // A type or trait no path names reaches no class.
     facts.impls.retain(|i| !i.ty.is_empty());
     facts.externs = heads.externs.into_iter().collect();
     facts.macro_use = macro_use(tree.root_node(), src);
@@ -1206,12 +1087,8 @@ fn def(name: &str, kind: Kind, node: Node) -> Def {
     Def::new(name.to_string(), kind, node.byte_range())
 }
 
-/// The route attributes of a function: the attribute item, the segments of its path (`get`,
-/// `actix_web::get`) and its argument tokens, first first.
 type Routes<'t> = Vec<(Node<'t>, Vec<String>, Node<'t>)>;
 
-/// The route attributes written at the end of `before`, the children of a node that come before
-/// a function. Comments between attributes are skipped, and only `ROUTES_PER_FUNCTION` are kept.
 fn route_attributes<'t>(before: &[Node<'t>], src: &[u8]) -> Routes<'t> {
     let mut out = Vec::new();
     for &item in before.iter().rev() {
@@ -1231,7 +1108,6 @@ fn route_attributes<'t>(before: &[Node<'t>], src: &[u8]) -> Routes<'t> {
     out
 }
 
-/// The segments of the path and the argument tokens of a route attribute item.
 fn route_attribute<'t>(item: Node<'t>, src: &[u8]) -> Option<(Vec<String>, Node<'t>)> {
     let attribute = named(item).find(|n| n.kind() == "attribute")?;
     let tree = field(attribute, "arguments")?;
@@ -1241,7 +1117,6 @@ fn route_attribute<'t>(item: Node<'t>, src: &[u8]) -> Option<(Vec<String>, Node<
         .then_some((segments, tree))
 }
 
-/// The crates the file declares with `#[macro_use] extern crate x;` at its top level.
 fn macro_use(root: Node, src: &[u8]) -> Vec<String> {
     let (mut out, mut marked) = (Vec::new(), false);
     for item in named(root) {
@@ -1260,14 +1135,10 @@ fn macro_use(root: Node, src: &[u8]) -> Vec<String> {
     out
 }
 
-/// Whether the item is `pub`: `pub(crate)` and narrower stay inside the crate.
 fn is_pub(node: Node, src: &[u8]) -> bool {
     named(node).any(|n| n.kind() == "visibility_modifier" && text(n, src) == "pub")
 }
 
-/// A top-level name: the file exports it to its own crate, and to others and to a glob import
-/// when it is `pub`. In a module written in place, whose modules around are all `pub` (`open`),
-/// a `pub` name is exported under its dotted name (`inner.helper`).
 fn export(
     facts: &mut Facts,
     public: &mut Vec<String>,
@@ -1294,8 +1165,6 @@ fn export(
     }
 }
 
-/// A `mod x;` declaration in `module` (empty at the top level): an import of the file it names
-/// under `module.x`, which the file exports when it is at the top level.
 fn declare(
     facts: &mut Facts,
     public: &mut Vec<String>,
@@ -1311,7 +1180,6 @@ fn declare(
         None => format!("{MOD}{}", qualify(&chain, name).replace('.', "/")),
     };
     let local = qualify(module, name);
-    // The module is a definition of its own, the declaration's span (`search` finds it).
     facts.defs.push(def(&local, Kind::Module, node));
     if module.is_empty() {
         facts.exports.push(Export::From {
@@ -1331,12 +1199,6 @@ fn declare(
     });
 }
 
-/// The children of `node` that are built, in one pass over the list (a sibling lookup per
-/// child would be quadratic in a flat file): the `#[cfg(..)]` attributes before a child decide
-/// it, and so does an inner `#![cfg(..)]` of a module written in place. A `#[path]` value
-/// goes to `paths` under the id of the item it sits on, and the route attributes before a
-/// function to `routes`. A `#[cfg_attr(..)]` only adds attributes, so it never leaves an item out.
-/// An item macro's invocation that is built gives the items of its body instead (`expand`).
 fn built<'t>(
     node: Node<'t>,
     features: &BTreeSet<String>,
@@ -1358,14 +1220,11 @@ fn built<'t>(
     out
 }
 
-/// The bodies of the item macros a file invokes (`macros::bodies`), by the start of
-/// the invocation, and what the file's setting says of each macro.
 struct Expand<'t, 's> {
     roots: HashMap<usize, Node<'t>>,
     table: &'s macros::Table<'s>,
 }
 
-/// What `built` reads the children of a node with.
 struct Built<'a, 't, 's> {
     features: &'a BTreeSet<String>,
     src: &'a [u8],
@@ -1375,9 +1234,6 @@ struct Built<'a, 't, 's> {
 }
 
 impl<'t> Built<'_, 't, '_> {
-    /// Adds the `kids` that are built to `out`, each judged by the attributes before it and by
-    /// `outer`, what the attributes an item macro's arm writes on every item make of it (with
-    /// `test` false and true). An item macro's body is read in its place, as items.
     fn keep(&mut self, kids: &[Node<'t>], outer: (bool, bool), out: &mut Vec<Node<'t>>) {
         let (features, src) = (self.features, self.src);
         let (mut on, mut on_test, mut path) = (outer.0, outer.1, None);
@@ -1390,9 +1246,6 @@ impl<'t> Built<'_, 't, '_> {
                 }
                 "line_comment" | "block_comment" | "inner_attribute_item" => out.push(child),
                 _ => {
-                    // A module a test build compiles is indexed; any other item is judged with
-                    // `test` false. Its inner `#![cfg(..)]` is judged in the same build as its
-                    // outer one.
                     let kept = (on && !inner_off(child, features, src, false))
                         || (on_test
                             && child.kind() == "mod_item"
@@ -1401,9 +1254,6 @@ impl<'t> Built<'_, 't, '_> {
                         .then(|| self.expand.roots.get(&child.start_byte()))
                         .flatten();
                     match body {
-                        // An item macro's items are judged by the attributes on the invocation,
-                        // then by those the arm writes on each: a module in it may be one a
-                        // test build compiles.
                         Some(&body) if on || on_test => {
                             let name =
                                 field(child, "macro").and_then(|m| macros::invoked_name(m, src));
@@ -1437,22 +1287,17 @@ impl<'t> Built<'_, 't, '_> {
     }
 }
 
-/// The `(..)` condition of an attribute item that is a `cfg`.
 fn cfg_condition<'a>(item: Node, src: &'a [u8]) -> Option<&'a str> {
     let attribute = named(item).find(|n| n.kind() == "attribute")?;
     let rest = text(attribute, src).strip_prefix("cfg")?.trim_start();
     rest.starts_with('(').then_some(rest)
 }
 
-/// Whether an attribute item is no `#[cfg(..)]`, or one that holds, with `test` false and with
-/// it true.
 fn attribute_holds(item: Node, features: &BTreeSet<String>, src: &[u8]) -> (bool, bool) {
     let holds = |test| cfg_condition(item, src).is_none_or(|c| cfg::holds(c, features, test));
     (holds(false), holds(true))
 }
 
-/// Whether the file or the module written in place that `node` is (or holds as its body) opens
-/// with an inner `#![cfg(..)]` that does not hold, with `test` as given.
 fn inner_off(node: Node, features: &BTreeSet<String>, src: &[u8], test: bool) -> bool {
     let body = match node.kind() {
         "mod_item" => field(node, "body"),
@@ -1476,7 +1321,6 @@ fn inner_off(node: Node, features: &BTreeSet<String>, src: &[u8], test: bool) ->
     false
 }
 
-/// The value of a `#[path = "..."]` attribute item, if it is a plain string.
 fn path_value(item: Node, src: &[u8]) -> Option<String> {
     let attribute = named(item).find(|n| n.kind() == "attribute")?;
     let is_path = named(attribute)
@@ -1490,7 +1334,6 @@ fn path_value(item: Node, src: &[u8]) -> Option<String> {
     }
 }
 
-/// A parameter, and the names its pattern binds when it is no plain name.
 struct Parameter {
     param: Param,
     names: Vec<String>,
@@ -1537,14 +1380,11 @@ fn parameters(function: Node, src: &[u8]) -> Vec<Parameter> {
     out
 }
 
-/// Whether the function takes `self`.
 fn has_self(function: Node) -> bool {
     let list = field(function, "parameters");
     list.is_some_and(|l| named(l).any(|p| p.kind() == "self_parameter"))
 }
 
-/// The parameters named by a plain identifier whose type the source writes, with the path of
-/// that type.
 fn typed_parameters(function: Node, place: Around, src: &[u8]) -> Vec<(String, Vec<String>)> {
     let Some(list) = field(function, "parameters") else {
         return Vec::new();
@@ -1561,7 +1401,6 @@ fn typed_parameters(function: Node, place: Around, src: &[u8]) -> Vec<(String, V
         .collect()
 }
 
-/// The named fields of a struct whose type the source writes, with the path of that type.
 fn fields(item: Node, place: Around, src: &[u8]) -> Vec<(String, Vec<String>)> {
     let Some(list) = field(item, "body").filter(|b| b.kind() == "field_declaration_list") else {
         return Vec::new();
@@ -1575,14 +1414,11 @@ fn fields(item: Node, place: Around, src: &[u8]) -> Vec<(String, Vec<String>)> {
         .collect()
 }
 
-/// What a `let` of a plain name gives its receiver: the type it writes, or the call it holds.
 enum How {
     Type(Vec<String>),
-    /// The span of the call (`Call::range`).
     Call(Range<usize>),
 }
 
-/// Whether a `let` or `static` is `mut`.
 fn mutable(node: Node) -> bool {
     children(node).any(|c| c.kind() == "mutable_specifier")
 }
@@ -1593,7 +1429,6 @@ fn typed_let(node: Node, place: Around, src: &[u8]) -> Option<(String, How)> {
     if let Some(ty) = field(node, "type") {
         return Some((name, How::Type(written(ty, place.down(1), src, true)?)));
     }
-    // Only a call of a name or a path: the function it calls is what the call's own callee says.
     let value = field(node, "value").filter(|v| v.kind() == "call_expression")?;
     let function = field(value, "function")?;
     let function = match function.kind() {
@@ -1604,14 +1439,9 @@ fn typed_let(node: Node, place: Around, src: &[u8]) -> Option<(String, How)> {
         .then(|| (name, How::Call(value.byte_range())))
 }
 
-/// What a function's written result gives a call, by how the call goes on.
 struct ResultTypes {
-    /// The item a call gives (`written`).
     result: Option<Vec<String>>,
-    /// The item `?` unwraps it to: the first argument of a `Result` or `Option`.
     unwrapped: Option<Vec<String>>,
-    /// The item `.await` yields from a future signature (`impl Future<Output = T>`,
-    /// `Pin<Box<dyn Future<Output = T>>>`), which a call made without `.await` does not get.
     output: Option<Vec<String>>,
 }
 
@@ -1631,8 +1461,6 @@ fn result_types(ty: Node, place: Around, src: &[u8]) -> ResultTypes {
     }
 }
 
-/// The `T` of a written `Future<Output = T>` (`impl`, `dyn`, or behind `Pin` and `Box`), with
-/// how many levels below `ty` it is.
 fn future_output<'t>(ty: Node<'t>, src: &[u8]) -> Option<(Node<'t>, usize)> {
     let mut at = ty;
     for depth in 0..PATH_DEPTH {
@@ -1663,12 +1491,6 @@ fn future_output<'t>(ty: Node<'t>, src: &[u8]) -> Option<(Node<'t>, usize)> {
     None
 }
 
-/// The path of the item a written type names: `&T` and `&mut T` name `T`; `dyn Trait`, `impl
-/// Trait` and a type parameter bounded by one trait name that trait, so a call on it stops at
-/// the trait's method. `None` for a type that names no single item: a tuple, a slice, a
-/// function, a parameter bounded by several traits or by none. With `generic` false a type
-/// parameter names nothing (a function's result: it is whatever its caller passes). `place` is
-/// where `ty` is.
 fn written(ty: Node, mut place: Around, src: &[u8], generic: bool) -> Option<Vec<String>> {
     let mut at = ty;
     for _ in 0..PATH_DEPTH {
@@ -1679,7 +1501,6 @@ fn written(ty: Node, mut place: Around, src: &[u8], generic: bool) -> Option<Vec
                 continue;
             }
             "dynamic_type" | "abstract_type" | "bounded_type" => only_bound(&[at], src),
-            // `(dyn A + Send)`: a parenthesized type is a tuple of one.
             "tuple_type" if at.child_count() == 3 && at.named_child_count() == 1 => {
                 at = at.named_child(0)?;
                 place = place.down(1);
@@ -1692,7 +1513,6 @@ fn written(ty: Node, mut place: Around, src: &[u8], generic: bool) -> Option<Vec
             "primitive_type" => Some(vec![text(at, src).to_string()]),
             "scoped_type_identifier" | "generic_type" => {
                 let path = segments(at, src)?;
-                // `T::Item`: a member of a type parameter names nothing here.
                 match parameter(place, &path[0], src) {
                     Some(_) => None,
                     None => Some(path),
@@ -1704,16 +1524,11 @@ fn written(ty: Node, mut place: Around, src: &[u8], generic: bool) -> Option<Vec
     None
 }
 
-/// The path of the one trait among `bounds` (a `+` list is a `bounded_type`), ignoring
-/// lifetimes, `?Sized` and the marker traits `Send`, `Sync`, `Unpin` and `Sized`, which add no
-/// method; `None` for none or several.
 fn only_bound(bounds: &[Node], src: &[u8]) -> Option<Vec<String>> {
     segments(bound_node(bounds, src)?, src)
 }
 
-/// The node of the one trait among `bounds`, as `only_bound` reads it.
 fn bound_node<'t>(bounds: &[Node<'t>], src: &[u8]) -> Option<Node<'t>> {
-    // `A + B + 'c` nests: `(A + B) + 'c`.
     let mut found = Vec::new();
     let mut pending: Vec<Node<'t>> = bounds.to_vec();
     while let Some(bound) = pending.pop() {
@@ -1722,7 +1537,6 @@ fn bound_node<'t>(bounds: &[Node<'t>], src: &[u8]) -> Option<Node<'t>> {
         }
         match bound.kind() {
             "bounded_type" => pending.extend(named(bound)),
-            // The first bound of `impl A + B` and `dyn A + B` is the type's own `trait`.
             "dynamic_type" | "abstract_type" => pending.extend(field(bound, "trait")),
             _ => found.push(bound),
         }
@@ -1749,9 +1563,6 @@ fn bound_node<'t>(bounds: &[Node<'t>], src: &[u8]) -> Option<Node<'t>> {
     }
 }
 
-/// The type parameter `name` as the items around the type at `place` declare it: `Some` of the
-/// one trait it is bounded by (in `<T: Trait>` or a `where` clause), or of `None` when it has no
-/// single bound; `None` when no item around declares it, so the name is a type.
 fn parameter(place: Around, name: &str, src: &[u8]) -> Option<Option<Vec<String>>> {
     let mut up = place.items;
     // ponytail: blocks nest deeper than items; past the limit the name is taken as a type
@@ -1786,8 +1597,6 @@ fn parameter(place: Around, name: &str, src: &[u8]) -> Option<Option<Vec<String>
     (place.depth >= PATH_DEPTH).then_some(None)
 }
 
-/// The names a pattern binds, `BINDING_DEPTH` levels deep: not the type a struct or tuple
-/// struct pattern names, nor a match arm's guard.
 fn bind(pattern: Node, depth: usize, out: &mut Vec<String>, src: &[u8]) {
     if depth >= BINDING_DEPTH {
         return;
@@ -1810,15 +1619,11 @@ fn bind(pattern: Node, depth: usize, out: &mut Vec<String>, src: &[u8]) {
     }
 }
 
-/// A name a `use` tree binds, with the path it names; no name for a glob of the path.
 struct Leaf {
     segments: Vec<String>,
     name: Option<String>,
 }
 
-/// The leaves of a `use` tree below the path `prefix`, `BINDING_DEPTH` levels deep and `room`
-/// of them in all (`use a::{b, c as d, e::*}` has three). `use serde;` names nothing a path
-/// could not reach already, and `as _` binds no name.
 fn leaves(
     node: Node,
     prefix: &mut Vec<String>,
@@ -1849,7 +1654,6 @@ fn leaves(
                 });
             }
         }
-        // `use a::b::{self}` binds `b`.
         "self" => {
             if let Some(name) = prefix.last().cloned() {
                 let segments = prefix.clone();
@@ -1907,8 +1711,6 @@ fn leaves(
     }
 }
 
-/// The segments of a path (`crate::a::f`, `Vec::<u8>::new`), or `None` for a form that names
-/// no item by its segments (`<T as Trait>::f`, `::f`, a path longer than `PATH_DEPTH`).
 fn segments(node: Node, src: &[u8]) -> Option<Vec<String>> {
     let mut out = Vec::new();
     let mut at = node;
@@ -1933,9 +1735,6 @@ fn segments(node: Node, src: &[u8]) -> Option<Vec<String>> {
     Some(out)
 }
 
-/// The path an `impl` block's type or trait is written as (`Store`, `super::Store`, `&Store`,
-/// `Store<T>`); `None` for a type that names no item (a tuple, a slice, a function).
-/// References past `PATH_DEPTH` (`& & & Store`) name nothing.
 fn type_path(node: Node, src: &[u8]) -> Option<Vec<String>> {
     let mut at = node;
     for _ in 0..PATH_DEPTH {
@@ -1947,8 +1746,6 @@ fn type_path(node: Node, src: &[u8]) -> Option<Vec<String>> {
     None
 }
 
-/// A method call's callee: the member chain of identifiers (`self.store.save`), any other
-/// receiver its node kind (`(call_expression).amount`).
 fn member(node: Node, src: &[u8]) -> String {
     let mut parts = Vec::new();
     let mut at = node;
@@ -1978,9 +1775,6 @@ fn member(node: Node, src: &[u8]) -> String {
     parts.join(".")
 }
 
-/// The call a method call is made on (`Router::new()` in `Router::new().route(..)`), through
-/// `.await`, parentheses and one `?`, and what it crossed. Two `?` name no type, nor a `?`
-/// before an `.await` (`f()?.await`): what `?` unwraps is awaited, and its output is unknown.
 fn inner_call(function: Node) -> Option<(Node, Through)> {
     if function.kind() != "field_expression" {
         return None;
@@ -2006,8 +1800,6 @@ fn inner_call(function: Node) -> Option<(Node, Through)> {
     None
 }
 
-/// The name a method call on a call chain starts at (`Call::root`): `client` for
-/// `client.get(u).send()` and `client.get(u)?.send()`, `None` for a call on anything else.
 fn chain_root(function: Node, src: &[u8]) -> Option<String> {
     if function.kind() != "field_expression" {
         return None;
@@ -2039,12 +1831,6 @@ fn chain_root(function: Node, src: &[u8]) -> Option<String> {
     (!root.starts_with('(')).then_some(root)
 }
 
-/// A path as a callee-like name the shared resolution reads (`crate.a.f`, `super.f`,
-/// `Self.f`, `mod.inner.f`), with the imports it needs (`crate`, `super`, `mod` for the file
-/// itself, an outside crate). `self::` and `super::` within the file are read from the file's
-/// top (`mod.<module>.<rest>`), so no name between hides them; `None` where they are read in a
-/// module inside a function, whose place in the file no path names. A `use` path (`module`)
-/// may be the module itself (`super`, `self`).
 fn normalize(path: &Path, scan: &Scan, heads: &mut Heads, module: bool) -> Option<String> {
     let segments = &path.segments;
     let head = segments.first()?.as_str();
@@ -2068,7 +1854,6 @@ fn normalize(path: &Path, scan: &Scan, heads: &mut Heads, module: bool) -> Optio
             }
             let module: Vec<&str> = path.module.split('.').filter(|m| !m.is_empty()).collect();
             if ups > module.len() {
-                // Out of the file: the module that declares it, and so on up.
                 let up = ups - module.len();
                 let local = vec!["super"; up].join(".");
                 heads
@@ -2091,7 +1876,6 @@ fn normalize(path: &Path, scan: &Scan, heads: &mut Heads, module: bool) -> Optio
         }
         _ => {
             if !scan.defines(path, head) {
-                // Neither the module nor a `use` binds it: a crate outside the repository.
                 heads.externs.insert(head.to_string());
             }
             Some(segments.join("."))
@@ -2110,12 +1894,8 @@ mod tests {
         parse(src.as_bytes(), "").unwrap()
     }
 
-    /// How many empty blocks the timing tests put side by side, and how many they nest.
     const DEPTH: usize = 2000;
 
-    /// Times `run` on two files of the same nodes, `fn f() { BODY }`: one with `body` after
-    /// `DEPTH` empty blocks side by side, one with `body` inside `DEPTH` nested blocks. It must
-    /// take less than four times as long deep as at the top.
     pub(super) fn same_time_at_any_depth(
         body: &str,
         run: impl Fn(&str, &tree_sitter::Tree) -> Duration,
@@ -2134,9 +1914,6 @@ mod tests {
             assert!(!tree.root_node().has_error());
             (src, tree)
         });
-        // A parent or sibling lookup walks down from the root of the tree, so it costs the depth
-        // of the node; each node must cost the same anywhere. The least of interleaved runs
-        // keeps the machine's speed and load out of the ratio.
         let (mut at_top, mut at_depth) = (Duration::MAX, Duration::MAX);
         for _ in 0..5 {
             at_top = at_top.min(run(&top.0, &top.1));
@@ -2165,8 +1942,6 @@ mod tests {
         assert!(!read(values::VALUE_DEPTH));
     }
 
-    /// The first argument of each call to `g` in `src`: a string as its text (`<x>` for a name in
-    /// it, `{}` for a hole), a name as `@x`, anything else as `?`.
     fn read(src: &str) -> Vec<String> {
         use crate::lang::{Part, Value};
         let show = |value: &Value| match value {
@@ -2207,8 +1982,6 @@ mod tests {
 
     #[test]
     fn a_string_something_else_may_change_is_not_a_builder() {
-        // A loop, a branch, a `&mut`, a macro that writes, another binding of the name, a
-        // method that changes it, and a closure that shadows it.
         for body in [
             "for p in ps { u.push_str(p); }",
             "if c { u.push_str(\"/b\"); }",
@@ -2223,7 +1996,6 @@ mod tests {
             let src = format!("fn f() {{ let mut u = String::from(\"/a\"); {body} g(&u); }}");
             assert_eq!(read(&src), ["@u"], "{body}");
         }
-        // Two in one scope under one name: neither is told apart.
         let twice = "fn f(c: bool) { if c { let mut u = String::from(\"/a\"); g(&u); } \
                      else { let mut u = String::from(\"/b\"); g(&u); } }";
         assert_eq!(read(twice), ["@u", "@u"]);
@@ -2233,18 +2005,15 @@ mod tests {
     fn a_string_that_doubles_or_chains_is_read_up_to_its_limits() {
         let doubling = (0..40).map(|_| "u.push_str(&u);").collect::<String>();
         let src = format!("fn f() {{ let mut u = String::from(\"a\"); {doubling} g(&u); }}");
-        // Past the size limit what it holds is holes, not the text.
         let found = read(&src);
         assert!(
             found[0].starts_with("{}") && !found[0].contains('a'),
             "{found:?}"
         );
-        // Each String pushes the one before it: past the depth limit the chain is a hole.
         let chain = |n: usize| {
             let mut src = String::from("fn f() { let mut s0 = String::from(\"a\");\n");
             for i in 1..=n {
                 let before = i - 1;
-                // A `+=` is no call, so no earlier read has folded the String it adds.
                 src += &format!("let mut s{i} = String::new(); s{i} += &s{before};\n");
             }
             src + &format!("g(&s{n}); }}")
@@ -2255,8 +2024,6 @@ mod tests {
 
     #[test]
     fn a_push_the_configuration_leaves_out_is_not_in_the_string() {
-        // The default configuration of a fixed Linux target: `windows` is false, `unix` true, a
-        // comment between the attribute and the statement changes nothing.
         let src = "fn f() {\n let mut u = String::from(\"/a\");\n\
                    #[cfg(windows)]\n // not here\n u.push_str(\"/w\");\n\
                    #[cfg(feature = \"x\")]\n u.push_str(\"/x\");\n\
@@ -2273,9 +2040,6 @@ mod tests {
 
     #[test]
     fn many_reads_of_a_long_builder_are_charged_to_the_work_budget() {
-        // 400 pushes of 8 bytes: a read copies about 3600 units, so the 4M budget lasts about a
-        // thousand of the 5000 reads, and the rest are holes. Walking every push for each read
-        // would be 2M steps; a prefix is folded once.
         let mut src = String::from("fn f() {\n let mut u = String::from(\"a\");\n");
         for _ in 0..400 {
             src += " u.push_str(\"abcdefgh\");\n";
@@ -2304,7 +2068,6 @@ mod tests {
             ["a".repeat(args)]
         );
         assert_eq!(read(&format!("fn f() {{ g({}); }}", many(args + 1))), ["?"]);
-        // Captures of a builder: each copies its text, and the output is bounded.
         let captures = "{u}".repeat(values::FORMAT_PLACEHOLDERS + 1);
         let src =
             format!("fn f() {{ let mut u = String::from(\"a\"); g(format!(\"{captures}\")); }}");
@@ -2315,7 +2078,6 @@ mod tests {
             "{u}".repeat(60)
         );
         assert_eq!(read(&src), ["?"]);
-        // Named arguments are looked up by name, however many.
         let keyed: Vec<String> = (0..args).map(|i| format!("k{i} = \"v\"")).collect();
         let template = (0..args).map(|i| format!("{{k{i}}}")).collect::<String>();
         let src = format!(
@@ -2356,7 +2118,6 @@ mod tests {
             ("format!(\"/{}\", \"a\",)", "/a"),
             ("std::format!(\"/{}\", \"a\")", "/a"),
             ("concat!(\"/a\", \"/b\", 7, y)", "/a/b7{}"),
-            // Not a format string, a count that does not match, or a macro of the file.
             ("format!(\"/{}\")", "?"),
             ("format!(\"/{}/{}\", a)", "?"),
             ("format!(\"/{.*}\", 1, 2)", "?"),
@@ -2401,7 +2162,6 @@ mod tests {
         assert_eq!(name("use reqwest::Method;", "Method::PUT"), ["PUT"]);
         assert_eq!(name("use http::Method;", "Method::PUT"), ["PUT"]);
         assert_eq!(name("", "reqwest::Method::DELETE"), ["DELETE"]);
-        // The file's own `Method`, another crate's, and a name that is no verb.
         for (head, call) in [
             ("enum Method { PUT }", "Method::PUT"),
             ("use mine::Method;", "Method::PUT"),
@@ -2461,7 +2221,6 @@ mod tests {
             .map(|(l, s)| (l.to_string(), s.to_string()))
             .collect();
         assert_eq!(imports, pairs);
-        // A crate no item of the file names is left to the resolver, after the file's imports.
         assert_eq!(facts(src).externs, ["Vec"]);
     }
 
@@ -2480,7 +2239,6 @@ mod tests {
             ("src/main.rs", &main),
             ("src/m.rs", &other),
         ]);
-        // `src/lib.rs` is a library root and `src/m.rs` a module: neither starts a program.
         let configs: [(&str, &[u8]); 1] = [("Cargo.toml", b"[package]\nname = \"p\"\n")];
         let found = Rust.layout(&configs, &files).unwrap().programs;
         assert_eq!(found, [("src/main.rs".to_string(), "main".to_string())]);
@@ -2526,13 +2284,11 @@ mod tests {
         assert!(file.unbuilt && file.defs.is_empty());
         let file = facts("// note\n#![cfg(unix)]\nfn a() {}\n");
         assert!(!file.unbuilt && file.defs.len() == 1);
-        // A file is a module: one a test build compiles stays.
         let file = facts("#![cfg(any(test, feature = \"p\"))]\nfn a() {}\n");
         assert!(!file.unbuilt);
         let src = "mod m {\n#![cfg(windows)]\nfn a() {}\n}\nmod n {\n#![cfg(unix)]\nfn b() {}\n}\n";
         let names: Vec<String> = facts(src).defs.into_iter().map(|d| d.name).collect();
         assert_eq!(names, ["n", "n.b"]);
-        // The outer and the inner cfg are judged in the same build: no build compiles both.
         let src = "#[cfg(any(test, feature = \"p\"))]\nmod m {\n#![cfg(not(test))]\nfn a() {}\n}\n";
         assert!(facts(src).defs.is_empty());
         let src = "#[cfg(any(test, unix))]\nmod m {\n#![cfg(not(test))]\nfn a() {}\n}\n";
@@ -2550,8 +2306,6 @@ mod tests {
         let start = std::time::Instant::now();
         let facts = facts(&src);
         assert_eq!(facts.defs.len(), 30_000);
-        // Quadratic sibling lookups took minutes here.
-        // 3.7 s measured in a local debug build; the bound is over twenty times that.
         assert!(start.elapsed().as_secs() < 90, "{:?}", start.elapsed());
     }
 
@@ -2578,7 +2332,6 @@ mod tests {
     fn a_feature_with_a_control_character_is_no_setting() {
         let manifest = "[package]\nname = \"p\"\n[features]\ndefault = [\"a\", \"b\\nc\"]\na = []\n\"b\\nc\" = []\n";
         let configs: [(&str, &[u8]); 1] = [("Cargo.toml", manifest.as_bytes())];
-        // A line break would end the setting's first line (`lang::setting`).
         assert_eq!(Rust.settings(&configs)("src/lib.rs"), "a,default");
     }
 
@@ -2638,8 +2391,6 @@ mod tests {
         assert_eq!(callees(&src)[0].0, "(scoped_identifier)");
     }
 
-    /// The imports as `local = path`, a glob as `local * path` (`^` marks one inside the module
-    /// it globs), anything else as `local source`.
     fn bindings(src: &str) -> Vec<String> {
         let imports = facts(src).imports.into_iter();
         imports
@@ -2675,8 +2426,6 @@ mod tests {
             "super super",
         ];
         assert_eq!(bindings(src), expected);
-        // `as _` and a bare crate bind nothing; the first segment of a path is a crate outside
-        // the file when nothing binds it.
         assert_eq!(facts(src).externs, ["a"]);
     }
 
@@ -2690,18 +2439,14 @@ mod tests {
 
     #[test]
     fn a_use_does_not_import_the_crate_its_own_path_begins_with() {
-        // `use tokio::{self}` and `use foo::foo` bind the name their path begins with, which
-        // is still a crate outside the file.
         let src = "use tokio::{self, select};\nuse foo::foo;\nfn f() { tokio::spawn(); }\n";
         assert_eq!(facts(src).externs, ["foo", "tokio"]);
-        // Another `use` of the name does bind it.
         let src = "use a::tokio;\nuse tokio::{self};\n";
         assert_eq!(facts(src).externs, ["a"]);
     }
 
     #[test]
     fn a_function_does_not_hide_the_crate_its_path_begins_with() {
-        // `rocket::build()` names the crate in a file that has a `fn rocket`; `rocket()` does not.
         let src = "fn rocket() { rocket::build(); }\n";
         assert_eq!(facts(src).externs, ["rocket"]);
         let src = "fn rocket() {}\nfn f() { rocket(); }\n";
@@ -2717,7 +2462,6 @@ mod tests {
         assert_eq!(decorating.count(), ROUTES_PER_FUNCTION);
     }
 
-    /// The value the second argument of the `mount` call of `src` holds.
     fn mounted(src: &str) -> Value {
         let calls = facts(src).calls;
         let call = calls.into_iter().find(|c| c.callee.ends_with("mount"));
@@ -2805,7 +2549,6 @@ mod tests {
         assert!(facts(&format!("use {nested};\n")).imports.is_empty());
     }
 
-    /// The receivers as `scope name = class`, sorted.
     fn receivers(src: &str) -> Vec<String> {
         let mut found: Vec<String> = (facts(src).receivers.into_iter())
             .map(|r| {
@@ -2870,8 +2613,6 @@ mod tests {
                    fn j(x: impl P + Send + 'static) {}\n\
                    fn k<T: P>(x: T) -> T { x }\n\
                    fn l(x: &[u8]) { let x: Y = make(); let z: Z = make(); }\n";
-        // Several bounds, none and a member of a parameter name no type; marker traits and
-        // lifetimes are no bound; a `let` of a parameter's name is a local, not a receiver.
         let expected = [
             "W inner = P",
             "W.g self = Self",
@@ -2900,16 +2641,11 @@ mod tests {
             "struct T;\nfn f<T: P>() {{ {blocks} let x: T = y(); {} }}\n",
             "}".repeat(PATH_DEPTH + 8)
         );
-        // The walk gives up before it finds the declaration: `T` is no type, so no receiver.
         assert!(receivers(&src).is_empty());
     }
 
     #[test]
     fn a_parameter_is_declared_for_the_types_up_to_the_limit_below_it() {
-        // Each nested block is two nodes (an expression statement and a block). The type of a
-        // `let` in `k` of them is `3 + 2k` levels below the function that declares `T`, one more
-        // behind a `&`; the type of a nested function's parameter or a nested struct's field is
-        // `5 + 2k`, and one more.
         let found = |head: &str, inner: &str, k: usize| {
             let (open, close) = ("{ ".repeat(k), "}".repeat(k));
             receivers(&format!("{head} {{ {open}{inner}{close} }}\n"))
@@ -2927,14 +2663,11 @@ mod tests {
             assert_eq!(found("fn f<T: P>()", inner, last), class, "{inner}");
             assert!(found("fn f<T: P>()", inner, last + 1).is_empty(), "{inner}");
         }
-        // A name nothing declares is a type, until the type is `PATH_DEPTH` levels below the
-        // root of the tree: there the walk gives up and the name is no type.
         for (inner, depth) in [("let x: U = y();", 4), ("let x: &U = y();", 5)] {
             let last = (PATH_DEPTH - 1 - depth) / 2;
             assert_eq!(found("fn f()", inner, last), ["f x = U"], "{inner}");
             assert!(found("fn f()", inner, last + 1).is_empty(), "{inner}");
         }
-        // So is the result of a nested function.
         let result = |k: usize| {
             let (open, close) = ("{ ".repeat(k), "}".repeat(k));
             let src = format!("fn f() {{ {open}fn g() -> U {{ y() }}{close} }}\n");
@@ -2966,8 +2699,6 @@ mod tests {
 
     #[test]
     fn a_type_parameter_is_read_in_the_same_time_at_any_depth() {
-        // Looking for the declaration of the `T` of each `let`, the walk went up the tree, a
-        // lookup per level, up to `PATH_DEPTH` of them.
         same_time_at_any_depth(&"let x: T = y();\n".repeat(50), |src, _| {
             let start = Instant::now();
             facts(src);
@@ -2977,7 +2708,6 @@ mod tests {
 
     #[test]
     fn the_route_attributes_of_a_function_are_read_in_the_same_time_at_any_depth() {
-        // Reading the attributes before each function, the walk looked up a sibling per attribute.
         let functions =
             (0..300).map(|i| format!("#[get(\"/a\")] #[post(\"/b\")] fn h{i}() {{}}\n"));
         same_time_at_any_depth(&functions.collect::<String>(), |src, _| {

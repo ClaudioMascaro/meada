@@ -1,13 +1,3 @@
-//! Build constraints, evaluated for one fixed target so that the index never depends on the
-//! machine: `linux/amd64`, the `gc` compiler, every `go1.N` release and no cgo. A file is left
-//! out when its name, up to its first dot, ends in another system or architecture (`_windows.go`,
-//! `_arm64.go`), when it starts with `_` or `.`, or when its `//go:build` line is false. Any other tag (`cgo`, a custom
-//! tag such as `integration`) is false, and a file that imports `"C"` is left out too (the pack
-//! sees its imports). A package directory `./...` does not list (`listed`) is built only when a
-//! built package imports it, which the whole repository tells (`Go::layout`).
-
-/// How deeply a `//go:build` expression may nest (`!`, parentheses); a deeper one is not read,
-/// and the file is left out.
 // ponytail: real constraints nest two or three levels; the limit keeps a crafted line of
 // thousands of parentheses from overflowing the stack.
 pub const CONSTRAINT_DEPTH: usize = 64;
@@ -15,7 +5,6 @@ pub const CONSTRAINT_DEPTH: usize = 64;
 const OS: &str = "linux";
 const ARCH: &str = "amd64";
 
-/// The systems and architectures a file name suffix may name.
 const SYSTEMS: &[&str] = &[
     "aix",
     "android",
@@ -63,7 +52,6 @@ const ARCHITECTURES: &[&str] = &[
     "wasm",
 ];
 
-/// Whether the target builds the file at `path` holding `src`.
 pub fn builds(path: &str, src: &[u8]) -> bool {
     named(path)
         && match header(src) {
@@ -73,32 +61,22 @@ pub fn builds(path: &str, src: &[u8]) -> bool {
         }
 }
 
-/// Whether the pattern `./...` of a module lists the package directory `below` its root, as
-/// `go help packages` says: no directory on the way is named `testdata` or begins with `_` or `.`
-/// (`mytestdata` and a file `testdata.go` are listed).
 pub fn listed(below: &str) -> bool {
     !(below.split('/')).any(|d| d == "testdata" || d.starts_with(['_', '.']))
 }
 
-/// The `//go:build` line of a file's header.
 enum Header<'s> {
     None,
     One(&'s str),
-    /// Two lines, or one that is not UTF-8: the Go tools reject the file.
     Unreadable,
 }
 
-/// Whether the file name lets the target build it.
 fn named(path: &str) -> bool {
     let file = path.rsplit('/').next().unwrap_or(path);
     if file.starts_with('_') || file.starts_with('.') {
         return false;
     }
-    // As the Go tools do (`go/build`'s `goodOSArchFile`), the suffix is read off the name cut at
-    // its first dot: `disk.gen_windows.go` is `disk`, with no suffix, and `disk_windows.gen.go`
-    // is `disk_windows`.
     let stem = file.split('.').next().unwrap_or(file);
-    // What precedes the first `_` is the name itself.
     let Some((_, tail)) = stem.split_once('_') else {
         return true;
     };
@@ -117,9 +95,6 @@ fn named(path: &str) -> bool {
     }
 }
 
-/// The `//go:build` line of the file's header, read as the Go tools read it: the lines before
-/// the first that holds code (blank lines, `//` comments, `/* */` comments), a directive inside a
-/// block comment not counting.
 fn header(src: &[u8]) -> Header<'_> {
     let mut found = Header::None;
     let mut in_block = false;
@@ -154,14 +129,12 @@ fn header(src: &[u8]) -> Header<'_> {
     found
 }
 
-/// The expression of a `//go:build` line.
 fn directive(line: &[u8]) -> Option<&[u8]> {
     let expression = line.strip_prefix(b"//go:build")?;
     (expression.is_empty() || expression.starts_with(b" ") || expression.starts_with(b"\t"))
         .then_some(expression)
 }
 
-/// Whether a constraint expression holds for the target. One that cannot be read does not.
 fn holds(expression: &str) -> bool {
     let tokens = tokens(expression);
     let mut at = 0;
@@ -253,12 +226,9 @@ mod tests {
             ("store/disk_linux_arm64.go", false),
             ("store/disk_android.go", false),
             ("store/disk_windows_test.go", false),
-            // The name before the first `_` is no suffix.
             ("store/windows.go", true),
             ("store/_draft.go", false),
             ("store/.hidden.go", false),
-            // The Go tools cut the name at its first dot before they read the suffix (#876):
-            // what follows the dot names no system, and a suffix before it does.
             ("store/disk.gen_windows.go", true),
             ("store/disk.x_arm64.go", true),
             ("store/a_b.c_windows.go", true),
@@ -287,7 +257,6 @@ mod tests {
             ("darwin || windows", false),
             ("!linux", false),
             ("go1.x", false),
-            // A line that cannot be read holds for nothing.
             ("linux &&", false),
             ("(linux", false),
             ("linux)", false),
@@ -308,19 +277,15 @@ mod tests {
         ));
         assert!(built("//go:build linux\n\npackage x\n"));
         assert!(built("package x\n"));
-        // Right above the package clause, it still counts.
         assert!(!built("//go:build ignore\npackage x\n"));
-        // After a block comment it counts; inside one it does not.
         assert!(!built("/* License */\n//go:build windows\npackage x\n"));
         assert!(!built(
             "/*\n * License\n */\n\n//go:build windows\n\npackage x\n"
         ));
         assert!(built("/*\n//go:build windows\n*/\npackage x\n"));
         assert!(!built("/* a */ /* b */\n//go:build ignore\npackage x\n"));
-        // After the package clause, it is any comment.
         assert!(built("package x\n\n//go:build ignore\n\n"));
         assert!(built("package x /* a */\n//go:build ignore\n"));
-        // Two lines: the Go tools reject the file.
         assert!(!built("//go:build linux\n//go:build amd64\n\npackage x\n"));
         assert!(built("//go:buildx windows\npackage x\n"));
     }

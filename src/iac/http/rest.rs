@@ -1,9 +1,6 @@
-//! REST API paths join only through the declared API/resource/public-method identity.
-
 use super::*;
 
 impl<'m> Eval<'m> {
-    /// These method attributes repeat declarations, never provider-returned contents.
     fn declared_attribute(
         &mut self,
         input: &Input<'m>,

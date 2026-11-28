@@ -345,3 +345,18 @@ curl --cacert proposals-ca.crt -i https://localhost:8445/ -H 'Content-Type: appl
 
 Sin token, la segunda llamada responde 401 con un `WWW-Authenticate` que apunta a la metadata (la primera, también sin token, responde un `resource` igual a `public_url`). Con un token cuyo `aud` es `[proposals] audience`, la misma llamada lista `catalog`, `workspaces`, `show` y `propose`; un token de nodo o de la consola se rechaza con 401. Para terminar, `compose_proposals down`.
 
+## Interfaz
+
+Los perfiles componen los servicios y sus volúmenes. La actualización obtiene los repositorios, los indexa y, si se habilita la publicación, sube la generación. `[refresh.sh:PUBLISH]` `[compose.yaml:services]`
+
+## Invariantes
+
+El ciclo exige un intervalo positivo y mantiene el bloqueo de snapshot durante la actualización. `[index-loop.sh:REFRESH_SECONDS]` `[index-loop.sh:stop]`
+
+## Efectos secundarios
+
+La actualización ejecuta Git y Meada, escribe índices en el volumen y puede publicar en el almacenamiento de snapshots. `[fetch.sh:git]` `[managed-refresh.sh:publish]`
+
+## Verificación
+
+Desde la raíz del repositorio, ejecuta `scripts/compose-check`.

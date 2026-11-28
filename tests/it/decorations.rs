@@ -1,15 +1,9 @@
-//! A call that decorates a definition (an annotation, an attribute, a decorator) carries the
-//! definition in the export's call site and shows apart in `context`; an ordinary call carries
-//! nothing.
-
 use crate::common::fixture_repo;
 use meada::engine::Engine;
 use serde_json::Value;
 
 const REPO: &str = "example.com/acme/decorations";
 
-/// Every call site of the fixture: its id (relative to the repository) and the definition it
-/// decorates, relative too.
 fn decorations(case: &str) -> (Engine, Vec<(String, Option<String>)>) {
     let repo = fixture_repo(
         case,
@@ -76,7 +70,6 @@ fn context_shows_annotations_apart_from_callees() {
     let text = engine
         .context("java/UseTest.java::example.UseTest", None)
         .unwrap();
-    // The source span above `callers:` quotes the annotations.
     let relations = text.split_once("callers:").expect(&text).1;
     let (callees, annotations) = relations.split_once("annotations:").expect(&text);
     assert!(

@@ -1,7 +1,3 @@
-//! Channels in `search`, `context` and `trace` (spec #20): a channel is found by name, its
-//! producers and consumers are listed across the workspace, and a side whose name Meada cannot
-//! evaluate shows as unresolved and is never linked.
-
 use crate::common;
 
 use std::path::PathBuf;
@@ -9,8 +5,6 @@ use std::path::PathBuf;
 use common::{assert_golden, fixture_repo, without_processes};
 use meada::engine::{Direction, Engine, Start};
 
-/// The channels fixture as siblings in one case directory; returns `api`, whose workspace
-/// holds all three.
 fn workspace(case: &str) -> PathBuf {
     for name in ["worker", "billing"] {
         let origin = format!("https://example.com/channels/{name}.git");
@@ -35,10 +29,8 @@ fn search_finds_a_channel_by_name_or_broker_kind() {
         .search("orders.created", Some("channel"), None)
         .unwrap();
     assert_golden("channels.search-channel.txt", &by_name);
-    // The broker kind matches too, and brings the unresolved sides, which have only that.
     let by_broker = engine.search("kafka", Some("channel"), None).unwrap();
     assert_golden("channels.search-channel-broker.txt", &by_broker);
-    // Symbols are not channels.
     let none = engine.search("createOrder", Some("channel"), None).unwrap();
     assert_eq!(none, "no matches for `createOrder`\n");
 }
@@ -63,7 +55,6 @@ fn context_on_an_unresolved_channel_lists_the_sides_with_no_name() {
 
     let answer = engine.context("channel::kafka", None).unwrap();
     assert_golden("channels.context-unresolved.txt", &answer);
-    // As `search` prints it.
     let printed = engine.context("channel::kafka (unresolved)", None).unwrap();
     assert_eq!(printed, answer);
 }
@@ -77,7 +68,6 @@ fn context_on_a_symbol_names_the_channels_it_produces_to_and_consumes() {
         ("src/dynamic.ts::replay", "producer-unresolved"),
         ("src/consumer.ts::handleOrder", "handler"),
         ("src/pattern.ts::seen", "handler-unresolved"),
-        // Publishes to an exchange, each with the queues the bindings route it to.
         ("src/amqp.ts::announce", "publisher"),
     ] {
         let answer = engine.context(symbol, None).unwrap();
@@ -89,7 +79,6 @@ fn context_on_a_symbol_names_the_channels_it_produces_to_and_consumes() {
 fn unresolved_channel_sides_are_never_open_items() {
     let engine = channels("channel_not_an_item");
 
-    // `search kind=unresolved` lists open items; channel sides are not decidable in v1.
     for query in ["send", "replay", "announce", "seen", "kafka"] {
         let answer = engine.search(query, Some("unresolved"), None).unwrap();
         assert_eq!(answer, format!("no matches for `{query}`\n"));
@@ -125,22 +114,16 @@ fn the_export_keeps_the_unresolved_sides_and_links_none_of_them() {
 fn context_on_a_queue_lists_the_bindings_that_reach_it() {
     let engine = channels("channel_bindings");
 
-    // The binding is declared in the worker, the publish it routes to the queue is in the
-    // api, with the binding as its reason.
     let bound = engine.context("channel::amqp::audit", None).unwrap();
     assert_golden("channels.context-queue-bound.txt", &bound);
-    // A queue and a topic that share a name stay apart.
     let queue = engine.context("channel::amqp::orders", None).unwrap();
     assert_golden("channels.context-queue.txt", &queue);
     let topic = engine.context("channel::kafka::orders", None).unwrap();
     assert_golden("channels.context-topic-same-name.txt", &topic);
-    // A queue named like the exchange: only its own consumer, no publish to the exchange.
     let lookalike = engine.context("channel::amqp::events", None).unwrap();
     assert_golden("channels.context-queue-lookalike.txt", &lookalike);
 }
 
-/// A query reuses the connection opened for each peer (#443): it neither reopens the peer's
-/// index nor rebuilds a file removed under it, so the refresh and the answer read the same file.
 #[test]
 fn a_query_reuses_the_connection_held_for_each_peer() {
     let api = workspace("channel_held_peers");

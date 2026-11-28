@@ -1,18 +1,11 @@
-//! A declared type with no set at its top level leaves the value as an untyped variable keeps it,
-//! from every source (#720): only a top-level `set(...)` converts. A list of objects, maps or
-//! lists named by `for_each` gives its keys, as Terraform does.
-
 use super::*;
 
-/// The exact names of the instances in `list`, each without its `[var ...]` suffix.
 fn exact(list: &[(&str, &str)]) -> Vec<String> {
     (names(list).into_iter())
         .map(|n| n.split(" [").next().unwrap().to_string())
         .collect()
 }
 
-/// A list of two collections keyed by their first element: its type, its HCL value, its JSON
-/// value and the key expression of one element `q`.
 type Case<'a> = (&'a str, &'a str, serde_json::Value, &'a str);
 
 fn cases<'a>() -> [(&'a str, Case<'a>); 4] {
@@ -59,7 +52,6 @@ fn resource(key: &str) -> String {
     )
 }
 
-/// A source: its label, its files and the prefix of its instances' addresses.
 type Source<'a> = (&'a str, Vec<(&'a str, &'a str)>, String);
 
 const WANT: [&str; 2] = ["a.obj[\"a\"] = \"obj-a\"", "a.obj[\"b\"] = \"obj-b\""];
@@ -130,8 +122,6 @@ fn a_declared_list_of_collections_gives_its_keys_from_every_source() {
     }
 }
 
-/// Every declared type with no set at its top level (a list, a tuple, a map, an object, each of a
-/// scalar, an object, a map or a list) names what an untyped variable of the same value names.
 #[test]
 fn a_type_without_a_top_level_set_names_what_an_untyped_variable_names() {
     let shapes: [(&str, &str, &str); 16] = [
@@ -214,7 +204,6 @@ fn a_type_without_a_top_level_set_names_what_an_untyped_variable_names() {
             got.iter().any(|n| n.contains(" = \"q-")),
             "{label}: {got:?}"
         );
-        // The same value given by a var file.
         let declared = format!("variable \"x\" {{\n  type = {ty}\n}}\n{read}");
         let bare = format!("variable \"x\" {{\n}}\n{read}");
         let vars = format!("x = {value}\n");

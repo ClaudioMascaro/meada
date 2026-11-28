@@ -1,7 +1,3 @@
-//! The data layer (ADR 0016, feature `postgres`): `meada postgres migrate` and the `postgres:`
-//! line of `meada status --workspace`, as child processes. The URL refusals need no service;
-//! the rest run against the local Postgres `MEADA_TEST_POSTGRES_URL` names, each test in a schema
-//! of its own, and print why and skip without it (fail with `MEADA_TEST_SERVICES_REQUIRED=1`).
 #![cfg(feature = "postgres")]
 
 use std::fs;
@@ -13,8 +9,6 @@ use std::time::{Duration, Instant};
 
 use crate::manifest::{MANIFEST, chain_manifest, run};
 
-/// The local Postgres `MEADA_TEST_POSTGRES_URL` names, or `None` with the reason printed;
-/// `MEADA_TEST_SERVICES_REQUIRED=1` turns the missing variable into a failure.
 pub(crate) fn service() -> Option<String> {
     let url = std::env::var("MEADA_TEST_POSTGRES_URL").ok();
     if url.is_none() {
@@ -25,12 +19,10 @@ pub(crate) fn service() -> Option<String> {
     url
 }
 
-/// A schema of this test's own; each test drops it first, in case a previous run left it.
 pub(crate) fn schema(case: &str) -> String {
     format!("meada_t{}_{case}", std::process::id())
 }
 
-/// `<case>/ops/meada.workspace.toml` with `index_dir` and a `[postgres]` section of `lines`.
 pub(crate) fn manifest(case: &str, lines: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(case);
     let _ = fs::remove_dir_all(&dir);
@@ -40,7 +32,6 @@ pub(crate) fn manifest(case: &str, lines: &str) -> PathBuf {
     dir
 }
 
-/// `meada <args>` in `dir` under `lang` with `env` set: stdout, stderr and the exit code.
 pub(crate) fn meada(
     dir: &Path,
     lang: &str,
@@ -64,15 +55,12 @@ pub(crate) const MIGRATE: [&str; 4] = ["postgres", "migrate", "--workspace", MAN
 pub(crate) const STATUS: [&str; 3] = ["status", "--workspace", MANIFEST];
 const EN: &str = "en_US.UTF-8";
 
-/// `meada postgres migrate` with the URL in `MEADA_POSTGRES_URL` and the version capped at
-/// `cap` when given.
 fn migrate(dir: &Path, url: &str, cap: Option<&str>) -> (String, String, i32) {
     let mut env = vec![("MEADA_POSTGRES_URL", url)];
     env.extend(cap.map(|cap| ("MEADA_POSTGRES_VERSION_MAX", cap)));
     meada(dir, EN, &env, &MIGRATE)
 }
 
-/// The `postgres:` line of `meada status --workspace`, as `migrate`.
 fn status_line(dir: &Path, url: &str, cap: Option<&str>) -> String {
     let mut env = vec![("MEADA_POSTGRES_URL", url)];
     env.extend(cap.map(|cap| ("MEADA_POSTGRES_VERSION_MAX", cap)));
@@ -82,7 +70,6 @@ fn status_line(dir: &Path, url: &str, cap: Option<&str>) -> String {
         .to_string()
 }
 
-/// A plain connection to the test's Postgres, for what the tests set up and look at.
 pub(crate) struct Admin {
     client: tokio_postgres::Client,
     runtime: tokio::runtime::Runtime,
@@ -119,7 +106,6 @@ impl Admin {
         done.unwrap_or_else(|e| panic!("{sql}: {e}"));
     }
 
-    /// The first column of every row of `sql`, as text.
     pub(crate) fn texts(&self, sql: &str) -> Vec<String> {
         let rows = self
             .runtime
@@ -133,8 +119,6 @@ impl Admin {
             .collect()
     }
 
-    /// What the schema holds: each table with its columns, and the version row with its `xmin`,
-    /// which any write to it changes.
     fn snapshot(&self, schema: &str) -> Vec<String> {
         let mut held = self.texts(&format!(
             "SELECT table_name || '.' || column_name || ' ' || data_type FROM \
@@ -147,14 +131,11 @@ impl Admin {
     }
 }
 
-/// The key of `schema`'s advisory lock, as the module documents it.
 fn lock_key(schema: &str) -> i64 {
     let hash = blake3::hash(format!("meada postgres migrate {schema}").as_bytes());
     i64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap())
 }
 
-/// Each URL refusal names `url_env` or `url_file` and never the URL, its password or its host,
-/// in `migrate`'s error and in `status`'s line; no connection is attempted.
 #[test]
 fn every_url_refusal_names_its_key_and_no_part_of_the_url() {
     let (password, host) = ("hunter2-327", "db-327.example.internal");
@@ -185,7 +166,6 @@ fn every_url_refusal_names_its_key_and_no_part_of_the_url() {
             }
         }
     }
-    // An unset variable names it; an unreadable file names the key and the file.
     let (_, stderr, code) = meada(&dir, EN, &[], &MIGRATE);
     assert_eq!(code, 1);
     assert_eq!(
@@ -203,7 +183,6 @@ fn every_url_refusal_names_its_key_and_no_part_of_the_url() {
         "{stderr}"
     );
     assert!(stderr.contains("pg-url"), "{stderr}");
-    // A file holding a refused URL names the key alone, with its trailing newline dropped.
     fs::write(
         dir.join("pg-url"),
         format!("{}\n", at("/m?sslmode=disable")),
@@ -218,7 +197,6 @@ fn every_url_refusal_names_its_key_and_no_part_of_the_url() {
     );
 }
 
-/// `migrate` without `[postgres]` names the manifest; `meada index` with it opens no connection.
 #[test]
 fn migrate_needs_the_section_and_index_never_connects() {
     let dir = manifest("postgres_no_section", "");
@@ -251,8 +229,6 @@ fn migrate_needs_the_section_and_index_never_connects() {
     );
 }
 
-/// `migrate` on an empty schema creates it at the binary's version and prints it; a second run
-/// prints it again and changes nothing.
 #[test]
 fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
     let Some(url) = service() else { return };
@@ -260,7 +236,6 @@ fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
     let admin = Admin::new(&url);
     admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
     let dir = manifest("postgres_migrate", &format!("schema = \"{schema}\"\n"));
-    // Every other test's schema is `meada_t*`: nothing else may change.
     let outside = || {
         admin.texts(
             "SELECT table_schema || '.' || table_name FROM information_schema.tables WHERE \
@@ -272,10 +247,6 @@ fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
     assert_eq!((stdout.as_str(), stderr.as_str(), code), ("10\n", "", 0));
     assert_eq!(outside(), before);
     let first = admin.snapshot(&schema);
-    // Migration 2: the audit's table (#328); 3: the directory's (#334); 4: its state (#335);
-    // 5: the permissions set (#331); 6: where a repository came from (#341); 7: the named
-    // workspaces and the context of an exclusion (#342); 8: the identities of a version (#343);
-    // 9: the local accounts (#554); 10: the first permissions set's time (#454).
     let columns = [
         "accounts.change_required boolean",
         "accounts.created timestamp with time zone",
@@ -378,7 +349,6 @@ fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
     let (stdout, stderr, code) = migrate(&dir, &url, None);
     assert_eq!((stdout.as_str(), stderr.as_str(), code), ("10\n", "", 0));
     assert_eq!(admin.snapshot(&schema), first);
-    // A schema the operator created beforehand, empty, is kept and migrated.
     admin.run(&format!(
         "DROP SCHEMA \"{schema}\" CASCADE; CREATE SCHEMA \"{schema}\""
     ));
@@ -387,9 +357,6 @@ fn migrate_creates_the_schema_once_and_a_second_run_changes_nothing() {
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
 
-/// Migration 10 (#454) moves a schema at 9 forward: a permissions set it holds stays readable and
-/// gives the first set's time; a schema without a set gets no time, which the first role check
-/// writes.
 #[test]
 fn migration_10_keeps_a_held_set_and_starts_from_its_time() {
     let Some(url) = service() else { return };
@@ -425,17 +392,12 @@ fn migration_10_keeps_a_held_set_and_starts_from_its_time() {
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
 
-/// Two runs serialize on the schema's advisory lock: one waits while the lock is held, longer
-/// than `statement_timeout_seconds`, and two started together both succeed at the binary's
-/// version.
 #[test]
 fn two_migrations_serialize_on_the_advisory_lock() {
     let Some(url) = service() else { return };
     let schema = schema("lock");
     let admin = Admin::new(&url);
     admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
-    // A three-second statement bound, which the wait on the lock outlasts; shorter, a loaded
-    // machine's migration DDL may outlast it too.
     let lines = format!("schema = \"{schema}\"\nstatement_timeout_seconds = 3\n");
     let dir = manifest("postgres_lock", &lines);
     let spawn = || {
@@ -475,7 +437,6 @@ fn two_migrations_serialize_on_the_advisory_lock() {
     assert_eq!(out.stdout, b"10\n");
 
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
-    // The default statement bound: two migrations' DDL on a loaded machine may outlast a second.
     let lines = format!("schema = \"{schema}\"\n");
     fs::write(
         dir.join(MANIFEST),
@@ -497,9 +458,6 @@ fn two_migrations_serialize_on_the_advisory_lock() {
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
 
-/// With the debug knob: a lower stored version (an absent schema) makes `status` print the
-/// unreachable form naming `meada postgres migrate`, a higher one the form naming both versions,
-/// and `migrate` by a capped binary refuses to lower it, naming both.
 #[test]
 fn a_version_this_binary_does_not_know_is_refused() {
     let Some(url) = service() else { return };
@@ -508,7 +466,6 @@ fn a_version_this_binary_does_not_know_is_refused() {
     admin.run(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"));
     let dir = manifest("postgres_version", &format!("schema = \"{schema}\"\n"));
     let current = crate::common::SCHEMA_VERSION;
-    // Capped at 0, migrate leaves the schema absent: version 0, lower than the binary's.
     let (stdout, _, code) = migrate(&dir, &url, Some("0"));
     assert_eq!((stdout.as_str(), code), ("0\n", 0));
     assert_eq!(
@@ -533,8 +490,6 @@ fn a_version_this_binary_does_not_know_is_refused() {
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
 
-/// `status` prints the reachable form against the local Postgres and the unreachable one against
-/// a closed port, with the exit code it has without `[postgres]`, indexed or not.
 #[test]
 fn status_names_whether_postgres_is_reachable_and_its_exit_code_ignores_it() {
     let dir = chain_manifest("postgres_status");
@@ -579,7 +534,6 @@ fn status_names_whether_postgres_is_reachable_and_its_exit_code_ignores_it() {
         crate::common::SCHEMA_VERSION
     );
     assert!(status.ends_with(&line), "{status}");
-    // A `ca_file` on loopback is never ignored: the plain test server refuses the TLS it asks.
     let roots = "/etc/ssl/certs/ca-certificates.crt";
     if Path::new(roots).is_file() {
         with(&format!("schema = \"{schema}\"\nca_file = \"{roots}\"\n"));
@@ -592,8 +546,6 @@ fn status_names_whether_postgres_is_reachable_and_its_exit_code_ignores_it() {
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
 
-/// A loopback relay to the test's Postgres that the test closes: a Postgres stopped, and
-/// opened again on the same port: the same Postgres back.
 #[cfg(any(
     feature = "refresh-lock",
     all(feature = "directory", feature = "ui"),
@@ -610,7 +562,6 @@ fn status_names_whether_postgres_is_reachable_and_its_exit_code_ignores_it() {
     expect(dead_code)
 )]
 pub(crate) struct Relay {
-    /// The test's URL with the relay's address.
     pub(crate) url: String,
     open: std::sync::Arc<std::sync::atomic::AtomicBool>,
     port: u16,
@@ -663,7 +614,6 @@ impl Relay {
         }
     }
 
-    /// Forwards each connection `listener` accepts to `to` until `flag` is cleared.
     fn serve(
         listener: TcpListener,
         to: String,
@@ -672,7 +622,6 @@ impl Relay {
         use std::sync::atomic::Ordering;
         std::thread::spawn(move || {
             for client in listener.incoming().flatten() {
-                // Closed: the listener goes with this thread, so connections are refused.
                 if !flag.load(Ordering::SeqCst) {
                     break;
                 }
@@ -692,8 +641,6 @@ impl Relay {
         });
     }
 
-    /// Opens the relay again, on its port, after `close`. The freed port can be held for a moment
-    /// by another test's socket under a loaded run, so the bind is retried for up to five seconds.
     #[cfg(feature = "github-app")]
     pub(crate) fn open(&self) {
         self.open.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -713,7 +660,6 @@ impl Relay {
         Self::serve(listener, self.to.clone(), self.open.clone());
     }
 
-    /// Stops the relay: every connection after it is refused.
     pub(crate) fn close(&self) {
         self.open.store(false, std::sync::atomic::Ordering::SeqCst);
         let address = ("127.0.0.1", self.port);
@@ -729,9 +675,6 @@ impl Relay {
     }
 }
 
-/// A Postgres that stops answering without closing the connection: it takes the connection,
-/// completes the startup (no password asked) and then reads every statement and answers none, so
-/// only the client's own deadline ends a call (the server's `statement_timeout` never fires).
 #[cfg(any(
     feature = "directory",
     all(
@@ -753,7 +696,6 @@ impl Relay {
     expect(dead_code)
 )]
 pub(crate) struct Stalled {
-    /// A URL naming it.
     pub(crate) url: String,
 }
 
@@ -785,7 +727,6 @@ impl Stalled {
         std::thread::spawn(move || {
             for mut stream in listener.incoming().flatten() {
                 std::thread::spawn(move || {
-                    // The startup message: its length, itself included, then the rest.
                     let mut length = [0u8; 4];
                     if stream.read_exact(&mut length).is_err() {
                         return;
@@ -794,7 +735,6 @@ impl Stalled {
                     if stream.read_exact(&mut vec![0u8; rest]).is_err() {
                         return;
                     }
-                    // AuthenticationOk, then ReadyForQuery (idle).
                     let ready = [b'R', 0, 0, 0, 8, 0, 0, 0, 0, b'Z', 0, 0, 0, 5, b'I'];
                     if stream.write_all(&ready).is_err() {
                         return;
@@ -808,8 +748,6 @@ impl Stalled {
     }
 }
 
-/// The audit (#328) of a test's manifests in `dir`: `[postgres]` (`section`, to append to each)
-/// reading its URL, the relay's, from `ops/pg-url`, in a schema of `case`'s own, migrated.
 #[cfg(any(
     feature = "refresh-lock",
     all(feature = "directory", feature = "ui"),
@@ -828,7 +766,6 @@ pub(crate) struct Audited {
     pub(crate) schema: String,
     pub(crate) section: String,
     pub(crate) relay: Relay,
-    /// The test's own URL, which no output may carry.
     pub(crate) url: String,
 }
 
@@ -873,7 +810,6 @@ pub(crate) fn audited(dir: &Path, case: &str) -> Option<Audited> {
     all(feature = "accounts", feature = "ui")
 ))]
 impl Audited {
-    /// Every record, oldest first, as Postgres's `row_to_json` writes it.
     #[cfg(feature = "refresh-lock")]
     pub(crate) fn records(&self) -> Vec<serde_json::Value> {
         let sql = format!(
@@ -885,7 +821,6 @@ impl Audited {
             .collect()
     }
 
-    /// `text` carries neither the test's Postgres URL nor its password.
     #[cfg_attr(
         not(any(
             all(feature = "refresh-lock", feature = "postgres"),

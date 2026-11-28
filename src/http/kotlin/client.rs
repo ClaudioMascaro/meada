@@ -1,26 +1,3 @@
-//! Ktor client consumers (spec #27, #99). A call is a consumer when `Code::outside` says an
-//! import from Ktor binds its verb (`get`, `post`, `put`, `patch`, `delete`, `head`, `options`
-//! or `request`, of `io.ktor.client.request`) and its receiver is a Ktor `HttpClient`: one made
-//! by a call to it that `Code::origins` reaches, or that a local holds (`val c = HttpClient(..)`,
-//! or the receiver `use` passes on, found through `Facts::bound`), or one the source writes the
-//! type of. A local, a parameter or a loop variable of the name hides a client of the file.
-//! The URL is the call's first argument (or `urlString`), folded like any other value, with a
-//! template hole that does not fold a parameter; a call with no such argument (`get { url { ..
-//! } }`) is an unresolved consumer, as the builders of the request block are not read.
-//! `request` sends the method its block assigns (`method = HttpMethod.X`, or `this.method`),
-//! `GET` when it assigns none: a block that is no lambda written in the call, an assignment
-//! that may not run (an `if`, a lambda inside the block) or a method that is no `HttpMethod`
-//! member is an unknown method, and the consumer is unresolved. A `defaultRequest { url(base)
-//! }` in the configuration of the client the call comes from is the base of its relative URLs.
-//! Over a base Meada did not read (a `defaultRequest` that is no string, a client only its type
-//! names), a path from the root is the path alone, as Ktor's `defaultRequest` replaces the base's
-//! path with it, and a relative one leaves the consumer an open item that names the client's base
-//! (#801).
-//! A client wrapper is read at each of its call sites (`Code::expand`, through any number of
-//! levels), the URL and the method it takes from its parameters substituted there. A base
-//! Spring injects with `@Value("\${key}")` into a property or a constructor property is read
-//! from the module's configuration (`jvm::spring::inject`, as the Java clients do).
-
 use super::{VERBS, external, implicit};
 use crate::contract::Found;
 use crate::index::Indexed;
@@ -33,23 +10,15 @@ use crate::resolve::{Code, Expand, Expanded, Follow, Injected, Of, passes_nothin
 
 use super::super::{based, consumer, fetches};
 
-/// The package of the request functions.
 const REQUEST: &str = "io.ktor.client.request.";
-/// Ktor's `HttpClient`.
 const CLIENT: &str = "io.ktor.client.HttpClient";
-/// The spellings of `defaultRequest`: Ktor 2 and 3, then Ktor 1.
 const DEFAULT_REQUEST: &[&str] = &[
     "io.ktor.client.plugins.defaultRequest",
     "io.ktor.client.features.defaultRequest",
 ];
-/// The request function that takes its method from its block; the others name it (`VERBS`).
 const REQUEST_FUNCTION: &str = "request";
-/// The key the pack records a request block's `method = value` under in `Call::kwargs` (a
-/// property assigned in a lambda passed to the call is `<name>=`, `kotlin::assigned`).
 const METHOD: &str = "method=";
 
-/// A client, as far as the source tells: the call that makes it, only its type, or one whose
-/// configuration is not known.
 #[derive(PartialEq)]
 enum Client<'a> {
     Made(&'a str, usize),
@@ -62,7 +31,6 @@ struct Clients<'c, 'a> {
 }
 
 impl<'c, 'a> Clients<'c, 'a> {
-    /// The Ktor clients the receiver of a call may be, `None` when it is not one.
     fn of(&self, path: &'a str, scope: &'a str, receiver: &'a Value) -> Option<Vec<Client<'a>>> {
         self.reach(path, scope, receiver, 0)
     }
@@ -100,7 +68,6 @@ impl<'c, 'a> Clients<'c, 'a> {
             if written.iter().any(|s| s == CLIENT) {
                 return Some(vec![Client::Typed]);
             }
-            // A local with no written type holds what the pack recorded for it.
             let Bound { within, value, .. } = self.code.local(path, scope, name)?;
             return match depth < LOCAL_DEPTH {
                 true => self.reach(path, within, value, depth + 1),
@@ -113,16 +80,12 @@ impl<'c, 'a> Clients<'c, 'a> {
         Some(out)
     }
 
-    /// Whether the call at `index` of `path` is Ktor's `HttpClient(..)` as its own imports spell
-    /// it: the on-demand ones too, which the origin's import does not name.
     fn makes(&self, path: &'a str, index: usize) -> bool {
         let call = &self.code.files()[path].calls[index];
         let spelled = spellings(self.code, path, &call.scope, &call.callee);
         one(&spelled, |s| s == CLIENT).is_some()
     }
 
-    /// The base URL `clients` share, `None` when none is set. A hole when they differ or one is
-    /// not known, as for a client only its type names: its `defaultRequest`, if any, was not read.
     fn base(&self, clients: &[Client<'a>]) -> Option<Vec<Part>> {
         let mut bases: Vec<Option<Vec<Part>>> = Vec::new();
         for client in clients {
@@ -141,8 +104,6 @@ impl<'c, 'a> Clients<'c, 'a> {
         }
     }
 
-    /// The base URL the `defaultRequest { url(..) }` in the configuration block of the call
-    /// that makes a client sets: a hole when it is set more than once or not by a string.
     fn configured(&self, path: &'a str, index: usize) -> Option<Vec<Part>> {
         let code = self.code;
         let Some(Value::Function(block)) = code.call(path, index)?.args.last() else {
@@ -187,10 +148,6 @@ impl<'c, 'a> Clients<'c, 'a> {
     }
 }
 
-/// The method a `request` call sends, from the `method=` pseudo-keyword the pack gives the
-/// call whose block assigns it: `GET` when it assigns none, a `Ref` while it depends on a
-/// parameter of a wrapper (read again at the wrapper's call sites), unknown when it is no
-/// `HttpMethod` member or the call is given its block some other way (`given`).
 fn requested(kwargs: &[(String, Value)], given: bool) -> Value {
     match kwargs.iter().find(|(k, _)| k == METHOD) {
         None if given => Value::Unknown,
@@ -205,9 +162,7 @@ fn text(method: String) -> Value {
     Value::Str(vec![Part::Text(method)])
 }
 
-/// Ktor client consumers: see the module.
 pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
-    // Read the first time an annotation is injected: a repository without one parses none.
     let configs = std::cell::OnceCell::new();
     let inject = |code: &Code<'a>, path: &'a str, on: Injected<'a>| {
         let configs = configs.get_or_init(|| Configs::read(indexed.configs, indexed.manifests));
@@ -230,7 +185,6 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
             if one(&spelled, |s| s.strip_prefix(REQUEST) == Some(member)).is_none() {
                 continue;
             }
-            // The values of the call: `files` holds none, only the facts the index keeps.
             let Some(call) = code.call(path, n) else {
                 continue;
             };
@@ -241,8 +195,6 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
                 continue;
             };
             let base = clients.base(&of);
-            // The call whole, its names kept as the caller's imports spell them: an enum member
-            // a wrapper takes keeps the evidence of the caller (`Expand::Chain`).
             let read = |args: &[Value], kwargs: &[(String, Value)]| {
                 let [Value::Call(request)] = args else {
                     return None;
@@ -252,7 +204,6 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
                 let url = (first.or(named.map(|(_, v)| v)))
                     .cloned()
                     .unwrap_or(Value::Unknown);
-                // What else the call is given: a block that is no lambda written there.
                 let rest = request.args.iter().skip(usize::from(first.is_some()));
                 let given = rest.into_iter().any(|v| !matches!(v, Value::Function(_)))
                     || (kwargs.iter()).any(|(k, v)| {
@@ -263,7 +214,6 @@ pub(in crate::http) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<
                     REQUEST_FUNCTION => requested(kwargs, given),
                     verb => text(verb.to_uppercase()),
                 };
-                // A path from the root replaces the path of a base Meada did not read (#801).
                 let url = match base.as_deref() {
                     Some(base) if crate::http::rooted_over_unread(base, &url) => url,
                     base => based(base, &url),
@@ -297,8 +247,6 @@ mod tests {
     const IMPORTS: &str = "import io.ktor.client.HttpClient\nimport io.ktor.client.engine.cio.CIO\n\
         import io.ktor.client.request.get\n";
 
-    /// The consumers of the Kotlin file `body`, after the Ktor imports, and how long reading
-    /// them took at best of three.
     fn read(body: &str) -> (usize, std::time::Duration) {
         with_code(body, |code, indexed| {
             let runs = (0..3).map(|_| {
@@ -309,7 +257,6 @@ mod tests {
         })
     }
 
-    /// `f` of the code of the Kotlin file `body`, after the Ktor imports.
     fn with_code<R>(body: &str, f: impl Fn(&Code, &Indexed) -> R) -> R {
         let src = format!("package a\n{IMPORTS}{body}");
         let facts = Kotlin.parse(KOTLIN, src.as_bytes()).unwrap();
@@ -329,11 +276,6 @@ mod tests {
         f(&code, &indexed)
     }
 
-    /// A path the reader joins after a base Meada did not read (#801): over a `defaultRequest`
-    /// base that is no string, or a client only its type names, a relative path leaves the
-    /// consumer an open item that names the client's base, and a path from the root is the path
-    /// alone, as Ktor replaces the base's path with it; a template that starts with a call's
-    /// return value names the callee.
     #[test]
     fn a_path_after_a_base_meada_did_not_read_is_an_open_item_that_names_it() {
         let body = "import io.ktor.client.plugins.defaultRequest\n\
@@ -366,8 +308,6 @@ mod tests {
         );
     }
 
-    /// A client held through locals is followed by the value flow (`Facts::bound`), past
-    /// `LOCAL_DEPTH`; a chain of locals past the value flow's own depth is not.
     #[test]
     fn a_client_is_followed_through_a_bounded_chain_of_locals() {
         let chain = |locals: usize| {
@@ -381,14 +321,10 @@ mod tests {
             )
         };
         assert_eq!(read(&chain(LOCAL_DEPTH + 1)).0, 1);
-        // The pack's own `LOCAL_DEPTH` locals, then the value flow's `EVAL_DEPTH`.
         assert_eq!(read(&chain(EVAL_DEPTH + LOCAL_DEPTH)).0, 1);
         assert_eq!(read(&chain(EVAL_DEPTH + LOCAL_DEPTH + 1)).0, 0);
     }
 
-    /// A file of many functions, each with a client local and a call, is read in time linear
-    /// in their number: a local is looked up by its scope and name (`Code::local`), never by a
-    /// scan of the file's locals.
     #[test]
     fn many_client_locals_are_read_in_linear_time() {
         let time = |n: usize| {
@@ -405,7 +341,6 @@ mod tests {
             took
         };
         let (small, large) = (time(500), time(2000));
-        // Linear is about 4x; scanning the file's locals per call would be about 16x.
         assert!(large < small * 9, "{small:?} then {large:?}");
     }
 }

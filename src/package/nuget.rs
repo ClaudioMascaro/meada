@@ -1,28 +1,3 @@
-//! NuGet packages (spec #28): each SDK-style `.csproj` provides `package::nuget::<id>`, the id
-//! being its `PackageId`, else its `AssemblyName`, else its file name, and each `PackageReference`
-//! or cross-repository `ProjectReference` naming a provider of the workspace consumes it. The
-//! project file is read by `dotnet::msbuild`, the reader the C# pack shares. The module answers
-//! the trait's questions as follows:
-//!
-//! - `read` and `inherit`: a `Directory.Build.props` is a manifest that is no project; its
-//!   references go to the projects below it (`msbuild::chain`), which then declare them, and its
-//!   package properties name them under their own.
-//! - `entries`: the references of the nearest project holding the file, then those the projects
-//!   it references in its repository pass on (`dotnet::references`), nearest first, once each.
-//! - `reaches`: a `ProjectReference` (an entry with a `path` source, as Cargo's) only the project
-//!   at that path, and only in another repository: inside its own repository it stays inside it,
-//!   where the pack resolves it. A `PackageReference` reaches every provider of the id.
-//! - `settle`: a `ProjectReference` names the project's file, so the workspace step first gives
-//!   the entry the id of the project at that path, and a `PackageReference` the provider's own
-//!   spelling of an id that differs by case only.
-//! - `owns`: an SDK-style project only (`Summary::project`), as the pack's `join`.
-//! - `resolutions` and `declares`: Java's rule (`maven`), with a namespace as the package: a type
-//!   a `using` or a written name brings is looked up under the qualified name the provider's
-//!   `exports` rows give its public types, among the files of the projects the file depends on,
-//!   and the method is picked by name and argument count. `import namespace` is the reason.
-//!
-//! Package ids are matched without case; neither `Directory.Build.targets`, `Directory.Packages.props` nor a feed is read.
-
 use super::maven;
 use super::{
     Ecosystem, Entry, Export, How, Manifest, Provided, Providers, Resolution, Summary,
@@ -34,26 +9,19 @@ use crate::resolve::Code;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-/// The field a `PackageReference` is kept under in `Summary::dependencies`.
 const PACKAGE: &str = "PackageReference";
-/// The field a `ProjectReference` is kept under; its entry's `via` is `path <project file>`.
 const PROJECT: &str = "ProjectReference";
 const EXTENSION: &str = ".csproj";
 
-/// Whether `value` can be a name: valid, and no `$(Property)` MSBuild would evaluate.
 fn literal(value: &str) -> bool {
     valid_name(value) && !value.contains("$(")
 }
 
-/// The project file name of `path`, less its extension.
 fn stem(path: &str) -> &str {
     let file = path.rsplit('/').next().unwrap_or(path);
     file.strip_suffix(EXTENSION).unwrap_or(file)
 }
 
-/// The `ProjectReference` `reference`, written in the project at `dir`: its entry, named by the
-/// project file's name until `settle` knows the project's id. `None` for a path that is not a
-/// `.csproj` of the repository or beyond it (absolute, or computed).
 fn project(dir: &str, reference: &msbuild::Reference) -> Option<Entry> {
     let at = references::located(dir, &reference.include)?;
     Some(Entry {
@@ -65,9 +33,6 @@ fn project(dir: &str, reference: &msbuild::Reference) -> Option<Entry> {
     })
 }
 
-/// What the props file at `path` adds to the projects below it: its `PackageReference`s, its
-/// `ProjectReference`s named by the path as written (relative to the project they reach, so
-/// `inherit` locates them), its package properties, and the props file it imports.
 fn props(path: &str, src: &[u8]) -> Summary {
     let Some(msbuild::Props {
         project, import, ..
@@ -95,15 +60,12 @@ fn props(path: &str, src: &[u8]) -> Summary {
     }
 }
 
-/// `entries` sorted by field, name and `via`, without repeats.
 fn sorted(mut entries: Vec<Entry>) -> Vec<Entry> {
     entries.sort_by(|a, b| (&a.field, &a.name, &a.via).cmp(&(&b.field, &b.name, &b.via)));
     entries.dedup();
     entries
 }
 
-/// The package the project at `path` names with the package properties of `layers` (its props
-/// files', outer first, then its own): its id and version, none when computed.
 fn named<'a>(
     path: &str,
     layers: impl IntoIterator<Item = &'a msbuild::Properties>,
@@ -116,7 +78,6 @@ fn named<'a>(
     )
 }
 
-/// The project file of the repository the `ProjectReference` entry names.
 fn in_repository(entry: &Entry) -> Option<&str> {
     let at = entry.via.as_deref()?.strip_prefix("path ")?;
     (entry.field == PROJECT && !at.starts_with("../")).then_some(at)
@@ -137,10 +98,6 @@ impl Ecosystem for Nuget {
         file_name.ends_with(EXTENSION) || file_name == msbuild::PROPS
     }
 
-    /// The project's id and version as it writes them (a computed one makes no provider), its
-    /// package properties and its references. Hostile bytes, and a file with no SDK, read as
-    /// empty. A `Directory.Build.props` reads as the references and properties it adds to the
-    /// projects below it and the props file it imports, which `inherit` gives them.
     fn read(&self, path: &str, src: &[u8]) -> Summary {
         if msbuild::is_props(path) {
             return props(path, src);
@@ -174,7 +131,6 @@ impl Ecosystem for Nuget {
         &["cs"]
     }
 
-    /// Only an SDK-style project bounds a package, as the pack's `join` has it.
     fn owns(&self, manifest: &Manifest) -> bool {
         manifest.summary.project
     }
@@ -189,8 +145,6 @@ impl Ecosystem for Nuget {
         maven::imports(code, path, call, &["System."])
     }
 
-    /// A constructor or a method of the class itself, by its id: the class's id, a dot, then a
-    /// signature; a nested type's member is not.
     fn member_of(&self, target: &str, class: &str) -> bool {
         (target.strip_prefix(class))
             .and_then(|rest| rest.strip_prefix('.'))
@@ -207,9 +161,6 @@ impl Ecosystem for Nuget {
         via.is_none() || from.0 != (to.0).0 && sourced(via, from, to)
     }
 
-    /// The references of the project file `from.1` belongs to (the nearest `.csproj` above it),
-    /// then those that pass on of each project it references in its repository, directly or not
-    /// (`references::referenced`), nearest first, once for each package: the nearer entry wins.
     fn entries<'e>(
         &self,
         exports: &'e [Export],
@@ -287,9 +238,6 @@ impl Ecosystem for Nuget {
         maven::declares(self, exports, providers, at, from, import)
     }
 
-    /// Each project takes the references of the props files MSBuild imports into it
-    /// (`msbuild::chain`), outer first, ahead of its own, and is named by their package
-    /// properties under its own; the props files keep no references.
     fn inherit(&self, manifests: &mut [Manifest]) {
         let mut props: HashMap<String, (Option<msbuild::Import>, Vec<Entry>)> = HashMap::new();
         for m in manifests.iter_mut().filter(|m| msbuild::is_props(&m.path)) {
@@ -329,13 +277,8 @@ impl Ecosystem for Nuget {
         }
     }
 
-    /// Each `ProjectReference` to a project of another repository takes that project's id, which
-    /// its file name does not always say, and each `PackageReference` the spelling of the one
-    /// provider whose id differs from it by case only (ids are case-insensitive).
     fn settle(&self, exports: &mut [Export]) {
         let nuget = |m: &Manifest| self.is_manifest(m.path.rsplit('/').next().unwrap_or(""));
-        // Each named project by its folded location, with its repository, and each id by its
-        // lowercase spelling.
         let mut located: HashMap<PathBuf, (String, String)> = HashMap::new();
         let mut spellings: HashMap<String, BTreeSet<String>> = HashMap::new();
         for export in exports.iter() {
@@ -359,7 +302,6 @@ impl Ecosystem for Nuget {
             let manifests = export.manifests.iter_mut().filter(|m| nuget(m));
             for entry in manifests.flat_map(|m| &mut m.summary.dependencies) {
                 if entry.field == PROJECT {
-                    // Only a path that leaves its repository names another one's project.
                     let path = (entry.via.as_deref())
                         .and_then(|v| v.strip_prefix("path "))
                         .filter(|p| p.starts_with("../"));
@@ -400,7 +342,6 @@ mod tests {
         );
         let both = "<AssemblyName>A.B</AssemblyName><PackageId>P</PackageId>";
         assert_eq!(named(both).as_deref(), Some("P"));
-        // A computed or invalid id makes no provider, and does not fall back to another name.
         assert_eq!(named("<PackageId>$(Id)</PackageId>"), None);
         assert_eq!(named("<AssemblyName>a b</AssemblyName>"), None);
         assert_eq!(
@@ -554,14 +495,11 @@ mod tests {
             at("app", "/w/app"),
             (at("lib", "/w/lib"), "Other.csproj")
         ));
-        // Inside its own repository the reference stays inside it.
         let own = (Some("path Kit/Kit.csproj"), None);
         assert!(!Nuget.reaches(own, at("lib", "/w/lib"), kit));
         assert!(Nuget.reaches((None, Some("1")), at("lib", "/w/lib"), kit));
     }
 
-    /// A props file keeps its references and import until `inherit` gives the references to the
-    /// projects below it, the outer file's too, beside their own; the props files keep none.
     #[test]
     fn inherit_gives_a_props_file_s_references_to_the_projects_below_it() {
         let item = "<Project><ItemGroup><PackageReference Include=\"P\" Version=\"1\" />\
@@ -601,15 +539,11 @@ mod tests {
                 .iter()
                 .all(|m| m.summary.dependencies.is_empty())
         );
-        // Only a project owns files; a props file is no package.
         assert!(!Nuget.owns(&manifests[1]) && Nuget.owns(&manifests[2]));
         assert_eq!(read("Directory.Build.props", "<Project/>").name, None);
         assert_eq!(read("Directory.Build.props", "not xml"), Summary::default());
     }
 
-    /// A props file's package properties name the projects below it under their own: a literal
-    /// one is the id, a computed one makes no provider (no fall back to the file name), and a
-    /// property the project writes wins.
     #[test]
     fn inherit_names_a_project_by_the_props_file_s_properties_under_its_own() {
         let named = |props: &str, own: &str| {
@@ -645,7 +579,6 @@ mod tests {
         );
         let both = "<AssemblyName>Acme.Asm</AssemblyName><Version>1.0</Version>";
         assert_eq!(named(both, ""), (some("Acme.Asm"), some("1.0")));
-        // A `PackageId` above wins over the project's `AssemblyName`, as MSBuild reads it.
         assert_eq!(
             named(
                 "<PackageId>Acme.Kit</PackageId>",

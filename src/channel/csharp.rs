@@ -1,30 +1,3 @@
-//! The channel kind's C# forms (spec #28, #115): Confluent.Kafka (`kafka`), RabbitMQ.Client
-//! (`amqp`), AWSSDK.SQS (`sqs`), NATS.Client (`nats`), StackExchange.Redis streams (`redis`) and
-//! Azure.Messaging.ServiceBus (`servicebus`). MassTransit is not read.
-//!
-//! A form is a method called on a client, and a call counts only when its receiver is one: the
-//! type the source writes for it (a field, a property, a parameter, a typed local) or the
-//! construction it was made by (`new ProducerBuilder<..>(..).Build()`, a factory's
-//! `CreateConnection()`, a local bound to either), the type read through the usings
-//! (`names::spellings`) and accepted only as the one spelling of this module's table
-//! (`names::one`), so a type of the repository with the same name, or a name two namespaces may
-//! bind (`ConnectionFactory` is RabbitMQ's and NATS's), is none. The methods that make a client of
-//! another (`Build`, `CreateConnection`, `CreateModel`, `GetDatabase`) are listed in `STEPS`, as
-//! the HTTP kind lists its clients.
-//!
-//! A channel name is evaluated like a URL: constants, `static readonly` fields, locals bound once
-//! and the arguments of a wrapper's callers fold (`Code::expand`). A name that cannot be
-//! evaluated, an environment or configuration read included, is an unresolved side.
-//!
-//! A callback is the handler it names: the lambda or the method group given to the call, or each
-//! one attached to the event of the client the call's result is held by with `+=` (a consumer
-//! per handler). Every other client polls, so its handler is the method holding the call that
-//! names the topic or the queue (`consume`'s default), wherever the receive loop runs.
-//!
-//! A Service Bus send names the queue or topic of the `CreateSender` that made the sender, which
-//! it counts only when nothing else writes the name (`Facts::bound`'s `name=` is one per write).
-//! When that argument is a parameter, each caller of the method around it is a producer.
-
 use super::message::{
     Handler, Message, Side, bind, channel_name as name, consume, produce, publish, topics,
 };
@@ -34,13 +7,10 @@ use crate::resolve::{Code, Keywords, method as member};
 use std::cell::OnceCell;
 use std::collections::HashMap;
 
-/// How many links a receiver is followed through: a local bound to a call on a local bound to
-/// another, down to the construction or the declared type.
 // ponytail: real clients are made a few steps deep; the limit keeps a crafted chain of thousands
 // of locals (or of calls on one) from overflowing the stack.
 const CHANNEL_CLIENT_DEPTH: usize = 32;
 
-/// What a receiver may be: the client of a library, or something a client is made by.
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Obj {
     KafkaProducer,
@@ -59,7 +29,6 @@ enum Obj {
     BusSender,
 }
 
-/// The types of the libraries, by the full name the usings give them (generics dropped).
 const TYPES: &[(&str, Obj)] = &[
     ("Confluent.Kafka.IProducer", Obj::KafkaProducer),
     ("Confluent.Kafka.IConsumer", Obj::KafkaConsumer),
@@ -101,8 +70,6 @@ const TYPES: &[(&str, Obj)] = &[
     ),
 ];
 
-/// The methods that make a client of another: what a method called on the first returns. A
-/// builder's setters hand the builder back.
 const STEPS: &[(Obj, &[&str], Obj)] = &[
     (Obj::KafkaProducerBuilder, &["Build"], Obj::KafkaProducer),
     (Obj::KafkaConsumerBuilder, &["Build"], Obj::KafkaConsumer),
@@ -119,7 +86,6 @@ const STEPS: &[(Obj, &[&str], Obj)] = &[
     (Obj::NatsFactory, &["CreateConnection"], Obj::NatsConnection),
     (Obj::RedisMultiplexer, &["GetDatabase"], Obj::RedisDatabase),
     (Obj::BusClient, &["CreateSender"], Obj::BusSender),
-    // The static factory, called on the type's own name.
     (
         Obj::RedisMultiplexer,
         &["Connect", "ConnectAsync"],
@@ -127,15 +93,11 @@ const STEPS: &[(Obj, &[&str], Obj)] = &[
     ),
 ];
 
-/// The setters of a builder, which hand it back (`SetValueSerializer`, `SetErrorHandler`).
 const SETTER: &str = "Set";
-/// The method of a task that hands back what it is awaited for.
 const CONFIGURE: &str = "ConfigureAwait";
 
-/// `System.String`, whose `Empty` is the default exchange.
 const STRING: &str = "System.String";
 
-/// The methods a form is made of.
 const METHODS: &[&str] = &[
     "Produce",
     "ProduceAsync",
@@ -160,11 +122,8 @@ const METHODS: &[&str] = &[
     "CreateProcessor",
 ];
 
-/// The events of a RabbitMQ consumer that hand it a delivery.
 const DELIVERED: &[&str] = &["Received", "ReceivedAsync"];
-/// The event of a NATS subscription that hands it a message.
 const MESSAGE: &[&str] = &["MessageHandler"];
-/// The event of a Service Bus processor that hands it a message.
 const PROCESS: &[&str] = &["ProcessMessageAsync"];
 
 pub(super) fn messages(code: &Code) -> Vec<Message> {
@@ -173,7 +132,6 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
     }
     let mut out = Vec::new();
     for (&path, facts) in code.files() {
-        // The names that hold a call's result, built the first time a form needs one.
         let held: OnceCell<Held> = OnceCell::new();
         let holder = |n: usize| -> Option<&Bound> {
             let range = &code.call(path, n)?.range;
@@ -181,8 +139,6 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 .get(&(range.start, range.end))
                 .copied()
         };
-        // The position of a call in the file, by its range, and the producers each
-        // `CreateSender` call names.
         let positions: OnceCell<HashMap<(usize, usize), usize>> = OnceCell::new();
         let position = |made: &Invocation| -> Option<usize> {
             positions
@@ -223,7 +179,6 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     out.extend(consume(code, path, n, "kafka", &read, None));
                 }
                 (Obj::RabbitChannel, "BasicPublish" | "BasicPublishAsync") => {
-                    // `string.Empty` is read as the call writes it: folded, it is unknown.
                     let blank = Value::Str(Vec::new());
                     let default = code.call(path, n).is_some_and(|call| {
                         let exchange = arg(&call.args, &call.kwargs, 0, &["exchange"]);
@@ -247,8 +202,6 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                     out.extend(bind(code, path, n, &read));
                 }
                 (Obj::RabbitChannel, "BasicConsume" | "BasicConsumeAsync") => {
-                    // The queue is the first argument, or the second after the consumer that
-                    // some overloads take first: the one the first argument's type tells.
                     let consumer_first = (code.call(path, n).and_then(|c| c.args.first()))
                         .is_some_and(|first| {
                             client(code, path, &stored.scope, first, 0) == Some(Obj::RabbitConsumer)
@@ -279,7 +232,6 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                 }
                 (Obj::BusSender, "SendMessageAsync" | "SendMessagesAsync")
                 | (Obj::BusSender, "ScheduleMessageAsync" | "ScheduleMessagesAsync") => {
-                    // The name is where the sender was made: the send reads no argument.
                     let Some(at) = sender(code, path, &stored.scope, receiver).and_then(position)
                     else {
                         let unknown: Vec<Option<String>> = vec![None];
@@ -293,8 +245,6 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
                         .entry(at)
                         .or_insert_with(|| produce(code, path, at, "servicebus", &first));
                     for m in made.iter() {
-                        // A name read where the sender stands is that send's; one a caller of
-                        // its method passes is that caller's, once for all the sends.
                         let here = m.call == at && m.path == path;
                         if here || first_send {
                             out.push(Message {
@@ -333,8 +283,6 @@ pub(super) fn messages(code: &Code) -> Vec<Message> {
     out
 }
 
-/// The handlers of the consumer the `BasicConsume` at `n` of `path` is given: each one attached
-/// to its `Received` event (`+=`).
 fn delivery<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Vec<Handler> {
     let Some(call) = code.call(path, n) else {
         return Vec::new();
@@ -356,8 +304,6 @@ fn delivery<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Vec<Handler> {
     }
 }
 
-/// A consumer per handler, or one with the default handler (the method holding the call) when
-/// the call has none.
 fn each(handlers: Vec<Handler>) -> Vec<Option<Handler>> {
     match handlers.is_empty() {
         true => vec![None],
@@ -365,9 +311,6 @@ fn each(handlers: Vec<Handler>) -> Vec<Option<Handler>> {
     }
 }
 
-/// The `CreateSender` call that made the Service Bus sender `receiver`, written in `scope` of
-/// `path`: in place, or held by a local, a field or a property written once. `None` when no such
-/// call is found.
 fn sender<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -381,8 +324,6 @@ fn sender<'a>(
             let bound = match code.local(path, scope, held) {
                 Some(bound) => bound,
                 None => {
-                    // Every write of the name is a `name=`: the one made by `CreateSender` is
-                    // the sender only when no other writes it.
                     let (at, within, _) = code.written(path, scope, held)?;
                     let mut assigned = code.bounds(at, within, &format!("{held}=")).into_iter();
                     let only = assigned.next().filter(|_| at == path)?;
@@ -400,8 +341,6 @@ fn sender<'a>(
     (from == Some(Obj::BusClient) && member(&made.callee) == "CreateSender").then_some(made)
 }
 
-/// The handlers attached with `+=` to the events `events` of the name `holder`, declared in
-/// `within` of `path`, in the order they are attached: each lambda or method group.
 fn attached<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -415,8 +354,6 @@ fn attached<'a>(
         .collect()
 }
 
-/// The callback the call at `n` of `path` is given after its subject: a lambda written in place
-/// or a method of the repository.
 fn callback<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<Handler> {
     let call = code.call(path, n)?;
     function(
@@ -427,8 +364,6 @@ fn callback<'a>(code: &Code<'a>, path: &'a str, n: usize) -> Option<Handler> {
     )
 }
 
-/// The handler a function value is: the lambda as the inline definition it makes, a method group
-/// as the definition it names.
 fn function<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -448,7 +383,6 @@ fn function<'a>(
     }
 }
 
-/// The names that hold a call's result in `path`, by the call's range.
 type Held<'a> = HashMap<(usize, usize), &'a Bound>;
 
 fn held_by<'a>(code: &Code<'a>, path: &'a str) -> Held<'a> {
@@ -460,9 +394,6 @@ fn held_by<'a>(code: &Code<'a>, path: &'a str) -> Held<'a> {
         .collect()
 }
 
-/// What `value`, written in `scope` of `path`, is: a client of a library or what makes one. A
-/// name is its written type, else the construction a local is bound to, else a type's own name
-/// (a static factory: `ConnectionMultiplexer.Connect`).
 fn client<'a>(
     code: &Code<'a>,
     path: &'a str,
@@ -493,21 +424,17 @@ fn client<'a>(
                 .find(|(from, methods, _)| *from == made && methods.contains(&method))
                 .map(|(.., to)| *to)
                 .or_else(|| setter(made, method))
-                // Awaiting without capturing the context is awaiting.
                 .or((method == CONFIGURE).then_some(made))
         }
         _ => None,
     }
 }
 
-/// A builder's setter hands the builder back.
 fn setter(made: Obj, method: &str) -> Option<Obj> {
     let builder = matches!(made, Obj::KafkaProducerBuilder | Obj::KafkaConsumerBuilder);
     (builder && method.starts_with(SETTER)).then_some(made)
 }
 
-/// The library type `ty`, written in `scope` of `path`, is: in full (`in_full`), or the one
-/// spelling in the table the usings give it.
 fn type_of<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, ty: &'a str) -> Option<Obj> {
     let found = |full: &str| TYPES.iter().find(|(t, _)| *t == full).map(|(_, o)| *o);
     if in_full(code, path, scope, ty, |t| found(t).is_some()) {
@@ -518,8 +445,6 @@ fn type_of<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, ty: &'a str) -> O
     })?)
 }
 
-/// Whether `value`, written in `scope` of `path`, is `string.Empty`, or `String.Empty` of
-/// `System.String` as the usings bind the name.
 // ponytail: only an exchange the form's call writes is read; one a wrapper's caller passes folds
 // to unknown, so it is an unresolved producer.
 fn empty<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, value: &Value) -> bool {
@@ -527,7 +452,6 @@ fn empty<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, value: &Value) -> b
         return false;
     };
     match spelled.strip_suffix(".Empty") {
-        // The keyword `string` is `System.String` whatever the repository declares.
         Some("string") => true,
         Some("System.String") => is_type(code, path, scope, "System.String", STRING),
         Some("String") => is_type(code, path, scope, "String", STRING),
@@ -535,8 +459,6 @@ fn empty<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, value: &Value) -> b
     }
 }
 
-/// The argument at position `at`, or the one named by any of `names`; `Undefined` when the call
-/// leaves it out.
 fn arg<'v>(args: &'v [Value], named: &'v Keywords, at: usize, names: &[&str]) -> &'v Value {
     let named = named.iter().find(|(k, _)| names.contains(&k.as_str()));
     named
@@ -545,7 +467,6 @@ fn arg<'v>(args: &'v [Value], named: &'v Keywords, at: usize, names: &[&str]) ->
         .unwrap_or(&Value::Undefined)
 }
 
-/// The one channel the first argument names: a subject, a stream key, a queue or a topic.
 fn first(args: &[Value], named: &Keywords) -> Option<Vec<Option<String>>> {
     let names = [
         "subject",
@@ -557,7 +478,6 @@ fn first(args: &[Value], named: &Keywords) -> Option<Vec<Option<String>>> {
     Some(vec![name(arg(args, named, 0, &names))?])
 }
 
-/// A Kafka topic name (see `message::topic`).
 fn topic(value: &Value) -> Option<Option<String>> {
     super::message::topic(value)
 }
@@ -572,8 +492,6 @@ mod tests {
 
     const USINGS: &str = "using System;\nusing System.Threading.Tasks;\n";
 
-    /// The messages of the class body `body` in `A/C.cs` under `usings`, beside other files of
-    /// the repository, as lines.
     fn lines_with(usings: &str, body: &str, others: &[(&str, &str)]) -> Vec<String> {
         let src = format!("{USINGS}{usings}\nnamespace A;\npublic class C {{\n{body}\n}}\n");
         let mut parsed = vec![("A/C.cs", CSharp.parse("A/C.cs", src.as_bytes()).unwrap())];
@@ -628,7 +546,6 @@ mod tests {
         assert_eq!(lines(KAFKA, body), ["kafka Orders producer"]);
     }
 
-    /// `lines`, with the position an inline handler is named after masked.
     fn masked(lines: Vec<String>) -> Vec<String> {
         let mask = |line: String| {
             let Some((head, tail)) = line.split_once("@") else {
@@ -709,8 +626,6 @@ mod tests {
         );
     }
 
-    /// A declared type is the SDK's only through the usings: a repository type of that name, or
-    /// a client read off a call, names no SQS client.
     #[test]
     fn an_sqs_client_is_declared_by_the_sdk_type_not_by_its_name() {
         let body = "interface IAmazonSQS { Task SendMessageAsync(string url, string body); }\n\
@@ -828,25 +743,21 @@ mod tests {
     #[test]
     fn a_service_bus_sender_written_more_than_once_is_unknown() {
         let unresolved = ["servicebus unresolved producer"];
-        // Another constructor hands one in: the field is made by `CreateSender` or given.
         let given = "ServiceBusSender _sender;\n\
             C(ServiceBusClient c) { _sender = c.CreateSender(\"orders\"); }\n\
             internal C(ServiceBusSender s) { _sender = s; }\n\
             async Task Send(ServiceBusMessage m) { await _sender.SendMessageAsync(m); }\n";
         assert_eq!(lines(BUS, given), unresolved);
-        // A setter replaces what the constructor made.
         let setter = "ServiceBusSender _sender;\n\
             C(ServiceBusClient c) { _sender = c.CreateSender(\"orders\"); }\n\
             public void Use(ServiceBusSender s) => _sender = s;\n\
             async Task Send(ServiceBusMessage m) { await _sender.SendMessageAsync(m); }\n";
         assert_eq!(lines(BUS, setter), unresolved);
-        // A field initializer and a later assignment are two writes.
         let initialized = "static ServiceBusClient S;\n\
             ServiceBusSender _sender = S.CreateSender(\"init\");\n\
             void Reset() { _sender = S.CreateSender(\"other\"); }\n\
             async Task Send(ServiceBusMessage m) { await _sender.SendMessageAsync(m); }\n";
         assert_eq!(lines(BUS, initialized), unresolved);
-        // A local made twice: both sends are unknown, neither is the last one.
         let local = "ServiceBusClient _c;\n\
             async Task Send(ServiceBusMessage m) {\n\
               ServiceBusSender s = _c.CreateSender(\"first\");\n\
@@ -855,12 +766,10 @@ mod tests {
               await s.SendMessageAsync(m);\n\
             }\n";
         assert_eq!(lines(BUS, local), [unresolved[0], unresolved[0]]);
-        // Written once, by whatever form of assignment, it is that one.
         let once = "ServiceBusSender _sender;\n\
             C(ServiceBusClient c) { this._sender = c.CreateSender(\"orders\"); }\n\
             async Task Send(ServiceBusMessage m) { await _sender.SendMessageAsync(m); }\n";
         assert_eq!(lines(BUS, once), ["servicebus orders producer"]);
-        // Handed out by a `ref` parameter, it is written there too.
         let by_ref = "ServiceBusSender _sender;\n\
             C(ServiceBusClient c) { _sender = c.CreateSender(\"orders\"); Fill(ref _sender); }\n\
             void Fill(ref ServiceBusSender s) { }\n\
@@ -870,8 +779,6 @@ mod tests {
 
     #[test]
     fn a_service_bus_sender_made_for_a_parameter_is_named_by_its_callers() {
-        // The sender is made for the queue the method is given: each caller is a producer, and
-        // two sends on the one sender name them once.
         let body = "ServiceBusClient _c;\n\
             async Task Send(string queue, ServiceBusMessage m) {\n\
               var s = _c.CreateSender(queue);\n\
@@ -883,13 +790,11 @@ mod tests {
             lines(BUS, body),
             ["servicebus orders producer", "servicebus audit producer"]
         );
-        // Through a second wrapper, and in a constructor that makes the field.
         let deep = "ServiceBusSender _sender;\n\
             C(ServiceBusClient c, string queue) { _sender = c.CreateSender(queue); }\n\
             async Task Send(ServiceBusMessage m) { await _sender.SendMessageAsync(m); }\n\
             static C Orders(ServiceBusClient c) => new C(c, \"orders\");\n";
         assert_eq!(lines(BUS, deep), ["servicebus orders producer"]);
-        // A sender nobody makes for a name is unresolved where it stands.
         let alone = "ServiceBusClient _c;\n\
             async Task Send(string queue, ServiceBusMessage m) {\n\
               await _c.CreateSender(queue).SendMessageAsync(m);\n\
@@ -899,7 +804,6 @@ mod tests {
 
     #[test]
     fn every_handler_attached_to_an_event_is_a_consumer_of_the_channel() {
-        // Spec #20: several consumers of a channel are all linked, never an ambiguity.
         let body = "async Task Listen(IChannel channel) {\n\
               var consumer = new AsyncEventingBasicConsumer(channel);\n\
               consumer.ReceivedAsync += First;\n\
@@ -937,8 +841,6 @@ mod tests {
 
     #[test]
     fn the_queue_of_a_consumer_first_basic_consume_is_found_by_the_consumer_type() {
-        // The extension overload takes the consumer first; the consumer may be a field or a
-        // parameter, not only built in place or held by a local.
         let body = "AsyncEventingBasicConsumer _consumer;\n\
             async Task A(IChannel ch) { await ch.BasicConsumeAsync(_consumer, \"q1\", true); }\n\
             async Task B(IChannel ch, EventingBasicConsumer given) { await ch.BasicConsumeAsync(given, \"q2\", true); }\n\
@@ -965,7 +867,6 @@ mod tests {
             lines(RABBIT, body),
             ["amqp q1 producer", "amqp q2 producer", "amqp q3 producer"]
         );
-        // Without `using System;`, `String` is whatever else binds the name.
         let own =
             "namespace A;\npublic static class String { public const string Empty = \"x\"; }\n";
         let other = "IChannel _ch;\n\
@@ -978,9 +879,6 @@ mod tests {
 
     #[test]
     fn a_call_on_anything_but_a_library_client_is_no_form() {
-        // The same names on a type of the repository, on a client of the wrong kind, on a value
-        // made by the repository's type, and with the library's own name hidden by a type of the
-        // repository.
         let body = "IProducer<string, string> _hidden;\n\
             void F(Bus other, IConsumer<string, string> c) {\n\
               _hidden.Produce(\"a\", null);\n\
@@ -998,7 +896,6 @@ mod tests {
             lines_with(KAFKA, body, &[("A/Own.cs", &hiding)]),
             Vec::<String>::new()
         );
-        // Without the repository's own `IProducer`, the library's is the one `_hidden` is.
         let plain = format!("namespace A;\n{bus}");
         assert_eq!(
             lines_with(KAFKA, body, &[("A/Own.cs", &plain)]),
@@ -1015,7 +912,6 @@ mod tests {
 
     #[test]
     fn two_namespaces_that_bind_a_type_name_make_it_none() {
-        // `IConnection` is RabbitMQ's and NATS's: with both imported it is neither.
         let body = "IConnection _c;\n\
             void F() { _c.Publish(\"a\", null); }\n";
         let both = format!("{RABBIT}{NATS}");
@@ -1034,7 +930,6 @@ mod tests {
               made.Produce(\"c\", null);\n\
             }\n\
             IProducer<string, string> Other() => null;\n";
-        // The producer made and then replaced is no client; the topic written twice is unknown.
         assert_eq!(lines(KAFKA, body), ["kafka unresolved producer"]);
     }
 
@@ -1048,7 +943,6 @@ mod tests {
 
     #[test]
     fn a_receiver_is_followed_to_the_receiver_depth_only() {
-        // A client held by `n` locals, each bound to the one before.
         let held = |n: usize| {
             let mut body = String::from(
                 "void F() {\nvar x0 = new ProducerBuilder<string, string>(null).Build();\n",

@@ -188,3 +188,30 @@ results by symbol identity. Embeddings and any model step live downstream, outsi
 - [Contribute](https://claudiomascaro.github.io/meada/en/contributing/)
 
 [Apache-2.0](LICENSE).
+
+## Repository map
+
+### Local interface and invariants
+
+The build script compiles one Kotlin grammar from the vendored parser and scanner. Cargo reruns this step when the source directory changes. `[build.rs:main]`
+
+### Component boundaries
+
+- [Query engine, indexing and MCP server](./src/README.en.md)
+- [Shared Rust and WASM types and validation](./meada-core/README.en.md)
+- [Browser administration console](./ui/README.en.md)
+- [Docker Compose and Helm deployment](./deploy/README.en.md)
+- [Checks and maintenance tools](./scripts/README.en.md)
+- [Export comparison and map splitting](./examples/README.en.md)
+
+### Global invariants
+
+The CLI and MCP server use the same engine. Each index belongs to one repository. The types and validation core also builds for the browser. `[src/engine.rs:Engine]` `[src/index.rs:open]` `[meada-core/src/wasm.rs:validate]`
+
+### Side effects
+
+Indexing reads repositories and writes SQLite indexes. The HTTP server queries existing indexes in read-only mode. `[src/index.rs:refresh]` `[src/engine.rs:open_manifest]`
+
+### Verification
+
+From the root, run `cargo test`. For optional modules, consult the feature matrix in [CI](./.github/workflows/ci.yml).

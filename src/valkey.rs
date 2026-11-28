@@ -1,9 +1,3 @@
-//! The one Valkey client the cloud modules share (ADR 0012, feature `valkey`), configured by the
-//! manifest's `[valkey]` section: TLS outside loopback, an AUTH/RBAC user and password, a
-//! standalone server or a cluster, and every key under the manifest's `key_prefix`. The
-//! password comes only from the environment variable or the file the section names; it
-//! appears in no error and on no stderr line.
-
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -18,17 +12,13 @@ use serde::Deserialize;
 use crate::modules::{Problem, Secret};
 use crate::msg::Msg;
 
-/// How long `meada status` waits for Valkey to answer its ping: a dead one must not stall the
-/// probe.
 const PING_TIMEOUT: Duration = Duration::from_millis(800);
-/// A connection attempt, and an answer, of the shared client.
 const NETWORK_TIMEOUT: Duration = Duration::from_secs(2);
 // ponytail: the most `password_file` may hold; past it the connection fails, naming the file.
 const VALKEY_PASSWORD_MAX: u64 = 4096;
 // ponytail: the most `ca_file` may hold; past it the connection fails, naming the file.
 const VALKEY_CA_MAX: u64 = 1 << 20;
 
-/// The `[valkey]` section as written.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct File {
@@ -69,7 +59,6 @@ impl File {
                 return Err((url, Msg::ValkeyUrlInsecure.text()));
             }
             ConnectionAddr::Unix(_) => return Err((url, Msg::ValkeyUrlInvalid.text())),
-            // A cluster announces its nodes, which are not loopback: TLS from the seed on.
             ConnectionAddr::Tcp(..) if self.cluster => {
                 return Err(("valkey.cluster", Msg::ValkeyClusterPlain.text()));
             }
@@ -96,9 +85,6 @@ impl File {
 }
 
 impl Config {
-    /// The one function every key the modules build goes through: `<key_prefix>:<name>`, or
-    /// `{<key_prefix>}:<name>` when `tagged`, so the keys one script reads or writes together
-    /// (the pointer, the lock and the fence) land on one slot in cluster mode.
     pub fn key(&self, name: &str, tagged: bool) -> String {
         let prefix = &self.key_prefix;
         match tagged {
@@ -107,8 +93,6 @@ impl Config {
         }
     }
 
-    /// The AUTH password, read now from the variable or the file the section names (on a
-    /// blocking thread, so a slow mount stalls no timeout).
     async fn auth(&self) -> Result<Option<String>, String> {
         let Some(password) = self.password.clone() else {
             return Ok(None);
@@ -121,7 +105,6 @@ impl Config {
     }
 }
 
-/// `config::read_bounded` on a blocking thread, so a slow mount stalls no timeout.
 async fn read_file(path: &Path, max: u64) -> Result<Vec<u8>, String> {
     let path = path.to_path_buf();
     let shown = path.display().to_string();
@@ -187,7 +170,6 @@ impl Valkey {
         Ok(Self { conn, secret })
     }
 
-    /// Runs `command`; an error never carries the password.
     pub async fn query<T: FromRedisValue>(&self, command: &Cmd) -> Result<T, String> {
         let answer = match &self.conn {
             Conn::Single(c) => command.query_async(&mut c.clone()).await,
@@ -201,7 +183,6 @@ impl Valkey {
     }
 }
 
-/// `text` without the secret, if the text carries it.
 pub(crate) fn scrub(text: &str, secret: Option<&str>) -> String {
     match secret {
         Some(secret) if !secret.is_empty() => text.replace(secret, "***"),
@@ -209,13 +190,11 @@ pub(crate) fn scrub(text: &str, secret: Option<&str>) -> String {
     }
 }
 
-/// Whether Valkey answers within `PING_TIMEOUT`, or why not.
 pub fn reach(config: &Config) -> Result<(), String> {
     let ping = async { Valkey::connect(config).await?.ping().await };
     crate::modules::within(PING_TIMEOUT, ping, Msg::ValkeyTimeout)
 }
 
-/// The `valkey:` line `meada status --workspace` prints.
 pub fn status_line(config: &Config) -> String {
     match reach(config) {
         Ok(()) => Msg::ValkeyReachable.text(),
@@ -291,7 +270,6 @@ pub(crate) mod tests {
             assert_eq!(found, key, "{toml}");
             assert!(!message.contains(secret), "{message}");
         }
-        // Loopback may stay plain, in any of its forms.
         for host in ["localhost", "127.0.0.1", "127.9.9.9", "[::1]"] {
             let url = format!("url = \"redis://{host}\"");
             assert!(section(&url).is_ok(), "{host}");
@@ -342,8 +320,6 @@ pub(crate) mod tests {
         assert_eq!(config.key("fence", true), "{meada:prod}:fence");
     }
 
-    /// The local Valkey the tests name, or `None` (with the reason printed) when the variable is
-    /// unset; `MEADA_TEST_SERVICES_REQUIRED=1` turns that into a failure.
     pub(crate) fn service() -> Option<String> {
         let url = std::env::var("MEADA_TEST_VALKEY_URL").ok();
         if url.is_none() {
@@ -354,14 +330,11 @@ pub(crate) mod tests {
         url
     }
 
-    /// A password made at run time, another on each call (each `RandomState` has keys of its
-    /// own): the tests use no literal credential.
     fn made_password() -> String {
         use std::hash::{BuildHasher, RandomState};
         RandomState::new().hash_one(std::process::id()).to_string()
     }
 
-    /// A config for `url` as `user`, the password in a file of this test's own.
     fn with_password(url: &str, user: &str, password: &str, name: &str) -> Config {
         let pid = std::process::id();
         let file = std::env::temp_dir().join(format!("meada-valkey-{pid}-{name}"));
@@ -376,7 +349,6 @@ pub(crate) mod tests {
     }
 
     async fn admin(url: &str) -> redis::aio::MultiplexedConnection {
-        // The defaults (1 s to connect, 500 ms per response) fail under load.
         let config = redis::AsyncConnectionConfig::new()
             .set_connection_timeout(Some(NETWORK_TIMEOUT))
             .set_response_timeout(Some(NETWORK_TIMEOUT));
@@ -385,8 +357,6 @@ pub(crate) mod tests {
         (connected.await).unwrap_or_else(|e| panic!("the admin connection to {url}: {e}"))
     }
 
-    /// A TLS handshake with a port that closes every connection fails with an error. In a build
-    /// with every module, two rustls providers made it panic instead (one provider, ring, now).
     #[tokio::test(flavor = "current_thread")]
     async fn a_tls_handshake_that_fails_is_an_error_and_no_panic() {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -413,7 +383,6 @@ pub(crate) mod tests {
         let key = config.key("probe", false);
         let set = cmd("SET").arg(&key).arg("v").clone();
         valkey.query::<()>(&set).await.unwrap();
-        // Read back by the literal key, not by the function that built it.
         let literal = format!("meada:test-{pid}:probe");
         let mut root = admin(&url).await;
         let got: String = cmd("GET")
@@ -461,7 +430,6 @@ pub(crate) mod tests {
             "{reason}"
         );
 
-        // TLS to a plain port fails, and says nothing of the password either.
         let tls = with_password(
             &url.replacen("redis://", "rediss://", 1),
             &user,

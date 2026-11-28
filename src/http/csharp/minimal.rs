@@ -1,27 +1,3 @@
-//! ASP.NET Core minimal API providers (spec #28, #110): `MapGet`, `MapPost`, `MapPut`,
-//! `MapPatch`, `MapDelete` and `MapMethods(pattern, methods, handler)` called on the
-//! application or on a `MapGroup(prefix)` group serve the pattern under every prefix of the
-//! groups around it, at any depth.
-//!
-//! A builder is followed through the shared value flow (`Code::origins` with `Follow::Values`):
-//! locals, method arguments, return values and the receiver of an extension method
-//! (`group.MapOrders()` binds `this RouteGroupBuilder group`). Each origin is a node of the
-//! mounts: a `MapGroup` call is mounted on the origins of its receiver under its prefix, and
-//! the application (`WebApplication.Create(..)`, or `Build()` on a builder made by
-//! `WebApplication.CreateBuilder(..)` and its siblings) is the root; any other origin is a
-//! mount Meada does not read, so what it holds is served nowhere. A builder one function
-//! returns keeps the calls the walk climbed to reach it (`Route::through`), and what is
-//! written in that function is read with that call's arguments alone (`Code::origins_within`),
-//! so two groups one factory makes from two builders keep their own prefixes. A builder used
-//! under two prefixes (an extension method called on two groups) serves each route under both.
-//! A factory that calls itself to make the group it returns, and a repository past
-//! `MINIMAL_NODES` nodes, serve nothing.
-//!
-//! A lambda handler is an inline handler named for its route (`handler_site`, the pack's
-//! `Kind::Inline` scope of a lambda argument); a method group (`Handlers.List`) is that method
-//! when it names one, and anything else leaves the route at its file. A method of the
-//! repository named like one of the framework's (`MapGet`, `MapGroup`) hides it.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::super::{
@@ -34,7 +10,6 @@ use crate::lang::{Call, Value};
 use crate::names::{one, spellings};
 use crate::resolve::{Code, Of, passes_nothing};
 
-/// The route methods of one HTTP method, with the method each serves.
 const VERBS: &[(&str, &str)] = &[
     ("MapGet", "GET"),
     ("MapPost", "POST"),
@@ -45,13 +20,9 @@ const VERBS: &[(&str, &str)] = &[
 const MAP_METHODS: &str = "MapMethods";
 const MAP_GROUP: &str = "MapGroup";
 pub(super) const APP: &str = "Microsoft.AspNetCore.Builder.WebApplication.";
-/// What makes an application: `WebApplication.Create(..)`.
 const CREATE: &str = "Create";
-/// What makes a builder whose `Build()` is an application.
 pub(super) const BUILDERS: &[&str] = &["CreateBuilder", "CreateSlimBuilder", "CreateEmptyBuilder"];
 const HTTP_METHODS: &str = "Microsoft.AspNetCore.Http.HttpMethods.";
-/// The conventions a group is configured with, each returning the group it is called on
-/// (`app.MapGroup("/api").RequireAuthorization()`).
 // ponytail: the common ones; a group configured through another call is served nowhere.
 const CONVENTIONS: &[&str] = &[
     "AddEndpointFilter",
@@ -66,46 +37,33 @@ const CONVENTIONS: &[&str] = &[
     "WithTags",
 ];
 
-/// An origin of a builder: the call that made it and the calls the walk climbed through to
-/// reach it, outermost first (`Route::through`).
 type Node<'a> = (CallAt<'a>, Vec<CallAt<'a>>);
 
-/// The method a callee calls: `MapGet` of `app.MapGet`, `AddEndpointFilter` of
-/// `g.AddEndpointFilter<F>`.
 fn method(callee: &str) -> &str {
     let name = callee.rsplit('.').next().unwrap_or(callee);
     name.split('<').next().unwrap_or(name)
 }
 
-/// How many nodes the mounts of one repository may hold.
 // ponytail: real apps make tens of groups; past this (a crafted web of factories) nothing is
 // served, rather than routes under part of their prefixes.
 const MINIMAL_NODES: usize = 4096;
 
 struct Minimal<'c, 'a> {
     code: &'c Code<'a>,
-    /// Whether a node was dropped past `MINIMAL_NODES`.
     overflow: bool,
-    /// The nodes whose origins went round a factory that calls itself (`origins`): what is
-    /// mounted above them is not known, so a route reaching one is served nowhere.
     cycles: BTreeSet<usize>,
-    /// Each node by its place in `nodes`.
     ids: BTreeMap<Node<'a>, usize>,
     nodes: Vec<Node<'a>>,
-    /// The nodes not yet read.
     pending: Vec<usize>,
     roots: BTreeSet<usize>,
     mounts: Mounts<'a, usize>,
 }
 
 impl<'c, 'a> Minimal<'c, 'a> {
-    /// Whether the call at `index` of `path` is the framework's: no function of the repository
-    /// answers it (a method of the repository named `MapGet` hides it only there).
     fn framework(&self, path: &'a str, index: usize) -> bool {
         self.code.reaches(path, index).is_none()
     }
 
-    /// The place of `node` in `nodes`, read later when it is new; `None` past `MINIMAL_NODES`.
     fn intern(&mut self, node: Node<'a>) -> Option<usize> {
         if let Some(&id) = self.ids.get(&node) {
             return Some(id);
@@ -121,9 +79,6 @@ impl<'c, 'a> Minimal<'c, 'a> {
         Some(id)
     }
 
-    /// The origins of `value`, written in `scope` of `path` inside the functions the calls of
-    /// `context` reach, which bind their parameters (`Code::origins_within`); `None` when one
-    /// climbs a call twice, round a factory that calls itself.
     fn origins(
         &self,
         path: &'a str,
@@ -149,8 +104,6 @@ impl<'c, 'a> Minimal<'c, 'a> {
         Some(out.into_iter().collect())
     }
 
-    /// Whether the call at `index` of `path` is the framework's `WebApplication.<name>` for
-    /// one of `names`, as the file's usings spell it.
     fn app_call(&self, path: &'a str, index: usize, names: &[&str]) -> bool {
         let call = &self.code.files()[path].calls[index];
         let spelled = spellings(self.code, path, &call.scope, &call.callee);
@@ -160,9 +113,6 @@ impl<'c, 'a> Minimal<'c, 'a> {
         .is_some()
     }
 
-    /// Reads the node `id`: a `MapGroup` call is mounted on the origins of its receiver under
-    /// its prefix, a convention (`CONVENTIONS`) with none, the application is a root, and
-    /// anything else is left unread.
     fn read(&mut self, id: usize) {
         let code = self.code;
         let ((path, index), context) = self.nodes[id].clone();
@@ -178,7 +128,6 @@ impl<'c, 'a> Minimal<'c, 'a> {
         let Some(receiver) = call.receiver.as_ref() else {
             return;
         };
-        // `Build()` on what the framework's builder made is the framework's.
         if name == "Build" {
             let made = self
                 .origins(path, scope, receiver, &context)
@@ -192,7 +141,6 @@ impl<'c, 'a> Minimal<'c, 'a> {
             MAP_GROUP => (call.args.first())
                 .or_else(|| call.keyword("prefix"))
                 .and_then(|v| path_literal(code.value(path, scope, v))),
-            // A convention returns the group it configures.
             _ if CONVENTIONS.contains(&name) => Some(String::new()),
             _ => return,
         };
@@ -209,8 +157,6 @@ impl<'c, 'a> Minimal<'c, 'a> {
         self.mounts.insert(id, parents);
     }
 
-    /// Whether a node mounted under `nodes`, at any depth, went round a factory that calls
-    /// itself (`cycles`).
     fn round(&self, nodes: &[usize]) -> bool {
         let (mut seen, mut work) = (BTreeSet::new(), nodes.to_vec());
         while let Some(id) = work.pop() {
@@ -226,8 +172,6 @@ impl<'c, 'a> Minimal<'c, 'a> {
         false
     }
 
-    /// The methods `value` names, upper-case: a list of literals or `HttpMethods.X`; `None`
-    /// when one cannot be read.
     fn methods(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Option<Vec<String>> {
         let Value::List(items) = value else {
             return None;
@@ -254,7 +198,6 @@ impl<'c, 'a> Minimal<'c, 'a> {
     }
 }
 
-/// A route a call registers: its call, its pattern, its methods and its handler.
 struct Route<'a> {
     path: &'a str,
     call: &'a Call,
@@ -264,7 +207,6 @@ struct Route<'a> {
     nodes: Vec<usize>,
 }
 
-/// Minimal API providers: see the module.
 pub(in crate::http) fn providers(code: &Code) -> Vec<Found> {
     let files: Vec<_> = (code.files().iter())
         .filter(|(p, _)| p.ends_with(".cs"))
@@ -291,7 +233,6 @@ pub(in crate::http) fn providers(code: &Code) -> Vec<Found> {
             {
                 continue;
             }
-            // The index keeps no argument: they come from the full facts of the file.
             let Some(call) = code.call(path, n) else {
                 continue;
             };
@@ -381,7 +322,6 @@ mod tests {
     const APP_START: &str = "var builder = WebApplication.CreateBuilder(args);\n\
                              var app = builder.Build();\n";
 
-    /// Each provider the files give (`(path, source)`), as `contract site`, sorted.
     fn served_in(sources: &[(&str, &str)]) -> Vec<String> {
         let parsed: Vec<_> = (sources.iter())
             .map(|(p, s)| (*p, CSharp.parse(p, s.as_bytes()).unwrap()))
@@ -406,7 +346,6 @@ mod tests {
         found
     }
 
-    /// The providers of top-level statements `program` after the usings and the application.
     fn served(program: &str) -> Vec<String> {
         let src = format!("{USINGS}{APP_START}{program}\n");
         served_in(&[("Program.cs", &src)])
@@ -424,7 +363,6 @@ mod tests {
         );
     }
 
-    /// The contracts alone.
     fn contracts(found: Vec<String>) -> Vec<String> {
         let mut out: Vec<String> = (found.into_iter())
             .map(|f| f.split(' ').next().unwrap_or_default().to_string())
@@ -472,8 +410,6 @@ mod tests {
 
     #[test]
     fn a_builder_meada_does_not_read_serves_nothing() {
-        // A parameter no call reaches, a group whose prefix is unknown, an application that is
-        // not the framework's, and a builder reassigned (the pack drops its bound).
         let found = served_in(&[(
             "Program.cs",
             &format!(
@@ -524,8 +460,6 @@ mod tests {
         );
     }
 
-    /// `Routes.cs`: an extension method mapping routes on the group it is called on, a cycle,
-    /// a method given a group, and factories returning groups.
     const ROUTES: &str = "using Microsoft.AspNetCore.Builder;\nusing Microsoft.AspNetCore.Routing;\n\
         namespace Acme.Routes;\n\
         public static class OrderRoutes {\n\
@@ -640,8 +574,6 @@ mod tests {
         assert_eq!(contracts(found), ["http::GET::/api/a"]);
     }
 
-    /// Groups nested in place are read once each: a deep nest costs its depth, and one past
-    /// the pack's `VALUE_DEPTH` (and so `PREFIX_DEPTH`) is served nowhere.
     #[test]
     fn a_deep_nest_of_groups_is_read_in_linear_time_and_served_nowhere_past_the_prefix_depth() {
         let nest = |n: usize| {
@@ -669,8 +601,6 @@ mod tests {
         assert_eq!(contracts(found), ["http::GET::/g/a"]);
     }
 
-    /// A factory that calls itself to make the group it returns is read to a bound and serves
-    /// nothing: a route above a node whose origins climb one call twice is served nowhere.
     #[test]
     fn a_recursive_group_factory_is_read_in_bounded_time() {
         let factories = "static class F {\n\
@@ -688,11 +618,9 @@ mod tests {
         )));
         let took = start.elapsed();
         assert!(took < std::time::Duration::from_secs(5), "{took:?}");
-        // What the recursive factories make is served nowhere, not under part of its prefixes.
         assert_eq!(found, ["http::GET::/ok"]);
     }
 
-    /// Past `MINIMAL_NODES` nodes nothing is served.
     #[test]
     fn past_the_node_ceiling_nothing_is_served() {
         let groups: String = (0..MINIMAL_NODES)

@@ -1,6 +1,3 @@
-//! Freshness (ADR 0004): every query first brings the index up to date with the files on
-//! disk, and a refreshed index exports exactly what a cold index of the same files does.
-
 use crate::common;
 
 use std::fs;
@@ -15,7 +12,6 @@ use meada::engine::Engine;
 const ORIGIN: Option<&str> = Some("https://example.com/acme/conformance.git");
 const WEB: Option<&str> = Some("https://example.com/acme/web.git");
 
-/// The level of the call `id` ends with in the export `json`.
 fn level<'j>(json: &'j serde_json::Value, id: &str) -> &'j serde_json::Value {
     let calls = json["calls"].as_array().unwrap();
     let call = calls
@@ -24,8 +20,6 @@ fn level<'j>(json: &'j serde_json::Value, id: &str) -> &'j serde_json::Value {
     &call.unwrap_or_else(|| panic!("no call {id}"))["level"]
 }
 
-/// Refreshes a copy of the C# fixture after `edit`, checks it equals a cold export of the same
-/// files and differs from the export before, and gives the refreshed export.
 fn csharp_refreshed(case: &str, edit: impl Fn(&Path)) -> serde_json::Value {
     let repo = fixture_repo(case, "conformance-csharp", ORIGIN);
     age(&repo);
@@ -39,7 +33,6 @@ fn csharp_refreshed(case: &str, edit: impl Fn(&Path)) -> serde_json::Value {
     serde_json::from_str(&refreshed).unwrap()
 }
 
-/// Rewrites a file of the repository with `from` replaced by `to`.
 fn replace(repo: &Path, file: &str, from: &str, to: &str) {
     let path = repo.join(file);
     let before = fs::read_to_string(&path).unwrap();
@@ -50,8 +43,6 @@ fn replace(repo: &Path, file: &str, from: &str, to: &str) {
 const GLOBALS: &str = "src/Acme.Core/GlobalUsings.cs";
 const API_PROJECT: &str = "src/Acme.Api/Acme.Api.csproj";
 
-/// Edits a global using file, adds and deletes `.cs` files, deletes one project file and adds
-/// another: files that did not change on disk resolve anew.
 #[test]
 fn csharp_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
     let json = csharp_refreshed("fresh_csharp", |repo: &Path| {
@@ -75,8 +66,6 @@ fn csharp_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
         )
         .unwrap();
     });
-    // The alias is gone from every file of Acme.Core, Acme.Api's project file with its
-    // `<Using>`, and the new SDK-style project file adds a `using static`.
     assert!(level(&json, "OrderService.Place(string,int)::Fmt.Upper#0").is_null());
     assert!(level(&json, "Checkout.Run()::OrderService.Default#0").is_null());
     assert_eq!(level(&json, "Legacy.Old.Run()::Upper#0"), "exact");
@@ -86,7 +75,6 @@ fn csharp_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
     );
 }
 
-/// A project file changes alone: the files of its project resolve anew.
 #[test]
 fn csharp_refreshed_export_after_a_project_file_edit_equals_a_cold_export() {
     let json = csharp_refreshed("fresh_csharp_project", |repo: &Path| {
@@ -101,11 +89,9 @@ fn csharp_refreshed_export_after_a_project_file_edit_equals_a_cold_export() {
     assert_eq!(level(&json, "Checkout.Run()::Svc.Default#0"), "exact");
 }
 
-/// A `Directory.Build.props` changes alone: the files of the projects below it resolve anew.
 #[test]
 fn csharp_refreshed_export_after_a_directory_build_props_edit_equals_a_cold_export() {
     let props = "src/Acme.Api/Directory.Build.props";
-    // The project's `<Using>` moves to the props file beside it.
     let setup = |repo: &Path| {
         replace(
             repo,
@@ -143,7 +129,6 @@ fn csharp_refreshed_export_after_a_directory_build_props_edit_equals_a_cold_expo
     assert!(level(&json, call).is_null());
 }
 
-/// A global using file changes alone: the other files of its project resolve anew.
 #[test]
 fn csharp_refreshed_export_after_a_global_using_edit_equals_a_cold_export() {
     let json = csharp_refreshed("fresh_csharp_globals", |repo: &Path| {
@@ -197,7 +182,6 @@ fn kotlin_refreshed_export_after_edit_add_and_delete_equals_a_cold_export() {
         refreshed,
         cold_export("fresh_kotlin_cold", "conformance-kotlin", ORIGIN, edit)
     );
-    // The edited overload takes one argument now: `tool()` no longer fits it.
     let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
     let called = json["calls"]
         .as_array()
@@ -291,8 +275,6 @@ fn java_consumers_follow_an_edited_constant_of_another_file_like_a_cold_index() 
     assert_eq!(consumed(list), Some("http::GET::/v2/orders".into()));
 }
 
-/// A listener's topic follows an edited key of the Spring configuration, and a producer's an
-/// edited constant, as a cold index reads them (spec #26, #92).
 #[test]
 fn java_channels_follow_an_edited_configuration_key_and_constant_like_a_cold_index() {
     let edit = |repo: &Path| {
@@ -335,7 +317,6 @@ fn java_channels_follow_an_edited_configuration_key_and_constant_like_a_cold_ind
 
 #[test]
 fn java_declarative_clients_follow_edited_files_like_a_cold_index() {
-    // The base lives in `Remotes`, the interface in `Ledger`: the edit is in another file.
     let edit = |repo: &Path| {
         let dir = repo.join("maven/api/src/main/java/example/declarative");
         for (file, from, to) in [
@@ -378,9 +359,6 @@ fn java_declarative_clients_follow_edited_files_like_a_cold_index() {
     );
 }
 
-/// Edits a file whose exports others import, adds a file whose definition turns an inferred
-/// call in an unrelated file into an ambiguous one, deletes a file, and drops the tsconfig
-/// path alias.
 fn edit(repo: &Path) {
     let math = fs::read_to_string(repo.join("src/math.ts")).unwrap();
     fs::write(
@@ -397,8 +375,6 @@ fn edit(repo: &Path) {
     fs::write(repo.join("tsconfig.json"), "{}\n").unwrap();
 }
 
-/// Edits a Backstage config partial (#689), and nothing else: its root `app-config.yaml` includes
-/// it, so the refreshed export reads the new variable, as a cold export of the same files does.
 #[test]
 fn a_refresh_after_editing_only_a_backstage_partial_equals_a_cold_export() {
     const PARTIAL: &str = "config/partials/acme.yaml";
@@ -430,8 +406,6 @@ fn a_refresh_after_editing_only_a_backstage_partial_equals_a_cold_export() {
     assert_eq!(via("viaGetString"), Some("env:API_URL".into()));
 }
 
-/// Edits, adds and deletes `.swift` files of the SwiftPM fixture, then edits its `Package.swift`
-/// alone: each refreshed export equals a cold export of the same files (spec #29, #117).
 #[test]
 fn swift_refreshed_export_after_edit_add_delete_and_a_manifest_edit_equals_a_cold_export() {
     let run = "Checkout.run()::";
@@ -465,7 +439,6 @@ fn swift_refreshed_export_after_edit_add_delete_and_a_manifest_edit_equals_a_col
     assert_eq!(level(&json, &format!("{run}missing#0")), "exact");
     assert!(level(&json, "place(order:quantity:)::order.price#0").is_null());
 
-    // The `Store` target moves away from its files: they leave the module the import names.
     let manifest = |repo: &Path| {
         files(repo);
         replace(
@@ -498,10 +471,6 @@ fn swift_refreshed_export_after_edit_add_delete_and_a_manifest_edit_equals_a_col
     assert!(level(&json, &format!("{run}Order#0")).is_null());
 }
 
-/// The conformance app beside a second Swift package, one repository: a type parameter an
-/// extension in another file sees (`Page<Item>`, `extension Page { Item() }`) is read from the
-/// files a refresh kept as it is from the ones it parsed, so an edit to an unrelated Swift file
-/// leaves the export a cold one (#609).
 #[test]
 fn swift_refreshed_export_after_an_unrelated_edit_equals_a_cold_export_beside_another_package() {
     let beside = |repo: &Path| {
@@ -536,7 +505,6 @@ fn swift_refreshed_export_after_an_unrelated_edit_equals_a_cold_export_beside_an
     beside(&cold);
     edit(&cold);
     assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
-    // `Item` is `Page`'s type parameter, so its construction is no construction of the struct.
     let json: serde_json::Value = serde_json::from_str(&refreshed).unwrap();
     assert!(level(&json, "Page.build()::Item#0").is_null());
 }
@@ -563,9 +531,6 @@ fn refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() {
     );
 }
 
-/// Renames a function others import, adds a module whose function turns an inferred call
-/// into an ambiguous one, deletes a module star-imported elsewhere, and declares a source
-/// root, which drops the implicit `src` one.
 fn edit_python(repo: &Path) {
     let units = fs::read_to_string(repo.join("geometry/units.py")).unwrap();
     fs::write(
@@ -603,7 +568,6 @@ fn python_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files(
     );
 }
 
-/// Drops the console script that names `reports:build` and adds one for `jobs.steps:store`.
 fn edit_python_scripts(repo: &Path) {
     fs::write(
         repo.join("pyproject.toml"),
@@ -613,7 +577,6 @@ fn edit_python_scripts(repo: &Path) {
     .unwrap();
 }
 
-/// The kind of the process an entry point of the export starts, by the end of its identity.
 fn kind_of(export: &str, entry_point: &str) -> Option<String> {
     let json: serde_json::Value = serde_json::from_str(export).unwrap();
     let processes = json["processes"].as_array().unwrap().iter();
@@ -632,8 +595,6 @@ fn python_console_scripts_follow_an_edited_pyproject_like_a_cold_index() {
 
     let refreshed = Engine::open(&repo).unwrap().export().unwrap();
 
-    // `build` is a program while a script names it, an export once none does; `store` is
-    // called by other functions, so only a script makes it a door.
     assert_eq!(
         kind_of(&before, "reports/__init__.py::build").as_deref(),
         Some("program")
@@ -658,8 +619,6 @@ fn python_console_scripts_follow_an_edited_pyproject_like_a_cold_index() {
     );
 }
 
-/// Renames a topic constant the Python channel files import, adds a consumer of a topic that
-/// had none, and deletes a module with producers and consumers (spec #73).
 fn edit_python_channels(repo: &Path) {
     let topics = fs::read_to_string(repo.join("messages/topics.py")).unwrap();
     assert!(topics.contains("\"orders\""));
@@ -687,7 +646,6 @@ fn python_channels_follow_an_edited_topic_constant_like_a_cold_index() {
     let refreshed = Engine::open(&repo).unwrap().export().unwrap();
 
     assert_ne!(refreshed, before);
-    // The renamed constant reaches the channels of the files that import it.
     assert!(refreshed.contains("channel::kafka::sales"));
     assert!(!refreshed.contains("channel::kafka::orders"));
     assert_eq!(
@@ -701,9 +659,6 @@ fn python_channels_follow_an_edited_topic_constant_like_a_cold_index() {
     );
 }
 
-/// Moves `mod health;` out of `routes/mod.rs` (its file is no longer reached), declares the
-/// unreached `orphan.rs`, adds a module with its file, deletes a module's file, edits a
-/// function others call and drops the `[[bin]]` root from a member's `Cargo.toml`.
 fn edit_rust(repo: &Path) {
     let replace = |file: &str, from: &str, to: &str| {
         let text = fs::read_to_string(repo.join(file)).unwrap();
@@ -729,7 +684,6 @@ fn edit_rust(repo: &Path) {
     .unwrap();
     fs::remove_file(repo.join("api/tools/shared.rs")).unwrap();
     replace("api/Cargo.toml", "[[bin]]", "[[example]]");
-    // A `pub use` edited, an item moved to another file, a package renamed.
     replace(
         "crates/billing/src/billing.rs",
         "pub use invoice::Invoice;",
@@ -755,7 +709,6 @@ fn rust_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() 
 
     let refreshed = Engine::open(&repo).unwrap().export().unwrap();
 
-    // The moved declaration looks for `api/src/health.rs`, which is not there.
     assert!(before.contains("api/src/routes/health.rs::check"));
     assert!(!refreshed.contains("api/src/routes/health.rs"));
     assert!(refreshed.contains("api/src/orphan.rs::lost"));
@@ -769,9 +722,6 @@ fn rust_refreshed_export_is_byte_identical_to_a_cold_export_of_the_same_files() 
     );
 }
 
-/// A refresh after a one-line edit reads the values of every unchanged file from the values
-/// cache (ADR 0027), parsing only the edited one, and leaves the index a cold one; deleting the
-/// cache costs only the parses.
 #[test]
 fn a_refresh_over_the_values_cache_parses_only_the_edited_file_and_equals_a_cold_export() {
     let edit = |repo: &Path| {
@@ -821,9 +771,6 @@ fn a_refresh_over_the_values_cache_parses_only_the_edited_file_and_equals_a_cold
     assert_eq!(refreshed, expected);
 }
 
-/// Renames a function of a multi-file package that the package's other files call, adds a file
-/// to the package that defines a name another file calls, adds one the build constraints leave
-/// out, deletes a file of another package, and replaces `go.mod`'s `replace` target.
 fn edit_go(repo: &Path) {
     let replace = |file: &str, from: &str, to: &str| {
         let text = fs::read_to_string(repo.join(file)).unwrap();
@@ -914,8 +861,6 @@ fn a_default_feature_toggled_in_cargo_toml_refreshes_to_the_cold_export() {
     );
 }
 
-/// Refreshes a copy of the Rust item macro fixture (#398) after `edit`, checks it equals a cold
-/// export of the same files and differs from the export before, and gives both exports.
 fn item_macros_refreshed(case: &str, edit: impl Fn(&Path)) -> (String, String) {
     let repo = fixture_repo(case, "rust-item-macros", ORIGIN);
     age(&repo);
@@ -944,7 +889,6 @@ fn a_file_only_an_item_macro_reaches_refreshes_to_the_cold_export() {
 
 #[test]
 fn an_item_macro_edited_in_another_file_refreshes_its_callers_to_the_cold_export() {
-    // `lib.rs` does not change on disk: what its setting carries of `cfg_runtime` does.
     let (before, after) = item_macros_refreshed("fresh_rust_item_macro_gate", |repo| {
         let gate = "#[cfg(feature = \"rt\")]\n            #[cfg_attr";
         let net = "#[cfg(feature = \"net\")]\n            #[cfg_attr";
@@ -972,7 +916,6 @@ fn deleting_the_file_that_defines_an_item_macro_refreshes_to_the_cold_export() {
     });
     assert!(before.contains("src/runtime.rs::start"));
     assert!(!after.contains("src/runtime.rs"));
-    // `cfg_rt` is defined in `lib.rs` itself.
     assert!(after.contains("src/rt.rs::block_on"));
 }
 
@@ -997,7 +940,6 @@ fn edit_file(repo: &Path, file: &str, from: &str, to: &str) {
 }
 
 fn chain_metrics(repo: &Path) {
-    // `json` is a default feature: what it enables is on now.
     edit_file(repo, "api/Cargo.toml", "json = []", "json = [\"metrics\"]");
 }
 
@@ -1082,7 +1024,6 @@ fn a_bin_added_to_cargo_toml_refreshes_its_program_to_the_cold_export() {
 
 #[test]
 fn an_open_engine_answers_after_files_change() {
-    // No aging: every file was just written, so none can be trusted by mtime alone.
     let repo = fixture_repo("fresh_same_engine", "conformance-ts-js", ORIGIN);
     let engine = Engine::open(&repo).unwrap();
     engine.export().unwrap();
@@ -1098,8 +1039,6 @@ fn an_open_engine_answers_after_files_change() {
 
 #[test]
 fn unchanged_files_are_not_read_again() {
-    // An unreadable file whose mtime and size still match the index cannot be read, so a
-    // refresh that succeeds took its facts from the index.
     let view = |repo: &Path| {
         fs::write(
             repo.join("src/view.tsx"),
@@ -1124,7 +1063,6 @@ fn unchanged_files_are_not_read_again() {
     );
 }
 
-/// The two-repository fixture as siblings in one case directory.
 fn web_and_api(case: &str) -> (PathBuf, PathBuf) {
     (
         fixture_repo(case, "http-web", Some("git@example.com:acme/web.git")),
@@ -1132,8 +1070,6 @@ fn web_and_api(case: &str) -> (PathBuf, PathBuf) {
     )
 }
 
-/// Changes links from both sides: the api drops one route handler, deletes a route and adds
-/// one; the web consumes the new route.
 fn edit_link_ends(web: &Path, api: &Path) {
     let users = api.join("app/api/users/route.ts");
     let route = fs::read_to_string(&users).unwrap();
@@ -1159,7 +1095,6 @@ fn links_that_touch_changed_files_follow_a_refresh_on_both_sides() {
     age(&web);
     let engine = Engine::open(&web).unwrap();
     let before = engine.export().unwrap();
-    // The api has its own index already, refreshed from its side.
     Engine::open(&api).unwrap().export().unwrap();
     edit_link_ends(&web, &api);
 
@@ -1177,7 +1112,6 @@ fn links_that_touch_changed_files_follow_a_refresh_on_both_sides() {
 
 #[test]
 fn context_refreshes_when_the_span_hash_no_longer_matches() {
-    // Same size and the old mtime: only the span hash shows the edit.
     let repo = fixture_repo("fresh_context", "ts-basic", WEB);
     age(&repo);
     let engine = Engine::open(&repo).unwrap();
@@ -1194,9 +1128,6 @@ fn context_refreshes_when_the_span_hash_no_longer_matches() {
     );
 }
 
-/// Repositories whose contracts read values from other files: path constants (`http-paths`,
-/// with its provider `http-api`), client wrappers (`http-wrappers`) and Express mounts
-/// (`http-express`, whose inline handlers are named by the mounts above them).
 fn values(case: &str) -> [PathBuf; 3] {
     fixture_repo(case, "http-api", Some("https://example.com/acme/api.git"));
     [
@@ -1218,8 +1149,6 @@ fn values(case: &str) -> [PathBuf; 3] {
     ]
 }
 
-/// Edits only the files that hold values: a constant other files import, a wrapper's default
-/// method, and the mount prefix that names the inline handlers of another file.
 fn edit_values([paths, admin, backend]: &[PathBuf; 3]) {
     let replace = |path: PathBuf, from: &str, to: &str| {
         let src = fs::read_to_string(&path).unwrap();
@@ -1267,9 +1196,6 @@ fn contracts_follow_values_edited_in_other_files() {
     }
 }
 
-/// A cold index keeps no file's values past its parse (the index does not hold them), yet a
-/// kind that reads one still finds it: the constants a URL is built from, and the arguments of
-/// a client wrapper's call (#395).
 #[test]
 fn a_cold_index_still_reads_the_values_a_contract_kind_asks_for() {
     let [paths, admin, _] = values("cold_values");
@@ -1299,8 +1225,6 @@ fn a_cold_index_still_reads_the_values_a_contract_kind_asks_for() {
     );
 }
 
-/// Renames the topic the gateway produces through its wrapper, in the imported constant, and
-/// the topics the conformance fixture builds from a constant (spec #20).
 fn edit_topics(gateway: &Path, conformance: &Path) {
     let replace = |path: PathBuf, from: &str, to: &str| {
         let src = fs::read_to_string(&path).unwrap();
@@ -1353,9 +1277,6 @@ fn channels_follow_an_edited_topic_constant() {
 
 pub(crate) type Chain = (PathBuf, PathBuf, PathBuf);
 
-/// Edits, adds and deletes files in each repository of the chain: the web adds a consumer and
-/// deletes the file of two others, the gateway moves a route to another method, the catalog
-/// deletes a route its peers link to and edits the end of its cycle.
 pub(crate) fn edit_chain((web, gateway, catalog): &Chain) {
     let replace = |path: PathBuf, from: &str, to: &str| {
         let src = fs::read_to_string(&path).unwrap();
@@ -1407,7 +1328,6 @@ fn a_refreshed_chain_exports_what_a_cold_chain_does() {
     }
 }
 
-/// Moves the gateway's write of `orders` to `listOrders` and makes the worker a writer too.
 fn edit_resources(gateway: &Path) {
     let edit = |path: PathBuf, from: &str, to: &str| {
         let src = fs::read_to_string(&path).unwrap();
@@ -1426,9 +1346,6 @@ fn edit_resources(gateway: &Path) {
     );
 }
 
-/// Edits, adds and deletes `.py` files of the inventory and deletes a route of the storefront:
-/// a route path changes, a module with a consumer on the declared host appears, the jobs
-/// module goes, and the topic its handler consumes changes names.
 fn edit_xlang((storefront, inventory): &(PathBuf, PathBuf)) {
     let main = inventory.join("inventory/main.py");
     let src = fs::read_to_string(&main).unwrap();
@@ -1445,7 +1362,6 @@ fn edit_xlang((storefront, inventory): &(PathBuf, PathBuf)) {
     .unwrap();
     fs::remove_file(inventory.join("inventory/jobs.py")).unwrap();
     fs::remove_file(storefront.join("app/api/promotions/route.ts")).unwrap();
-    // The topic the storefront produces and the inventory's handler consumes changes names.
     let events = inventory.join("inventory/events.py");
     let src = fs::read_to_string(&events).unwrap();
     assert!(src.contains("stock.restocked"));
@@ -1480,9 +1396,6 @@ fn a_refreshed_cross_language_pair_exports_what_a_cold_pair_does() {
     }
 }
 
-/// Edits, adds and deletes `.rs` files of the api and deletes a route of the web app: a route
-/// path changes, the variable a base URL is read from changes names, a module with a consumer on
-/// the declared host appears, and the module a `mod` declaration points to goes.
 fn edit_xlang_rust((web, api): &(PathBuf, PathBuf)) {
     edit_file(
         api,
@@ -1532,15 +1445,11 @@ fn a_refreshed_rust_cross_language_pair_exports_what_a_cold_pair_does() {
         assert_ne!(refreshed, before, "repository {n}");
         assert_eq!(*refreshed, cold, "repository {n}");
     }
-    // The renamed variable no longer reaches the web app's routes.
     assert!(before[1].contains("env:WEB_URL"));
     assert!(refreshed[1].contains("env:SITE_URL"));
     assert!(!refreshed[1].contains("env:WEB_URL"));
 }
 
-/// Edits, adds and deletes `.go` files of the api and deletes a route of the web app: a route
-/// path changes, the variable a base URL is read from changes names, a file with a consumer on
-/// the declared host appears, and the file with the other environment read goes.
 fn edit_xlang_go((web, api): &(PathBuf, PathBuf)) {
     edit_file(
         api,
@@ -1585,15 +1494,11 @@ fn a_refreshed_go_cross_language_pair_exports_what_a_cold_pair_does() {
         assert_ne!(refreshed, before, "repository {n}");
         assert_eq!(*refreshed, cold, "repository {n}");
     }
-    // The renamed variable no longer reaches the web app's routes.
     assert!(before[1].contains("env:WEB_URL"));
     assert!(refreshed[1].contains("env:SITE_URL"));
     assert!(!refreshed[1].contains("env:WEB_URL"));
 }
 
-/// Edits, adds and deletes `.swift` files of the api and deletes a route of the web app: a route
-/// path changes, the variable a base URL is read from changes names, a file with a consumer on
-/// the declared host appears, and the file with the other environment read goes.
 fn edit_xlang_swift((web, api): &(PathBuf, PathBuf)) {
     edit_file(
         api,
@@ -1638,16 +1543,11 @@ fn a_refreshed_swift_cross_language_pair_exports_what_a_cold_pair_does() {
         assert_ne!(refreshed, before, "repository {n}");
         assert_eq!(*refreshed, cold, "repository {n}");
     }
-    // The renamed variable no longer reaches the web app's routes.
     assert!(before[1].contains("env:WEB_URL"));
     assert!(refreshed[1].contains("env:SITE_URL"));
     assert!(!refreshed[1].contains("env:WEB_URL"));
 }
 
-/// Edits, adds and deletes `.java` and Spring configuration files of the api: a placeholder's
-/// default goes, the YAML file that gave a constructor parameter its literal URL goes (its key
-/// now names a variable), a module appears with a client and a configuration of its own, a
-/// `@Value` key changes, and the file with the environment read goes.
 fn edit_xlang_java((_, api): &(PathBuf, PathBuf)) {
     let java = "src/main/java/com/example/api";
     edit_file(
@@ -1708,8 +1608,6 @@ fn a_refreshed_java_cross_language_pair_exports_what_a_cold_pair_does() {
     edit_xlang_java(&cold);
     assert_eq!(refreshed, exports(&cold));
     assert_ne!(refreshed[1], before[1]);
-    // The default left the configuration, the literal with its file, and the new module's
-    // configuration gives its client a host.
     assert!(before[1].contains("\"contract\": \"http::POST::/api/audit\""));
     assert!(!before[1].contains("env:AUDIT_URL"));
     assert!(refreshed[1].contains("\"via\": \"env:AUDIT_URL\""));
@@ -1721,7 +1619,6 @@ fn a_refreshed_java_cross_language_pair_exports_what_a_cold_pair_does() {
     assert!(refreshed[1].contains(tool), "{}", refreshed[1]);
 }
 
-/// A Spring configuration edited alone, with no `.java` file changed, refreshes the contracts.
 #[test]
 fn an_edited_spring_configuration_alone_refreshes_the_java_consumers() {
     let (_, api) = common::xlang_java("fresh_xlang_java_config");
@@ -1741,10 +1638,6 @@ fn an_edited_spring_configuration_alone_refreshes_the_java_consumers() {
     assert!(refreshed.contains("\"via\": \"env:SITE_URL\""));
 }
 
-/// Edits, adds and deletes `.kt` and Spring configuration files of the Kotlin api: a placeholder's
-/// default goes, the YAML file that gave a constructor property its literal URL goes (its key
-/// now names a variable), a module appears with a client and a configuration of its own, a
-/// `@Value` key changes, and the file with the environment read goes.
 fn edit_xlang_kotlin((_, api): &(PathBuf, PathBuf)) {
     let kotlin = "src/main/kotlin/com/example/api";
     edit_file(
@@ -1807,8 +1700,6 @@ fn a_refreshed_kotlin_cross_language_pair_exports_what_a_cold_pair_does() {
     edit_xlang_kotlin(&cold);
     assert_eq!(refreshed, exports(&cold));
     assert_ne!(refreshed[1], before[1]);
-    // The default left the configuration, the literal with its file, and the new module's
-    // configuration gives its client a host.
     assert!(before[1].contains("\"contract\": \"http::POST::/api/audit\""));
     assert!(!before[1].contains("env:AUDIT_URL"));
     assert!(refreshed[1].contains("\"via\": \"env:AUDIT_URL\""));
@@ -1820,7 +1711,6 @@ fn a_refreshed_kotlin_cross_language_pair_exports_what_a_cold_pair_does() {
     assert!(refreshed[1].contains(tool), "{}", refreshed[1]);
 }
 
-/// A Spring configuration edited alone, with no `.kt` file changed, refreshes the contracts.
 #[test]
 fn an_edited_spring_configuration_alone_refreshes_the_kotlin_consumers() {
     let (_, api) = common::xlang_kotlin("fresh_xlang_kotlin_config");
@@ -1840,11 +1730,6 @@ fn an_edited_spring_configuration_alone_refreshes_the_kotlin_consumers() {
     assert!(refreshed.contains("\"via\": \"env:SITE_URL\""));
 }
 
-/// Edits, adds and deletes `.cs` files of the C# api and edits its `appsettings.json`: the
-/// environment variable one client reads changes, the file with the configuration read of
-/// `builder.Configuration` goes, a client appears that reads the environment, and two keys of
-/// the configuration change their literal (one now names a host the web app serves, the other no
-/// longer does).
 fn edit_xlang_csharp((_, api): &(PathBuf, PathBuf)) {
     edit_file(api, "Clients/StockClient.cs", "\"WEB_URL\"", "\"SITE_URL\"");
     fs::remove_file(api.join("Program.cs")).unwrap();
@@ -1890,7 +1775,6 @@ fn a_refreshed_csharp_cross_language_pair_exports_what_a_cold_pair_does() {
     edit_xlang_csharp(&cold);
     assert_eq!(refreshed, exports(&cold));
     assert_ne!(refreshed[1], before[1]);
-    // The key now served by host links by it, the one that no longer is maps to its variable.
     let audit = "\"contract\": \"http::POST::/api/audit\"";
     let prices = "\"via\": \"env:Prices__BaseUrl\"";
     assert!(before[1].contains(audit) && before[1].contains(prices));
@@ -1902,7 +1786,6 @@ fn a_refreshed_csharp_cross_language_pair_exports_what_a_cold_pair_does() {
     assert!(refreshed[1].contains("Clients/ToolClient.cs"));
 }
 
-/// An `appsettings.json` edited alone, with no `.cs` file changed, refreshes the contracts.
 #[test]
 fn an_edited_appsettings_alone_refreshes_the_csharp_consumers() {
     let (_, api) = common::xlang_csharp("fresh_xlang_csharp_config");
@@ -1921,9 +1804,6 @@ fn an_edited_appsettings_alone_refreshes_the_csharp_consumers() {
     assert!(!refreshed.contains("\"via\": \"env:Prices__BaseUrl\""));
 }
 
-/// An `appsettings.json` deleted, and then added back, refreshes the C# consumers as a cold
-/// export of the same files does: without it, a key whose literal the web app serves is its
-/// variable alone, and with it back the key links by that host again.
 #[test]
 fn a_deleted_then_added_appsettings_refreshes_like_a_cold_export() {
     let settings = "appsettings.json";
@@ -1978,8 +1858,6 @@ fn an_edited_meada_toml_relinks_resources_like_a_cold_chain() {
     }
 }
 
-/// Moves the documented-only route of the gateway's OpenAPI document, adds a JSON document with
-/// a route of its own, and deletes the invalid one.
 fn edit_documents(gateway: &Path) {
     let doc = fs::read_to_string(gateway.join("openapi.yaml")).unwrap();
     let doc = doc.replace("/api/shipments/{id}", "/api/parcels/{id}");
@@ -1992,8 +1870,6 @@ fn edit_documents(gateway: &Path) {
     fs::remove_file(gateway.join("broken.openapi.yaml")).unwrap();
 }
 
-/// Writes the listed path that did not exist, and takes the gitignored document and the
-/// oddly named one off the list.
 fn edit_listed_documents(gateway: &Path) {
     fs::write(
         gateway.join("docs/missing.yaml"),
@@ -2008,7 +1884,6 @@ fn edit_listed_documents(gateway: &Path) {
     fs::write(gateway.join("meada.toml"), toml).unwrap();
 }
 
-/// Drops the gateway's `[serve]` table: its documents stop counting.
 fn drop_serve(gateway: &Path) {
     let toml = fs::read_to_string(gateway.join("meada.toml")).unwrap();
     let serve = ["[serve]", "hosts = ", "documents = "];
@@ -2019,8 +1894,6 @@ fn drop_serve(gateway: &Path) {
     fs::write(gateway.join("meada.toml"), toml).unwrap();
 }
 
-/// The web's client wrapper returns the response instead of its parsed body: its caller, in an
-/// unchanged file, reads no field any more.
 fn return_the_response(web: &Path) {
     let path = web.join("src/api/body.ts");
     let src = fs::read_to_string(&path).unwrap();
@@ -2043,8 +1916,6 @@ fn an_edited_client_wrapper_changes_its_callers_drift_like_a_cold_chain() {
     assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
 }
 
-/// The web's shared `Entity` type renames `id`: the consumers that extend it, in another file
-/// and unchanged, declare `key` instead.
 fn rename_a_shared_field(web: &Path) {
     let path = web.join("src/api/types.ts");
     let src = fs::read_to_string(&path).unwrap();
@@ -2069,7 +1940,6 @@ fn an_edited_shared_type_changes_the_drift_of_its_users_like_a_cold_chain() {
     assert_eq!(refreshed, Engine::open(&cold).unwrap().export().unwrap());
 }
 
-/// The catalog's zod schema drops `title`, which a consumer in the web app reads.
 fn drop_a_schema_field(catalog: &Path) {
     let path = catalog.join("lib/schemas.ts");
     let src = fs::read_to_string(&path).unwrap();
@@ -2099,8 +1969,6 @@ fn a_field_removed_from_a_zod_schema_adds_drift_like_a_cold_chain() {
     assert_eq!(refreshed, exports([&cold, &cold_web]));
 }
 
-/// The catalog's profile route adds `nickname` to the schema it declares in its own file: the
-/// web's consumers of the route, in other files of another repository, read it.
 fn add_a_profile_field(catalog: &Path) {
     let path = catalog.join("app/api/profiles/route.ts");
     let src = fs::read_to_string(&path).unwrap();
@@ -2112,11 +1980,6 @@ fn add_a_profile_field(catalog: &Path) {
     fs::write(&path, edited).unwrap();
 }
 
-/// A refresh parses again, before it extracts, the files whose values the last extraction read
-/// (#391). Two refreshes in a row, each against a cold chain of the same files: the first edits
-/// a provider file, and the links of its consumers in another repository follow; the second,
-/// starting from what the first one read, edits the schema another file's route returns, and
-/// that route's contract follows.
 #[test]
 fn a_provider_file_then_a_schema_another_file_reads_refresh_like_a_cold_chain() {
     let exports = |repos: [&Path; 2]| -> Vec<String> {
@@ -2148,8 +2011,6 @@ fn a_provider_file_then_a_schema_another_file_reads_refresh_like_a_cold_chain() 
     assert_eq!(schema, exports([&cold, &cold_web]));
 }
 
-/// The catalog's shared package drops `price` from its zod schema and `warehouse` from its
-/// constant, which consumers in the web app read; the routes importing them are unchanged.
 fn drop_shared_fields(catalog: &Path) {
     for (file, from, to) in [
         ("quote.ts", ", price: z.number()", ""),
@@ -2183,7 +2044,6 @@ fn an_edited_shared_package_changes_its_importers_drift_like_a_cold_chain() {
 
     let (cold_web, cold_gateway, cold) = drift_chain("fresh_shared_cold");
     drop_shared_fields(&cold);
-    // The links of the quote's reader and the shelf's now miss what the package dropped.
     let link = |export: &str, consumer: &str| -> String {
         let site = format!("\"consumer\": \"example.com/chain/web::src/shared.ts::{consumer}\"");
         let at = export.find(&site).unwrap();
@@ -2247,10 +2107,6 @@ fn edited_documents_relink_like_a_cold_chain() {
     }
 }
 
-/// Edits that change calls, so the partition and the entry points of every repository move
-/// (spec #31): the web's dashboard now calls `createOrder` (no longer an entry point), a new
-/// file adds an entry point that reaches two communities, and `status.ts` is deleted; the
-/// gateway loses the file of one route handler; the catalog's route stops calling into its cycle.
 fn edit_calls((web, gateway, catalog): &Chain) {
     let replace = |path: PathBuf, from: &str, to: &str| {
         let src = fs::read_to_string(&path).unwrap();
@@ -2282,7 +2138,6 @@ fn edit_calls((web, gateway, catalog): &Chain) {
     );
 }
 
-/// The `communities` and `processes` of an export.
 fn views(export: &str) -> (serde_json::Value, serde_json::Value) {
     let export: serde_json::Value = serde_json::from_str(export).unwrap();
     (export["communities"].clone(), export["processes"].clone())
@@ -2311,7 +2166,6 @@ fn communities_and_processes_follow_edited_calls_like_a_cold_chain() {
         .zip(exports(&cold))
         .enumerate()
     {
-        // The worker (n = 3) is not edited: its views stay, and still equal a cold export.
         if n < 3 {
             let (communities, processes) = views(refreshed);
             let (was_communities, was_processes) = views(before);
@@ -2325,7 +2179,6 @@ fn communities_and_processes_follow_edited_calls_like_a_cold_chain() {
     }
 }
 
-/// Every repository of the chain, the worker included, exported by one engine each.
 fn export_chain(web: &Path) -> Vec<String> {
     let gateway = web.with_file_name("chain-gateway");
     let catalog = web.with_file_name("chain-catalog");
@@ -2357,9 +2210,6 @@ fn a_rust_export_does_not_depend_on_the_order_files_and_manifests_are_found() {
     assert_eq!(reversed, normal);
 }
 
-/// A nested `tsconfig.json` serves the importers beneath it (each of `frontend`, `a` and `b`
-/// maps `@/*` to its own `src`), and editing its `paths` rebinds them: the refreshed export
-/// equals a cold one.
 #[test]
 fn a_nested_tsconfig_binds_its_own_imports_and_an_edit_rebinds_them() {
     let target = |json: &serde_json::Value, project: &str| {
@@ -2398,9 +2248,6 @@ fn a_nested_tsconfig_binds_its_own_imports_and_an_edit_rebinds_them() {
     assert_eq!(target(&json, "b").0, "exact");
 }
 
-/// A package config that only `extends` the root's takes the root's `paths` (its alias import is
-/// `exact`), one with `paths` of its own keeps them, and editing the base rebinds the first: the
-/// refreshed export equals a cold one.
 #[test]
 fn an_extending_tsconfig_binds_the_base_paths_and_an_edit_of_the_base_rebinds_them() {
     let target = |export: &str, project: &str| {
@@ -2472,8 +2319,6 @@ fn a_new_nested_pyproject_binds_its_imports_like_a_cold_index() {
 
 const CATALOG: Option<&str> = Some("https://example.com/acme/catalog.git");
 
-/// The catalog of the drift chain with a TypeScript consumer of its comments route in another
-/// file, and a Python job beside them: a group of its own, which no edit below reaches.
 fn catalog(case: &str) -> PathBuf {
     let repo = fixture_repo(case, "chain-drift/catalog", CATALOG);
     fs::create_dir_all(repo.join("web")).unwrap();
@@ -2493,16 +2338,12 @@ fn catalog(case: &str) -> PathBuf {
     repo
 }
 
-/// Makes the provider of the route the consumer of another file calls answer one comment, not
-/// a list: the link's drift follows. What the file exports stays, so the Python job's group is
-/// kept.
 fn answer_one(repo: &Path) {
     let parse = "const comments = Comments.parse(await load());";
     let one = "const comments = Comment.parse(await load());";
     replace(repo, "app/api/comments/route.ts", parse, one);
 }
 
-/// Adds a field to the schema another file's routes answer with.
 fn widen_schema(repo: &Path) {
     replace(
         repo,
@@ -2512,10 +2353,6 @@ fn widen_schema(repo: &Path) {
     );
 }
 
-/// A refresh keeps the rows of the group nothing changed in (#391), and the group a file changed
-/// in follows its edit across files: the link of a consumer in another file to the edited
-/// provider, and the routes whose shape a schema of another file gives. Dropping the kept
-/// group's contract rows turns either case red.
 #[test]
 fn a_refresh_keeps_untouched_groups_and_follows_edits_across_files_like_a_cold_index() {
     for (case, edit) in [
@@ -2545,10 +2382,6 @@ fn a_refresh_keeps_untouched_groups_and_follows_edits_across_files_like_a_cold_i
     }
 }
 
-/// A config file edited alone (#639) rewrites its values and nothing else: the Python job's
-/// file, rewritten under its old stamp, still gives its old consumer, so no group of code was
-/// extracted again, and the export does not move, while `search` finds the edited value and not
-/// the old one; a removed config file takes its values along.
 #[test]
 fn an_edited_config_file_alone_refreshes_its_values_and_nothing_else() {
     let repo = catalog("fresh_config_alone");
@@ -2581,9 +2414,6 @@ fn an_edited_config_file_alone_refreshes_its_values_and_nothing_else() {
     assert_eq!(values("us-east-2"), "no matches for `us-east-2`\n");
 }
 
-/// A changed value is found by its new text and not its old one through the trigram index too
-/// (#647): a substring of three characters or more takes that path, so the rows of the old text
-/// must leave it with the file, and a removed file takes its rows along.
 #[test]
 fn an_edited_config_value_is_found_by_a_substring_of_its_new_text_only() {
     let repo = catalog("fresh_config_trigram");
@@ -2613,9 +2443,6 @@ fn an_edited_config_value_is_found_by_a_substring_of_its_new_text_only() {
     assert_eq!(values("s-eas"), "no matches for `s-eas`\n");
 }
 
-/// A refresh does not read a kept group's files again (#391): the Python job's file, rewritten
-/// under its old stamp with a host of the same length, still gives its old consumer after an
-/// edit of the TypeScript group, since its values are not parsed again.
 #[test]
 fn a_refresh_does_not_parse_a_kept_group_again() {
     let repo = catalog("fresh_kept_unread");
@@ -2632,9 +2459,6 @@ fn a_refresh_does_not_parse_a_kept_group_again() {
     assert!(!refreshed.contains("bulling"), "{refreshed}");
 }
 
-/// An edit that changes what a file exports keeps no group, though the other groups' exports
-/// are read from their stored rows (#610): the Python job's file, rewritten under its old stamp,
-/// is parsed again and gives its new host.
 #[test]
 fn an_edit_of_what_a_file_exports_keeps_no_group() {
     let repo = catalog("fresh_kept_exports");
@@ -2656,9 +2480,6 @@ fn an_edit_of_what_a_file_exports_keeps_no_group() {
     assert!(refreshed.contains("bulling.example.com"), "{refreshed}");
 }
 
-/// A refresh with nothing changed summarizes no contract configuration again (every YAML, JSON
-/// and Terraform file was, on every query); one whose input moved without its bytes changing (the
-/// handler a SAM template names, removed) is summarized again, and the export is the cold one.
 #[test]
 fn a_refresh_summarizes_again_only_the_configurations_whose_inputs_moved() {
     let remove = |repo: &Path| fs::remove_file(repo.join("runtime/app.ts")).unwrap();
@@ -2680,10 +2501,6 @@ fn a_refresh_summarizes_again_only_the_configurations_whose_inputs_moved() {
     assert_eq!(refreshed, expected);
 }
 
-/// The Dockerfile a Compose build names is an input of its summary: its text edited, the file
-/// removed (the whole context, inferred) and a file written where none was each summarize the
-/// compose file again, and the refreshed export is the cold one. Touching it to the same bytes
-/// summarizes nothing.
 #[test]
 fn a_changed_dockerfile_summarizes_its_compose_file_again_and_matches_a_cold_export() {
     let file = "frontend/Dockerfile.playwright";
@@ -2762,8 +2579,6 @@ fn an_upgrade_reextracts_unchanged_sources_and_matches_a_cold_index() {
     let warm = fixture("items_upgrade_go_warm");
     run(&warm, "index");
     let index = warm.join(".meada/index.db");
-    // The version and the two missing contracts as recorded by e4058ebc. The test leaves all
-    // source bytes and their timestamps alone, so ordinary freshness cannot fix these rows.
     rusqlite::Connection::open(index)
         .unwrap()
         .execute_batch(

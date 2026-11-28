@@ -10,7 +10,6 @@ import './operations.css';
 
 const columns = ['time', 'via', 'subject', 'login', 'role', 'owners', 'action', 'arguments', 'outcome', 'message'] as const;
 
-/** The global operator's audit page: newest first, one page at a time through `next`. */
 export function AuditPage({ api, locale }: { api: Api; locale: Language }) {
   const t = auditCopy[locale];
   const common = copy[locale];

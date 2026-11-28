@@ -44,12 +44,9 @@ use crate::workspace::Manifest;
 /// The variables the child gets: the lock's token and the acquisition's fence.
 pub const TOKEN_ENV: &str = "MEADA_REFRESH_LOCK";
 pub const FENCE_ENV: &str = "MEADA_REFRESH_FENCE";
-/// The shortest `ttl_seconds`, and its default.
 const TTL_MIN: i64 = 10;
 const TTL_DEFAULT: i64 = 300;
-/// How long the child's group has to exit after SIGTERM before it gets SIGKILL.
 const KILL_GRACE: Duration = Duration::from_secs(10);
-/// A release's wait for Valkey: the TTL frees a lock a release could not.
 const RELEASE_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// The `[refresh_lock]` section as written.
@@ -106,7 +103,6 @@ fn is_token(text: &str) -> bool {
     text.len() == 32 && text.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
 
-/// A fresh token: 16 random bytes in hex.
 fn token() -> Result<String, String> {
     let mut bytes = [0u8; 16];
     let read = std::fs::File::open("/dev/urandom").and_then(|mut f| f.read_exact(&mut bytes));
@@ -128,9 +124,6 @@ pub async fn holds(valkey: &Valkey, config: &valkey::Config, token: &str) -> Res
     }
 }
 
-/// Takes the lock and writes its holder, both with the TTL. KEYS: lock, holder. ARGV: token, TTL
-/// in ms, then the holder's host, pid, started and holds. Nil when taken; else the holder's four
-/// fields, each nil when missing (a lock taken by an older binary has no holder).
 const TAKE: &str = r"
 if redis.call('SET', KEYS[1], ARGV[1], 'NX', 'PX', ARGV[2]) then
   redis.call('DEL', KEYS[2])
@@ -141,8 +134,6 @@ end
 return redis.call('HMGET', KEYS[2], 'host', 'pid', 'started', 'holds')
 ";
 
-/// Compare-and-extend, the holder with the lock (KEYS: lock, holder): 1 when the lock held the
-/// token and lives `ARGV[2]` ms more, 0 if not.
 const RENEW: &str = r"
 if redis.call('GET', KEYS[1]) == ARGV[1] then
   redis.call('PEXPIRE', KEYS[2], ARGV[2])
@@ -151,7 +142,6 @@ end
 return 0
 ";
 
-/// Compare-and-delete: the lock and its holder go only while the lock holds the token.
 const RELEASE: &str = r"
 if redis.call('GET', KEYS[1]) == ARGV[1] then
   redis.call('DEL', KEYS[2])
@@ -160,12 +150,8 @@ end
 return 0
 ";
 
-/// The last fence Valkey's native signed INCR can issue. Wire/read fences remain u64.
 pub(super) const LAST_FENCE: u64 = i64::MAX as u64;
 
-/// Increment only under our token and below the caller's ceiling. Compare decimal text and
-/// read back after INCR: Lua numbers cannot return large fences exactly. Nil means lock lost;
-/// an empty string means the acquisition would exceed the ceiling.
 const INCREMENT: &str = r"
 if redis.call('GET', KEYS[1]) ~= ARGV[1] then
   return false
@@ -202,7 +188,6 @@ pub async fn acquire(
     take.arg(std::process::id()).arg(rfc3339(now())).arg(holds);
     let held: Option<Vec<Option<Vec<u8>>>> = match valkey.query(&take).await {
         Ok(held) => held,
-        // The server may have taken the lock and the answer been lost: release ours, if it is.
         Err(e) => {
             release(valkey, config, &token).await;
             return Err(format!("{lock}: {e}").into());
@@ -242,8 +227,6 @@ pub async fn acquire(
     }
 }
 
-/// A holder's field as a message shows it: Valkey's bytes are hostile, so none reaches a
-/// terminal unescaped.
 fn shown(field: &[u8]) -> String {
     String::from_utf8_lossy(field).escape_debug().to_string()
 }
@@ -270,7 +253,6 @@ pub fn run(manifest: &Path, command: &[OsString]) -> crate::Result<i32> {
     ))??)
 }
 
-/// The TTL in milliseconds, as `PX` and `PEXPIRE` take it.
 fn millis(ttl: Duration) -> u64 {
     u64::try_from(ttl.as_millis()).unwrap_or(u64::MAX)
 }
@@ -280,7 +262,6 @@ async fn supervise(
     config: &valkey::Config,
     command: &[OsString],
 ) -> Result<i32, String> {
-    // Before the child exists: a signal to `lock` from now on reaches its group.
     let listen = |kind| signal(kind).map_err(|e| e.to_string());
     let (mut term, mut int, mut hup, mut quit) = (
         listen(SignalKind::terminate())?,
@@ -291,7 +272,6 @@ async fn supervise(
     let valkey = Valkey::connect(config).await?;
     let (lock, ms) = (keys(config).0, millis(section.ttl));
     let ttl = section.ttl;
-    // A renewal counts from before it was sent: the lock lives at least a TTL from then.
     let mut renewed = Instant::now();
     let program = command[0].to_string_lossy();
     let Held { token, fence } =
@@ -319,9 +299,6 @@ async fn supervise(
             *kill_at = Some(Instant::now() + KILL_GRACE);
         }
     };
-    // The renewal in flight, polled as a branch of its own, so a signal, the child's exit or
-    // the SIGKILL timer never waits for Valkey: when it was sent, and the answer.
-    // The command outlives the future that borrows it: declared first, dropped last.
     let renew = cmd("EVAL")
         .arg(RENEW)
         .arg(2)
@@ -352,7 +329,6 @@ async fn supervise(
             }
             _ = sleep_until(next), if !lost && renewing.is_none() => {
                 let sent = Instant::now();
-                // A renewal that stalls past the deadline is one that did not succeed.
                 let bound = deadline.min(sent + period);
                 renewing = Some(Box::pin(async move {
                     let answer = timeout_at(bound, shared.query::<i64>(renew)).await;
@@ -372,14 +348,12 @@ async fn supervise(
                         lost = true;
                         stop(&mut kill_at);
                     }
-                    // Failed or stalled: the deadline decides.
                     None => {}
                 }
                 next = sent + period;
             }
         }
     };
-    // Whatever the child left in its group goes with it.
     let _ = killpg(group, Signal::SIGKILL);
     release(&valkey, config, &token).await;
     let status = (status.map_err(|_| "the child's waiter stopped".to_string())?)
@@ -392,7 +366,6 @@ async fn supervise(
         .unwrap_or_else(|| 128 + status.signal().unwrap_or(0)))
 }
 
-/// The child: `command` in a process group of its own, with the token and the fence.
 fn spawn(command: &[OsString], token: &str, fence: u64) -> Result<std::process::Child, String> {
     let program = &command[0];
     let mut child = Command::new(program);
@@ -407,7 +380,6 @@ fn spawn(command: &[OsString], token: &str, fence: u64) -> Result<std::process::
         unsafe {
             child.pre_exec(move || {
                 nix::sys::prctl::set_pdeathsig(Signal::SIGTERM)?;
-                // `lock` died before the signal was armed: run nothing.
                 if nix::unistd::getppid() != parent {
                     return Err(nix::errno::Errno::ESRCH.into());
                 }

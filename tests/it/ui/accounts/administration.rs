@@ -1,9 +1,3 @@
-//! Account administration (#557, ADR 0024): the global operator lists, creates and changes local
-//! accounts through the console's API, whatever `[ui] operations` says; the last active operator
-//! is never suspended nor demoted, even by two requests at once; a suspended or demoted account
-//! loses its writes at once, its reads lasting until its token expires. Each test runs against
-//! the local Postgres of `MEADA_TEST_POSTGRES_URL` in a schema of its own, and skips without it.
-
 use serde_json::{Value, json};
 
 use super::{
@@ -12,27 +6,18 @@ use super::{
 use crate::server::Server;
 use crate::ui::{Reply, send};
 
-/// A temporary password the policy takes.
 const TEMPORARY: &str = "temporary passphrase one";
-/// Another, for a reset.
 const RESET: &str = "temporary passphrase two";
-/// What an account sets once its change is required.
 const OWN: &str = "my own long passphrase";
-/// The 403 of a console write by anyone but an operator.
 const OPERATOR_REQUIRED: &str = "console writes require an authenticated operator with a subject";
-/// The 403 of account administration by anyone but the global operator.
 const ADMINISTRATION: &str = "account administration needs the global operator";
 
-/// The console of `case` with `operations` as given, `admin` set up with `CHOSEN` (no change
-/// required), and `admin`'s session token.
 fn console(case: &'static str, operations: bool) -> Option<(Local, String)> {
     let local = local_with(case, operations, &[(ADMIN_ENV, CHOSEN)])?;
     let admin = token(&login(&local.console, "admin", CHOSEN));
     Some((local, admin))
 }
 
-/// `POST accounts` creating `username` of `role` with `password`, `change_required` as given
-/// (absent: the default).
 fn create(
     console: &Server,
     token: &str,
@@ -48,7 +33,6 @@ fn create(
     post(console, "accounts", Some(token), &body.to_string())
 }
 
-/// `POST accounts/<username>` with `body`.
 pub(super) fn act(console: &Server, token: &str, username: &str, body: Value) -> Reply {
     post(
         console,
@@ -58,7 +42,6 @@ pub(super) fn act(console: &Server, token: &str, username: &str, body: Value) ->
     )
 }
 
-/// The accounts `GET accounts` lists.
 pub(super) fn listed(console: &Server, token: &str) -> Vec<Value> {
     let reply = ask(console, "/api/v1/accounts", token);
     assert_eq!(reply.status, 200, "{}", reply.body);
@@ -66,7 +49,6 @@ pub(super) fn listed(console: &Server, token: &str) -> Vec<Value> {
     reply.json()["accounts"].as_array().unwrap().clone()
 }
 
-/// The listed account `username`.
 fn account(console: &Server, token: &str, username: &str) -> Value {
     let all = listed(console, token);
     (all.into_iter())
@@ -74,8 +56,6 @@ fn account(console: &Server, token: &str, username: &str) -> Value {
         .unwrap_or_else(|| panic!("{username} is not listed"))
 }
 
-/// A sign-in of `username` with `password` whose change is required, then the change to `OWN`:
-/// the fresh token.
 fn changed(console: &Server, username: &str, password: &str) -> String {
     let first = login(console, username, password);
     assert_eq!(first.json()["change_required"], true, "{}", first.body);
@@ -88,9 +68,6 @@ fn changed(console: &Server, username: &str, password: &str) -> String {
     ))
 }
 
-/// The audit's records of account administration (`account.*` but the sign-in and the password
-/// change, and the route-level `account`), oldest first: action, subject, role, arguments,
-/// outcome and message.
 pub(super) fn administered(console: &Server, token: &str) -> Vec<Value> {
     let page = ask(console, "/api/v1/audit?limit=100", token);
     assert_eq!(page.status, 200, "{}", page.body);
@@ -115,11 +92,6 @@ pub(super) fn administered(console: &Server, token: &str) -> Vec<Value> {
     found
 }
 
-/// The global operator lists, creates and changes accounts: each refusal of a body (400, 413,
-/// 422), a taken username (409), an unknown account (404), no route that deletes or renames,
-/// `reset_password` clearing a lock and requiring a change unless told not to, and the record of
-/// each change naming the account and the fields changed, never a password. Anyone else gets a
-/// 403, recorded for a write.
 #[test]
 fn the_global_operator_lists_creates_and_changes_accounts() {
     let Some((local, admin)) = console("accounts_administration", true) else {
@@ -128,7 +100,6 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
     let console = &local.console;
     let mut replies = Vec::new();
 
-    // The default account, as the list shows it: never a hash, no creator.
     let all = listed(console, &admin);
     assert_eq!(all.len(), 1, "{all:?}");
     let first = &all[0];
@@ -177,7 +148,6 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
         assert!(text.len() == 27 && text.ends_with('Z'), "{time}: {text}");
     }
 
-    // Bodies that do not parse, one past the cap, and the 422s.
     for bad in [
         "",
         "{",
@@ -214,7 +184,6 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
     assert_eq!(same.json()["error"]["rule"], "username", "{}", same.body);
     replies.extend([huge, short, same]);
 
-    // Created, a change required by default; a taken username is a 409.
     let created = create(console, &admin, "carol", "viewer", TEMPORARY, None);
     assert_eq!(created.status, 200, "{}", created.body);
     let carol = &created.json()["account"];
@@ -250,7 +219,6 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
     assert_eq!(names, [json!("admin"), json!("carol"), json!("dave")]);
     replies.extend([created, taken, dave]);
 
-    // An unknown account is a 404; no action, method or route deletes or renames one.
     let unknown = act(console, &admin, "nobody", json!({"action": "suspend"}));
     assert_eq!(refusal(&unknown), (404, "not_found".into()));
     let malformed = act(console, &admin, "No%20body", json!({"action": "suspend"}));
@@ -278,7 +246,6 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
     }
     assert_eq!(account(console, &admin, "carol")["username"], "carol");
 
-    // The role, both ways.
     let promoted = act(
         console,
         &admin,
@@ -304,7 +271,6 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
         demoted.body
     );
 
-    // A lock, listed with its end, cleared by a reset that requires a change by default.
     for i in 0..10 {
         let reply = login(console, "carol", &format!("wrong guess {i}"));
         assert_eq!(refusal(&reply).0, 401);
@@ -359,7 +325,6 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
     );
     replies.extend([weak, reset, kept]);
 
-    // Suspended and reactivated.
     let suspended = act(console, &admin, "dave", json!({"action": "suspend"}));
     assert_eq!(
         suspended.json()["account"]["state"],
@@ -370,7 +335,6 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
     let back = act(console, &admin, "dave", json!({"action": "reactivate"}));
     assert_eq!(back.json()["account"]["state"], "active", "{}", back.body);
 
-    // A viewer administers nothing: its reads a 403, its writes a 403 recorded.
     let list = ask(console, "/api/v1/accounts", &carol_token);
     assert_eq!(refusal(&list), (403, "forbidden".into()));
     assert_eq!(list.json()["error"]["message"], ADMINISTRATION);
@@ -543,11 +507,6 @@ fn the_global_operator_lists_creates_and_changes_accounts() {
     assert_leaks_nothing(&audit, &keys, &stderr, &passwords, &tokens);
 }
 
-/// The demo: a viewer and an operator created by the global operator sign in; suspended, the
-/// viewer's next write gets the role refusal and its next sign-in the one 401 (recorded
-/// `suspended`), while its token still reads; suspended, then demoted, the operator's writes get
-/// the viewer's refusal at once, though its token still says operator. Reactivated, it writes
-/// again; its row made hostile, it writes as a viewer, with one line naming the table.
 #[test]
 fn a_suspended_or_demoted_account_loses_its_writes_at_once_and_keeps_its_reads() {
     let Some((local, admin)) = console("accounts_standing", true) else {
@@ -555,8 +514,6 @@ fn a_suspended_or_demoted_account_loses_its_writes_at_once_and_keeps_its_reads()
     };
     let console = &local.console;
     let pointer = json!({"action": "set", "generation": "0".repeat(32)}).to_string();
-    // The generation is no id (16 hex digits): an operator's pointer write passes its role check
-    // and is the 400 of its body, which is read only then; a refused role is the 403 before it.
     let written = |token: &str| refusal(&post(console, "pointer", Some(token), &pointer));
     let refused = (403, "forbidden".to_string());
     let admitted = (400, "bad_request".to_string());
@@ -570,7 +527,6 @@ fn a_suspended_or_demoted_account_loses_its_writes_at_once_and_keeps_its_reads()
     let otto = token(&login(console, "otto", TEMPORARY));
     assert_eq!(written(&otto), admitted);
 
-    // The viewer suspended: its write refused, its reads kept, its sign-in the one 401.
     let suspended = act(console, &admin, "vera", json!({"action": "suspend"}));
     assert_eq!(suspended.status, 200, "{}", suspended.body);
     assert_eq!(written(&vera), refused);
@@ -580,7 +536,6 @@ fn a_suspended_or_demoted_account_loses_its_writes_at_once_and_keeps_its_reads()
     assert_eq!(refusal(&signin), (401, "invalid_credentials".into()));
     assert_eq!(signin.body, wrong.body);
 
-    // The operator suspended: every write refused at once, reads kept.
     let suspended = act(console, &admin, "otto", json!({"action": "suspend"}));
     assert_eq!(suspended.status, 200, "{}", suspended.body);
     let write = post(console, "pointer", Some(&otto), &pointer);
@@ -590,7 +545,6 @@ fn a_suspended_or_demoted_account_loses_its_writes_at_once_and_keeps_its_reads()
     assert_eq!(refusal(&administer), refused);
     let session = ask(console, "/api/v1/session", &otto);
     assert_eq!(session.json()["role"], "operator", "{}", session.body);
-    // Reactivated, it writes again; demoted, its writes are a viewer's.
     let back = act(console, &admin, "otto", json!({"action": "reactivate"}));
     assert_eq!(back.status, 200, "{}", back.body);
     assert_eq!(written(&otto), admitted);
@@ -614,8 +568,6 @@ fn a_suspended_or_demoted_account_loses_its_writes_at_once_and_keeps_its_reads()
         "viewer"
     );
 
-    // The records: the suspended sign-in's reason, and the refused writes under the role the
-    // row gave, not the token's.
     let page = ask(console, "/api/v1/audit?limit=100", &admin).json();
     let records = page["records"].as_array().unwrap();
     let reasons: Vec<Value> = (records.iter())
@@ -636,8 +588,6 @@ fn a_suspended_or_demoted_account_loses_its_writes_at_once_and_keeps_its_reads()
         "{otto_refused:?}"
     );
 
-    // A row that fails its checks admits nothing: promoted again, then its row made hostile, the
-    // operator's token writes as a viewer, with one line naming the table and no value.
     let promoted = act(
         console,
         &admin,
@@ -659,11 +609,6 @@ fn a_suspended_or_demoted_account_loses_its_writes_at_once_and_keeps_its_reads()
     assert!(!stderr.contains("'root'"), "{stderr}");
 }
 
-/// The last active operator is neither suspended nor demoted: alone (beside a hostile operator
-/// row, which admits nothing), by itself, a 409; two
-/// operators each removing themselves at once, each request admitted as an active operator,
-/// one passes and the other is the 409 `last_operator`, round after round, so exactly one
-/// active operator is ever left.
 #[test]
 fn the_last_active_operator_stays_even_against_two_requests_at_once() {
     let Some((local, admin)) = console("accounts_last_operator", true) else {
@@ -671,7 +616,6 @@ fn the_last_active_operator_stays_even_against_two_requests_at_once() {
     };
     let console = &local.console;
     let last = (409, "last_operator".to_string());
-    // A hostile operator row (no argon2id hash) admits nothing, so it is no other operator.
     local.audit.admin.run(&format!(
         "INSERT INTO \"{}\".accounts (username, password_hash, role, change_required) \
          VALUES ('ghost', 'not a hash', 'operator', false)",
@@ -714,7 +658,6 @@ fn the_last_active_operator_stays_even_against_two_requests_at_once() {
             passed.contains(&200) && codes.contains(&last),
             "round {round}: {codes:?} {passed:?}"
         );
-        // One active operator is left, and puts the other back.
         let left = match demote.status {
             200 => &olga,
             _ => &admin,
@@ -740,8 +683,6 @@ fn the_last_active_operator_stays_even_against_two_requests_at_once() {
     assert_eq!(refusals, 7);
 }
 
-/// Account administration answers with `operations = false`; the workspace and generation
-/// writes keep requiring it.
 #[test]
 fn account_administration_works_with_operations_off() {
     let Some((local, admin)) = console("accounts_operations_off", false) else {
@@ -769,8 +710,6 @@ fn account_administration_works_with_operations_off() {
     }
 }
 
-/// A change whose record cannot be written changes nothing: a 503 `audit_unavailable`; with
-/// Postgres gone, a write cannot read its account and is a 503 too.
 #[test]
 fn an_account_change_without_its_record_changes_nothing() {
     let Some((local, admin)) = console("accounts_administration_audit", true) else {

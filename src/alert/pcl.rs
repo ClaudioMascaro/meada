@@ -1,4 +1,3 @@
-//! A bounded, literal PCL condition subset. Unread syntax stays unknown as a whole.
 use super::config::{Matcher, Op};
 use serde::{Deserialize, Serialize};
 
@@ -74,8 +73,6 @@ impl Parser<'_> {
             let first_matcher = self.matchers.len();
             let first_test = self.tests.len();
             self.atom(depth + 1)?;
-            // Push negation into atoms so exported matchers and their levels describe the
-            // condition that was actually true, including negated parenthesized groups.
             for matcher in &mut self.matchers[first_matcher..] {
                 matcher.op = matcher.op.negated();
             }

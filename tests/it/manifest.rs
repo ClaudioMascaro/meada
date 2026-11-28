@@ -1,8 +1,3 @@
-//! Server mode's workspace manifest (spec #259, ADR 0011): `meada index --workspace`,
-//! `meada status --workspace` and `meada export --workspace` over fixture mirrors listed in a
-//! `meada.workspace.toml`, with every index under the manifest's `index_dir`, nothing written
-//! into a mirror, and only `meada index` writing.
-
 use crate::common;
 
 use std::fs;
@@ -24,19 +19,12 @@ pub(crate) const CHAIN: [(&str, &str); 4] = [
     ("example.com/chain/worker", "chain-worker"),
 ];
 
-/// The chain's four mirrors in `<case>/`, listed by `<case>/ops/meada.workspace.toml` with
-/// paths relative to it and `index_dir = "../indexes"`. Returns the case directory.
 pub(crate) fn chain_manifest(case: &str) -> PathBuf {
     let dir = mirrors(case);
     list(&dir, &CHAIN, false);
     dir
 }
 
-/// Writes `<dir>/ops/meada.workspace.toml` listing `repos` (identity, directory in `dir`) with
-/// `index_dir = "../indexes"`, after removing what a previous run left. With `configs`, each
-/// mirror's `meada.toml` moves into its entry: `[serve]`, `[[peer]]` (without `path`) and
-/// `[[resource]]` become the entry's `[repository.serve]`, `[[repository.peer]]` and
-/// `[[repository.resource]]`, and the mirror is left without one.
 pub(crate) fn list(dir: &Path, repos: &[(&str, &str)], configs: bool) {
     for left in ["indexes", "ops"] {
         let _ = fs::remove_dir_all(dir.join(left));
@@ -63,8 +51,6 @@ pub(crate) fn list(dir: &Path, repos: &[(&str, &str)], configs: bool) {
     write_manifest(dir, &toml);
 }
 
-/// The chain's four mirrors in `<case>/`, with nothing a previous run left next to them.
-/// Returns the case directory.
 fn mirrors(case: &str) -> PathBuf {
     let (web, _, _) = chain(case);
     let dir = web.parent().unwrap().to_path_buf();
@@ -74,7 +60,6 @@ fn mirrors(case: &str) -> PathBuf {
     dir
 }
 
-/// Writes `<dir>/ops/meada.workspace.toml`.
 fn write_manifest(dir: &Path, toml: &str) -> PathBuf {
     let ops = dir.join("ops");
     fs::create_dir_all(&ops).unwrap();
@@ -83,27 +68,21 @@ fn write_manifest(dir: &Path, toml: &str) -> PathBuf {
     manifest
 }
 
-/// `meada <command> --workspace ops/meada.workspace.toml`, run in `dir` in English: stdout and
-/// stderr with `dir` replaced by `<repo>`, and whether it succeeded.
 pub(crate) fn run(dir: &Path, command: &str) -> (String, String, bool) {
     let (stdout, stderr, code) = run_code(dir, command);
     (stdout, stderr, code == Some(0))
 }
 
-/// `run` with the exit code.
 fn run_code(dir: &Path, command: &str) -> (String, String, Option<i32>) {
     run_args(dir, &[command, "--workspace", MANIFEST])
 }
 
-/// The manifest every test writes, relative to its case directory.
 pub(crate) const MANIFEST: &str = "ops/meada.workspace.toml";
 
-/// `meada export --workspace ops/meada.workspace.toml --repo <repo>`, as `run_code`.
 pub(crate) fn run_export(dir: &Path, repo: &str) -> (String, String, Option<i32>) {
     run_args(dir, &["export", "--workspace", MANIFEST, "--repo", repo])
 }
 
-/// `meada <args>` in `dir`, as `run_code`.
 pub(crate) fn run_args(dir: &Path, args: &[&str]) -> (String, String, Option<i32>) {
     let out = Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(dir)
@@ -116,7 +95,6 @@ pub(crate) fn run_args(dir: &Path, args: &[&str]) -> (String, String, Option<i32
     (text(&out.stdout), text(&out.stderr), out.status.code())
 }
 
-/// Every file under `dir`, relative to it, sorted.
 fn files(dir: &Path) -> Vec<String> {
     let mut out = Vec::new();
     let mut stack = vec![dir.to_path_buf()];
@@ -135,9 +113,6 @@ fn files(dir: &Path) -> Vec<String> {
     out
 }
 
-/// After a command: the only files under `<dir>/indexes` are each listed repository's
-/// `index.db`, SQLite's companions, the rebuild lock (`index.db.new.*` exists only during a
-/// rebuild) and the values cache (`values.db`, ADR 0027), and no mirror has a `.meada/`.
 pub(crate) fn assert_nothing_else_written(dir: &Path, indexed: &[&str]) {
     let written = files(&dir.join("indexes"));
     for file in &written {
@@ -176,7 +151,6 @@ fn index_writes_every_index_under_index_dir_and_nothing_into_the_mirrors() {
     assert_eq!((stdout.as_str(), stderr.as_str()), ("", ""));
     let all: Vec<&str> = CHAIN.iter().map(|(repo, _)| *repo).collect();
     assert_nothing_else_written(&dir, &all);
-    // The manifest's workspace answers as the local one: the chain's own export goldens.
     let manifest = dir.join("ops/meada.workspace.toml");
     for (repo, path) in CHAIN {
         let export = Engine::open_manifest(&manifest, repo)
@@ -191,8 +165,6 @@ fn index_writes_every_index_under_index_dir_and_nothing_into_the_mirrors() {
 #[test]
 fn status_reports_every_listed_repository_and_the_peers_the_manifest_leaves_out() {
     let dir = mirrors("manifest_status");
-    // The catalog, which the gateway's `meada.toml` names, is not listed; the worker is not
-    // listed either, and nothing looks for it as a sibling clone.
     write_manifest(
         &dir,
         "index_dir = \"../indexes\"\n\n\
@@ -201,7 +173,6 @@ fn status_reports_every_listed_repository_and_the_peers_the_manifest_leaves_out(
     );
 
     let (unindexed, stderr, ok) = run(&dir, "status");
-    // Not servable (no index yet): the readiness probe fails, the text is the same.
     assert!(!ok && stderr.is_empty(), "{stderr}");
     assert_eq!(
         unindexed,
@@ -217,7 +188,6 @@ fn status_reports_every_listed_repository_and_the_peers_the_manifest_leaves_out(
     assert!(ok, "{stderr}");
     assert_golden("chain.workspace-status.txt", &indexed);
 
-    // An index of another schema is reported, and rebuilt by the next `meada index`.
     let web_index = dir.join("indexes/example.com/chain/web/index.db");
     fs::write(&web_index, "not an index\n").unwrap();
     let (other, _, _) = run(&dir, "status");
@@ -293,7 +263,6 @@ fn each_unservable_entry_is_refused_and_the_others_are_still_indexed() {
     assert!(!dir.join("bare.git/.meada").exists());
 
     let (status, _, ok) = run(&dir, "status");
-    // A listed repository that is not an identity cannot be served: exit 1.
     assert!(!ok);
     assert!(
         status.starts_with(
@@ -309,11 +278,9 @@ fn each_unservable_entry_is_refused_and_the_others_are_still_indexed() {
     );
     assert_nothing_else_written(&dir, &served);
 
-    // An `index_dir` inside a mirror would put every index there.
     let toml = [
         "index_dir = \"../chain-web/./x/..\"\n".to_string(),
         entry("example.com/chain/web", "../chain-web"),
-        // Overridden by the web mirror's own `meada.toml`, but the web is not served at all.
         "\n[repository.serve]\nprefix = \"/edge\"\n".to_string(),
         entry("example.com/chain/catalog", "../chain-catalog"),
     ]
@@ -356,7 +323,6 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
             "index_dir = \"../indexes\"\n\n[[repository]]\npath = \"../chain-web\"\n",
             "meada: ops/meada.workspace.toml:3: `repository.repo` is missing\n",
         ),
-        // The manifest locates every repository: a peer has no `path`.
         (
             "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
              path = \"../chain-web\"\n\n[[repository.peer]]\nrepo = \"example.com/chain/gateway\"\n\
@@ -368,8 +334,6 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
              path = \"../chain-web\"\n\n[repository.serve]\nprefix = \"edge\"\n",
             "meada: ops/meada.workspace.toml:8: `repository.serve.prefix`: must start with `/`\n",
         ),
-        // An owner belongs to a workspace version (ADR 0015): a static manifest names the key
-        // of the first entry that holds one, and `source = "store"`.
         (
             "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
              path = \"../chain-web\"\n\n[[repository]]\nrepo = \"example.com/chain/gateway\"\n\
@@ -378,7 +342,6 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
              entries of a workspace version, which a static manifest has none of: use [workspace] \
              source = \"store\" and `meada workspace import`\n",
         ),
-        // Likewise an `added_by` (#330); a repository's own `meada.toml` keeps it unknown.
         (
             "index_dir = \"../indexes\"\n\n[[repository]]\nrepo = \"example.com/chain/web\"\n\
              path = \"../chain-web\"\nadded_by = \"ana\"\n",
@@ -405,7 +368,6 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
             assert_eq!(stderr, expected, "{command}: {toml}");
         }
     }
-    // Read only from the path given: no manifest there is an error, not an empty workspace.
     fs::remove_file(dir.join("ops/meada.workspace.toml")).unwrap();
     let (_, stderr, ok) = run(&dir, "index");
     assert!(!ok);
@@ -416,9 +378,6 @@ fn manifest_errors_name_the_file_the_line_and_the_key() {
     assert!(!dir.join("indexes").exists());
 }
 
-/// A section a module owns, in a build without the module's feature (ADR 0012): an error naming
-/// the file, the line, the section and the feature. A section the table does not list stays an
-/// unknown key.
 #[cfg(not(feature = "valkey"))]
 #[test]
 fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
@@ -440,27 +399,23 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
             "index_dir = \"../indexes\"\n\n[cache]\nurl = \"redis://127.0.0.1\"\n",
             "meada: ops/meada.workspace.toml:3: `cache` is not a meada.workspace.toml key\n",
         ),
-        // The session store was not built (#277): its section is an unknown key too.
         (
             "index_dir = \"../indexes\"\n\n[sessions]\nttl_seconds = 60\n",
             "meada: ops/meada.workspace.toml:3: `sessions` is not a meada.workspace.toml key\n",
         ),
     ];
-    // `oidc` needs no `valkey`, so a build may have it here.
     if !cfg!(feature = "oidc") {
         cases.push((
             "index_dir = \"../indexes\"\n[oidc]\nissuer = \"https://id.example.com\"\n",
             "meada: ops/meada.workspace.toml:2: [oidc] needs a Meada built with the oidc feature\n",
         ));
     }
-    // Nor does `postgres`.
     if !cfg!(feature = "postgres") {
         cases.push((
             "index_dir = \"../indexes\"\n\n[postgres]\nschema = \"meada\"\n",
             "meada: ops/meada.workspace.toml:3: [postgres] needs a Meada built with the postgres feature\n",
         ));
     }
-    // Nor does `directory`.
     if !cfg!(feature = "directory") {
         cases.push((
             "index_dir = \"../indexes\"\n\n[directory]\nuser_claim = \"oid\"\n",
@@ -468,7 +423,6 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
              feature\n",
         ));
     }
-    // Nor does `catalog` (#341).
     if !cfg!(feature = "workspaces") {
         cases.push((
             "index_dir = \"../indexes\"\n\n[catalog]\nallow = [\"github.com/acme/*\"]\n",
@@ -476,7 +430,6 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
              feature\n",
         ));
     }
-    // Nor does `proposals` (ADR 0022).
     if !cfg!(feature = "proposals") {
         cases.push((
             "index_dir = \"../indexes\"\n\n[proposals]\npublic_url = \"https://p.example\"\n",
@@ -484,7 +437,6 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
              proposals feature\n",
         ));
     }
-    // `ui` needs no `valkey` either.
     if !cfg!(feature = "ui") {
         cases.push((
             "index_dir = \"../indexes\"\n\n\n\n[ui]\ndir = \"ui\"\n",
@@ -501,7 +453,6 @@ fn a_module_section_without_its_feature_is_an_error_naming_the_feature() {
     }
 }
 
-/// `[snapshot]` in a build without the `snapshot` feature (ADR 0012): the error naming it.
 #[cfg(not(feature = "snapshot"))]
 #[test]
 fn a_snapshot_section_without_its_feature_is_an_error_naming_the_feature() {
@@ -522,15 +473,11 @@ fn a_snapshot_section_without_its_feature_is_an_error_naming_the_feature() {
     }
 }
 
-/// The 1-based line of the first `found` in `text`.
 #[cfg(feature = "generation-pointer")]
 pub(crate) fn line_of(text: &str, found: &str) -> usize {
     text[..text.find(found).unwrap()].matches('\n').count() + 1
 }
 
-/// `[workspace]` (ADR 0014) is read in every build: an unknown key and an unknown source name the
-/// file, the line and the key; without `generation-pointer`, `source = "store"` names the
-/// feature. `source = "file"` is the file as before.
 #[test]
 fn the_workspace_section_is_read_in_every_build() {
     let dir = mirrors("manifest_workspace_section");
@@ -574,8 +521,6 @@ fn the_workspace_section_is_read_in_every_build() {
     }
 }
 
-/// `source = "store"` with the feature: without `[snapshot]` or `[generations]` the error names
-/// them, and beside a `[[repository]]` it names both.
 #[cfg(feature = "generation-pointer")]
 #[test]
 fn a_store_source_needs_its_sections_and_no_repository_entry() {
@@ -618,8 +563,6 @@ fn a_store_source_needs_its_sections_and_no_repository_entry() {
     }
 }
 
-/// The `[valkey]` section of a build that has the module: its keys are checked, and each error
-/// names the file, the line and the key without echoing the URL.
 #[cfg(feature = "valkey")]
 #[test]
 fn valkey_section_errors_name_the_file_the_line_and_the_key() {
@@ -673,8 +616,6 @@ fn valkey_section_errors_name_the_file_the_line_and_the_key() {
     }
 }
 
-/// The identity provider's `type` and its table (ADR 0016): each error names the file, the line
-/// and the key, and none echoes a value, a token or a URL.
 #[cfg(feature = "oidc")]
 #[test]
 fn oidc_type_errors_name_the_file_the_line_and_the_key() {
@@ -722,10 +663,6 @@ fn oidc_type_errors_name_the_file_the_line_and_the_key() {
     }
 }
 
-/// `overage = "directory"` (#336) needs `[oidc] groups_claim` and `[directory]`: each missing one
-/// is the error naming the file, the line and the key or section (a build without the
-/// `directory` feature names the feature instead), and under a `type` other than `entra` the
-/// error of `[oidc.entra]` stands.
 #[cfg(feature = "oidc")]
 #[test]
 fn oidc_overage_directory_names_what_it_needs() {
@@ -762,11 +699,6 @@ fn oidc_overage_directory_names_what_it_needs() {
     }
 }
 
-/// The GitHub grant provider's `[oidc.github]` (#331): each key error, the table without
-/// `[postgres]` and, in a build without `postgres`, the table at all, name the file, the line
-/// and the key or the sections, never a value; alone, without `identities_claim` or
-/// `groups_claim`, it is accepted. `meada github-app roles` needs a `[[github_app]]` block for
-/// its host.
 #[cfg(feature = "oidc")]
 #[test]
 fn oidc_github_errors_name_the_file_the_line_and_the_key() {
@@ -834,11 +766,9 @@ fn oidc_github_errors_name_the_file_the_line_and_the_key() {
     ] {
         refused(&format!("{oidc}{body}{postgres}"), &expected);
     }
-    // Alone: no `identities_claim` or `groups_claim` is needed beside it.
     write_manifest(&dir, &format!("{oidc}{table}{postgres}"));
     let (_, stderr, ok) = run(&dir, "index");
     assert!(ok, "{stderr}");
-    // The role check lists collaborators through the installations of its host.
     #[cfg(feature = "github-app")]
     for apps in [
         "",
@@ -858,8 +788,6 @@ fn oidc_github_errors_name_the_file_the_line_and_the_key() {
     }
 }
 
-/// The `[postgres]` section of a build that has the module (ADR 0016): each key error names the
-/// file, the line and the key.
 #[cfg(feature = "postgres")]
 #[test]
 fn postgres_section_errors_name_the_file_the_line_and_the_key() {
@@ -917,9 +845,6 @@ fn postgres_section_errors_name_the_file_the_line_and_the_key() {
     }
 }
 
-/// The `[directory]` section (#334): without `[postgres]`, without `[oidc]`, with both token
-/// keys, with an unknown key and with a `user_attribute` it does not accept, each error names the
-/// file, the line and the sections or the key, and never a value.
 #[cfg(all(feature = "directory", feature = "oidc"))]
 #[test]
 fn directory_section_errors_name_the_file_the_line_and_the_keys() {
@@ -974,11 +899,6 @@ fn directory_section_errors_name_the_file_the_line_and_the_keys() {
     }
 }
 
-/// The `[catalog]` section (#341): without the GitHub grant provider (`[oidc.github]`, or
-/// `[accounts.github]` since #562), with an allow list that is not patterns on its host, with a
-/// missing or out-of-range cap and with an unknown key, each error names the file, the line and
-/// the key, and never a pattern. Under `[accounts.github]` the patterns are checked against its
-/// host as under `[oidc.github]`.
 #[cfg(feature = "workspaces")]
 #[test]
 fn catalog_section_errors_name_the_file_the_line_and_the_keys() {
@@ -1038,8 +958,6 @@ fn catalog_section_errors_name_the_file_the_line_and_the_keys() {
             ),
         ),
     ];
-    // `[accounts.github]` in place of `[oidc.github]` (#562): the catalog is checked against its
-    // host, so a pattern on another host is the same error.
     #[cfg(feature = "accounts")]
     {
         let accounts = "\n[accounts]\npublic_key_env = \"A\"\nprivate_key_env = \"B\"\n\n\
@@ -1069,9 +987,6 @@ fn catalog_section_errors_name_the_file_the_line_and_the_keys() {
     }
 }
 
-/// The `[proposals]` section (ADR 0022): without `[workspaces]`, with a URL that is not `https`
-/// off loopback or has a path, with an empty audience and with an unknown key, each error names
-/// the file, the line and the key.
 #[cfg(feature = "proposals")]
 #[test]
 fn proposals_section_errors_name_the_file_the_line_and_the_keys() {
@@ -1112,8 +1027,6 @@ fn proposals_section_errors_name_the_file_the_line_and_the_keys() {
     }
 }
 
-/// The local Valkey `MEADA_TEST_VALKEY_URL` names, or `None` with the reason printed;
-/// `MEADA_TEST_SERVICES_REQUIRED=1` turns the missing variable into a failure.
 #[cfg(feature = "valkey")]
 fn valkey_service() -> Option<String> {
     let url = std::env::var("MEADA_TEST_VALKEY_URL").ok();
@@ -1125,14 +1038,12 @@ fn valkey_service() -> Option<String> {
     url
 }
 
-/// The chain's manifest with a `[valkey]` section made of `lines`, indexed.
 #[cfg(feature = "valkey")]
 fn valkey_manifest(case: &str, lines: &str) -> PathBuf {
     let dir = chain_manifest(case);
     assert!(run(&dir, "index").2);
     let ops = dir.join(MANIFEST);
     let toml = fs::read_to_string(&ops).unwrap();
-    // Top-level tables go before the first `[[repository]]`.
     let (head, entries) = toml.split_once("\n[[repository]]").unwrap();
     fs::write(
         &ops,
@@ -1142,13 +1053,9 @@ fn valkey_manifest(case: &str, lines: &str) -> PathBuf {
     dir
 }
 
-/// `status` names Valkey on one line and its exit code stays what local state alone says: a
-/// dead Valkey neither fails an indexed workspace nor stalls the probe, a live one does not
-/// rescue an unindexed one.
 #[cfg(feature = "valkey")]
 #[test]
 fn status_names_whether_valkey_is_reachable_and_its_exit_code_ignores_it() {
-    // Nothing listens on port 1.
     let dir = valkey_manifest("manifest_valkey_dead", "url = \"redis://127.0.0.1:1\"\n");
     let start = std::time::Instant::now();
     let (status, stderr, code) = run_args(&dir, &["status", "--workspace", MANIFEST]);
@@ -1157,7 +1064,6 @@ fn status_names_whether_valkey_is_reachable_and_its_exit_code_ignores_it() {
     assert!(stderr.is_empty(), "{stderr}");
     assert!(status.contains("\nvalkey: unreachable ("), "{status}");
     assert!(took < std::time::Duration::from_millis(1500), "{took:?}");
-    // Unindexed: still not ready, whatever Valkey says.
     fs::remove_file(dir.join("indexes/example.com/chain/web/index.db")).unwrap();
     let (status, _, code) = run_args(&dir, &["status", "--workspace", MANIFEST]);
     assert_eq!(code, Some(1));
@@ -1170,8 +1076,6 @@ fn status_names_whether_valkey_is_reachable_and_its_exit_code_ignores_it() {
     assert!(status.ends_with("\nvalkey: reachable\n"), "{status}");
 }
 
-/// A `password_file` that is a FIFO nobody writes is refused at once: the probe neither hangs on
-/// the open nor changes its exit code.
 #[cfg(all(feature = "valkey", unix))]
 #[test]
 fn status_refuses_a_password_file_that_is_not_a_regular_file_without_stalling() {
@@ -1196,15 +1100,12 @@ fn status_refuses_a_password_file_that_is_not_a_regular_file_without_stalling() 
     );
 }
 
-/// A refused AUTH and a failed TLS handshake leave the password out of stdout and stderr.
 #[cfg(feature = "valkey")]
 #[test]
 fn status_never_prints_the_valkey_password() {
     let Some(url) = valkey_service() else { return };
     let secret = "known-secret-7";
     let tls = url.replacen("redis://", "rediss://", 1);
-    // The default user has no such password: AUTH is refused. A TLS handshake with a plain
-    // port fails.
     for (case, url) in [("auth", url), ("tls", tls)] {
         let lines = format!("url = \"{url}\"\npassword_file = \"../valkey-pass\"\n");
         let dir = valkey_manifest(&format!("manifest_valkey_secret_{case}"), &lines);
@@ -1269,7 +1170,6 @@ fn a_chain_refreshed_by_index_workspace_exports_what_a_cold_one_does() {
     assert!(run(&dir, "index").2);
     let before = exports(&dir);
     edit_chain(&mirrors(&dir));
-    // Only `meada index` refreshes: until it runs, the export is the index's, not the files'.
     assert_eq!(exports(&dir), before);
 
     assert!(run(&dir, "index").2);
@@ -1282,7 +1182,6 @@ fn a_chain_refreshed_by_index_workspace_exports_what_a_cold_one_does() {
         .zip(exports(&cold))
         .enumerate()
     {
-        // The worker is not edited.
         if n < 3 {
             assert_ne!(refreshed, before, "repository {n}");
         }
@@ -1292,9 +1191,6 @@ fn a_chain_refreshed_by_index_workspace_exports_what_a_cold_one_does() {
     assert_nothing_else_written(&dir, &all);
 }
 
-/// "Build once, distribute" (spec #259): an index built elsewhere for the same mirror commits,
-/// renamed over `<index_dir>/<identity>/index.db`, answers as the one it replaces, and an engine
-/// opened before the rename keeps answering from the old one.
 #[test]
 fn an_index_built_elsewhere_and_renamed_in_answers_as_the_one_it_replaces() {
     let dir = chain_manifest("manifest_renamed_in");
@@ -1323,22 +1219,17 @@ fn an_index_built_elsewhere_and_renamed_in_answers_as_the_one_it_replaces() {
     assert_nothing_else_written(&dir, &all);
 }
 
-/// The bytes of every file under `dir`, by path relative to it.
 pub(crate) fn contents(dir: &Path) -> Vec<(String, Vec<u8>)> {
     (files(dir).into_iter())
         .map(|f| (f.clone(), fs::read(dir.join(&f)).unwrap()))
         .collect()
 }
 
-/// A directory tree made read-only (directories `0555`, files `0444`) until dropped, when the
-/// permissions come back so the temp dir can be cleaned.
 #[cfg(unix)]
 pub(crate) struct ReadOnly(Vec<(PathBuf, fs::Permissions)>);
 
 #[cfg(unix)]
 impl ReadOnly {
-    /// Locks `dir` down, or `None` with a printed reason when permissions do not bind this user
-    /// (root).
     pub(crate) fn lock(dir: &Path) -> Option<Self> {
         use std::os::unix::fs::PermissionsExt;
         let mut all = vec![dir.to_path_buf()];
@@ -1372,16 +1263,12 @@ impl ReadOnly {
 #[cfg(unix)]
 impl Drop for ReadOnly {
     fn drop(&mut self) {
-        // Directories first, so what is inside them can be reached again.
         for (path, was) in &self.0 {
             let _ = fs::set_permissions(path, was.clone());
         }
     }
 }
 
-/// A mirror owned by another user (`GIT_TEST_ASSUME_DIFFERENT_OWNER`): in server mode Meada
-/// passes `-c safe.directory=<mirror>` for the manifest's mirrors, so the start checks pass;
-/// `git` itself still refuses the mirror, and a local run in it gets no such option.
 #[test]
 fn a_mirror_owned_by_another_user_is_trusted_in_server_mode() {
     let dir = chain_manifest("manifest_other_owner");
@@ -1392,7 +1279,6 @@ fn a_mirror_owned_by_another_user_is_trusted_in_server_mode() {
             .args(args)
             .env("LANG", "en_US.UTF-8")
             .env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
-            // A runner's own `safe.directory` (even `*`) must not trust the mirror.
             .env("GIT_CONFIG_NOSYSTEM", "1")
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
             .output()
@@ -1404,8 +1290,6 @@ fn a_mirror_owned_by_another_user_is_trusted_in_server_mode() {
     };
     let mirror = dir.join("chain-web");
 
-    // Without the option, git refuses; a git that does not (older than 2.38, or one that
-    // ignores the variable) cannot be tested here.
     let refused = Command::new("git")
         .arg("-C")
         .arg(&mirror)
@@ -1425,7 +1309,6 @@ fn a_mirror_owned_by_another_user_is_trusted_in_server_mode() {
     let (code, stderr) = owned(&dir, &["export", "--workspace", MANIFEST, "--repo", WEB]);
     assert_eq!((code, stderr.as_str()), (Some(0), ""));
 
-    // The start checks of `mcp --listen` pass too: it reaches its listening line.
     let mut server = Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(&dir)
         .args(["mcp", "--listen", "127.0.0.1:0", "--workspace", MANIFEST])
@@ -1443,8 +1326,6 @@ fn a_mirror_owned_by_another_user_is_trusted_in_server_mode() {
     let _ = server.wait();
     assert!(line.starts_with("listening on "), "{line:?}");
 
-    // Locally nothing changes: in the same mirror, git's refusal stands, so the checkout is
-    // taken for a directory outside git and Meada names it `local/<directory>`.
     let local = Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(&mirror)
         .arg("status")
@@ -1466,7 +1347,6 @@ fn export_prints_one_repository_over_the_manifest_and_only_index_writes() {
     let dir = chain_manifest("manifest_export");
     let web = "example.com/chain/web";
 
-    // Before `meada index`, nothing is created or built: the error names the fix.
     let (stdout, stderr, code) = run_export(&dir, web);
     assert_eq!((stdout.as_str(), code), ("", Some(1)));
     assert_eq!(
@@ -1487,7 +1367,6 @@ fn export_prints_one_repository_over_the_manifest_and_only_index_writes() {
     assert!(run(&dir, "status").2);
     assert!(contents(&indexes) == indexed, "a read wrote an index");
 
-    // An identity the manifest does not list names the ones it serves.
     let (_, stderr, code) = run_export(&dir, "example.com/chain/nope");
     assert_eq!(code, Some(1));
     assert_eq!(
@@ -1496,7 +1375,6 @@ fn export_prints_one_repository_over_the_manifest_and_only_index_writes() {
          example.com/chain/web, example.com/chain/gateway, example.com/chain/catalog, \
          example.com/chain/worker\n"
     );
-    // A peer's index of another schema is not rebuilt by a read.
     let catalog = indexes.join("example.com/chain/catalog/index.db");
     fs::write(&catalog, "not an index\n").unwrap();
     let (stdout, stderr, code) = run_export(&dir, web);
@@ -1508,7 +1386,6 @@ fn export_prints_one_repository_over_the_manifest_and_only_index_writes() {
     );
     assert_eq!(fs::read_to_string(&catalog).unwrap(), "not an index\n");
 
-    // `--repo` and `--workspace` go together.
     let (_, stderr, code) = run_args(&dir, &["export", "--workspace", MANIFEST]);
     assert!(code == Some(2) && stderr.contains("--repo"), "{stderr}");
     let (_, stderr, code) = run_args(&dir, &["export", "--repo", web]);
@@ -1522,7 +1399,6 @@ fn export_prints_one_repository_over_the_manifest_and_only_index_writes() {
 
 #[test]
 fn entry_blocks_configure_a_mirror_with_no_meada_toml_as_the_file_would() {
-    // The chain: base URL variables, hosts and resources.
     let dir = mirrors("manifest_blocks");
     list(&dir, &CHAIN, true);
     assert!(run(&dir, "index").2);
@@ -1533,7 +1409,6 @@ fn entry_blocks_configure_a_mirror_with_no_meada_toml_as_the_file_would() {
         assert_eq!(stderr, "");
     }
 
-    // Provider documents under `serve`.
     let (web, ..) = documented_chain("manifest_blocks_documents");
     let dir = web.parent().unwrap();
     list(dir, &CHAIN, true);
@@ -1547,7 +1422,6 @@ fn entry_blocks_configure_a_mirror_with_no_meada_toml_as_the_file_would() {
         );
     }
 
-    // Gateway prefixes and strips.
     let case = "manifest_blocks_gateway";
     let acme = ["ledger", "client", "orders", "billing"].map(|name| {
         let origin = format!("https://example.com/acme/{name}.git");
@@ -1625,9 +1499,6 @@ fn each_mirrors_decisions_are_replayed_and_the_stale_ones_reported() {
     assert!(status.contains("\n  stale decision: "), "{status}");
 }
 
-/// An index that fails to read is named in place of the decisions and the lines under each
-/// repository, and the probe still answers from readiness alone; a manifest that lists nothing
-/// has nothing to evaluate and says nothing more (#934).
 #[test]
 fn status_says_why_it_did_not_evaluate_the_decisions() {
     let dir = chain_manifest("manifest_status_unevaluated");
@@ -1658,9 +1529,6 @@ fn status_says_why_it_did_not_evaluate_the_decisions() {
     assert_eq!(run(&dir, "status").0, "workspace: 0 repositories\n");
 }
 
-/// `status --workspace` as a readiness probe: 0 when every repository is servable, 1 when one
-/// is not (here the gateway's index is missing), whatever the text says. Without `--workspace`
-/// the exit code is what it was.
 #[test]
 fn status_exits_zero_only_when_every_repository_can_be_served() {
     let dir = chain_manifest("manifest_status_probe");
@@ -1676,8 +1544,6 @@ fn status_exits_zero_only_when_every_repository_can_be_served() {
     assert!(some.contains("example.com/chain/web (../chain-web) indexed, "));
 }
 
-/// A commit in progress on one index does not stall the probe, nor fail it: the index is there
-/// and the server answers once the lock clears. The text still names the locked state.
 #[test]
 fn status_probe_answers_fast_and_ready_while_a_writer_holds_an_index() {
     let dir = chain_manifest("manifest_status_locked");
@@ -1700,8 +1566,6 @@ fn status_probe_answers_fast_and_ready_while_a_writer_holds_an_index() {
     writer.execute_batch("ROLLBACK").unwrap();
 }
 
-/// `[snapshot] node_name` (#298): a configured name is checked against the node name pattern, and
-/// each failure names the file, the line and the key.
 #[cfg(feature = "snapshot")]
 #[test]
 fn a_bad_node_name_names_the_file_the_line_and_the_key() {
@@ -1729,10 +1593,6 @@ fn a_bad_node_name_names_the_file_the_line_and_the_key() {
     }
 }
 
-/// `[workspaces]` (#342) needs the sections it rides on, each error naming both, and its keys
-/// are checked: the file, the line and the key are named, and the mirrors root is a path, not a
-/// value anyone may read back from an answer. The GitHub grant provider is `[catalog]`'s need;
-/// `[accounts.github]` with local accounts (#562) satisfies it as `[oidc.github]` does.
 #[cfg(feature = "workspaces")]
 #[test]
 fn workspaces_section_errors_name_the_file_the_line_and_the_sections() {
@@ -1769,8 +1629,6 @@ fn workspaces_section_errors_name_the_file_the_line_and_the_sections() {
                 "{at}:{line}: `workspaces`: [workspaces] needs [workspace] source = \"store\"\n"
             ),
         ),
-        // Local accounts with `[accounts.github]` and a writable console: every section need
-        // holds, so the next check is the managed workspace's.
         #[cfg(feature = "accounts")]
         (
             format!("{head}{section}{accounts}{local_ui}"),
@@ -1808,10 +1666,6 @@ fn workspaces_section_errors_name_the_file_the_line_and_the_sections() {
     }
 }
 
-/// A server-mode mirror's `meada.toml` or `meada.decisions.toml` that is a symbolic link (#547),
-/// to a file outside the mirror and to one inside it, is refused unopened as a pulled
-/// generation's is (#506): `index` and `status` name the file, and what the target holds (which
-/// would parse) is in none of their output. The file itself, in the link's place, is read.
 #[cfg(unix)]
 #[test]
 fn a_mirror_config_through_a_symbolic_link_is_refused_and_never_read() {
@@ -1851,7 +1705,6 @@ fn a_mirror_config_through_a_symbolic_link_is_refused_and_never_read() {
             for out in [&stdout, &stderr, &status] {
                 assert!(!out.contains(marker), "{out}");
             }
-            // The other mirrors are served as before.
             assert!(
                 status.contains("example.com/chain/gateway (../chain-gateway) indexed"),
                 "{status}"
@@ -1865,8 +1718,6 @@ fn a_mirror_config_through_a_symbolic_link_is_refused_and_never_read() {
     }
 }
 
-/// A local checkout is the developer's own tree (#547): its `meada.toml`, a symbolic link, is
-/// read as the file would be.
 #[cfg(unix)]
 #[test]
 fn a_local_checkouts_meada_toml_through_a_symbolic_link_is_read() {
@@ -1885,8 +1736,6 @@ fn a_local_checkouts_meada_toml_through_a_symbolic_link_is_read() {
     assert!(after.contains("example.com/chain/gateway"), "{after}");
 }
 
-/// A server-mode mirror's `meada.toml` or `meada.decisions.toml` past 1 MiB is refused naming
-/// the file (#547), as a pulled generation's is; one of exactly 1 MiB is read.
 #[test]
 fn an_oversized_mirror_config_is_refused_naming_the_file() {
     const MAX: usize = 1 << 20;

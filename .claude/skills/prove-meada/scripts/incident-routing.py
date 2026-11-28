@@ -155,7 +155,6 @@ resource "pagerduty_event_orchestration_service" "checkout" {
     assert all(name in texts[2] for name in ['datadog_monitor.checkout', 'opsgenie_team_routing_rule.datadog', 'opsgenie_team_routing_rule.transformed', 'pagerduty_event_orchestration_service.checkout']), texts[2]
     assert 'signals.yaml' in texts[3] and 'forwarding:' in texts[3], texts[3]
     assert 'signals.yaml' in texts[4] and 'emitter' in texts[4], texts[4]
-    # Filtering out the receiver also removes both of its incident field forwardings.
     write(roots['routing'], 'dispatch.yaml', dispatch.replace('match: {support: squad-cedar}', 'match: {support: squad-absent}'))
     filtered = json.loads(command(binary, roots['routing'], run, 'filtered-receiver', 'export'))
     assert link_rows(filtered) == [row for row in expected if 'datadog_monitor' in row[2]], filtered

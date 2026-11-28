@@ -1,7 +1,3 @@
-//! Channels (spec #20): producers and consumers of a broker's topics and queues, recognized
-//! only on clients that trace back to their library, linked from every consumer to every
-//! producer of the same channel, in the same repository too.
-
 use crate::common;
 
 use std::path::PathBuf;
@@ -10,8 +6,6 @@ use common::{assert_golden, fixture_repo, without_processes};
 use meada::engine::Engine;
 use serde_json::Value;
 
-/// The channels fixture as siblings in one case directory; returns the producer side, `api`,
-/// whose workspace holds all three.
 fn channels(case: &str) -> PathBuf {
     for fixture in ["channels-worker", "channels-billing"] {
         let name = fixture.trim_start_matches("channels-");
@@ -58,19 +52,16 @@ fn every_consumer_links_to_every_producer_of_its_kafka_topic() {
     let billing_handler =
         format!("{BILLING}::src/listen.ts::listen.kafka orders.created billing.invoices");
     let mut expected = vec![
-        // Same repository, through an object-literal method handler.
         link(
             format!("{API}::src/audit.ts::auditLog.kafka audit.log"),
             "orders.ts::audit::producer.send#0",
             "audit.log",
         ),
-        // A template literal over an imported constant.
         link(
             billing_handler.clone(),
             "orders.ts::invoice::producer.send#0",
             "billing.invoices",
         ),
-        // Fan-out: both consumers of `orders.created`, each at `exact`.
         link(billing_handler, created, "orders.created"),
         link(
             format!("{WORKER}::src/consumer.ts::handleOrder"),
@@ -80,8 +71,6 @@ fn every_consumer_links_to_every_producer_of_its_kafka_topic() {
     ];
     expected.sort();
     assert_eq!(links, expected);
-    // `mailer.send` is no producer, and `orders.shipped` has no consumer yet stays exported.
-    // The two producers whose topic Meada cannot evaluate are `channel::kafka`, never linked.
     let providers: Vec<&str> = (json["providers"].as_array().unwrap())
         .iter()
         .map(|p| p["contract"].as_str().unwrap())
@@ -102,7 +91,6 @@ fn every_consumer_links_to_every_producer_of_its_kafka_topic() {
     assert_golden("channels-api.export.json", &without_processes(&export));
 }
 
-/// The queue and subject fixtures as siblings in one case directory; returns the producer side.
 fn queues(case: &str) -> PathBuf {
     fixture_repo(
         case,
@@ -116,9 +104,6 @@ fn queues(case: &str) -> PathBuf {
     )
 }
 
-/// SQS queues link by the queue name at the end of the URL, whatever its prefix, with the AWS
-/// SDK v3 and `sqs-consumer`; NATS subjects link exactly, and through `*` and `>` at
-/// `inferred`, with the pattern in the reason.
 #[test]
 fn sqs_queues_link_by_name_and_nats_subjects_through_wildcards() {
     let api = queues("channels_queues");
@@ -151,14 +136,12 @@ fn sqs_queues_link_by_name_and_nats_subjects_through_wildcards() {
     let created = format!("{nats_api}orderCreated::nc.publish#0");
     let created_eu = format!("{nats_api}orderCreated::nc.publish#1");
     let mut expected = vec![
-        // The queue name is the last segment of a URL whose prefix is dynamic.
         link(
             "worker::src/sqs.ts::drain",
             "api::src/sqs.ts::enqueueOrder::SendMessageCommand#0",
             "exact",
             "channel::sqs::orders",
         ),
-        // `sqs-consumer`'s `handleMessage`, a producer reached through a client wrapper.
         link(
             "worker::src/sqs.ts::handleRefund",
             "api::src/sqs.ts::enqueueRefund::enqueue#0",
@@ -204,8 +187,6 @@ fn sqs_queues_link_by_name_and_nats_subjects_through_wildcards() {
     );
 }
 
-/// `context` on a subject lists the wildcard subscribers that match it, and on a pattern the
-/// producers it matches, each with the level and reason of the match.
 #[test]
 fn context_on_a_subject_lists_the_wildcard_sides_linked_to_it() {
     let engine = Engine::open(&queues("channels_wildcard_context")).unwrap();
@@ -218,10 +199,6 @@ fn context_on_a_subject_lists_the_wildcard_sides_linked_to_it() {
     assert_golden("channels-queues.context-pattern.txt", &pattern);
 }
 
-/// RabbitMQ (spec #20): `sendToQueue` links to `consume` by the queue name; a publish reaches
-/// the queues bound to its exchange, the binding declared in another repository, at `exact`
-/// when the pattern is the routing key and `inferred` for a wildcard; the empty exchange is
-/// the queue the key names. The Kafka topic `orders` beside the queue `orders` never links.
 #[test]
 fn amqp_publishes_reach_the_queues_bound_to_their_exchange() {
     let api = channels("channels_amqp");
@@ -281,12 +258,7 @@ fn amqp_publishes_reach_the_queues_bound_to_their_exchange() {
         ),
     ];
     expected.sort();
-    // `order.refunded` matches no binding: its publish stays exported, with no link, and
-    // neither it nor any other publish to `events` reaches the queues named `events` and
-    // `order.refunded`.
     assert_eq!(links, expected);
-    // A publish to a named exchange holds no channel of its own: it is listed apart, and
-    // every channel the export names is `channel::<broker>::<name>` of a v1 broker kind.
     let publishes: Vec<String> = (json["publishes"].as_array().unwrap().iter())
         .map(|p| {
             format!(

@@ -1,11 +1,3 @@
-//! Entra ID's groups overage through the directory in the console (#336, ADR 0016): a token with
-//! `_claim_names` and no `groups` gets its groups from the directory the identity provider
-//! pushed, and is granted, made an operator or a team operator and shown its groups like any
-//! other; the token check resolves a pasted one the same way. The team fixture of `team` (real
-//! Valkey and store, the `oidc` module's loopback issuer) with a local Postgres in a schema of
-//! each test's own, fed through the SCIM endpoint as `directory`'s tests feed it. Without
-//! `MEADA_TEST_POSTGRES_URL` they print why and skip.
-
 use std::fs;
 
 use serde_json::{Value, json};
@@ -18,15 +10,12 @@ use crate::server::Server;
 use crate::snapshot::KEY_ID;
 use crate::ui::{Reply, send_body};
 
-/// The `[directory]` of every console here: Entra's recipe, the object id as `externalId`.
 const DIRECTORY: &str = "\n[directory]\nuser_claim = \"oid\"\nuser_attribute = \"externalId\"\ngroup_attribute = \"externalId\"\n";
 const NODES: &str = "https://meada.example";
 const ANA: &str = "5d0a8c1e-0000-4000-8000-00000000a001";
 const OPA: &str = "5d0a8c1e-0000-4000-8000-00000000a002";
 const NOB: &str = "5d0a8c1e-0000-4000-8000-00000000a003";
 
-/// The consoles of one case: the first reads the directory for overage, the second has
-/// `overage = "ignore"`; both share the schema, the store and the issuer.
 struct Overage {
     team: Team,
     audit: Audited,
@@ -34,16 +23,12 @@ struct Overage {
     ignore: Server,
 }
 
-/// The team fixture whose console manifest is `type = "entra"`, has `operator_groups` naming
-/// `ops-group`, `[postgres]` and `[directory]`, started twice: with `overage = "directory"` and
-/// with `"ignore"`, `ttl_ms` shortening the answers' lifetime when given.
 fn overaged(case: &'static str, ttl_ms: Option<&str>) -> Option<Overage> {
     let team = team(case, true)?;
     let audit = audited(&team.fleet.dir, case)?;
     let file = team.fleet.dir.join("ops/console.toml");
     let text = fs::read_to_string(&file).unwrap();
     let text = text.replacen("\n[oidc]\n", "\n[oidc]\ntype = \"entra\"\n", 1);
-    // `operator_groups` and `operator_claim` exclude each other.
     let key = "operator_claim = \"operator\"\n";
     let text = text.replacen(key, "operator_groups = [\"ops-group\"]\n", 1);
     assert!(
@@ -74,14 +59,12 @@ fn code(reply: &Reply) -> String {
     reply.json()["error"]["code"].as_str().unwrap_or("").into()
 }
 
-/// A user `name` whose `externalId` is `oid`; its id.
 fn user(console: &Server, name: &str, oid: &str, active: bool) -> String {
     let body = json!({"schemas": [USER], "userName": name, "externalId": oid, "active": active});
     let created = expect(console, "POST", "/Users", Some(&body), 201);
     created["id"].as_str().unwrap().to_string()
 }
 
-/// A group `external` (what a token's `groups` would carry) with `members`; its id.
 fn group(console: &Server, external: &str, members: &[&str]) -> String {
     let members: Vec<Value> = members.iter().map(|id| json!({"value": id})).collect();
     let body = json!({"schemas": [GROUP], "displayName": format!("display of {external}"),
@@ -95,7 +78,6 @@ fn activate(console: &Server, id: &str, active: bool) {
     expect(console, "PATCH", &format!("/Users/{id}"), Some(&set), 200);
 }
 
-/// A token of `oid`, with `_claim_names` and no `groups`, as Entra issues one in overage.
 fn overage_token(team: &Team, subject: &str, oid: &str) -> String {
     team.sign(&overage_claims(team, subject, oid))
 }
@@ -120,7 +102,6 @@ fn post(console: &Server, route: &str, token: &str, body: Value) -> Reply {
     send_body(console, "POST", &route, &headers, &body.to_string())
 }
 
-/// Neither `text` nor any of `values` there: tokens' parts, the SCIM token, the Postgres URL.
 fn assert_leaks_nothing(audit: &Audited, text: &str, tokens: &[&str], values: &[&str]) {
     for token in tokens {
         for part in token.split('.') {
@@ -134,11 +115,6 @@ fn assert_leaks_nothing(audit: &Audited, text: &str, tokens: &[&str], values: &[
     audit.assert_no_url(text);
 }
 
-/// A token in overage is granted through the directory's groups, made `operator` through
-/// `operator_groups` and a team operator through a group owning an entry it reads, and its
-/// `session` lists the groups; a user in no group is a viewer with none; under `overage =
-/// "ignore"` the same tokens have no groups. No line or body carries a token, an object id, a
-/// group or the URL.
 #[test]
 fn an_overage_token_is_granted_and_made_an_operator_through_directory_groups() {
     let Some(case) = overaged("ui_overage_roles", None) else {
@@ -178,7 +154,6 @@ fn an_overage_token_is_granted_and_made_an_operator_through_directory_groups() {
         (&viewer["role"], &viewer["groups"], &viewer["grant"]),
         (&json!("viewer"), &json!([]), &json!([]))
     );
-    // Under `ignore` they have no directory-derived groups: viewers, whatever the directory holds.
     for token in &tokens {
         let seen = session(ignore, token);
         assert_eq!(seen["role"], "viewer", "{seen}");
@@ -192,9 +167,6 @@ fn an_overage_token_is_granted_and_made_an_operator_through_directory_groups() {
     }
 }
 
-/// A token that is no overage, or whose `_claim_names` is no object or maps to a non-string, or
-/// which has `groups`, is never looked up: it keeps what its claims say, whatever the
-/// directory holds for its `oid`.
 #[test]
 fn a_token_with_groups_or_an_odd_claim_names_is_no_overage() {
     let Some(case) = overaged("ui_overage_shapes", None) else {
@@ -231,15 +203,10 @@ fn a_token_with_groups_or_an_odd_claim_names_is_no_overage() {
         assert_eq!(seen["groups"], json!(groups), "{name}: {seen}");
         assert_eq!(seen["role"], "viewer", "{name}: {seen}");
     }
-    // The control: the same user, in overage, is a team operator.
     let seen = session(directory, &overage_token(team, "ana", ANA));
     assert_eq!(seen["role"], "team_operator", "{seen}");
 }
 
-/// A user the directory deactivated or deleted is refused by console admission with 403
-/// `deprovisioned` before the overage answer cached for it is used, on `session` and a write
-/// alike; reprovisioned active and in no group, it is a viewer once its answer expired: an
-/// expired answer revives nothing.
 #[test]
 fn a_deprovisioned_overage_user_is_refused_before_its_cached_groups_are_used() {
     let Some(case) = overaged("ui_overage_deprovision", Some("2000")) else {
@@ -274,12 +241,10 @@ fn a_deprovisioned_overage_user_is_refused_before_its_cached_groups_are_used() {
     refused(write());
     activate(directory, &ana, true);
     assert_eq!(session(directory, &token)["role"], "team_operator");
-    // Deleted: refused, now and after the cached answer expired.
     expect(directory, "DELETE", &format!("/Users/{ana}"), None, 204);
     refused(ask(directory, "/api/v1/session", &token));
     std::thread::sleep(std::time::Duration::from_millis(2500));
     refused(ask(directory, "/api/v1/session", &token));
-    // Provisioned again, active, in no group: admitted, and the expired answer is gone.
     user(directory, "ana", ANA, true);
     let seen = session(directory, &token);
     assert_eq!(
@@ -290,8 +255,6 @@ fn a_deprovisioned_overage_user_is_refused_before_its_cached_groups_are_used() {
     assert_leaks_nothing(&audit, &stderr, &[&token], &[ANA, "team-billing"]);
 }
 
-/// The token check of a pasted overage token lists the identities its directory groups grant (the
-/// nodes' admission, so none under `ignore`) and records no request on the loopback issuer.
 #[test]
 fn the_token_check_resolves_a_pasted_overage_token_through_the_directory() {
     let Some(case) = overaged("ui_overage_check", None) else {
@@ -331,6 +294,5 @@ fn the_token_check_resolves_a_pasted_overage_token_through_the_directory() {
     assert_eq!(log.len(), requests, "the check reached the issuer: {log:?}");
     let stderr = console.stderr();
     assert_leaks_nothing(&audit, &stderr, &[&pasted, &root], &[ANA, "team-billing"]);
-    // The entries the fixture's grant never names stay out of it.
     assert!(ENTRIES.iter().any(|(repo, _)| *repo == SEARCH));
 }

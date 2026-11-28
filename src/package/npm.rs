@@ -1,19 +1,3 @@
-//! The npm ecosystem (spec #22): a `package.json` with a valid name provides
-//! `package::npm::<name>`. The adapter answers by npm's own rules:
-//! - `read`: the name, version, the four dependency tables and the entry fields (`exports`,
-//!   `types`, `module`, `main`) of a `package.json`.
-//! - `names_package`, `entries`: a bare specifier splits into its package (scoped or not) and
-//!   the subpath, and names the entry of the importing file's nearest `package.json`.
-//! - `carried`: the `default` a Backstage backend adds by `backend.add(import('<package>'))`
-//!   (`backstage::added_plugin`), and each a test backend starts with by
-//!   `startTestBackend({ features: [import('<package>')] })` (`backstage::test_features`).
-//! - `flag`: npm semver, by the `nodejs-semver` crate behind a comparator grammar check.
-//! - `reaches`: a `workspace:` range keeps a dependency inside its own repository.
-//! - `shapes`: shapes cross npm packages alone.
-//!
-//! Everything else is the shared default, Node's rule (`ways`, the candidates, the provider
-//! view's `resolve`), which `exported` serves with the `exports` map of a manifest.
-
 use std::path::Path;
 
 use serde_json::Value;
@@ -26,7 +10,6 @@ use crate::resolve::Code;
 
 mod backstage;
 
-/// The dependency fields of a manifest that `read` collects.
 const FIELDS: [&str; 4] = [
     "dependencies",
     "devDependencies",
@@ -34,23 +17,16 @@ const FIELDS: [&str; 4] = [
     "optionalDependencies",
 ];
 
-/// The prefix of an npm range that keeps a dependency inside its own repository.
 const WORKSPACE: &str = "workspace:";
 
-/// The conditions of an `exports` target Meada reads, in order: at each level the first one
-/// present is taken, and no other is followed.
 const CONDITIONS: [&str; 4] = ["types", "import", "default", "require"];
 
-/// The deepest an `exports` target nests conditions; deeper, the subpath has no target.
 // ponytail: real maps nest two or three levels; this bounds the walk over a hostile one.
 const MAX_CONDITIONS: usize = 32;
 
-/// The longest range checked, in bytes; a longer one is `range unchecked`. The crate sets no
-/// limit of its own on a range, and a real one is a few dozen bytes.
 // ponytail: a flat 256 (the crate's own limit for versions); a measured need lifts it.
 pub const MAX_RANGE: usize = 256;
 
-/// The npm ecosystem.
 pub struct Npm;
 
 impl Ecosystem for Npm {
@@ -62,9 +38,6 @@ impl Ecosystem for Npm {
         file_name == "package.json"
     }
 
-    /// Reads a `package.json` from its bytes. Hostile input: a file too large, not JSON, nested
-    /// past `serde_json`'s depth limit or not an object reads as empty; a field of another type
-    /// counts as absent; a name that breaks npm's rules makes no provider.
     fn read(&self, _path: &str, src: &[u8]) -> Summary {
         if src.len() > MAX_BYTES {
             return Summary::default();
@@ -105,7 +78,6 @@ impl Ecosystem for Npm {
         }
     }
 
-    /// The TS/JS pack's.
     fn sources(&self) -> &'static [&'static str] {
         &EXTENSIONS
     }
@@ -128,7 +100,6 @@ impl Ecosystem for Npm {
             .collect()
     }
 
-    /// The entry of the split name in the importing file's nearest `package.json`.
     fn entries<'e>(
         &self,
         exports: &'e [Export],
@@ -144,12 +115,6 @@ impl Ecosystem for Npm {
         entry.map(|e| (e, subpath)).into_iter().collect()
     }
 
-    /// Whether the dependency `range` accepts the provider's `version`, by npm's semantics: `None`
-    /// when it does, else the `Flag`. A missing range or version, a `workspace:`, `file:`, `link:`
-    /// or `npm:` range, a git or URL source (anything holding `:` or `/`), a tag such as `latest`
-    /// and a range past `MAX_RANGE` are `Unchecked`. The crate lets garbage through in a range of
-    /// several tokens (`foo 1.2.3` parses as `1.2.3`), so each token must also look like a
-    /// comparator.
     fn flag(&self, range: Option<&str>, version: Option<&str>) -> Option<Flag> {
         let (Some(range), Some(version)) = (range, version) else {
             return Some(Flag::Unchecked);
@@ -165,7 +130,6 @@ impl Ecosystem for Npm {
         }
     }
 
-    /// A `workspace:` range keeps only the dependent's own repository.
     fn reaches(
         &self,
         (_, range): (Option<&str>, Option<&str>),
@@ -175,9 +139,6 @@ impl Ecosystem for Npm {
         from.0 == to || !range.is_some_and(|r| r.starts_with(WORKSPACE))
     }
 
-    /// Never: `imports` gives one at most per call, so several rows at one site are the imports
-    /// its arguments carry (`carried`, a test backend's `features`), each its own, not
-    /// candidates of one import for `import` to choose between.
     fn declares<'e>(
         &self,
         _exports: &'e [Export],
@@ -189,17 +150,11 @@ impl Ecosystem for Npm {
         false
     }
 
-    /// Shapes cross npm packages alone.
     fn shapes(&self) -> bool {
         true
     }
 }
 
-/// The target the `exports` field of a manifest gives `subpath` (`.` for the bare name, else
-/// `./<rest>`), as written, `*` replaced: exact keys first, then the pattern with one `*` whose
-/// prefix is the longest. A string, or an object without subpath keys, is the target of `.`. A
-/// `null` target, an array of fallbacks, a key or a target with two `*`, keys that mix subpaths
-/// and conditions, or none of `CONDITIONS` present give no target.
 pub(super) fn exported(exports: &Value, subpath: &str) -> Option<String> {
     let map = match exports {
         Value::Object(map) if map.keys().any(|k| k.starts_with('.')) => map,
@@ -225,10 +180,8 @@ pub(super) fn exported(exports: &Value, subpath: &str) -> Option<String> {
     target(value, Some(star), 0)
 }
 
-/// The path a target of `exports` names, through its conditions (see `exported`).
 fn target(value: &Value, star: Option<&str>, depth: usize) -> Option<String> {
     match value {
-        // One `*` at most, as in a key: the expansion stays the size of the subpath.
         Value::String(t) if t.matches('*').nth(1).is_none() => {
             Some(star.map_or_else(|| t.clone(), |s| t.replace('*', s)))
         }
@@ -240,9 +193,6 @@ fn target(value: &Value, star: Option<&str>, depth: usize) -> Option<String> {
     }
 }
 
-/// The package a bare specifier names and the subpath inside it: `@a/b/c` is `@a/b` and
-/// `./c`, `x` is `x` and `.`. `None` for a relative or absolute specifier, or a name npm does not
-/// accept (`node:fs` among them).
 pub(crate) fn split(specifier: &str) -> Option<(&str, String)> {
     if specifier.starts_with(['.', '/']) {
         return None;
@@ -253,10 +203,6 @@ pub(crate) fn split(specifier: &str) -> Option<(&str, String)> {
     (valid_name(name) && (segments == 1 || name.contains('/'))).then(|| (name, format!(".{rest}")))
 }
 
-/// Whether every token of `range` looks like part of an npm range: `||` separates sets of at
-/// least one token, `-` joins a hyphen range, and a comparator is an optional operator then a
-/// version body that begins with a digit, or is a wildcard (`x`, `X`, `*`) alone or followed by
-/// `.` (so no `:` or `/` gets through, nor `xyz`).
 fn comparators(range: &str) -> bool {
     range.split("||").all(|set| {
         let mut tokens = set.split_whitespace().peekable();
@@ -425,7 +371,6 @@ mod tests {
             (">=1.0.0 <2.0.0", "2.0.0", MISMATCH),
             ("1.2.0", "1.2.0", None),
             ("1.2.0", "1.2.1", MISMATCH),
-            // A prerelease matches only a comparator on the same major.minor.patch.
             ("^1.0.0", "1.2.0-beta.1", MISMATCH),
             ("^1.2.0-beta.0", "1.2.0-beta.1", None),
             ("^1.2.0-beta.0", "1.3.0-beta.1", MISMATCH),
@@ -465,7 +410,6 @@ mod tests {
         }
         assert_eq!(Npm.flag(None, Some("1.2.0")), UNCHECKED);
         assert_eq!(Npm.flag(Some("^1.0.0"), None), UNCHECKED);
-        // A local version that is not a version cannot be compared either.
         assert_eq!(Npm.flag(Some("^1.0.0"), Some("not-a-version")), UNCHECKED);
         let long = "^1.0.0 || ".repeat(MAX_RANGE);
         assert!(long.len() > MAX_RANGE);
@@ -491,27 +435,21 @@ mod tests {
             "./two/*": "./src/*/*.ts",
         });
         let cases: [(&str, Option<&str>); 18] = [
-            // The first of `types`, `import`, `default`, `require` present is taken.
             (".", Some("./src/index.ts")),
             ("./format", Some("./src/format.ts")),
             ("./conditions", Some("./import.ts")),
             ("./nested", Some("./i.ts")),
             ("./required", Some("./required.ts")),
-            // Other conditions are not followed.
             ("./none", None),
-            // Exact keys first, then the pattern with the longest prefix; `*` is replaced.
             ("./utils/slug", Some("./src/utils/slug.ts")),
             ("./utils/a/b", Some("./src/utils/a/b.ts")),
             ("./utils/special/x", Some("./src/special/x.js")),
             ("./utils/", None),
-            // A `null` target blocks the subpath, even under a condition taken.
             ("./utils/blocked/x", None),
             ("./blocked", None),
             ("./typed", None),
-            // Fallback arrays and keys with two `*` are not read.
             ("./fallbacks", None),
             ("./many/a/x/b", None),
-            // A target with two `*` is not read either.
             ("./two/x", None),
             ("./missing", None),
             ("./format/more", None),
@@ -519,8 +457,6 @@ mod tests {
         for (subpath, expected) in cases {
             assert_eq!(exported(&map, subpath).as_deref(), expected, "{subpath}");
         }
-        // A string or an object of conditions is the target of `.` alone; keys that mix
-        // subpaths and conditions make no target.
         let sugar = serde_json::json!("./main.ts");
         assert_eq!(exported(&sugar, ".").as_deref(), Some("./main.ts"));
         assert_eq!(exported(&sugar, "./x"), None);

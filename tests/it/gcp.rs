@@ -1,4 +1,3 @@
-//! GCP provisioners, subscriptions and Cloud Run workloads (#667, ADR 0026).
 use crate::common::{assert_golden, fixture_repo};
 use meada::engine::Engine;
 use serde_json::Value;
@@ -265,7 +264,6 @@ fn cloud_run_services_and_jobs_scope_images_environment_and_secret_targets() {
     export.dirty = None;
     assert_golden("gcp-run.export.json", &export.write().unwrap());
 
-    // One known builder per container is required even when both builders are visible.
     std::fs::create_dir_all(infra.join(".github/workflows")).unwrap();
     std::fs::write(
         infra.join(".github/workflows/second.yml"),
@@ -411,7 +409,6 @@ fn gcp_config_refresh_keeps_privacy_cut_values_and_complete_orphan_scope() {
         .lines()
         .filter(|l| l.starts_with("orphan "))
         .collect::<Vec<_>>();
-    // `gcs_bucket: absent` is `inferred` and no line; `gs://absent/` is `exact` (#797).
     assert_eq!(orphan_rows.len(), 3, "{reports}");
     let orphans = orphan_rows
         .iter()
@@ -698,8 +695,6 @@ resource "google_sql_database" "too_short" {
 #[test]
 fn cloud_run_environment_budget_discards_entries_without_losing_its_image() {
     let (infra, _) = workspace("gcp_environment_budget");
-    // Repeating a retained image across entries crosses the real 1 MiB environment ceiling,
-    // while the source itself stays small. No huge resource fleet is needed for this guard.
     let image = format!("registry.example.com/{}:v1", "a".repeat(16384));
     let env = (0..128)
         .map(|i| format!("env {{\n name = \"V{i}\"\n value = \"known\"\n}}\n"))

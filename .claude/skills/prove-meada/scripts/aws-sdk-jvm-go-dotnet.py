@@ -18,9 +18,6 @@ from prove import Http, Stdio, answer, free_port, git, mcp_answers
 
 BASE = "eae2a567ed250d0ac4a8b8e6f57b62f7a3041c62"
 REMOTE = "example.com/zz-prove-aws-sdk/"
-# SDK operation and argument directions are AWS request semantics. The coordinating brief
-# supplies the inventory because issue #660's referenced ADR has no operation table.
-# service, request operation, argument, side, argument shape
 OPS = [
     ("sqs", "SendMessage", "QueueUrl", "providers", "one"),
     ("sqs", "SendMessageBatch", "QueueUrl", "providers", "one"),
@@ -140,7 +137,6 @@ def source(lang, service, operation, field, shape, mode, name, variable):
         return ("import software.amazon.awssdk.services." + service + "." + jclient + ";\n"
                 + ("class Case extends foreign.Parent {\n" if mode == "name_hop" else "class Case {\n") + extras + "void " + marker + "(" + params + ") { " + setup + " " + call + " }\n}\n"), marker
     if lang == "csharp":
-        # .NET S3 uses SDK-specific names; preserve the logical operation in the oracle.
         if service == "s3":
             field = "BucketName"
             if operation == "HeadObject":
@@ -232,8 +228,6 @@ def declared_sqs(lang, service, mode):
 
 def seed(run):
     roots, oracle = {}, []
-    # Separate directories per case avoid accidental method-name collisions making an
-    # intended exact wrapper a name match. There is one repository per language.
     for lang in ("java", "go", "csharp"):
         root = run / "work" / lang
         root.mkdir(parents=True)
@@ -269,7 +263,6 @@ def seed(run):
                                    accepted=mode in ("literal", "env", "exact_hop", "builder", "multiple") or declared_sqs(lang, service, mode),
                                    unresolved=mode == "env" or operation == "GetParametersByPath",
                                    contracts=[prefix(service) + "::" + n for n in ([name, name + "-other"] if mode == "multiple" else [name])]))
-        # A separate neutral provisioner gives each literal use one exact reference.
         infra = run / "work" / ("infra-" + lang)
         infra.mkdir()
         git("init", "-q", cwd=infra)
@@ -340,8 +333,6 @@ def judge(probe, lang, data, oracle):
         if not row["accepted"]:
             probe.check(label + " contributes no side", got == [], got)
         elif row["unresolved"]:
-            # The public unresolved representation may live in contract or via. Never
-            # accept a literal contract, a missing provenance, or a wrong direction.
             combined = json.dumps(got)
             unresolved = len(got) == 1 and (got[0][1].get("contract") in (None, "")
                 or "*" in (got[0][1].get("contract") or "")
@@ -376,8 +367,6 @@ def judge(probe, lang, data, oracle):
 def queries_for(lang, oracle, data):
     queries = []
     for row in oracle:
-        # The source path and authored marker pick the known function; its public
-        # export id supplies language-specific signature spelling, not an expected answer.
         symbols = [s["id"] for s in data["symbols"] if s["span"]["path"] == row["path"]
                    and row["marker"] in s["id"].rsplit("::", 1)[-1]]
         if row["accepted"] and len(symbols) != 1:
@@ -456,7 +445,6 @@ def refresh_probe(probe, binary, root, lang, oracle, original):
     server = Stdio(binary, root, probe.run / (lang + ".refresh.stdio.err"))
     captures = {}
     try:
-        # Initialize the persistent session and establish its old indexed answer.
         old_query = {"name": "search", "arguments": {"query": row["contract"], "kind": "contract", "budget": 30000}}
         captures["before"] = answer(server.call("tools/call", old_query))
         path.write_text(before.replace(row["name"], changed_name))
@@ -499,8 +487,6 @@ def main():
         if args.seed_only:
             print("inputs authored; no product proof run: " + str(run))
             return 0
-        # A tempting process value must not resolve an SDK side. Only repository
-        # workload configuration is allowed to supply one (ADR0025/26).
         for row in oracle:
             if row["mode"] == "env":
                 os.environ[row["variable"]] = identifier(row["service"], row["name"])

@@ -1,8 +1,3 @@
-//! Kubernetes objects and Kustomize trees as IaC nodes (#651, ADR 0025): every object with an
-//! `apiVersion`, a `kind` and a name is a node found by `search` with the kind `iac`, explained by
-//! `context` and walked by `trace` through the references between objects, each overlay being
-//! its own evaluation unit.
-
 use std::fs;
 
 use meada::engine::{Direction, Engine, Start};
@@ -11,7 +6,6 @@ use crate::common::{assert_golden, fixture_repo};
 
 const ORIGIN: Option<&str> = Some("https://example.com/acme/deploy.git");
 
-/// Each answer of `ask` over `questions`, in order, a blank line between two.
 fn answers(questions: &[&str], ask: impl Fn(&str) -> String) -> String {
     (questions.iter())
         .map(|q| ask(q))
@@ -19,11 +13,6 @@ fn answers(questions: &[&str], ask: impl Fn(&str) -> String) -> String {
         .join("\n")
 }
 
-/// The fixture: a base with a Deployment, a Service, a ConfigMap and a Secret (one file of two
-/// documents), an Ingress and a ServiceAccount; overlays `dev` (a namespace, a prefix and an
-/// image tag) and `prod` (a namespace, a suffix, a renamed image and a remote base); and plain
-/// manifests in `raw` (three documents in one file, a JSON Job) and a Helm template that is no
-/// object. A query matches the address, the kind and the name, exact first.
 #[test]
 fn search_with_the_kind_iac_finds_kubernetes_objects() {
     let repo = fixture_repo("kube_search", "kubernetes-nodes", ORIGIN);
@@ -41,9 +30,6 @@ fn search_with_the_kind_iac_finds_kubernetes_objects() {
     assert_golden("kubernetes-nodes.search.txt", &answers(&queries, search));
 }
 
-/// `context` shows the kind, the name once the overlay's prefix and suffix changed it, the root
-/// overlay, the images the overlay deploys with, the references both ways (each through how the
-/// object names the other) and the values of its file; a Secret's value stays hidden.
 #[test]
 fn context_on_an_object_shows_its_overlay_images_references_and_values() {
     let repo = fixture_repo("kube_context", "kubernetes-nodes", ORIGIN);
@@ -66,8 +52,6 @@ fn context_on_an_object_shows_its_overlay_images_references_and_values() {
     );
 }
 
-/// `trace` walks the references down (an Ingress to its Service to the workload it selects, to
-/// the ConfigMap, Secret and ServiceAccount it mounts) and up (what reaches a ConfigMap).
 #[test]
 fn trace_walks_the_references_of_an_object_both_ways() {
     let repo = fixture_repo("kube_trace", "kubernetes-nodes", ORIGIN);
@@ -83,8 +67,6 @@ fn trace_walks_the_references_of_an_object_both_ways() {
     assert_golden("kubernetes-nodes.trace.txt", &text.join("\n"));
 }
 
-/// A remote base is not fetched and is counted: `meada status` names the entries not followed
-/// (the remote one, and a base through a symlink or above the root, which are no file of the walk).
 #[test]
 fn status_counts_the_entries_a_kustomization_did_not_follow() {
     let repo = fixture_repo("kube_status", "kubernetes-nodes", ORIGIN);
@@ -109,7 +91,6 @@ fn status_counts_the_entries_a_kustomization_did_not_follow() {
             text.contains("kustomize entries not followed: 3 (remote, never fetched: 1)"),
             "{text}"
         );
-        // Only the file reached through a real path is an object of the stage overlay.
         let found = engine.search("Deployment", Some("iac"), None).unwrap();
         let stage: Vec<&str> = found
             .lines()
@@ -123,7 +104,6 @@ fn status_counts_the_entries_a_kustomization_did_not_follow() {
     }
 }
 
-/// Only workload objects with image sides enter the export (#662).
 #[test]
 fn only_kubernetes_objects_with_image_sides_enter_the_export() {
     let repo = fixture_repo("kube_export", "kubernetes-nodes", ORIGIN);
@@ -146,7 +126,6 @@ fn only_kubernetes_objects_with_image_sides_enter_the_export() {
     assert!(!text.contains("api-settings"), "{text}");
 }
 
-/// The default search leaves objects out: a name finds the config values that hold it.
 #[test]
 fn the_default_search_leaves_kubernetes_objects_out() {
     let repo = fixture_repo("kube_default", "kubernetes-nodes", ORIGIN);
@@ -155,8 +134,6 @@ fn the_default_search_leaves_kubernetes_objects_out() {
     assert!(!found.contains("root overlays"), "{found}");
 }
 
-/// An edited, an added and a deleted manifest or kustomization change the nodes at the next
-/// query, as a cold index of the same files has them.
 #[test]
 fn a_changed_manifest_changes_the_nodes_at_the_next_query() {
     let repo = fixture_repo("kube_fresh", "kubernetes-nodes", ORIGIN);
@@ -170,7 +147,6 @@ fn a_changed_manifest_changes_the_nodes_at_the_next_query() {
         text
     };
     let before = ask(&engine);
-    // A name the overlay's prefix gives, a new object and a kustomization that drops a file.
     fs::write(
         repo.join("overlays/dev/kustomization.yaml"),
         "resources:\n  - ../../base\nnamespace: shop-dev\nnamePrefix: dev2-\n",
@@ -191,9 +167,7 @@ fn a_changed_manifest_changes_the_nodes_at_the_next_query() {
     assert!(after.contains("Service/shop-dev/dev2-api"), "{after}");
     assert!(after.contains("Service/extra"), "{after}");
     assert!(!after.contains("dev-api"), "{after}");
-    // The ServiceAccount is no longer listed by the base, so a plain one of its directory.
     assert!(!after.contains("ServiceAccount/shop-dev"), "{after}");
-    // A deletion alone, with no other manifest read again.
     fs::remove_file(repo.join("raw/extra.yaml")).unwrap();
     let deleted = ask(&engine);
     assert!(!deleted.contains("Service/extra"), "{deleted}");
@@ -201,8 +175,6 @@ fn a_changed_manifest_changes_the_nodes_at_the_next_query() {
     assert_eq!(deleted, ask(&Engine::open(&repo).unwrap()));
 }
 
-/// A refresh that read no manifest again keeps the stored nodes: a row rewritten by hand
-/// survives an edit to a file that holds no object, and an edit to a manifest replaces it.
 #[test]
 fn a_refresh_with_no_manifest_changed_keeps_the_nodes() {
     let repo = fixture_repo("kube_kept", "kubernetes-nodes", ORIGIN);
@@ -229,8 +201,6 @@ fn a_refresh_with_no_manifest_changed_keeps_the_nodes() {
     assert!(fresh.contains("(Pod, "), "{fresh}");
 }
 
-/// A manifest a kustomization lists that is past the size ceiling exists, so its entry is no
-/// unresolved one (prove on kube-prometheus: a 1 MiB dashboards file counted as missing).
 #[test]
 fn a_listed_manifest_past_the_size_ceiling_is_not_an_unresolved_entry() {
     let repo = fixture_repo("kube_big", "kubernetes-nodes", ORIGIN);
@@ -249,8 +219,6 @@ fn a_listed_manifest_past_the_size_ceiling_is_not_an_unresolved_entry() {
     );
 }
 
-/// A Terraform root and a Kubernetes unit of one directory share the label `raw`: a change to
-/// the manifests keeps the Terraform nodes, and a change to the Terraform keeps the objects.
 #[test]
 fn a_terraform_root_and_a_kubernetes_unit_of_one_directory_keep_each_others_rows() {
     let repo = fixture_repo("kube_shared", "kubernetes-nodes", ORIGIN);

@@ -74,7 +74,6 @@ def review(path, out):
                       for name in archive.namelist() if name.startswith('bin/') and name.endswith('.from')}
         data = {'url': f'{GITHUB}/{run}/artifacts/{artifact}', 'sha256': digest,
                 'driver_revision': receipt['head'], 'bin_from': from_files, 'raw_receipt': receipt}
-        # These original jobs never exercised the pinned smoke app/lib/shared workspaces.
         data['smoke_mocks'] = 'not selected'
         by_step = {step['name']: step for step in receipt['steps']}
         data['drivers'] = {}

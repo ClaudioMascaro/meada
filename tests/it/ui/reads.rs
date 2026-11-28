@@ -1,5 +1,3 @@
-//! Operational console reads through the binary and HTTP, against the configured services.
-
 use serde_json::json;
 
 use super::playground::{WEB, chain_console};
@@ -49,7 +47,6 @@ fn local_repositories_report_freshness_and_missing_modules_are_explicit() {
         .unwrap();
     assert_ne!(web["indexed_commit"], web["head"]);
     assert!(run(&dir, "index").2);
-    // A stale write after a rebuild/crash must never claim its older commit.
     let provenance = dir.join("indexes").join(WEB).join("index.commit.json");
     let mut oversized = std::fs::read(&provenance).unwrap();
     oversized.resize(4097, b' ');
@@ -330,7 +327,6 @@ mod fleet {
             assert_eq!(status, Some(0), "{stderr}");
             assert_eq!(get(&console, "/api/v1/fleet").json()["stuck"], Value::Null);
         }
-        // A live CLI lock exposes its real holder and remaining TTL without a console write.
         #[cfg(feature = "refresh-lock")]
         {
             let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_meada"));
@@ -390,8 +386,6 @@ mod fleet {
     }
 }
 
-/// A hanging Valkey consumes one deadline for the whole read; basic routes and invalid ids
-/// remain available, including when the store endpoint cannot answer either.
 #[cfg(feature = "generation-pointer")]
 #[test]
 fn service_reads_share_a_two_second_deadline_and_identify_the_service() {
@@ -438,7 +432,6 @@ fn service_reads_share_a_two_second_deadline_and_identify_the_service() {
     assert!(began.elapsed() < Duration::from_millis(500));
 }
 
-/// A credential must be a regular file; the HTTP read must refuse a FIFO before opening it.
 #[cfg(all(unix, feature = "snapshot"))]
 #[test]
 fn a_nonregular_store_credential_is_refused_without_opening_it() {
@@ -483,8 +476,6 @@ fn a_nonregular_store_credential_is_refused_without_opening_it() {
     assert_eq!(get(&console, "/api/v1/config").status, 200);
 }
 
-/// Four slow reads retain their workers after timing out. A later burst waits within the
-/// same deadline and must not start more work; the basic routes keep answering throughout.
 #[cfg(unix)]
 #[test]
 fn read_deadlines_bound_workers_and_overload_without_blocking_basic_routes() {

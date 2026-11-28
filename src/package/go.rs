@@ -1,25 +1,3 @@
-//! Go packages (spec #25): a `go.mod` with a `module` path provides `package::go::<module path>`,
-//! and each `require` entry, and each `replace` to a local directory, consumes the module it
-//! names. The lines come from the Go pack's one `go.mod` reader (`lang::go::modfile`). A
-//! `go.mod` carries no version of its own, so a provider's version is always none.
-//!
-//! An entry keeps where its module comes from in `Entry::via`, as Cargo's does: `path
-//! <go.mod>` for a `replace` to a local directory (folded lexically from the manifest's
-//! directory: a path of the repository, or one that starts with `../` when it leaves it),
-//! `module <path>` for a `replace` by another module (the module path as written), which keeps
-//! only the provider in the repository that path names, and `outside` for any other target (an
-//! absolute path), which leaves the module out of the workspace; nothing otherwise. Ranges are
-//! never checked, and neither `go.sum` nor the module proxy is read.
-//!
-//! Each rule answers one question of `Ecosystem`:
-//! - `names_package`: any valid contract name may name a module (a module path needs no dot).
-//! - `entries`: the entry of the owning `go.mod` with the longest module path the import starts
-//!   with, the rest of the import as the subpath.
-//! - `reaches`: a local `replace` is a path source, the rule Cargo's `path` follows (`sourced`);
-//!   a `replace` by a module reaches the `go.mod` of the repository the module path names.
-//! - `resolve`: the one package directory the subpath names in the module, test files and the
-//!   files of a nested module left out, through the provider view's directory table.
-
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -32,15 +10,11 @@ use crate::index::Export;
 use crate::lang::go::modfile;
 use crate::repo::relative;
 
-/// The field a `require` entry is kept under.
 const REQUIRE: &str = "require";
-/// The field of an entry only a `replace` gives (a module some other module requires).
 const REPLACE: &str = "replace";
 
-/// The start of a `via` that names a module (`module <path>`).
 const MODULE: &str = "module";
 
-/// The Go ecosystem.
 pub struct Go;
 
 impl Ecosystem for Go {
@@ -52,16 +26,12 @@ impl Ecosystem for Go {
         file_name == "go.mod"
     }
 
-    /// Reads a `go.mod` from its bytes. Hostile input: a file too large reads as empty, a line it
-    /// cannot read is skipped, and a module path that cannot be a contract name makes no provider
-    /// and no entry.
     fn read(&self, path: &str, src: &[u8]) -> Summary {
         if src.len() > MAX_BYTES {
             return Summary::default();
         }
         let dir = bare_directory(path);
         let file = modfile::read(&String::from_utf8_lossy(src));
-        // The first `replace` of a module decides, found once for all.
         let mut replaced: HashMap<&str, &str> = HashMap::new();
         for (old, new) in &file.replaces {
             replaced.entry(old).or_insert(new);
@@ -89,7 +59,6 @@ impl Ecosystem for Go {
                 });
             }
         }
-        // A replaced module nobody here requires may be one a dependency requires.
         for (module, _) in &file.replaces {
             let via = via(module).filter(|v| v.starts_with("path "));
             if via.is_some() && valid_name(module) && seen.insert(module) {
@@ -113,15 +82,10 @@ impl Ecosystem for Go {
         &["go"]
     }
 
-    /// Any path that can be a contract name may name a module of the workspace: a module path
-    /// needs no dot (`module kit` with a local `replace`), and the standard library stays
-    /// external since no `require` names it.
     fn names_package(&self, specifier: &str) -> bool {
         valid_name(specifier)
     }
 
-    /// The entry of the owning `go.mod` with the longest module path the import starts with,
-    /// the rest of the import as the subpath.
     fn entries<'e>(
         &self,
         exports: &'e [Export],
@@ -144,8 +108,6 @@ impl Ecosystem for Go {
             .collect()
     }
 
-    /// A local `replace` by the folded location, as Cargo's `path` (`sourced`); a `replace` by a
-    /// module only the `go.mod` that module's repository holds (`modfile::held_by`).
     fn reaches(
         &self,
         (via, _): (Option<&str>, Option<&str>),
@@ -158,10 +120,6 @@ impl Ecosystem for Go {
         }
     }
 
-    /// The symbol `chain` names in the Go package at `subpath` (`.` for the module's root, else
-    /// `./<directory>`) of the module at `manifest`: the exported name of the one source file of
-    /// that directory (a test file or one of a nested module is none) that defines it. `exact`
-    /// when found; none when the directory lacks or the name is not exported there.
     fn resolve(
         &self,
         at: &Provided,
@@ -281,7 +239,6 @@ mod tests {
         let reaches = |via, id| Go.reaches((via, None), from, to(id));
         assert!(reaches(vias[1], "github.com/acme/fork"));
         assert!(!reaches(vias[1], "github.com/acme/other"));
-        // An `outside` entry reaches no repository.
         assert!(!reaches(vias[0], "github.com/acme/fork"));
         assert!(!Go.reaches(
             (vias[1], None),
@@ -299,7 +256,6 @@ mod tests {
             Go.read("go.mod", &vec![b'x'; MAX_BYTES + 1]),
             Summary::default()
         );
-        // A replace at the root of the repository names its `go.mod`.
         let s = Go.read("go.mod", b"replace example.com/a => .\n");
         assert_eq!(
             rows(&s),
@@ -310,7 +266,6 @@ mod tests {
     #[test]
     fn an_import_path_may_name_a_module_and_the_standard_library_is_left_to_the_requires() {
         assert!(valid_name("example.com/a/b"));
-        // A module path needs no dot: a local one is `module kit` with a `replace`.
         assert!(valid_name("kit/text"));
         assert!(!valid_name(""));
         assert!(!valid_name("a:b"));
@@ -329,8 +284,6 @@ mod tests {
         }
     }
 
-    /// A repository with these manifests and Go files, each exporting the name of its stem,
-    /// capitalised (`upper.go` exports `Upper`).
     fn repository(name: &str, manifests: Vec<Manifest>, files: &[&str]) -> Export {
         let stem = |f: &str| {
             let stem = f.rsplit('/').next().unwrap().trim_end_matches(".go");
@@ -418,7 +371,6 @@ mod tests {
             Some((r.targets, r.level))
         };
         let exact = |id: &str| Some((vec![id.to_string()], Level::Exact));
-        // The one directory the subpath names: not the directories under it, not the tests.
         assert_eq!(
             resolve(0, "./text", "Upper"),
             exact("p::text/upper.go::Upper")
@@ -429,7 +381,6 @@ mod tests {
             exact("p::text/deep/lower.go::Lower")
         );
         assert_eq!(resolve(0, "./text", "Upper_test"), None);
-        // The nested module's file belongs to the nested module alone.
         assert_eq!(resolve(0, "./sub", "Nested"), None);
         assert_eq!(resolve(1, ".", "Nested"), exact("p::sub/nested.go::Nested"));
         assert_eq!(resolve(0, ".", "Upper"), None);
@@ -449,7 +400,6 @@ mod tests {
         assert!(!Go.reaches(source, at("a"), (at("a"), "go.mod")));
         assert!(!Go.reaches(source, at("a"), (at("a"), "other/go.mod")));
         assert!(!Go.reaches(source, at("a"), (at("b"), "lib/go.mod")));
-        // A module no `replace` moves is every repository's.
         assert!(Go.reaches((None, None), at("a"), (at("b"), "go.mod")));
     }
 
@@ -472,7 +422,6 @@ mod tests {
         let start = std::time::Instant::now();
         let s = Go.read("go.mod", text);
         assert!(s.dependencies.len() > n, "{}", s.dependencies.len());
-        // Scanning the replaces for each require compares every pair: hundreds of millions here.
         let took = start.elapsed();
         assert!(took.as_secs() < 20, "{took:?}");
     }

@@ -1,33 +1,16 @@
-//! Splits a `docs/agents` Markdown file that is over its size budget, by its second-level headings.
-//!
-//! ```text
-//! scripts/split-agents docs/agents/map/tests.md
-//! ```
-//!
-//! Each `## ` section of `docs/agents/map/tests.md` becomes a file of its own in
-//! `docs/agents/map/tests/` (its heading turned into the file's `# ` title, the relative links
-//! of its text kept pointing where they did), and the file keeps what came before the first
-//! section plus one line per part. No model and no network: the same text gives the same
-//! files, and the index has no second-level heading, so running this on it changes nothing.
-//! A part still past its budget has no second-level headings of its own to split by: give it
-//! some (promote its `### ` headings), then run this on that part.
-
 use std::fs;
 use std::path::Path;
 use std::process::ExitCode;
 
-/// What the splitter writes: the file's new text and the parts, as (file name, text).
 struct Split {
     index: String,
     parts: Vec<(String, String)>,
 }
 
-/// The title of a `## ` heading line (the caller skips the lines inside a code fence).
 fn heading(line: &str) -> Option<&str> {
     line.strip_prefix("## ")
 }
 
-/// A file name for a title: ASCII letters and digits, words joined by `-`, at most 48 bytes.
 fn slug(title: &str) -> String {
     let mut out = String::new();
     for c in title.chars() {
@@ -42,8 +25,6 @@ fn slug(title: &str) -> String {
     if out.is_empty() { "part" } else { out }.to_string()
 }
 
-/// `text` with every relative link target moved one directory down: the part lives in a directory
-/// the file's own directory holds.
 fn deeper(text: &str) -> String {
     let mut out = String::new();
     let mut rest = text;
@@ -63,11 +44,9 @@ fn deeper(text: &str) -> String {
     out + rest
 }
 
-/// Splits `text`, the file `<stem>.md`; `None` when it has no second-level heading.
 fn split(stem: &str, text: &str) -> Option<Split> {
     let mut preamble = String::new();
     let mut sections: Vec<(String, String)> = Vec::new();
-    // The marker of the open code fence: a fence closes only on its own marker.
     let mut fence: Option<&str> = None;
     for line in text.lines() {
         let marker = ["```", "~~~"]
@@ -105,7 +84,6 @@ fn split(stem: &str, text: &str) -> Option<Split> {
         }
         let file = format!("{name}.md");
         let shown = title.replace('[', "\\[").replace(']', "\\]");
-        // One blank line between the preamble and the list, none between the list lines.
         let sep = if parts.is_empty() { "\n" } else { "" };
         index.push_str(&format!("{sep}- [{shown}]({stem}/{file})\n"));
         parts.push((file, format!("# {title}\n\n{}\n", deeper(body.trim()))));
@@ -137,7 +115,6 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     };
     let parts_dir = dir.join(&*stem);
-    // Never overwrite a different file the directory already holds.
     for (name, part) in &split.parts {
         let existing = fs::read_to_string(parts_dir.join(name));
         if existing.is_ok_and(|e| e != *part) {
@@ -188,7 +165,6 @@ mod tests {
         assert!(
             first.starts_with("# First part (#1)\n\nBody with [a](../a.md#top) and [self](#here).")
         );
-        // A fenced line that looks like a heading stays in its part.
         assert!(first.contains("```sh\n## not a heading\n```"));
         assert!(first.ends_with('\n') && !first.ends_with("\n\n"));
     }

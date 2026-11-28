@@ -1,8 +1,3 @@
-//! The shape of a route read from the zod schema its handler's response passes through or is
-//! typed with (spec #23, ADR 0009): the source after a document and before the returned
-//! literals. `z.object` gives fields, `z.array` elements, the primitives scalars, and anything
-//! whose output Meada cannot read (`.transform`, `z.lazy`, `.passthrough()`, `z.any`) is open.
-
 use std::collections::BTreeMap;
 
 use crate::lang::{Invocation, Ty, Value};
@@ -10,20 +5,14 @@ use crate::literals::Responses;
 use crate::resolve::{Code, scope_of};
 use crate::shape::{Budget, Import, Shape, Source, Spent, Want};
 
-/// What reading the schemas of one file's handlers may cost: every expression of a schema
-/// examined, over all the handlers of the file. Past it, the file's remaining handlers give no
-/// shape from a schema.
 // ponytail: one budget per handler file; real schemas spend a few hundred, a crafted union of
 // constants of unions would otherwise cost exponential time.
 const ZOD_BUDGET: usize = 1 << 14;
 
-/// How deep reading follows a schema: its nesting, the constants followed on the way and the
-/// methods chained on it. A part deeper than that is open.
 // ponytail: real schemas nest a handful of levels; the limit keeps a crafted chain of constants
 // or methods, or objects nested thousands of levels, from costing the stack.
 const ZOD_DEPTH: usize = 32;
 
-/// The methods that leave the fields a schema gives as they are.
 const KEEPS: [&str; 24] = [
     "optional",
     "nullable",
@@ -51,7 +40,6 @@ const KEEPS: [&str; 24] = [
     "uuid",
 ];
 
-/// The methods besides `KEEPS` that `Reader::method` reads on a schema.
 const SCHEMA_METHODS: [&str; 13] = [
     "optional",
     "nullish",
@@ -68,7 +56,6 @@ const SCHEMA_METHODS: [&str; 13] = [
     "loose",
 ];
 
-/// The functions of `z` that make a scalar.
 const SCALARS: [&str; 17] = [
     "string",
     "number",
@@ -89,20 +76,14 @@ const SCALARS: [&str; 17] = [
     "void",
 ];
 
-/// A schema's output as a tree: the fields of an object, the element of an array.
 #[derive(Default)]
 struct Node {
     fields: BTreeMap<String, Node>,
     element: Option<Box<Node>>,
     scalar: bool,
-    /// Anything may be here besides what the tree lists.
     open: bool,
-    /// The value may be absent from its object (`.optional()`, `.nullish()`, `.partial()`).
     optional: bool,
-    /// A union: the parts it gives may be there or not, whichever member holds.
     mixed: bool,
-    /// The schemas a package exports that give this part (issue #175), each at the root of it,
-    /// for the query to fill.
     imports: Vec<Import>,
 }
 
@@ -121,7 +102,6 @@ impl Node {
         }
     }
 
-    /// What either of the two gives: a union.
     fn union(&mut self, other: Node) {
         for (key, node) in other.fields {
             self.fields.entry(key).or_default().union(node);
@@ -140,16 +120,12 @@ impl Node {
         self.imports.extend(other.imports);
     }
 
-    /// The fields of `other` added to this object, replacing those of the same name.
     fn overlay(&mut self, other: Node) {
         self.fields.extend(other.fields);
         self.open |= other.open;
         self.imports.extend(other.imports);
     }
 
-    /// Adds the paths a consumer's `z.infer` type lists below `at` to `out`, each with whether it
-    /// may be absent, and the imports it leaves to the query to `imports`. A union lists no part
-    /// below it: which member holds is not known.
     fn declared(&self, at: &str, out: &mut BTreeMap<String, bool>, imports: &mut Vec<Import>) {
         if self.mixed {
             return;
@@ -177,8 +153,6 @@ impl Node {
         }
     }
 
-    /// Adds the paths of the tree below `at` to `shape`. A part that is a scalar for one member
-    /// of a union and something else for another may hold anything.
     fn render(&self, at: &str, shape: &mut Shape) {
         if !at.is_empty() {
             shape.fields.insert(at.to_string());
@@ -209,16 +183,12 @@ impl Node {
     }
 }
 
-/// Reads handlers' schemas, keeping the budget of each file.
 #[derive(Default)]
 pub struct Zod {
     spent: Budget<ZOD_BUDGET>,
 }
 
 impl Zod {
-    /// The shape of the 2xx responses of the handler `name` of `path` when they are typed by a
-    /// zod schema: every body the result of `S.parse(..)`. The root is open when the handler
-    /// may answer another way. `None` when the handler has no such schema, or past the budget.
     pub fn returned<'a>(
         &mut self,
         code: &Code<'a>,
@@ -257,10 +227,6 @@ impl Zod {
 }
 
 impl Zod {
-    /// The field paths below the root of the output of the schema `name`, written in `path`
-    /// within `scope`: what `z.infer<typeof name>` lists, each with whether the output may lack
-    /// it, and the schemas of a package it names (issue #175), each at its path. `None` when it is
-    /// no schema Meada reads, or past the file's budget.
     pub fn inferred<'a>(
         &mut self,
         code: &Code<'a>,
@@ -279,10 +245,6 @@ impl Zod {
         Some((out, imports))
     }
 
-    /// The two shapes the package's index stores for the schema `name` of `path` (issue #175):
-    /// the output a provider parsing with it sends (`Want::Zod`) and the paths a consumer typed
-    /// `z.infer<typeof name>` declares (`Want::Infer`). `None` when it is no schema Meada reads,
-    /// or past the file's budget.
     pub fn exported<'a>(
         &mut self,
         code: &Code<'a>,
@@ -307,8 +269,6 @@ impl Zod {
     }
 }
 
-/// What reading one file's schemas gives: `Some(None)` is an expression that is no zod schema
-/// (or that Meada cannot tell is one), `None` a spent budget.
 type Read = Option<Option<Node>>;
 
 struct Reader<'c, 'a> {
@@ -317,7 +277,6 @@ struct Reader<'c, 'a> {
 }
 
 impl<'a> Reader<'_, 'a> {
-    /// The constant `name` refers to: its file, the scope it is written in and its value.
     fn constant(
         &self,
         path: &'a str,
@@ -328,8 +287,6 @@ impl<'a> Reader<'_, 'a> {
         Some((at, scope_of(constant), held))
     }
 
-    /// The schema a response body is the output of: `S.parse(..)`, the `data` of
-    /// `S.safeParse(..)`, a value typed `z.infer<typeof S>`, or a constant holding one.
     fn body(&mut self, path: &'a str, scope: &'a str, value: &'a Value, depth: usize) -> Read {
         self.spent.charge()?;
         if depth >= ZOD_DEPTH {
@@ -354,8 +311,6 @@ impl<'a> Reader<'_, 'a> {
         }
     }
 
-    /// A parse result, optionally awaited. Safe parse supplies the schema only when `body`
-    /// selects its `data`; awaiting the result alone does not make that selection.
     fn parsed(
         &mut self,
         path: &'a str,
@@ -382,8 +337,6 @@ impl<'a> Reader<'_, 'a> {
         }
     }
 
-    /// The schema the constant `name` holds. A name imported from outside the repository is a
-    /// schema the query fills from the package that exports it (issue #175).
     fn named(&mut self, path: &'a str, scope: &'a str, name: &'a str, depth: usize) -> Read {
         if let Some((at, within, held)) = self.constant(path, scope, name) {
             return self.schema(at, within, held, depth + 1);
@@ -394,7 +347,6 @@ impl<'a> Reader<'_, 'a> {
         }))
     }
 
-    /// The output of the schema `value` stands for.
     fn schema(&mut self, path: &'a str, scope: &'a str, value: &'a Value, depth: usize) -> Read {
         self.spent.charge()?;
         if depth >= ZOD_DEPTH {
@@ -403,7 +355,6 @@ impl<'a> Reader<'_, 'a> {
         match value {
             Value::Ref(name) | Value::Schema(name) => self.named(path, scope, name, depth),
             Value::Call(call) => self.call(path, scope, call, depth),
-            // A member of a namespace import of a package (`C.Quote`).
             Value::Member(head, member) => {
                 let imported = self.code.imported_member(path, scope, head, member);
                 Some(imported.map(|imported| Node {
@@ -415,7 +366,6 @@ impl<'a> Reader<'_, 'a> {
         }
     }
 
-    /// The schema `value` stands for, open when it is none.
     fn part(
         &mut self,
         path: &'a str,
@@ -426,7 +376,6 @@ impl<'a> Reader<'_, 'a> {
         Some((self.schema(path, scope, value, depth + 1)?).unwrap_or_else(Node::open))
     }
 
-    /// A call: a function of `z`, or a method on a schema.
     fn call(&mut self, path: &'a str, scope: &'a str, call: &'a Invocation, depth: usize) -> Read {
         if let Some(function) = self.zod(path, scope, &call.callee) {
             return self.function(path, scope, &function, &call.args, depth);
@@ -437,8 +386,6 @@ impl<'a> Reader<'_, 'a> {
         let Some(on) = self.schema(path, scope, receiver, depth + 1)? else {
             return Some(None);
         };
-        // An imported name is taken for a schema only by the methods schemas have: `object` on
-        // a `z` imported from another library makes it none.
         let imported = match &**receiver {
             Value::Ref(name) => self.constant(path, scope, name).is_none(),
             Value::Member(..) => true,
@@ -457,8 +404,6 @@ impl<'a> Reader<'_, 'a> {
         )?))
     }
 
-    /// The function of `zod` the callee names, spelled as `z` does (`object`, `coerce.string`),
-    /// however it is imported.
     fn zod(&self, path: &'a str, scope: &'a str, callee: &'a str) -> Option<String> {
         let (specifier, spelled) = self.code.imported(path, scope, callee)?;
         if specifier != "zod" && !specifier.starts_with("zod/") {
@@ -468,7 +413,6 @@ impl<'a> Reader<'_, 'a> {
         Some(name.unwrap_or(&spelled).to_string())
     }
 
-    /// The output of calling the function `name` of `z`.
     fn function(
         &mut self,
         path: &'a str,
@@ -516,7 +460,6 @@ impl<'a> Reader<'_, 'a> {
         }))
     }
 
-    /// The fields of an object schema.
     fn object(
         &mut self,
         path: &'a str,
@@ -526,7 +469,6 @@ impl<'a> Reader<'_, 'a> {
     ) -> Option<Node> {
         let mut node = Node::default();
         for (key, value) in properties {
-            // A spread, or a key with no spelling in a field path, may be any field.
             if key == "..." || unreadable(key) {
                 node.open = true;
                 continue;
@@ -537,7 +479,6 @@ impl<'a> Reader<'_, 'a> {
         Some(node)
     }
 
-    /// The output of calling the method `name` on a schema giving `on`.
     fn method(
         &mut self,
         path: &'a str,
@@ -547,8 +488,6 @@ impl<'a> Reader<'_, 'a> {
         args: &'a [Value],
         depth: usize,
     ) -> Option<Node> {
-        // The fields of an imported schema are not known here: none can be picked, left out or
-        // made optional.
         if !on.imports.is_empty() && ["partial", "required", "pick", "omit"].contains(&name) {
             return Some(Node::open());
         }
@@ -588,7 +527,6 @@ impl<'a> Reader<'_, 'a> {
                     }
                     let named = |k: &String| keys.iter().any(|(key, _)| key == k);
                     on.fields.retain(|k, _| named(k) == (name == "pick"));
-                    // A computed key may name any field.
                     on.open |= keys.iter().any(|(key, _)| unreadable(key));
                 }
                 _ => on.open = true,
@@ -600,12 +538,10 @@ impl<'a> Reader<'_, 'a> {
     }
 }
 
-/// Whether an object key has no spelling in a field path (a computed key, `[K]`).
 fn unreadable(key: &str) -> bool {
     key.is_empty() || key.contains(['.', '['])
 }
 
-/// The method a call calls on its receiver.
 fn method(call: &Invocation) -> &str {
     call.callee.rsplit('.').next().unwrap_or_default()
 }
@@ -620,7 +556,6 @@ mod tests {
     use crate::resolve::{Code, Resolver};
     use crate::shape::{Shape, Source};
 
-    /// The shape of the handler `h` of one file `a.ts`.
     fn read(src: &str, kind: Handler) -> Option<Shape> {
         let facts = TsJs.parse("a.ts", src.as_bytes()).unwrap();
         let files = BTreeMap::from([("a.ts", &facts)]);
@@ -654,7 +589,6 @@ mod tests {
         assert!(shape.open.is_empty());
     }
 
-    /// The shape of `S.parse(..)` sent by an Express handler, `decls` holding the schemas.
     fn parsed(decls: &str, schema: &str) -> Shape {
         let src = format!(
             "import {{ z }} from 'zod';\n{decls}\nconst S = {schema};\n\
@@ -702,7 +636,6 @@ mod tests {
             assert_eq!(fields(&shape), "a b", "{schema}");
             assert_eq!(paths(&shape.scalars), ["a", "b"], "{schema}");
         }
-        // A part that is a scalar in one member and an object in another may hold anything.
         let shape = parsed(
             "",
             "z.union([z.object({ a: z.string() }), z.object({ a: z.object({ b: z.string() }) })])",
@@ -714,7 +647,6 @@ mod tests {
     #[test]
     fn what_meada_cannot_read_is_open() {
         let decls = "const Base = z.object({ id: z.string() });";
-        // (schema, fields, open paths)
         let cases = [
             ("Base.passthrough()", "id", vec![""]),
             ("Base.catchall(z.string())", "id", vec![""]),
@@ -764,7 +696,6 @@ mod tests {
     #[test]
     fn a_schema_a_package_exports_is_left_for_the_query_to_fill() {
         let decls = "import { Ext } from '@acme/schemas';";
-        // (schema, fields, the paths of the imports)
         let cases = [
             ("Ext", "", vec![""]),
             (
@@ -774,7 +705,6 @@ mod tests {
             ),
             ("z.array(Ext)", "[]", vec!["[]"]),
             ("Ext.extend({ more: z.string() })", "more", vec![""]),
-            // Its fields are not known here: none can be picked or left out.
             ("Ext.pick({ id: true })", "", vec![]),
         ];
         for (schema, fields, imports) in cases {
@@ -789,11 +719,9 @@ mod tests {
             assert!(named, "{schema}");
         }
         assert_eq!(paths(&parsed(decls, "Ext.pick({ id: true })").open), [""]);
-        // A namespace import's member is one too.
         let shape = parsed("import * as C from '@acme/schemas';", "C.Ext");
         let named: Vec<&str> = shape.imports.iter().map(|i| i.name.as_str()).collect();
         assert_eq!(named, ["Ext"]);
-        // A parameter of the same name hides the import: no schema Meada reads.
         let src = "import { Ext } from '@acme/schemas';\n\
                    export function h(req, res) { [req.body].forEach((Ext) => res.json(Ext.parse(req.body))); }\n";
         assert!(express(src).is_none_or(|s| s.imports.is_empty()));
@@ -812,7 +740,6 @@ mod tests {
     fn the_data_of_a_safe_parse_and_a_typed_value_give_the_schema() {
         let express = |body: &str| handler(body, Handler::Express);
         let bodies = [
-            // The failed parse answers 400, which the shape leaves out.
             "function h(req, res) { const r = S.safeParse(req.body); if (!r.success) { \
                 return res.status(400).json({ error: 1 }); } res.json(r.data); }",
             "async function h(req, res) { const r = await S.safeParseAsync(req.body); \
@@ -857,7 +784,6 @@ mod tests {
         assert_eq!(paths(&shape.open), [""]);
     }
 
-    /// The shape of `S.parse(..)` for a schema nested `n` levels in each of three ways.
     fn nested(n: usize, wrap: impl Fn(usize) -> String, base: &str) -> Shape {
         let decls: String = (0..n).map(wrap).collect();
         parsed(&format!("const L0 = {base};\n{decls}"), &format!("L{n}"))
@@ -867,7 +793,6 @@ mod tests {
     fn nesting_past_the_depth_limit_is_open() {
         let past = super::ZOD_DEPTH + 8;
         let leaf = "z.object({ end: z.string() })";
-        // Objects inside objects, constants of constants and methods on methods.
         let shapes = [
             nested(
                 past,
@@ -886,7 +811,6 @@ mod tests {
             assert!(!shape.open.is_empty(), "case {n}");
             assert!(!shape.fields.contains("end"), "case {n}");
         }
-        // Within the limit the leaf is read.
         let shallow = nested(
             4,
             |i| format!("const L{} = z.object({{ a: L{i} }});\n", i + 1),
@@ -898,7 +822,6 @@ mod tests {
 
     #[test]
     fn a_crafted_fan_out_of_constants_is_cut_by_the_budget() {
-        // 2^40 paths through the unions if each were read in full.
         let decls: String = (0..40)
             .map(|i| format!("const L{} = z.union([L{i}, L{i}]);\n", i + 1))
             .collect();

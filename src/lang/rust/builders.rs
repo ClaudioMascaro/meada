@@ -1,34 +1,20 @@
-//! The `String` a function builds before it sends a request: `let mut url = String::from(BASE);
-//! url.push_str("/users");`. A `let mut` whose name the rest of its block only reads, grows by
-//! `push_str`, `push` and `+=` statements of that block, or hands on as a value, holds a known
-//! text at each place it is read: what it began as, and the pushes that come before the place.
-//! Any other use (a push in a branch or a loop, `&mut url`, `write!(url, ..)`, a shadowing
-//! binding, a method that changes it) leaves the name unknown, as every `let mut` is.
-
 use tree_sitter::Node;
 
 use super::{field, mutable};
 use crate::lang::{children, named, text};
 
-/// How many syntax nodes the builders of one file may scan in all. Each `let mut` scans the rest
-/// of its block, so a file of a hundred thousand of them in one function would cost the square.
 // ponytail: real functions hold a few `let mut` Strings; past the budget the rest are unknown.
 pub(super) const BUILDER_BUDGET: usize = 1 << 20;
 
-/// How deep a builder is read through the builders its pushes read, and how big it grows, in
-/// bytes of text plus parts (a push of the string to itself doubles it).
 // ponytail: real code builds a URL from a few parts; a crafted file must not recurse or grow
 // without end. Past either limit the read is a hole.
 pub(super) const BUILDER_DEPTH: usize = 64;
 pub(super) const BUILDER_SIZE: usize = 4096;
 
-/// What folding the pushes of a file's builders and reading them may cost in all, in `size`
-/// units: each prefix folded and each read copies its text. Past it a read is a hole.
 // ponytail: real files read a few builders a few times; 2000 pushes and 100k reads of one
 // builder would otherwise cost the product.
 pub(super) const BUILDER_WORK: usize = 1 << 22;
 
-/// The size of a builder's `parts`, as `BUILDER_SIZE` counts it.
 pub(super) fn size(parts: &[crate::lang::Part]) -> usize {
     use crate::lang::Part;
     (parts.iter())
@@ -39,7 +25,6 @@ pub(super) fn size(parts: &[crate::lang::Part]) -> usize {
         .sum()
 }
 
-/// The methods that only read a `String`.
 const READS: &[&str] = &[
     "as_str",
     "as_ref",
@@ -53,50 +38,35 @@ const READS: &[&str] = &[
     "contains",
 ];
 
-/// The macros that read the arguments they are given by reference.
 const READING_MACROS: &[&str] = &["format", "print", "println", "eprint", "eprintln", "concat"];
 
-/// A `let mut` String and what grows it.
 pub(super) struct Builder<'t> {
-    /// Where the `let` ends, and where its block does: the places it holds its text.
     pub from: usize,
     pub to: usize,
     pub init: Node<'t>,
     pub steps: Vec<Push<'t>>,
 }
 
-/// A statement of the builder's block that appends to it.
 pub(super) struct Push<'t> {
-    /// Where the statement ends: a read after it sees the push.
     pub end: usize,
     pub arg: Node<'t>,
-    /// `push(c)` adds a char; `push_str(s)` and `+=` add a string.
     pub char: bool,
 }
 
-/// A node on the way down, with the two above it.
 #[derive(Clone, Copy)]
 struct Seen<'t> {
     node: Node<'t>,
     parent: Node<'t>,
     grand: Node<'t>,
-    /// Whether the node is part of a pattern (a binding, not a use).
     pattern: bool,
-    /// The nodes listed before and after it among its parent's children (every token, in a
-    /// token tree): a sibling lookup costs the depth of the node.
     before: Option<Node<'t>>,
     after: Option<Node<'t>>,
 }
 
-/// Whether `node` is a `let mut` that may be a builder.
 pub(super) fn candidate(node: Node) -> bool {
     node.kind() == "let_declaration" && mutable(node)
 }
 
-/// The builder the `let mut` `node` of `block` makes; `None` when anything else may change the
-/// name, or the budget `spent` is used up. `rest` is what follows it in the block, as `parse`
-/// reads the block's children once: a statement the file's configuration leaves out
-/// (`#[cfg(..)]` false) is not there, and neither is an attribute.
 pub(super) fn builder<'t>(
     node: Node<'t>,
     block: Node<'t>,
@@ -152,7 +122,6 @@ pub(super) fn builder<'t>(
             ..
         } = seen;
         match node.kind() {
-            // Another function's names are its own, and an attribute is no use.
             "function_item" | "impl_item" | "mod_item" | "trait_item" | "macro_definition"
             | "attribute_item" => continue,
             "identifier" if is_name(node) && (pattern || !reads(seen, src)) => return None,
@@ -168,7 +137,6 @@ pub(super) fn builder<'t>(
                 ) && field(node, "pattern").is_some_and(|p| p.id() == child.id()))
         };
         let kids = match node.kind() {
-            // The separators of a macro's arguments tell a lone name from an expression.
             "token_tree" => children(node).collect::<Vec<_>>(),
             _ => named(node).collect(),
         };
@@ -189,8 +157,6 @@ pub(super) fn builder<'t>(
     })
 }
 
-/// The argument and whether it is a char, of an append to the name: `name.push_str(arg)`,
-/// `name.push(arg)` or `name += arg`.
 fn append<'t>(
     expr: Node<'t>,
     is_name: &dyn Fn(Node) -> bool,
@@ -219,7 +185,6 @@ fn append<'t>(
     }
 }
 
-/// Whether the use of the name at `seen` only reads it.
 fn reads(seen: Seen, src: &[u8]) -> bool {
     let Seen {
         node,
@@ -233,12 +198,10 @@ fn reads(seen: Seen, src: &[u8]) -> bool {
     match parent.kind() {
         "assignment_expression" | "compound_assignment_expr" => !is(field(parent, "left"), node),
         "reference_expression" => !children(parent).any(|c| c.kind() == "mutable_specifier"),
-        // A method call that only reads.
         "field_expression" => {
             let called = grand.kind() == "call_expression" && is(field(grand, "function"), parent);
             called && field(parent, "field").is_some_and(|f| READS.contains(&text(f, src)))
         }
-        // The name alone as an argument of a macro that reads its arguments.
         "token_tree" => {
             let lone =
                 |n: Option<Node>, kinds: &[&str]| n.is_some_and(|n| kinds.contains(&n.kind()));
@@ -247,9 +210,6 @@ fn reads(seen: Seen, src: &[u8]) -> bool {
                 && grand.kind() == "macro_invocation"
                 && field(grand, "macro").is_some_and(|m| READING_MACROS.contains(&text(m, src)))
         }
-        // Handed on, compared or held: the String is moved or copied, and not changed in place.
-        // An index (`u[..].make_ascii_uppercase()`) or a deref (`*u`) reaches it for writing,
-        // and any other use is not known to read.
         kind => matches!(
             kind,
             "arguments"
@@ -279,7 +239,6 @@ mod tests {
     use super::builder;
     use crate::lang::children;
 
-    /// A `let mut` String that `n` statements push to, add to and print, `depth` blocks deep.
     fn block(n: usize, depth: usize) -> (String, Tree) {
         let body = "s.push_str(\"a\"); s += \"b\"; println!(\"{}\", s);\n".repeat(n);
         let src = format!(
@@ -295,7 +254,6 @@ mod tests {
         (src, tree)
     }
 
-    /// How long the builder of the `let mut` in `src` takes to read its block.
     fn read(src: &str, tree: &Tree, n: usize) -> Duration {
         let at = src.find("let mut").unwrap();
         let mut node = tree.root_node().descendant_for_byte_range(at, at).unwrap();
@@ -314,11 +272,6 @@ mod tests {
 
     #[test]
     fn a_builder_reads_a_block_in_the_same_time_at_any_depth() {
-        // A parent or sibling lookup walks down from the root of the tree (which balances a long
-        // list), so it costs the depth of the node: 2000 deep, the lookups this walk made took 90
-        // times as long as at the top, and one per print alone 30 times. Each statement must
-        // cost the same anywhere. The least of interleaved runs keeps the machine and its load
-        // out of the ratio.
         let (n, depth) = (1000, 2000);
         let (top, deep) = (block(n, 0), block(n, depth));
         let (mut at_top, mut at_depth) = (Duration::MAX, Duration::MAX);

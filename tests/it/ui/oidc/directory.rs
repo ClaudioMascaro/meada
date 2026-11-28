@@ -1,10 +1,3 @@
-//! The directory's SCIM endpoint (#334, ADR 0016): `/scim/v2/` on the console's listener with
-//! `[ui]`, `[oidc]`, `[postgres]` and `[directory]`, behind a bearer token of its own, answering
-//! what Entra ID's and Okta's provisioning send. Admission, the discovery documents, the 503 and
-//! the start refusals need no service; the rest run against the local Postgres
-//! `MEADA_TEST_POSTGRES_URL` names, in a schema of each test's own behind a loopback relay, and
-//! print why and skip without it (fail with `MEADA_TEST_SERVICES_REQUIRED=1`).
-
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -18,31 +11,26 @@ use crate::oidc::{Issuer, key, set, sign};
 use crate::postgres::{Audited, audited};
 use crate::server::Server;
 
-/// The SCIM token of every console here: 40 characters.
 pub(super) const TOKEN: &str = "scim-334-token-0123456789abcdefghijklmno";
 pub(super) const USER: &str = "urn:ietf:params:scim:schemas:core:2.0:User";
 pub(super) const GROUP: &str = "urn:ietf:params:scim:schemas:core:2.0:Group";
 const ENTERPRISE: &str = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User";
 const PATCH_OP: &str = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const ERROR: &str = "urn:ietf:params:scim:api:messages:2.0:Error";
-/// The `[directory]` of every console here, its token in the default `MEADA_SCIM_TOKEN`.
 pub(super) const DIRECTORY: &str =
     "\n[directory]\nuser_claim = \"oid\"\nuser_attribute = \"userName\"\n";
 
-/// `text` appended to the console's manifest in `dir`.
 pub(super) fn append(dir: &Path, text: &str) {
     let file = dir.join(MANIFEST);
     let source = fs::read_to_string(&file).unwrap();
     fs::write(&file, format!("{source}{text}")).unwrap();
 }
 
-/// `meada ui` in `dir` with `env`.
 fn start(dir: &Path, env: &[(&str, &str)]) -> Server {
     let args = ["--listen", "127.0.0.1:0", "--workspace", MANIFEST];
     Server::start_command(dir, "ui", &args, env)
 }
 
-/// A console with the directory over the local Postgres, its schema migrated, running.
 fn provisioned(case: &'static str) -> Option<(Issuer, Audited, Server)> {
     let (_, jwk) = key("k1");
     let issuer = Issuer::new(set(&[&jwk]));
@@ -53,7 +41,6 @@ fn provisioned(case: &'static str) -> Option<(Issuer, Audited, Server)> {
     Some((issuer, audit, console))
 }
 
-/// `method` on `/scim/v2<path>` with the SCIM token and `body`, as SCIM JSON.
 pub(super) fn scim(console: &Server, method: &str, path: &str, body: Option<&Value>) -> Reply {
     let authorization = bearer(TOKEN);
     let mut headers = vec![("Authorization", authorization.as_str())];
@@ -64,7 +51,6 @@ pub(super) fn scim(console: &Server, method: &str, path: &str, body: Option<&Val
     send_body(console, method, &format!("/scim/v2{path}"), &headers, &body)
 }
 
-/// `scim`, asserting `status`; the document when there is one.
 pub(super) fn expect(
     console: &Server,
     method: &str,
@@ -83,12 +69,10 @@ pub(super) fn expect(
     }
 }
 
-/// A `PATCH` body of `operations`.
 pub(super) fn patch(operations: Value) -> Value {
     json!({"schemas": [PATCH_OP], "Operations": operations})
 }
 
-/// The status and `scimType` of a refusal, checked to be RFC 7644's error.
 fn scim_type(reply: &Reply) -> (u16, String) {
     let error = reply.json();
     assert_eq!(error["schemas"], json!([ERROR]), "{}", reply.body);
@@ -97,7 +81,6 @@ fn scim_type(reply: &Reply) -> (u16, String) {
     (reply.status, kind)
 }
 
-/// The members of a group document, by id.
 fn members(group: &Value) -> Vec<&str> {
     let listed = group["members"].as_array().expect("members");
     listed
@@ -106,7 +89,6 @@ fn members(group: &Value) -> Vec<&str> {
         .collect()
 }
 
-/// `filter`, form-encoded for a query.
 fn encoded(filter: &str) -> String {
     filter
         .replace(' ', "+")
@@ -114,12 +96,10 @@ fn encoded(filter: &str) -> String {
         .replace('@', "%40")
 }
 
-/// The `scim:` lines of `stderr`.
 fn lines(stderr: &str) -> Vec<&str> {
     stderr.lines().filter(|l| l.starts_with("scim: ")).collect()
 }
 
-/// Neither `text` nor any of `values` there: the token, the Postgres URL, attribute values.
 fn assert_leaks_nothing(audit: &Audited, text: &str, values: &[&str]) {
     assert!(!text.contains(TOKEN), "the token in {text}");
     for value in values {
@@ -128,18 +108,12 @@ fn assert_leaks_nothing(audit: &Audited, text: &str, values: &[&str]) {
     audit.assert_no_url(text);
 }
 
-/// What the schema's table holds, as text, one row per line.
 fn rows(audit: &Audited, sql: &str) -> Vec<String> {
     audit
         .admin
         .texts(&sql.replace("{s}", &format!("\"{}\"", audit.schema)))
 }
 
-/// Entra ID's provisioning as it sends it: the lookup by `userName`, `POST`, a `PATCH` of
-/// attributes, `PATCH active` with `"False"`, the user shown inactive, a group with members added
-/// and removed by path and by value list (204), `excludedAttributes=members`, then `DELETE`. Each
-/// write leaves one `scim:` line; no line or error carries the token, a value or the URL. With
-/// Postgres stopped the endpoint is a 503 and the console's other routes answer.
 #[test]
 fn an_entra_id_sequence_provisions_patches_and_deletes() {
     let Some((_issuer, audit, console)) = provisioned("ui_directory_entra") else {
@@ -250,7 +224,6 @@ fn an_entra_id_sequence_provisions_patches_and_deletes() {
     );
     assert!(one.get("members").is_none() && one["displayName"] == json!("Engineering"));
 
-    // A deleted user leaves every group, and a revocation marker.
     assert_eq!(expect(&console, "DELETE", &path, None, 204), Value::Null);
     expect(&console, "GET", &path, None, 404);
     assert_eq!(
@@ -269,7 +242,6 @@ fn an_entra_id_sequence_provisions_patches_and_deletes() {
     expect(&console, "DELETE", &at, None, 204);
     expect(&console, "GET", &at, None, 404);
 
-    // Postgres stopped: a 503 in the same schema; the console's other routes still answer.
     audit.relay.close();
     let down = scim(&console, "GET", &path, None);
     assert_eq!(down.status, 503, "{}", down.body);
@@ -308,9 +280,6 @@ fn an_entra_id_sequence_provisions_patches_and_deletes() {
     assert_leaks_nothing(&audit, &stderr, &values);
 }
 
-/// Okta's provisioning: the lookup by `userName`, `POST`, `PUT` of the whole user, `PATCH`
-/// `active=false` without a path, a group created with no members, `PUT` replacing its members,
-/// a rename, `DELETE`; and paging with `startIndex` and `count=100` over 150 users.
 #[test]
 fn an_okta_sequence_and_paging_over_150_users() {
     let Some((_issuer, audit, console)) = provisioned("ui_directory_okta") else {
@@ -435,12 +404,6 @@ fn an_okta_sequence_and_paging_over_150_users() {
     );
 }
 
-/// The refusals: 409 `uniqueness` for a `userName` differing only in case (on `POST`, `PUT` and
-/// `PATCH`), a repeated `externalId` and a repeated group name; a member naming no user is a 400
-/// `invalidValue`; an unsupported filter, path and operation each get their `scimType`; an unknown
-/// id is a 404. A `PATCH` whose later operation fails writes nothing; `id` and `meta` stay Meada's;
-/// a body over 1 MiB and a resource over 64 KiB, before or after a `PATCH`, are 413 without
-/// `scimType`. Concurrent writes of one `userName` store one user. No error echoes a value.
 #[test]
 fn refusals_carry_their_scim_type_and_write_nothing() {
     let Some((_issuer, audit, console)) = provisioned("ui_directory_refusals") else {
@@ -512,7 +475,6 @@ fn refusals_carry_their_scim_type_and_write_nothing() {
     assert_eq!(scim(&console, "PATCH", &unknown, Some(&rename)).status, 404);
     assert_eq!(scim(&console, "GET", "/Users/ALICE", None).status, 404);
 
-    // Atomic: the first operation is undone by the failure of the second.
     let half = patch(json!([
         {"op": "replace", "path": "displayName", "value": "Changed"},
         {"op": "replace", "path": "emails[type eq \"home\"].value", "value": "h@contoso.example"},
@@ -522,7 +484,6 @@ fn refusals_carry_their_scim_type_and_write_nothing() {
         expect(&console, "GET", &path, None, 200)["displayName"],
         json!("Alice")
     );
-    // `id` and `meta` stay Meada's.
     let other = "f".repeat(32);
     let forged = patch(json!([
         {"op": "replace", "path": "id", "value": other},
@@ -541,7 +502,6 @@ fn refusals_carry_their_scim_type_and_write_nothing() {
     );
     expect(&console, "GET", &format!("/Users/{other}"), None, 404);
 
-    // The caps: a body past 1 MiB, a resource past 64 KiB on `POST` and after a `PATCH`.
     let too_large = |reply: Reply| {
         assert_eq!(reply.status, 413, "{}", reply.body);
         let error = reply.json();
@@ -564,7 +524,6 @@ fn refusals_carry_their_scim_type_and_write_nothing() {
     let total = expect(&console, "GET", "/Users", None, 200)["totalResults"].clone();
     assert_eq!(total, json!(2));
 
-    // A race: eight writers of one `userName`, one stored.
     let mut statuses: Vec<u16> = std::thread::scope(|scope| {
         let racers: Vec<_> = (0..8)
             .map(|n| {
@@ -579,7 +538,6 @@ fn refusals_carry_their_scim_type_and_write_nothing() {
     });
     statuses.sort();
     assert_eq!(statuses, [201, 409, 409, 409, 409, 409, 409, 409]);
-    // Four writers of one group name, one stored.
     let mut statuses: Vec<u16> = std::thread::scope(|scope| {
         let racers: Vec<_> = (0..4)
             .map(|_| {
@@ -594,8 +552,6 @@ fn refusals_carry_their_scim_type_and_write_nothing() {
     });
     statuses.sort();
     assert_eq!(statuses, [201, 409, 409, 409]);
-    // A user deleted while a group adds it: whichever writes second sees the first, and no
-    // membership outlives its user.
     for round in 0..5 {
         let user = json!({"userName": format!("erin{round}@contoso.example")});
         let user = expect(&console, "POST", "/Users", Some(&user), 201)["id"].clone();
@@ -616,7 +572,6 @@ fn refusals_carry_their_scim_type_and_write_nothing() {
         let held = expect(&console, "GET", &format!("/Groups/{group}"), None, 200);
         assert_eq!(members(&held), Vec::<&str>::new(), "round {round}");
     }
-    // A value Postgres cannot store is the provider's error, not an outage.
     let nul = json!({"userName": "nul\u{0}@contoso.example"});
     let reply = scim(&console, "POST", "/Users", Some(&nul));
     assert_eq!(
@@ -646,10 +601,6 @@ fn refusals_carry_their_scim_type_and_write_nothing() {
     assert_leaks_nothing(&audit, &stderr, &values);
 }
 
-/// The revocation marker: deactivating leaves none; deleting a provisioned user, inactive or
-/// active, leaves one that `GET` and `filter` do not show; deleting an unknown id leaves none;
-/// provisioning the user again inactive, or active only by default, keeps it, and naming it
-/// active (its `userName` compared ignoring case, the default `user_attribute`) clears it.
 #[test]
 fn a_deleted_user_leaves_a_revocation_marker_until_provisioned_active() {
     let Some((_issuer, audit, console)) = provisioned("ui_directory_revoked") else {
@@ -714,7 +665,6 @@ fn a_deleted_user_leaves_a_revocation_marker_until_provisioned_active() {
         200,
     );
     assert_eq!(markers(), ["erin@contoso.example"]);
-    // Active by default is not explicit: the marker stays until `active` is named true.
     let erin = json!({"userName": "erin@contoso.example"});
     let erin = expect(&console, "POST", "/Users", Some(&erin), 201)["id"].clone();
     assert_eq!(markers(), ["erin@contoso.example"]);
@@ -724,8 +674,6 @@ fn a_deleted_user_leaves_a_revocation_marker_until_provisioned_active() {
     assert_eq!(markers(), Vec::<String>::new());
 }
 
-/// A console whose `[postgres]` names a closed port, so no service is needed: `PG_334_URL`.
-/// `directory` its `[directory]`.
 fn unreachable_console(case: &str, issuer: &Issuer, directory: &str) -> PathBuf {
     let dir = console_dir(case, Some(VERSION), &head(&issuer.base), &ui_oidc());
     let postgres = "\n[postgres]\nurl_env = \"PG_334_URL\"\nschema = \"meada_t334\"\n";
@@ -735,11 +683,6 @@ fn unreachable_console(case: &str, issuer: &Issuer, directory: &str) -> PathBuf 
 
 const CLOSED: &str = "postgres://meada:pg-secret-334@127.0.0.1:1/meada";
 
-/// A Postgres that takes the connection and then answers nothing (the server's own
-/// `statement_timeout` never fires on it): a SCIM write is a 503 once the request's bound passes,
-/// one connect timeout and fourteen statements (the request's twelve and the version check's two)
-/// of one second each, and the console goes on: with the local Postgres (`MEADA_TEST_POSTGRES_URL`)
-/// pointed back at, the write that follows is a 201.
 #[test]
 fn a_scim_write_to_a_postgres_that_stops_answering_is_a_503_within_its_bound() {
     use std::time::{Duration, Instant};
@@ -784,12 +727,6 @@ fn a_scim_write_to_a_postgres_that_stops_answering_is_a_503_within_its_bound() {
     assert!(!lines(&stderr).is_empty(), "{stderr}");
 }
 
-/// Admission: no token, a console token, a wrong token and the token one character short each
-/// get a 401 with `WWW-Authenticate: Bearer`; any request carrying `Origin` gets a 403 before the
-/// token is read; the SCIM token under `/api/v1/session` is a 401; a body of another media type
-/// is a 415. The discovery documents answer with their fixed content; with Postgres unreachable
-/// a resource is a 503 and the other routes answer. The manifest route names the token's
-/// variable, never the token.
 #[test]
 fn admission_is_the_scim_token_alone() {
     let (signing, jwk) = key("k1");
@@ -923,9 +860,6 @@ fn admission_is_the_scim_token_alone() {
     }
 }
 
-/// The console refuses to start with a SCIM token of 31 characters or with none, naming the key
-/// and its line, never the value; in English under `pt_BR` too, as every start refusal of the
-/// console is (ADR 0008).
 #[test]
 fn the_console_refuses_a_short_or_missing_token() {
     let (_, jwk) = key("k1");

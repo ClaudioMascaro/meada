@@ -1,4 +1,3 @@
-//! Known Alertmanager receiver mappings. Templates are substituted once, never executed.
 use super::config::{self, Route, Rule, Stream, Summary};
 use super::{Limit, Work};
 use serde::{Deserialize, Serialize};
@@ -34,8 +33,6 @@ pub(super) fn read(body: &Value, document: usize, out: &mut Summary, bytes: &mut
                 let mut valid = value.is_object();
                 let mut details = BTreeMap::new();
                 if stream == Stream::Pagerduty {
-                    // Alertmanager's Events API v2 writes these details to custom_details.
-                    // The service_key (v1) receiver has a different payload, so it is not this path.
                     valid &= value
                         .get("routing_key")
                         .or_else(|| value.get("routingKey"))
@@ -55,7 +52,6 @@ pub(super) fn read(body: &Value, document: usize, out: &mut Summary, bytes: &mut
                             }
                         }
                     }
-                    // AlertmanagerConfig represents details as [{key, value}], unlike YAML.
                     for detail in config::array(value.get("details")) {
                         if let (Some(key), Some(template)) = (
                             detail.get("key").and_then(Value::as_str),
@@ -80,7 +76,6 @@ pub(super) fn read(body: &Value, document: usize, out: &mut Summary, bytes: &mut
                         {
                             scopes.insert(id.into());
                         } else {
-                            // A name alone is not the literal team ID tested by team_id.
                             valid = false;
                         }
                     }
@@ -145,8 +140,6 @@ pub(super) fn events(
         if receiver.stream == Stream::Opsgenie {
             if let Some(template) = &receiver.tags {
                 if let Some(tags) = render(template, route, rule, retained, work)? {
-                    // Plain tags can affect a conjunction, even though only key:value tags
-                    // declare emitter contracts. Keep the complete native payload.
                     let tags = tags.trim();
                     for tag in tags.split(',').filter(|_| !tags.is_empty()) {
                         reserve(retained, tag.len())?;
@@ -159,7 +152,6 @@ pub(super) fn events(
             }
         } else {
             for (key, template) in &receiver.details {
-                // A literal detail key with a dot is one JSON key, not a nested PCL path.
                 if key.is_empty() || !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
                     continue;
                 }
@@ -211,8 +203,6 @@ fn render(
     retained: &mut usize,
     work: &mut Work,
 ) -> Result<Option<String>, Limit> {
-    // Unread templates may emit nothing. Charge their scan too, before repeated rules can
-    // spend unbounded time on the same long, unsupported expression.
     work.spend(template.len())?;
     let mut out = String::new();
     let mut remaining = template;

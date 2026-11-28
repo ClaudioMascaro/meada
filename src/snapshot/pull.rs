@@ -38,7 +38,6 @@ use crate::{Result, repo};
 pub const POINTER: &str = "current";
 /// The document of a generation, in its directory.
 pub const DOCUMENT: &str = "generation.json";
-/// The lock one pull at a time holds, under `local_dir`.
 const LOCK: &str = "pull.lock";
 // ponytail: the most the node pointer file may hold (an id, a space, a `u64` fence and a
 // newline); past it the pointer file is malformed.
@@ -72,8 +71,6 @@ pub fn current(local_dir: &Path) -> std::result::Result<Option<(String, u64)>, S
     })
 }
 
-/// The id and fence the pointer file `path` names (one line, `<id> <fence>`), `None` when there
-/// is none; anything else is the error `bad` gives for the path shown.
 pub(super) fn pointer_file(
     path: &Path,
     bad: impl Fn(&str) -> String,
@@ -126,15 +123,11 @@ pub fn pull(manifest: &Path) -> Result<(Pulled, Vec<String>)> {
     ))??)
 }
 
-/// Where a pull learns the current generation: the store's `current`, or with `[generations]`
-/// the generation pointer in Valkey.
 struct Source {
     #[cfg(feature = "generation-pointer")]
     generations: Option<(super::generations::Config, crate::valkey::Config)>,
 }
 
-/// What the node should hold: the current generation, its fence and, with `[generations]`, the
-/// retained ones (newest first); `None` without it.
 type Wanted = (String, u64, Option<Vec<String>>);
 
 impl Source {
@@ -148,12 +141,10 @@ impl Source {
         let key = config.key("current");
         let bytes = store.get(&key, CURRENT_MAX).await?;
         let bytes = bytes.ok_or_else(|| Msg::SnapshotNoCurrent(&key).text())?;
-        // The store's pointer carries no fence.
         Ok((store_pointer(&key, &bytes)?, 0, None))
     }
 }
 
-/// The pull under the lock. Everything it reads is checked before the node changes.
 async fn pull_locked(
     config: &Config,
     local: &Path,
@@ -163,8 +154,6 @@ async fn pull_locked(
     let previous_id = previous.as_ref().map(|(id, _)| id.clone());
     let store = Store::connect(config)?;
     let (id, fence, retained) = source.wanted(&store, config).await?;
-    // Never to a lower fence than the node's (a refresh lock's; without one every fence is 0).
-    // Without a pointer file the node takes the current generation whatever its fence.
     #[cfg(feature = "generation-pointer")]
     if let (Some((_, valkey)), Some((_, held))) = (&source.generations, &previous)
         && fence < *held
@@ -184,19 +173,15 @@ async fn pull_locked(
     if retained.is_none() && held(&id) && previous_id.as_deref() == Some(id.as_str()) {
         return Ok((Pulled::Current(id), Vec::new()));
     }
-    // The current generation first, then the retained ones it lacks, each once.
     let mut wanted = vec![id.clone()];
     for retained in retained.iter().flatten() {
         if !wanted.contains(retained) {
             wanted.push(retained.clone());
         }
     }
-    // What a pull that crashed left.
     clear(local, |name| {
         name.strip_suffix(".partial").is_some_and(is_id)
     });
-    // A generation held is one a pull verified: only the pointer moves back to it. The current
-    // generation is fetched and swapped in before any retained one, so none of them blocks it.
     let fetched = !held(&id);
     if fetched {
         take(&store, config, local, &id).await?;
@@ -205,7 +190,6 @@ async fn pull_locked(
     if moved {
         swap(local, &id, fence)?;
     }
-    // A retained generation that fails is left for the next pull.
     let mut warnings = Vec::new();
     for want in wanted[1..].iter().filter(|want| !held(want)) {
         if let Err(why) = take(&store, config, local, want).await {
@@ -218,7 +202,6 @@ async fn pull_locked(
             );
         }
     }
-    // Never the current generation, a retained one or the one it just replaced.
     clear(local, |name| {
         is_id(name) && !wanted.iter().any(|w| w == name) && Some(name) != previous_id.as_deref()
     });
@@ -229,8 +212,6 @@ async fn pull_locked(
     Ok((pulled, warnings))
 }
 
-/// The generation `id` fetched into `<id>.partial` and renamed to `<id>`; on a failure the
-/// partial directory is removed.
 async fn take(
     store: &Store,
     config: &Config,
@@ -248,7 +229,6 @@ async fn take(
     fetched
 }
 
-/// The id the store's `current` holds: the id and a newline, nothing else.
 pub(super) fn store_pointer(key: &str, bytes: &[u8]) -> std::result::Result<String, String> {
     (std::str::from_utf8(bytes).ok())
         .and_then(|text| text.strip_suffix('\n'))
@@ -257,8 +237,6 @@ pub(super) fn store_pointer(key: &str, bytes: &[u8]) -> std::result::Result<Stri
         .ok_or_else(|| Msg::SnapshotBadId(key).text())
 }
 
-/// Removes every directory directly under `local` whose name `doomed` picks; a failure is left
-/// for the next pull.
 fn clear(local: &Path, doomed: impl Fn(&str) -> bool) {
     for entry in fs::read_dir(local).into_iter().flatten().flatten() {
         let dir = entry.file_type().is_ok_and(|t| t.is_dir());
@@ -268,14 +246,10 @@ fn clear(local: &Path, doomed: impl Fn(&str) -> bool) {
     }
 }
 
-/// `current.new` written with `<id> <fence>` and renamed over the pointer file.
 pub(super) fn swap(local: &Path, id: &str, fence: u64) -> std::result::Result<(), String> {
     replace(&local.join(POINTER), format!("{id} {fence}\n").as_bytes())
 }
 
-/// `bytes` written to `<target>.new`, synced and renamed over `target`, so a crash leaves the old
-/// file or the whole new one; `<target>.new` is removed when a step fails. A write error names
-/// `<target>.new`, a rename error `target`.
 pub(crate) fn replace(target: &Path, bytes: &[u8]) -> std::result::Result<(), String> {
     let mut name = target.as_os_str().to_owned();
     name.push(".new");
@@ -298,9 +272,6 @@ pub(crate) fn io_at(path: &Path) -> impl Fn(io::Error) -> String + use<> {
     move |e| format!("{shown}: {e}")
 }
 
-/// The generation `id` fetched into `partial`: its document checked, then per repository the
-/// bundle downloaded and checked against the document's size and hash, extracted, its git
-/// configuration replaced and the mirror checked against the document.
 async fn fetch(
     store: &Store,
     config: &Config,
@@ -338,7 +309,6 @@ async fn fetch(
     fs::write(partial.join(DOCUMENT), &bytes).map_err(io_at(partial))
 }
 
-/// The store's optional current generation id, checked before a caller builds any key.
 #[cfg(feature = "ui")]
 pub(crate) async fn store_current(
     store: &Store,
@@ -352,8 +322,6 @@ pub(crate) async fn store_current(
         .transpose()
 }
 
-/// The document of the generation `id` in the store, checked (`checked`), and its bytes as
-/// stored; a missing or malformed one is an error naming its key.
 pub(crate) async fn stored_document(
     store: &Store,
     config: &Config,
@@ -365,12 +333,6 @@ pub(crate) async fn stored_document(
     Ok((checked(config, id, &key, &bytes)?, bytes))
 }
 
-/// The document stored at `key` checked as the generation `id`, before any path or key is
-/// built from it: every identity passes the manifest's rules (`identity_problem`, none listed
-/// twice) and holds nothing a git remote URL cannot; every bundle key is `repos/<identity>/<bundle
-/// id>.tar` under the prefix, no bundle id listed twice; every hash has its shape; the sizes sum
-/// to at most `GENERATION_BYTES_MAX`; and the generation id derives from them. Each problem
-/// names the document.
 fn checked(
     config: &Config,
     id: &str,
@@ -406,8 +368,6 @@ fn checked(
             return Err(format!("{key}: {}: {problem}", identity.escape_debug()));
         }
         let mut fields = entry.blocks.as_object().cloned().ok_or_else(not)?;
-        // `owner` and `added_by` are an entry's metadata in a workspace version, never a block of a
-        // bundle.
         if NON_BLOCK_KEYS.iter().any(|k| fields.contains_key(*k)) {
             return Err(not());
         }
@@ -447,8 +407,6 @@ fn checked(
             .collect()
     };
     let (own, members) = (ids_of(&document.repositories), ids_of(&document.members));
-    // Each context names repositories the document holds, once, with blocks that read as an
-    // entry's; its digest is hashed into the generation id.
     let held: HashSet<&str> = (document.repositories.iter().chain(&document.members))
         .map(|e| e.identity.as_str())
         .collect();
@@ -472,7 +430,6 @@ fn checked(
             serde_json::from_value::<meada_core::manifest::EntryFile>(fields.into())
                 .map_err(|_| not())?;
         }
-        // The excluded identities (#510): sorted, once each, none of them recorded.
         for (at, identity) in context.excluded.iter().enumerate() {
             let ordered = at == 0 || context.excluded[at - 1] < *identity;
             if identity_problem(identity).is_some()
@@ -494,18 +451,10 @@ fn checked(
     Ok(document)
 }
 
-/// `ids` as the pairs `generation_id_of` takes.
 fn borrowed(ids: &[(String, String)]) -> Vec<(&str, &str)> {
     ids.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect()
 }
 
-/// The extracted mirror made safe for `git`, then checked against the document's entry: `.git`
-/// must be a directory; its `config` is replaced by a minimal one (`[core]` and the `origin`
-/// whose URL gives the entry's identity), and its `hooks`, `commondir` and
-/// `objects/info/alternates` (which point git elsewhere) are removed. Then, with `git` isolated
-/// from any system or global configuration (`repo::isolate`), the mirror must be a checkout of
-/// that identity at the entry's `HEAD`, with nothing changed, untracked or ignored, read
-/// without descending into a submodule (`extract` already refused any nested repository).
 fn settle(mirror: &Path, entry: &Entry) -> std::result::Result<(), String> {
     let git = mirror.join(".git");
     if !fs::symlink_metadata(&git).is_ok_and(|m| m.is_dir()) {
@@ -560,8 +509,6 @@ fn settle(mirror: &Path, entry: &Entry) -> std::result::Result<(), String> {
     Ok(())
 }
 
-/// Removes `path` without following a symbolic link: a directory with all it holds, anything
-/// else as a file. Nothing there is no error.
 fn remove(path: &Path) -> io::Result<()> {
     match fs::symlink_metadata(path) {
         Ok(meta) if meta.is_dir() => fs::remove_dir_all(path),
@@ -571,22 +518,11 @@ fn remove(path: &Path) -> io::Result<()> {
     }
 }
 
-/// What is left of a generation's ceilings as its bundles are extracted.
 struct Budget {
     bytes: u64,
     entries: u64,
 }
 
-/// The bundle archive `tar` extracted into `dest` (created here) as hostile input, each entry
-/// checked before it is written: `index.db` first, a regular file, then only `mirror` and what
-/// is under it; no absolute path and no `.` or `..` component; nothing written through a
-/// symbolic link or over an earlier entry; a symbolic link only to a relative target inside
-/// the mirror, through no other symbolic link; a hard link only to a regular file of the
-/// mirror extracted before it; no nested repository (a `.git` component below the mirror's
-/// own, or anything under its `.git/modules`); no device, FIFO or other special file. Entries
-/// and the bytes of
-/// regular files are charged to `budget`. A regular file is written `0644`, or `0755` when the
-/// archive gives it any execute bit.
 fn extract(tar: &Path, dest: &Path, budget: &mut Budget) -> std::result::Result<(), String> {
     let mut file = File::open(tar).map_err(io_at(tar))?;
     if !extensions_bounded(&mut file).map_err(io_at(tar))? {
@@ -596,7 +532,6 @@ fn extract(tar: &Path, dest: &Path, budget: &mut Budget) -> std::result::Result<
     fs::create_dir(dest).map_err(io_at(dest))?;
     let mut archive = tar::Archive::new(BufReader::new(file));
     let mirror = dest.join("mirror");
-    // Each symbolic link: its name, its directory in the mirror and its target.
     let mut links: Vec<(String, String, String)> = Vec::new();
     let mut first = true;
     for entry in archive.entries().map_err(|e| e.to_string())? {
@@ -625,8 +560,6 @@ fn extract(tar: &Path, dest: &Path, budget: &mut Budget) -> std::result::Result<
         if !placed {
             return Err(refuse(Msg::SnapshotEntryPath));
         }
-        // Only the mirror's own `.git`: git runs the configuration of a nested repository when
-        // `git status` descends into it as a submodule.
         let git = |part: &OsStr| part.eq_ignore_ascii_case(".git");
         let nested = parts.iter().skip(2).any(|part| git(part))
             || (parts.len() > 2 && git(parts[1]) && parts[2] == "modules");
@@ -698,8 +631,6 @@ fn extract(tar: &Path, dest: &Path, budget: &mut Budget) -> std::result::Result<
     if first {
         return Err(Msg::SnapshotEntryPath.text());
     }
-    // Once every entry is there: no link's target goes through another link, so the target
-    // resolves where its lexical fold says, inside the mirror.
     for (name, at, to) in &links {
         let steps: Vec<&str> = to.split('/').collect();
         for end in 1..steps.len() {
@@ -716,7 +647,6 @@ fn extract(tar: &Path, dest: &Path, budget: &mut Budget) -> std::result::Result<
     Ok(())
 }
 
-/// The components of `path` when all are names (no root, `.` or `..`), at least one.
 fn normal(path: &Path) -> Option<Vec<&OsStr>> {
     let parts: Option<Vec<&OsStr>> = (path.components())
         .map(|c| match c {
@@ -727,14 +657,10 @@ fn normal(path: &Path) -> Option<Vec<&OsStr>> {
     parts.filter(|parts| !parts.is_empty())
 }
 
-/// Whether the symbolic link target `to`, relative and folded from the mirror directory `at`,
-/// stays inside the mirror.
 fn inside(at: &str, to: &str) -> bool {
     repo::relative(at, to).is_some_and(|p| p != ".." && !p.starts_with("../"))
 }
 
-/// The directories above the entry `parts` under `dest`, each a directory and no symbolic link;
-/// with `make`, a missing one is created. Any other file in the way is `AlreadyExists`.
 fn directories(dest: &Path, parts: &[&OsStr], make: bool) -> io::Result<()> {
     let mut at = dest.to_path_buf();
     for part in &parts[..parts.len() - 1] {
@@ -749,8 +675,6 @@ fn directories(dest: &Path, parts: &[&OsStr], make: bool) -> io::Result<()> {
     Ok(())
 }
 
-/// A new regular file at `path`, never through a link there: `0755` when `mode` has an execute
-/// bit, `0644` otherwise.
 fn create(path: &Path, mode: u32) -> io::Result<File> {
     let mut options = File::options();
     options.write(true).create_new(true);
@@ -769,18 +693,14 @@ fn symlink(to: &str, path: &Path) -> io::Result<()> {
     std::os::unix::fs::symlink(to, path)
 }
 
-/// Only Unix nodes hold mirrors with symbolic links.
 #[cfg(not(unix))]
 fn symlink(_: &str, _: &Path) -> io::Result<()> {
     Err(io::ErrorKind::Unsupported.into())
 }
 
-/// Whether every GNU long name, long link and pax header of the archive `file` holds at most
-/// `HEADER_EXTENSION_MAX` bytes. Reads only the headers, seeking past each entry's data.
 fn extensions_bounded(file: &mut File) -> io::Result<bool> {
     let mut block = [0u8; 512];
     loop {
-        // A short or empty end is the tar crate's to report.
         if file.read_exact(&mut block).is_err() || block.iter().all(|b| *b == 0) {
             return Ok(true);
         }
@@ -844,8 +764,6 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         dir
     }
-
-    // Ids.
 
     #[test]
     fn the_store_pointer_is_an_id_and_a_newline() {
@@ -917,11 +835,8 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
-    // The generation document.
-
     const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 
-    /// A document of the generation of `entries` (identity, bundle key), with its id.
     fn document(entries: &[(&str, &str)]) -> (String, Vec<u8>) {
         let bundles: Vec<(&str, &str)> = (entries.iter())
             .map(|(identity, key)| (*identity, bundle_of(key)))
@@ -1063,8 +978,6 @@ mod tests {
         assert!(checked(&config(), &id, "d", &bytes).is_ok());
     }
 
-    /// A document of `WEB` alone, as a member, with one context recording it: `context` (its
-    /// `id`, `version` and `repositories` added), the generation id derived from them.
     fn with_context(context: serde_json::Value) -> (String, Vec<u8>) {
         let mut context = context;
         context["id"] = "c000000000000001".into();
@@ -1083,8 +996,6 @@ mod tests {
         (id, serde_json::to_vec(&text).unwrap())
     }
 
-    /// A context's excluded identities (#510) are part of its digest, so of the generation id;
-    /// without one the context, its digest and the id read as before the field existed.
     #[test]
     fn a_context_records_its_excluded_identities_in_its_digest() {
         const API: &str = "example.com/acme/api";
@@ -1103,7 +1014,6 @@ mod tests {
         assert_ne!(excluding, plain);
         let document = checked(&config(), &excluding, "d", &bytes).unwrap();
         assert_eq!(document.contexts[0].excluded, [API]);
-        // The same bundles under the id without the exclusion: not this document.
         assert!(checked(&config(), &plain, "d", &bytes).is_err());
         let (zed, other) = ("example.com/acme/zed", "example.com/acme/other");
         for bad in [
@@ -1121,10 +1031,6 @@ mod tests {
         assert!(checked(&config(), &id, "d", &bytes).is_ok());
     }
 
-    // Extraction.
-
-    /// An entry as a tar header writes it, its path and link name raw: no check of the tar
-    /// crate's own stands between the test and the reader.
     #[derive(Clone, Copy)]
     enum Item<'a> {
         File(&'a [u8], &'a [u8]),
@@ -1163,7 +1069,6 @@ mod tests {
         }
     }
 
-    /// `bytes` extracted into `<scratch>/b`, with `budget`.
     fn extracted(
         case: &str,
         bytes: &[u8],
@@ -1215,7 +1120,6 @@ mod tests {
         assert_eq!(fs::read(dest.join("mirror/h")).unwrap(), b"export {}");
         assert_eq!(fs::read(dest.join("mirror/deep/er/x")).unwrap(), b"x");
         let mode = |p: &str| fs::metadata(dest.join(p)).unwrap().permissions().mode() & 0o7777;
-        // No setuid bit, the execute bit kept, and the owner may read what it extracted.
         let (run, a) = (mode("mirror/run.sh"), mode("mirror/src/a.ts"));
         assert_eq!((run & 0o7000, run & 0o700), (0, 0o700), "{run:o}");
         assert_eq!((a & 0o111, a & 0o600), (0, 0o600), "{a:o}");
@@ -1293,7 +1197,6 @@ mod tests {
             ],
         );
         assert!(e.contains("through a symbolic link"), "{e}");
-        // Nor over one, or over any earlier entry.
         for item in [
             Item::File(b"mirror/l", b"x"),
             Item::Dir(b"mirror/l"),
@@ -1311,8 +1214,6 @@ mod tests {
         }
     }
 
-    /// Each link stays inside on its own, but one resolves through the other: `s` sits three
-    /// levels down and points at the top, so `s/../..` climbs out of the mirror.
     #[cfg(unix)]
     #[test]
     fn a_link_through_another_link_is_refused() {
@@ -1329,8 +1230,6 @@ mod tests {
         );
     }
 
-    /// A pulled mirror never needs a nested repository: git would run its configuration when
-    /// `git status` descends into it as a submodule.
     #[test]
     fn a_nested_git_directory_file_or_link_is_refused() {
         for item in [
@@ -1375,7 +1274,6 @@ mod tests {
             let e = refused("special", &[Item::Link(b"mirror/dev", kind, b"")]);
             assert!(e.contains("special file"), "{kind:?}: {e}");
         }
-        // A sparse file the tar crate cannot read stops it first; one it can is special.
         let sparse = [Item::Link(b"mirror/dev", EntryType::GNUSparse, b"")];
         assert!(!refused("sparse", &sparse).is_empty());
     }

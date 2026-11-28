@@ -1,5 +1,3 @@
-//! Environment reads resolve only through the workloads running their code (#663).
-
 use crate::common::{assert_golden, fixture_repo};
 use meada::engine::{Direction, Engine, Start};
 
@@ -468,7 +466,6 @@ fn many_workloads_match_only_the_variable_and_code_path_they_run() {
         std::fs::write(app.join(format!("p{group}/compose.yaml")), compose).unwrap();
     }
     std::fs::write(app.join(".github/workflows/build.yml"), format!("jobs:\n  image:\n    steps:\n      - uses: docker/build-push-action@v6\n        with:\n          tags: |\n{images}")).unwrap();
-    // Several files keep each YAML stream below the shared document ceiling.
     let docs = pods
         .split("---\n")
         .filter(|s| !s.is_empty())

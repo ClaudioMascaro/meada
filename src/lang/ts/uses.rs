@@ -1,10 +1,3 @@
-//! The shape facts of the TypeScript and JavaScript pack (spec #23): what the function making
-//! each call does with its result (`Call::uses`), read from the syntax tree while it is at hand.
-//! A value is followed through member and element accesses, method calls, `await`, and a
-//! `const` or destructuring pattern that holds it, the variable of a `for...of` and the element
-//! parameter of an array method's callback, until it is returned or the code does something
-//! else with it (passes it to a function, for one).
-
 use std::collections::{HashMap, HashSet};
 
 use tree_sitter::Node;
@@ -12,21 +5,14 @@ use tree_sitter::Node;
 use super::{BODIES, Parents, bound_nodes, named, text, types, unquote};
 use crate::lang::{Step, Ty};
 
-/// What following values may cost in one file: every node visited, by the climb from a call or
-/// by the scan of a function for a name's uses, and every step copied when a `const` is
-/// followed or a method called. Past it, the file's remaining calls have no uses: they read
-/// nothing, so they give no drift.
 // ponytail: one budget per file; real files spend a few thousand, a crafted chain of `const`s
 // would otherwise cost the square of its length, and a chain of method calls the cube.
 const USES_BUDGET: usize = 1 << 20;
 
-/// How deep a destructuring pattern is followed: a name nested deeper than this many fields or
-/// elements reads nothing, and nor do the names below it.
 // ponytail: real patterns nest a few levels; a crafted one would otherwise write paths as long
 // as the file.
 const PATTERN_DEPTH: usize = 32;
 
-/// The array methods whose callback takes an element first.
 const ELEMENT_METHODS: &[&str] = &[
     "map",
     "forEach",
@@ -40,21 +26,16 @@ const ELEMENT_METHODS: &[&str] = &[
     "flatMap",
 ];
 
-/// The uses of the calls of one file, sharing one budget.
 pub(super) struct Uses<'t> {
     src: &'t [u8],
     up: &'t Parents<'t>,
-    /// The names bound and used in each function (or the whole file), by node id, built when
-    /// a value is first followed into a `const` there.
     scopes: HashMap<usize, Scope<'t>>,
     spent: usize,
 }
 
 #[derive(Default)]
 struct Scope<'t> {
-    /// How many bindings make each name in the function, nested functions included.
     binds: HashMap<&'t str, usize>,
-    /// Each identifier that uses a name, in source order.
     uses: HashMap<&'t str, Vec<Node<'t>>>,
 }
 
@@ -73,14 +54,10 @@ impl<'t> Uses<'t> {
         self.spent <= USES_BUDGET
     }
 
-    /// What `function`, the function whose body holds `call` (or the whole file at the top
-    /// level), does with its result, one chain of steps per use.
     pub(super) fn of(&mut self, call: Node<'t>, function: Node<'t>) -> Vec<Vec<Step>> {
         let mut out = Vec::new();
         let mut followed = HashSet::new();
         let mut pending = vec![(call, Vec::new())];
-        // The type arguments of the call itself (`get<T>(path)`): the function called says
-        // whether they type what it returns.
         if !self.arguments(call, &mut out) {
             return Vec::new();
         }
@@ -97,7 +74,6 @@ impl<'t> Uses<'t> {
                     "as_expression" | "satisfies_expression"
                         if named(parent).next().is_some_and(|c| c.id() == at.id()) =>
                     {
-                        // What the cast declares counts; the reads that follow it go on.
                         let cast = Some(parent).filter(|p| p.kind() == "as_expression");
                         if let Some(t) = cast.and_then(|p| named(p).nth(1))
                             && !self.typed(&steps, t, &mut out)
@@ -114,7 +90,6 @@ impl<'t> Uses<'t> {
                     "subscript_expression" if is("object") => {
                         match parent.child_by_field_name("index") {
                             Some(i) if i.kind() == "number" => steps.push(Step::Element),
-                            // A key holding `.` or `[`, or none, has no spelling in a field path.
                             Some(i) if i.kind() == "string" => match unquote(i, self.src) {
                                 key if key.is_empty() || key.contains(['.', '[']) => break,
                                 key => steps.push(Step::Field(key)),
@@ -124,9 +99,6 @@ impl<'t> Uses<'t> {
                     }
                     "call_expression" if is("function") => match steps.pop() {
                         Some(Step::Field(method)) => {
-                            // `json<T>()`: the type argument declares what the method returns.
-                            // The copy is charged, or every call of a long chain would copy the
-                            // rest of it at each step: the cube of its length.
                             if !self.charge(steps.len()) {
                                 return Vec::new();
                             }
@@ -153,15 +125,12 @@ impl<'t> Uses<'t> {
                             }
                             steps.push(Step::Call(method));
                         }
-                        // The value itself is called: nothing is read from it.
                         _ => {
                             steps.clear();
                             break;
                         }
                     },
-                    // What was read so far counts, and so do the uses of the names it is bound to.
                     "variable_declarator" if is("value") => {
-                        // An annotation declares the type of the variable.
                         if let Some(t) = parent.child_by_field_name("type")
                             && !self.typed(&steps, t, &mut out)
                         {
@@ -176,7 +145,6 @@ impl<'t> Uses<'t> {
                         }
                         break;
                     }
-                    // Each element of the value, bound to the loop variable or pattern.
                     "for_in_statement"
                         if is("right")
                             && (parent.child_by_field_name("operator"))
@@ -217,8 +185,6 @@ impl<'t> Uses<'t> {
         out
     }
 
-    /// The function whose body holds `node`, or the whole file at the top level; `None` past
-    /// the budget.
     fn enclosing(&mut self, node: Node<'t>) -> Option<Node<'t>> {
         let mut at = node;
         while let Some(parent) = self.up.of(at) {
@@ -233,8 +199,6 @@ impl<'t> Uses<'t> {
         Some(at)
     }
 
-    /// Adds the chain `steps` then the type `node` writes, unless it lists no fields. `false`
-    /// past the budget.
     fn typed(&mut self, steps: &[Step], node: Node<'t>, out: &mut Vec<Vec<Step>>) -> bool {
         let mut cost = 0;
         let ty = types::ty(node, self.src, self.up, &mut cost);
@@ -244,8 +208,6 @@ impl<'t> Uses<'t> {
         self.charge(cost)
     }
 
-    /// Adds the chain of the type arguments `call` is given, unless none lists fields. `false`
-    /// past the budget.
     fn arguments(&mut self, call: Node<'t>, out: &mut Vec<Vec<Step>>) -> bool {
         let Some(arguments) = call.child_by_field_name("type_arguments") else {
             return true;
@@ -260,8 +222,6 @@ impl<'t> Uses<'t> {
         self.charge(cost)
     }
 
-    /// The same for the one type argument a method call is given (`json<T>()`): with several,
-    /// which one types the result is not known.
     fn type_argument(&mut self, call: Node<'t>, steps: &[Step], out: &mut Vec<Vec<Step>>) -> bool {
         let arguments = call.child_by_field_name("type_arguments");
         match arguments.map(|a| named(a).collect::<Vec<_>>()) {
@@ -270,9 +230,6 @@ impl<'t> Uses<'t> {
         }
     }
 
-    /// Binds the value read through `steps` to `pattern` in `scope`: each field or element the
-    /// pattern names is a read, and the uses of each name it binds are followed. `false` past
-    /// the budget.
     fn bind(
         &mut self,
         pattern: Node<'t>,
@@ -284,7 +241,6 @@ impl<'t> Uses<'t> {
         let with = |steps: &[Step], step| [steps, &[step]].concat();
         let mut stack = vec![(pattern, steps, 0)];
         while let Some((node, steps, depth)) = stack.pop() {
-            // Past the depth limit nothing below is read.
             if depth > PATTERN_DEPTH {
                 continue;
             }
@@ -306,7 +262,6 @@ impl<'t> Uses<'t> {
                     stack.extend(node.child_by_field_name("left").map(|l| (l, steps, depth)));
                 }
                 "object_pattern" => {
-                    // Every child copies the steps: charged before they are copied.
                     if !self.charge((steps.len() + 1).saturating_mul(node.named_child_count())) {
                         return false;
                     }
@@ -346,11 +301,9 @@ impl<'t> Uses<'t> {
         true
     }
 
-    /// The field a property key of a pattern names, when a field path can write it.
     fn key(&self, key: Node<'t>) -> Option<String> {
         match key.kind() {
             "property_identifier" => Some(text(key, self.src).to_string()),
-            // A key holding `.` or `[`, or none, has no spelling in a field path.
             "string" => {
                 Some(unquote(key, self.src)).filter(|k| !k.is_empty() && !k.contains(['.', '[']))
             }
@@ -358,9 +311,6 @@ impl<'t> Uses<'t> {
         }
     }
 
-    /// The uses of `name`, an identifier a pattern binds, in `scope`: none when anything else in
-    /// the function binds the same name (a parameter, a `catch`, a destructuring, an inner
-    /// `let`, an assignment), since a use may then read another value.
     fn uses_of(&mut self, name: Node<'t>, scope: Node<'t>) -> Vec<Node<'t>> {
         let name = text(name, self.src);
         if !self.scopes.contains_key(&scope.id()) {
@@ -376,12 +326,10 @@ impl<'t> Uses<'t> {
         found.uses.get(name).cloned().unwrap_or_default()
     }
 
-    /// The names `function` binds and uses; `None` past the budget.
     fn scan(&mut self, function: Node<'t>) -> Option<Scope<'t>> {
         let mut scope = Scope::default();
         let mut binding = HashSet::new();
         let mut identifiers = Vec::new();
-        // Explicit stack: generated code can nest deeper than the call stack.
         let mut stack = vec![function];
         while let Some(node) = stack.pop() {
             if !self.charge(1) {
@@ -394,7 +342,6 @@ impl<'t> Uses<'t> {
                 "catch_clause" => node.child_by_field_name("parameter"),
                 "for_in_statement" => node.child_by_field_name("left"),
                 "variable_declarator" => node.child_by_field_name("name"),
-                // A name assigned again may hold another value by the time it is used.
                 "assignment_expression" | "augmented_assignment_expression" => {
                     node.child_by_field_name("left")
                 }
@@ -428,15 +375,12 @@ impl<'t> Uses<'t> {
     }
 }
 
-/// Whether `declarator` is part of a `const` declaration.
 fn is_const(declarator: Node, src: &[u8], up: &Parents) -> bool {
     (up.of(declarator))
         .and_then(|d| d.child_by_field_name("kind"))
         .is_some_and(|k| text(k, src) == "const")
 }
 
-/// The function written in place as the first argument of `call`, and the pattern it takes
-/// its first parameter as.
 fn element_param(call: Node) -> Option<(Node, Node)> {
     let callback = (call.child_by_field_name("arguments")).and_then(|a| named(a).next())?;
     if !BODIES.contains(&callback.kind()) {
@@ -476,7 +420,6 @@ mod tests {
         }
     }
 
-    /// The uses of the fetch in `body`, written as the dotted paths they read after `.json()`.
     fn paths(body: &str) -> Vec<String> {
         let src = format!("async function f() {{\n  const r = await fetch(u);\n{body}\n}}\n");
         let mut out: Vec<String> = (uses(&src).iter())
@@ -506,7 +449,6 @@ mod tests {
             ),
             ["", ".a-b", ".a-b.d", ".id", ".owner.name"]
         );
-        // The names an array pattern binds read elements.
         assert_eq!(
             paths("const [first, { id }] = (await r.json()).items;\n  return first.id;"),
             [".items", ".items[]", ".items[].id", ".items[].id^"]
@@ -515,7 +457,6 @@ mod tests {
 
     #[test]
     fn a_key_the_path_notation_cannot_write_reads_nothing_in_a_pattern() {
-        // An empty key, a key with `.`, and a default that is itself a pattern.
         assert_eq!(
             paths(
                 "const { \"\": x, \"a.b\": y, c: { \"d[0]\": z }, { \"x.y\": q } = 1 } = await r.json();\n  return [x.a, y.b, z.c];"
@@ -526,7 +467,6 @@ mod tests {
 
     #[test]
     fn a_wide_pattern_over_a_long_chain_is_charged_before_it_is_copied() {
-        // Every name copies the steps so far: the product of the two is the cost.
         let names: Vec<String> = (0..30_000).map(|i| format!("a{i}")).collect();
         let chain = ".b".repeat(300);
         assert_eq!(
@@ -548,7 +488,6 @@ mod tests {
             paths("const list = await r.json();\n  for (const { id } of list.items) {}"),
             ["", ".items[]", ".items[].id"]
         );
-        // `for...in` walks keys, not elements.
         assert_eq!(
             paths("for (const k in await r.json()) { use(k.id); }"),
             [""]
@@ -579,8 +518,6 @@ mod tests {
 
     #[test]
     fn a_rebound_name_is_not_the_response() {
-        // A loop variable assigned again, a callback parameter shadowed by an inner one, a
-        // destructured name that a `catch` binds too: the uses of the name read nothing.
         assert_eq!(
             paths(
                 "const list = await r.json();\n  for (let row of list) { row = other(); use(row.gone); }\n  list.map((x) => { const f = (x) => x.nope; return x.id; });\n  const { a } = list;\n  try {} catch (a) { use(a.error); }"
@@ -616,7 +553,6 @@ mod tests {
         };
         let reads = |depth: usize| ".k".repeat(depth);
         assert!(nested(super::PATTERN_DEPTH).contains(&reads(super::PATTERN_DEPTH)));
-        // Past the limit the names read nothing: only the value itself is read.
         assert_eq!(nested(super::PATTERN_DEPTH + 8), [""]);
     }
 
@@ -633,7 +569,6 @@ mod tests {
         let mut want = vec![field("a"); 100];
         want.extend([field("b"), Step::Return]);
         assert!(uses(&chain(100)).contains(&want));
-        // Each `const` copies the steps so far: the cost grows with the square of the chain.
         assert_eq!(uses(&chain(2_000)), Vec::<Vec<Step>>::new());
     }
 
@@ -641,8 +576,6 @@ mod tests {
     fn a_long_method_chain_spends_the_budget_of_the_calls_after_it() {
         let after = |n: usize| uses(&format!("a{};\nfetch(u).json();\n", ".m()".repeat(n)));
         assert_eq!(after(3), [vec![Step::Call("json".into())]]);
-        // Each call of the chain climbs the rest of it, copying the steps read so far at every
-        // call: the cost grows with the cube of the chain.
         assert_eq!(after(600), Vec::<Vec<Step>>::new());
     }
 
@@ -657,7 +590,6 @@ mod tests {
             uses(&(src + "}\n"))
         };
         assert!(!casts(3).is_empty());
-        // Each cast reads its type again: the cost grows with the casts times the type.
         assert_eq!(casts(4_000), Vec::<Vec<Step>>::new());
     }
 
@@ -696,7 +628,6 @@ mod tests {
         for (body, chain) in cases {
             assert!(chains(body).contains(&chain), "{body}: {:?}", chains(body));
         }
-        // The reads after a cast go on; a form with no fields declares nothing.
         let after = chains("return ((await r.json()) as Row).id;");
         assert!(
             after.contains(&vec![json.clone(), typed("Row")]),
@@ -726,7 +657,6 @@ mod tests {
     fn a_type_argument_of_the_call_declares_its_result() {
         let facts = TsJs.parse("a.ts", b"async function f() { return get<Row>(u); }\nasync function g() { return get<A, B>(u); }").unwrap();
         let get: Vec<_> = facts.calls.iter().filter(|c| c.callee == "get").collect();
-        // The type arguments are offered to the wrapper, which says whether they type the result.
         let named = |n: &str| Ty::Named(n.into());
         let row = Step::Argument(vec![named("Row")]);
         assert_eq!(get[0].uses, [vec![row], vec![Step::Return]]);
@@ -736,7 +666,6 @@ mod tests {
 
     #[test]
     fn an_awaited_typed_call_is_used_like_the_untyped_await() {
-        // The grammar reads `await get<Row>(u)` as a call of `await get`.
         let parse = |src: &str| TsJs.parse("a.ts", src.as_bytes()).unwrap();
         let uses = |call: &str| {
             let src = format!("async function f() {{ const d = {call}; return d.a; }}");
@@ -751,7 +680,6 @@ mod tests {
             [vec![row.clone()], read.clone()]
         );
         assert_eq!(uses("await (api.get<Row>(u))"), [vec![row], read]);
-        // A declared type, and a method's type argument, under the same `await`.
         let src = "async function f() { const d: Row = await get<X>(u); }
                    async function g() { const r = await fetch(u); return await r.json<Row>(); }";
         let facts = parse(src);
@@ -761,7 +689,6 @@ mod tests {
         let fetch = facts.calls.iter().find(|c| c.callee == "fetch").unwrap();
         let json = Step::Call("json".into());
         assert!(fetch.uses.contains(&vec![json, typed]), "{:?}", fetch.uses);
-        // The receiver of the awaited call is read, as for the untyped one.
         for call in ["await api.get<Row>(u)", "await api.get(u)"] {
             let facts = parse(&format!("async function f() {{ g({call}); }}"));
             let g = facts.calls.iter().find(|c| c.callee == "g").unwrap();

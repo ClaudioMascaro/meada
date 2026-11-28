@@ -2,7 +2,6 @@ import { coverageText, diagnosticText, sourceText } from './named';
 import type { EffectiveView } from './named';
 import type { NamedCopy } from './named-i18n';
 
-/** The effective configuration of each entry, in text: its source, its coverage and what is ignored or not yet in effect. */
 export function EffectiveList({ view, t, title }: { view: EffectiveView; t: NamedCopy; title?: string }) {
   return <section aria-label={title ?? t.effective}>
     <h3>{title ?? t.effective}</h3>

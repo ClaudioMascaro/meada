@@ -1,4 +1,3 @@
-//! TypeScript runtime globals used as receivers when no binding hides their name.
 //! ponytail: the listed constructors and namespaces are the ceiling for removing candidates.
 
 use super::{Node, Parents, bound, imports, named, text};

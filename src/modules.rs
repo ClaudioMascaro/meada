@@ -1,10 +1,3 @@
-//! The cloud modules' sections of `meada.workspace.toml` (ADR 0012): the table from each section
-//! to the cargo feature that owns it, in every build. A section in a build without its feature
-//! is an error naming the feature; a section the table does not list stays an unknown key.
-//! A module ticket registers its section here and sets `built` to its own `cfg!(feature = ..)`.
-//! The helpers the modules share live here too: the section checks, the loopback test, the
-//! blocking runtime and the secret read from a variable or a file.
-
 use std::path::Path;
 
 use toml::de::DeTable;
@@ -15,7 +8,6 @@ use crate::msg::Msg;
 pub struct Module {
     pub section: &'static str,
     pub feature: &'static str,
-    /// Whether this build has the feature.
     pub built: bool,
 }
 
@@ -87,8 +79,6 @@ pub const MODULES: [Module; 13] = [
     },
 ];
 
-/// The first section of `src`, the content of `file`, whose feature this build lacks. A file
-/// that does not parse passes: the typed read names its syntax error.
 pub fn check(file: &Path, src: &str) -> Result<()> {
     let found = first_key(src, |key| {
         MODULES.iter().find(|m| !m.built && m.section == key)
@@ -101,8 +91,6 @@ pub fn check(file: &Path, src: &str) -> Result<()> {
     Err(located(file, src, at, &what))
 }
 
-/// The error for `section` of `src`, the content of `file`, when the sections it needs that
-/// `missing` names are not there: `[section] needs [missing...]`, at the section's line.
 #[cfg(any(
     feature = "generation-pointer",
     feature = "github-app",
@@ -121,8 +109,6 @@ pub fn needs(file: &Path, src: &str, section: &str, missing: &[&str]) -> Result<
     Err(at_section(file, src, section, &what))
 }
 
-/// The error `what` at the line of `section` in `src`, the content of `file`: `needs`'s place,
-/// for a need its list cannot word (#562: one of two tables).
 #[cfg(any(
     feature = "generation-pointer",
     feature = "github-app",
@@ -134,21 +120,17 @@ pub fn at_section(file: &Path, src: &str, section: &str, what: &str) -> Box<dyn 
     located(file, src, at, what)
 }
 
-/// The first top-level key of `src` that `pick` maps to something, with its offset; `None` for
-/// a file that does not parse.
 fn first_key<T>(src: &str, pick: impl Fn(&str) -> Option<T>) -> Option<(usize, T)> {
     let table = DeTable::parse(src).ok()?;
     (table.get_ref().iter())
         .find_map(|(key, _)| Some((key.span().start, pick(key.get_ref().as_ref())?)))
 }
 
-/// `<file>:<line>: <what>`, the line that of offset `at` of `src`, the content of `file`.
 fn located(file: &Path, src: &str, at: usize, what: &str) -> Box<dyn std::error::Error> {
     let line = crate::config::line_of(src, at);
     format!("{}:{line}: {what}", file.display()).into()
 }
 
-/// A problem with a key of a module section: its dotted name and the message.
 #[cfg(any(
     feature = "valkey",
     feature = "snapshot",
@@ -158,8 +140,6 @@ fn located(file: &Path, src: &str, at: usize, what: &str) -> Box<dyn std::error:
 ))]
 pub type Problem = (&'static str, String);
 
-/// `section` of `src`, the content of `file`, checked by `validate` when the manifest has it; a
-/// problem is an error naming the file, the line and the key.
 #[cfg(any(
     feature = "valkey",
     feature = "snapshot",
@@ -176,8 +156,6 @@ pub fn validated<S, C>(
         .map_err(|(key, problem)| crate::config::error_at(file, src, key, &problem))
 }
 
-/// An optional integer setting at `key`: `value`, or `default` when unset, if it is at least
-/// `min`; else `Msg::AtLeast`.
 #[cfg(any(
     feature = "generation-pointer",
     feature = "oidc",
@@ -206,8 +184,6 @@ pub enum Secret {
 
 #[cfg(any(feature = "valkey", feature = "snapshot", feature = "postgres"))]
 impl Secret {
-    /// The secret the `env` and `file` keys of a section name (`file` relative to `base`):
-    /// `None` when neither does, the `both` problem when both do.
     pub fn named(
         env: Option<String>,
         file: Option<String>,
@@ -222,7 +198,6 @@ impl Secret {
         }
     }
 
-    /// Its value, read now: `None` for an unset variable, a file through `read_secret`.
     pub fn read(&self, max: u64) -> std::result::Result<Option<String>, String> {
         match self {
             Self::Env(var) => Ok(std::env::var(var).ok()),
@@ -231,24 +206,18 @@ impl Secret {
     }
 }
 
-/// The regular file `path` (`config::read_bounded`, at most `max` bytes) as UTF-8. An error
-/// names the file, never what it holds.
 #[cfg(any(feature = "valkey", feature = "snapshot", feature = "postgres"))]
 pub fn read_utf8(path: &Path, max: u64) -> std::result::Result<String, String> {
     let bytes = crate::config::read_bounded(path, max)?;
     String::from_utf8(bytes).map_err(|_| format!("{}: not UTF-8", path.display()))
 }
 
-/// The secret file `path`: `read_utf8` without the editor's trailing newline.
 #[cfg(any(feature = "valkey", feature = "snapshot", feature = "postgres"))]
 pub fn read_secret(path: &Path, max: u64) -> std::result::Result<String, String> {
     let text = read_utf8(path, max)?;
     Ok(text.trim_end_matches(['\n', '\r']).to_string())
 }
 
-/// `run` to its end on a current-thread runtime of its own, then shut down without waiting:
-/// dropping it would wait for a blocking thread still in a DNS lookup or a file read, for as long
-/// as the resolver or the mount takes.
 #[cfg(any(feature = "valkey", feature = "snapshot", feature = "postgres"))]
 pub fn block_on<T>(run: impl Future<Output = T>) -> std::io::Result<T> {
     let runtime = (tokio::runtime::Builder::new_current_thread())
@@ -259,24 +228,17 @@ pub fn block_on<T>(run: impl Future<Output = T>) -> std::io::Result<T> {
     Ok(out)
 }
 
-/// Runs `ask` to completion on its own short-lived runtime and returns its answer within `bound`,
-/// else the `timeout` message of `bound` in milliseconds. It bounds any async call to an external
-/// service (Valkey, the store, a `meada status` probe) on a request path, in a poll or in a job;
-/// see "Service deadlines" in `CODING_STANDARDS.md`.
 #[cfg(any(feature = "valkey", feature = "snapshot", feature = "postgres"))]
 pub fn within<T>(
     bound: std::time::Duration,
     ask: impl Future<Output = std::result::Result<T, String>>,
     timeout: fn(u64) -> Msg<'static>,
 ) -> std::result::Result<T, String> {
-    // The timer is made on the runtime: one made before it would find no reactor.
     let answer = block_on(async { tokio::time::timeout(bound, ask).await });
     let answer = answer.map_err(|e| e.to_string())?;
     answer.unwrap_or_else(|_| Err(timeout(bound.as_millis() as u64).text()))
 }
 
-/// The HTTP client of a module's outbound calls: no redirect, no proxy, `timeout` for each request
-/// from connection to last byte, and the system's roots for `https`.
 #[cfg(any(feature = "oidc", feature = "github-app"))]
 pub fn agent(timeout: std::time::Duration) -> ureq::Agent {
     let tls = ureq::tls::TlsConfig::builder()
@@ -292,9 +254,6 @@ pub fn agent(timeout: std::time::Duration) -> ureq::Agent {
         .into()
 }
 
-/// Whether `host`, as a URL names it (an IPv6 address with or without its brackets), is
-/// loopback: `localhost`, `127.0.0.0/8` or `::1`. A name that only starts like one, and an
-/// IPv4-mapped address, are not.
 #[cfg(any(
     feature = "valkey",
     feature = "snapshot",
@@ -310,22 +269,15 @@ pub fn loopback(host: &str) -> bool {
             .is_ok_and(|ip| ip.is_loopback())
 }
 
-/// What a module's endpoint URL may hold past its host.
 #[cfg(any(feature = "oidc", feature = "github-app", feature = "ui"))]
 #[derive(Clone, Copy, PartialEq)]
 pub enum Shape {
-    /// A path (`[oidc]` `issuer`, `[[github_app]]` `api`).
     #[cfg(any(feature = "oidc", feature = "github-app"))]
     Path,
-    /// Nothing (`[oidc]` and `[ui]` `public_url`).
     Bare,
-    /// A path and a query (the OIDC metadata's `jwks_uri`).
     Query,
 }
 
-/// Whether `url` is an endpoint a module may name: `https`, or `http` on loopback
-/// (`localhost`, `127.0.0.0/8`, `::1`; an IPv4-mapped address is not loopback), with a host, no
-/// user and no fragment, and past its host what `shape` allows.
 #[cfg(any(feature = "oidc", feature = "github-app", feature = "ui"))]
 pub fn reachable(url: &str, shape: Shape) -> bool {
     let Ok(uri) = url.parse::<ureq::http::Uri>() else {
@@ -350,16 +302,11 @@ pub fn reachable(url: &str, shape: Shape) -> bool {
     }
 }
 
-/// Who runs a command that writes, as its record and its author name them: `cli:<login>@<host>`,
-/// the login and host from the system with the refresh lock's system calls, else from the
-/// environment.
 #[cfg(feature = "refresh-lock")]
 pub fn cli_author() -> String {
     crate::snapshot::lock::cli_author()
 }
 
-/// Who runs a command that writes: `cli:<login>@<host>`, from the environment in a build without
-/// the refresh lock's system calls.
 #[cfg(all(
     not(feature = "refresh-lock"),
     any(
@@ -374,15 +321,12 @@ pub fn cli_author() -> String {
     format!("cli:{login}@{}", host.to_lowercase())
 }
 
-/// The seconds since the Unix epoch.
 #[cfg(any(feature = "generation-pointer", feature = "oidc"))]
 pub fn now() -> u64 {
     let since = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
     since.map_or(0, |d| d.as_secs())
 }
 
-/// `secs` since the epoch in RFC 3339, UTC, to the second (the civil date by Howard Hinnant's
-/// algorithm, years starting in March).
 #[cfg(any(feature = "generation-pointer", all(feature = "oidc", feature = "ui")))]
 pub fn rfc3339(secs: u64) -> String {
     let (days, day) = ((secs / 86_400) as i64, secs % 86_400);
@@ -399,8 +343,6 @@ pub fn rfc3339(secs: u64) -> String {
     format!("{y:04}-{m:02}-{d:02}T{h:02}:{min:02}:{s:02}Z")
 }
 
-/// `identity` as GitHub compares it: lowercase when it is on `host`, as written on any other
-/// host. Only the comparison folds; a row stays keyed by the identity as written.
 #[cfg_attr(
     not(all(feature = "github-app", feature = "postgres", feature = "oidc")),
     expect(dead_code)
@@ -429,7 +371,6 @@ mod tests {
             err,
             "m.toml:3: [snapshot] needs a Meada built with the snapshot feature"
         );
-        // A module's feature may be named otherwise than its section.
         let err = check(Path::new("m.toml"), "[generations]\n")
             .unwrap_err()
             .to_string();

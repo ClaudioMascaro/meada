@@ -1,8 +1,3 @@
-//! A CI step that runs a console script of the workspace (#832, ADR 0028): the step is a
-//! consumer of the script's package and links to the program entry point the script names, at
-//! the level its evidence gives, never above `inferred` while the package is matched by its
-//! name alone (ADR 0029). `trace` crosses the link both ways.
-
 use std::fs;
 use std::path::PathBuf;
 
@@ -20,20 +15,13 @@ const CLI: &str = "core_sdk/cli.py";
 const TOOLS_CLI: &str = "tools/core_tools/cli.py";
 const INSTALLED: &str = "its package installed earlier in the CI job";
 const NOT_INSTALLED: &str = "no install of its package earlier in the CI job";
-/// What the reason of a link from a CI step says first when the name alone matched (ADR 0029).
 const BY_NAME: &str = "the name alone matched";
-/// The SDK's call to the API, a link Meada found before #832: the base URL is read from the
-/// environment, whatever the pipeline sets it to.
 const HTTP: &str =
     "inferred: base URL from CORE_API_URL, a base_url_env of peer github.com/acme/core-api";
-/// The link from the CI step of `publish.yml` that runs `core-publish` to its program.
 const RUNS: &str = "inferred: the name alone matched; package::pypi::core-sdk none (local 1.0.0), \
                     range unchecked; console script core-publish, its package installed earlier \
                     in the CI job";
 
-/// The chain of F2 as siblings in one case directory: the API, the SDK whose console scripts
-/// call it, the reusable pipeline that runs them, and the callers of #816's reproduction
-/// (`acme/app-a`, and `acme/app-c` through `acme/wrapper`).
 fn chain(case: &str) -> [PathBuf; 6] {
     [
         ("core-api", "core-api"),
@@ -53,7 +41,6 @@ fn program(path: &str, function: &str) -> String {
     format!("{SDK}::{path}::{function}")
 }
 
-/// The `(consumer address, provider, level)` of every link that leaves a CI node of `file`.
 fn links(export: &Value, file: &str) -> Vec<(String, String, String)> {
     let own = format!("{WORKFLOWS}::{file}::");
     let rows = export["links"].as_array().into_iter().flatten();
@@ -65,7 +52,6 @@ fn links(export: &Value, file: &str) -> Vec<(String, String, String)> {
     .collect()
 }
 
-/// The reason of the link from the CI node `address` of `file` to `provider`.
 fn reason(export: &Value, file: &str, address: &str, provider: &str) -> String {
     let consumer = format!("{WORKFLOWS}::{file}::{address}");
     let rows = export["links"].as_array().unwrap().iter();
@@ -76,7 +62,6 @@ fn reason(export: &Value, file: &str, address: &str, provider: &str) -> String {
     found[0]["reason"].as_str().unwrap().to_string()
 }
 
-/// The `(address, contract, via)` of the consumer rows at the CI nodes of `file`.
 fn sides(export: &Value, file: &str) -> Vec<(String, String, Option<String>)> {
     let own = format!("{WORKFLOWS}::{file}::");
     let rows = export["consumers"].as_array().into_iter().flatten();
@@ -93,7 +78,6 @@ fn traced(engine: &Engine, from: &str, direction: Direction) -> String {
     engine.trace(Start::From(from), direction, None).unwrap()
 }
 
-/// The level table of #832, one CI job of `programs.yml` per row.
 #[test]
 fn a_program_link_has_the_level_its_evidence_gives() {
     let [_, _, workflows, ..] = chain("ci_program_levels");
@@ -105,10 +89,6 @@ fn a_program_link_has_the_level_its_evidence_gives() {
         format!("{SDK}::pyproject.toml"),
         format!("{SDK}::tools/pyproject.toml"),
     );
-    // Every link that leaves the file: an install links to its package's manifest, a console
-    // script to its program, and `jobs.outside` (a command no package declares) to nothing.
-    // The package is matched by its name alone, so no link is above `inferred` (ADR 0029): the
-    // evidence of an install still picks the package among those that declare the script.
     let mut expected = vec![
         row("jobs.earlier_step.steps[0]", tools.clone(), "inferred"),
         row(
@@ -124,7 +104,6 @@ fn a_program_link_has_the_level_its_evidence_gives() {
         ),
         row("jobs.by_package.steps[0]", program(CLI, "main"), "inferred"),
         row("jobs.by_package.steps[1]", program(CLI, "main"), "inferred"),
-        // `uvx core-tools`: the package declares no script of its own name.
         row("jobs.no_script.steps[0]", tools.clone(), "inferred"),
         row(
             "jobs.no_install.steps[0]",
@@ -163,7 +142,6 @@ fn a_program_link_has_the_level_its_evidence_gives() {
     let mut found = links(&export, PROGRAMS);
     found.sort();
     assert_eq!(found, expected);
-    // The reason names the script and the evidence, after the package's own reason.
     let said = |address: &str, provider: &str| reason(&export, PROGRAMS, address, provider);
     assert_eq!(
         said(
@@ -174,7 +152,6 @@ fn a_program_link_has_the_level_its_evidence_gives() {
             "{BY_NAME}; package::pypi::core-tools none (local 0.2.0), range unchecked; console script core-lint, {INSTALLED}"
         )
     );
-    // The range is the install's.
     assert_eq!(
         said("jobs.earlier_line.steps[0]", &program(CLI, "health_main")),
         format!(
@@ -201,8 +178,6 @@ fn a_program_link_has_the_level_its_evidence_gives() {
     );
 }
 
-/// A name that more packages declare than the limit (`MAX_DECLARING`, 8) tells nothing: the CI
-/// step holds no side, where eight packages give it an `ambiguous` link each.
 #[test]
 fn a_script_name_too_many_packages_declare_gives_no_side() {
     let file = ".github/workflows/many.yml";
@@ -236,9 +211,6 @@ fn a_script_name_too_many_packages_declare_gives_no_side() {
     assert_eq!(sides(&export, file), []);
 }
 
-/// A word the shell does not run is no command: the pattern of a `case` and the name of a
-/// function a script defines give no side, whatever console script they are named like. A
-/// script the CI step runs on two lines is one row and one link.
 #[test]
 fn a_case_pattern_or_a_function_name_runs_no_program_and_a_script_run_twice_links_once() {
     let [_, _, workflows, ..] = chain("ci_program_words");
@@ -302,9 +274,6 @@ jobs:
     );
 }
 
-/// The program link is never stronger than the package link it continues: a package of the CI
-/// step's own repository is `inferred` (the package kind's rule for an entry with no source),
-/// install or not.
 #[test]
 fn a_program_of_the_ci_steps_own_repository_links_inferred() {
     let [_, sdk, ..] = chain("ci_program_own");
@@ -324,7 +293,6 @@ fn a_program_of_the_ci_steps_own_repository_links_inferred() {
         })
         .collect();
     found.sort();
-    // The package kind's own reason for an install with no source in the package's repository.
     let package = "no uv source names the local package, the registry package is the likely \
                    provider; package::pypi::core-sdk none (local 1.0.0), range unchecked";
     assert_eq!(
@@ -344,7 +312,6 @@ fn a_program_of_the_ci_steps_own_repository_links_inferred() {
     );
 }
 
-/// The command is recorded as written on the consumer row, after `run`.
 #[test]
 fn a_program_consumer_records_its_command_as_text() {
     let [_, _, workflows, ..] = chain("ci_program_sides");
@@ -384,9 +351,7 @@ fn a_program_consumer_records_its_command_as_text() {
         at("jobs.by_package.steps[1]"),
         [("core-sdk", Some("run pipx run core-sdk status"))]
     );
-    // A package run by its name with no script of that name: a consumer, as an install is.
     assert_eq!(at("jobs.no_script.steps[0]"), [("core-tools", None)]);
-    // A script two packages declare: a consumer of each.
     assert_eq!(
         at("jobs.declared_twice.steps[0]"),
         [
@@ -395,7 +360,6 @@ fn a_program_consumer_records_its_command_as_text() {
         ]
     );
     assert_eq!(at("jobs.outside.steps[0]"), []);
-    // No open item: a command no package declares is silent.
     let unresolved = export["consumers"].as_array().unwrap().iter();
     assert_eq!(unresolved.filter(|c| c["contract"].is_null()).count(), 0);
     assert_golden(
@@ -404,8 +368,6 @@ fn a_program_consumer_records_its_command_as_text() {
     );
 }
 
-/// `context` shows the link from both ends of the package contract: the CI step names the
-/// program it starts, and the package lists a CI step that installs it and runs its script once.
 #[test]
 fn context_shows_the_program_on_the_ci_step_and_the_ci_step_once_on_the_package() {
     let [_, _, workflows, ..] = chain("ci_program_context");
@@ -422,8 +384,6 @@ fn context_shows_the_program_on_the_ci_step_and_the_ci_step_once_on_the_package(
     assert_eq!(listed, 1, "{answer}");
 }
 
-/// The acceptance of F2: upward from the API's route, through the SDK's program and the
-/// reusable pipeline that runs it, to the CI jobs that call the pipeline.
 #[test]
 fn trace_up_from_a_route_reaches_the_ci_jobs_that_run_its_caller() {
     let [api, _, workflows, wrapper, ..] = chain("ci_program_trace_up");
@@ -439,7 +399,6 @@ fn trace_up_from_a_route_reaches_the_ci_jobs_that_run_its_caller() {
         [
             "github.com/acme/core-api app/main.py:6 register_package".to_string(),
             format!("  →[{HTTP}] {SDK} {CLI}:10 publish_main"),
-            // The job of the level table that installs the package after it runs the script.
             format!(
                 "    →[inferred: package::pypi::core-sdk none (local 1.0.0), range unchecked; console script core-publish, {NOT_INSTALLED}] {WORKFLOWS} {PROGRAMS}:48 jobs.later.steps[0]"
             ),
@@ -463,13 +422,10 @@ fn trace_up_from_a_route_reaches_the_ci_jobs_that_run_its_caller() {
         ],
         "{answer}"
     );
-    // The weakest level of the chain is the HTTP link's, as before #832.
     let footer = answer.lines().last().unwrap();
     assert!(footer.starts_with("chain: inferred · "), "{answer}");
 }
 
-/// Downward from a CI job that calls the pipeline: into the program's process, and on to the
-/// route it calls.
 #[test]
 fn trace_down_from_a_ci_job_enters_the_program_its_pipeline_runs() {
     let [_, _, workflows, wrapper, _, app_c] = chain("ci_program_trace_down");

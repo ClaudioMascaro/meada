@@ -1,6 +1,3 @@
-# The binary's crate at the root, and `meada-core` (ADR 0014): `meada` depends on `meada-core` at
-# exactly its version, and `meada-core` is published first. Since 1.6.0 the crate keeps its own
-# version: its public enums gained variants, a major of the crate (`docs/site/en/stability.md`).
 [workspace]
 members = [".", "meada-core"]
 default-members = [".", "meada-core"]
@@ -30,70 +27,43 @@ exclude = [".github/", "AGENTS.md", "CLAUDE.md", "dist-workspace.toml"]
 workspace = true
 
 [dependencies]
-# The local accounts' password hashes (ADR 0024), only behind `accounts`: argon2id, its salt from
-# the operating system's generator.
 argon2 = { version = "=0.5.3", optional = true, default-features = false, features = [
     "alloc",
     "password-hash",
     "rand",
 ] }
-# The salt of a hash from the operating system's generator (`OsRng`), only behind `accounts`.
 password-hash = { version = "=0.5.0", optional = true, default-features = false, features = [
     "getrandom",
 ] }
-# The transport guard of the snapshot store (ADR 0012), only behind `snapshot`: object_store's
-# `HttpService` is an `async_trait`.
 async-trait = { version = "=0.1.92", optional = true }
 blake3 = "1.8.7"
 clap = { version = "4.6.7", features = ["derive"] }
-# A bundle's download as a stream (`meada snapshot pull`), only behind `snapshot`. rmcp already
-# brings it into the default build, so it is no canary of the module.
 futures = { version = "0.3.34", optional = true, default-features = false, features = ["std"] }
-# Terraform and OpenTofu files (ADR 0025): `hcl-edit` parses with a span for every node, `hcl-rs`
-# evaluates a template that holds literals only (a heredoc), so the value is the string HCL reads.
 hcl-edit = "0.10.0"
 hcl-rs = "0.20.0"
-# The listener under rmcp's streamable HTTP server, which is a service with none (server mode).
 http-body-util = "0.1.3"
 hyper = { version = "1.9.0", features = ["server", "http1"] }
 hyper-util = { version = "0.1.21", features = ["tokio"] }
 ignore = "0.4.33"
-# At the workspace's version, exactly: bump both together.
 meada-core = { path = "meada-core", version = "=2.0.0" }
-# The OIDC module's JWT validation (ADR 0012), only behind `oidc`, and the GitHub App module's
-# JWT signing (ADR 0013), only behind `github-app`, and the local accounts' Ed25519 tokens (ADR
-# 0024), only behind `accounts`: RustCrypto as its backend, since the other, aws-lc-rs, would be a
-# second rustls provider beside ring. PEM reading (`use_pem`) only with `github-app` and
-# `accounts`, whose keys are PEM files; OIDC keys come as JWKs.
 jsonwebtoken = { version = "=11.1.0", optional = true, default-features = false, features = [
     "rust_crypto",
 ] }
-# The values cache's entries (ADR 0027), deflated in the zlib format: pure Rust, and its one
-# dependency (adler2) computes that format's checksum.
 miniz_oxide = "0.8.9"
 nodejs-semver = "7"
-# The snapshot store's S3 client (ADR 0012), only behind `snapshot`: no default features (no
-# local file store), the `aws` client with ring for its signatures. `aws` itself would bring
-# aws-lc-rs, a second rustls provider beside ring, and rustls then panics on the first TLS
-# connection of a build with every module.
 object_store = { version = "=0.14.2", optional = true, default-features = false, features = [
     "aws-base",
     "reqwest",
     "ring",
 ] }
 percent-encoding = "2.3.2"
-# Alertmanager label matchers use bounded, anchored regular expressions.
 regex = "1.13.1"
 regex-syntax = "0.8.11"
-# The Valkey client of the cloud modules (ADR 0012), only behind the internal `valkey` feature.
-# Default features off: no native-tls, only rustls.
 redis = { version = "=1.7.1", optional = true, default-features = false, features = [
     "tokio-rustls-comp",
     "cluster-async",
     "connection-manager",
 ] }
-# The HTTP client under object_store, built by the snapshot module itself: no redirect, no proxy,
-# and rustls with no provider of its own: the module hands it a ring configuration.
 reqwest = { version = "=0.13.5", optional = true, default-features = false, features = [
     "rustls-no-provider",
 ] }
@@ -103,33 +73,21 @@ rmcp = { version = "3.5.1", features = [
     "transport-io",
     "transport-streamable-http-server",
 ] }
-# The TLS configuration of the snapshot store and of Postgres, only behind `snapshot` and
-# `postgres`: ring, the one rustls provider of every build (ureq and redis use it too), and the
-# system's roots.
 rustls = { version = "0.23.46", optional = true, default-features = false, features = [
     "ring",
     "std",
     "tls12",
 ] }
 rustls-platform-verifier = { version = "0.7.1", optional = true }
-# The hash of Postgres's SCRAM channel binding (`tls-server-end-point`), only behind `postgres`:
-# ring is already rustls's provider in every build.
 ring = { version = "0.17.14", optional = true }
-# Maven POMs and .NET project files: read-only XML, DTD disabled and bounded by the JVM reader's
-# limits. Not quick-xml: it is in the lockfile only through the optional `snapshot` feature
-# (`object_store`), and the default dependency tree forbids it.
 roxmltree = "0.21.1"
 rusqlite = { version = "0.40.2", features = ["bundled"] }
 schemars = "1.2.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
-# The snapshot store's bundles (ADR 0012), only behind `snapshot`: no extended attributes.
 tar = { version = "=0.4.46", optional = true, default-features = false }
 toml = "1.1.8"
-# The Postgres client of the data layer (ADR 0016), only behind `postgres`: no `runtime` feature,
-# since the module opens the TCP stream itself and hands it over with `connect_raw`.
 tokio-postgres = { version = "=0.7.18", optional = true, default-features = false }
-# Postgres's TLS, only behind `postgres`: rustls with ring (no default features, so no aws-lc-rs).
 tokio-rustls = { version = "0.26.6", optional = true, default-features = false, features = [
     "ring",
 ] }
@@ -139,26 +97,18 @@ tree-sitter-c-sharp = "0.23.5"
 tree-sitter-go = "0.25.0"
 tree-sitter-java = "0.23.5"
 tree-sitter-javascript = "0.25.0"
-# The vendored Kotlin grammar's `LanguageFn` (`build.rs`, ADR 0017).
 tree-sitter-language = "0.1.9"
 tree-sitter-python = "0.25.0"
 tree-sitter-rust = "0.24.2"
 tree-sitter-swift = "0.7.4"
 tree-sitter-typescript = "0.23.2"
-# Terraform and OpenTofu hold every string in Unicode NFC (#749). Already in the lockfile through
-# `stringprep`, at the same version.
 unicode-normalization = "0.1.26"
 ureq = { version = "3.4.2", default-features = false, features = ["rustls"] }
 yaml-rust2 = { version = "0.13.0", default-features = false }
 
-# The refresh lock's child supervision (`meada snapshot lock`), only behind `refresh-lock` and
-# Unix only: a signal to the child's process group and, on Linux, the signal the child gets when
-# `lock` dies; the host name and the login the lock's holder names.
 [target.'cfg(unix)'.dependencies]
 nix = { version = "=0.31.3", optional = true, default-features = false, features = ["signal", "hostname", "user"] }
 
-# Cloud modules (ADR 0012), all off by default: a build without a feature carries none of its
-# crates. `valkey` is internal, enabled through the modules that need it.
 [features]
 valkey = ["dep:redis"]
 snapshot = [
@@ -170,19 +120,10 @@ snapshot = [
     "dep:rustls",
     "dep:rustls-platform-verifier",
 ]
-# The current and retained generations in Valkey, and pins (`[generations]`); `nix` names the host
-# in the heartbeat.
 generation-pointer = ["snapshot", "valkey", "dep:nix"]
-# The refresh lock and its fencing tokens (`[refresh_lock]`, `meada snapshot lock`).
 refresh-lock = ["generation-pointer"]
-# Meada as an OAuth resource server (`[oidc]`): the issuer's metadata and JWKS come through the
-# binary's own ureq client, which then verifies certificates against the system's roots.
 oidc = ["dep:jsonwebtoken", "ureq/platform-verifier"]
-# git's credential helper with GitHub App installation tokens (`[[github_app]]`, ADR 0013): the
-# App's JWT signed from its PEM key, its REST calls through the binary's own ureq client.
 github-app = ["valkey", "dep:jsonwebtoken", "jsonwebtoken/use_pem", "ureq/platform-verifier"]
-# The data layer (`[postgres]`, `meada postgres migrate`, ADR 0016): an asynchronous Postgres
-# client over the binary's tokio runtime and rustls with ring.
 postgres = [
     "dep:tokio-postgres",
     "dep:tokio-rustls",
@@ -190,14 +131,8 @@ postgres = [
     "dep:rustls",
     "dep:rustls-platform-verifier",
 ]
-# The directory (`[directory]`, ADR 0016): a SCIM 2.0 endpoint on the console's listener, its
-# users and groups in the data layer. No crate beyond `postgres`'s.
 directory = ["postgres"]
-# The management console (`[ui]`, `meada ui`, ADR 0014): the node's hyper listener and
-# serde_json. No crate of its own.
 ui = []
-# Named workspaces (ADR 0020, 0021): the catalog of repositories a maintainer may select
-# (`[catalog]`, #341) and, in the slices after it, the workspaces themselves. No crate of its own.
 workspaces = [
     "ui",
     "oidc",
@@ -206,12 +141,7 @@ workspaces = [
     "generation-pointer",
     "refresh-lock",
 ]
-# The proposal server (ADR 0022, `[proposals]`, `meada workspaces mcp`): the named workspaces'
-# discovery, validation and stateless proposals over MCP, for agents. No crate of its own.
 proposals = ["workspaces"]
-# Local accounts (ADR 0024, `[accounts]`): the console's sign-in and its Ed25519 session and agent
-# tokens, over the OIDC module's JWT code and grant providers and the data layer; `argon2` hashes
-# the passwords. `ui` too: a node checks an agent token's issuer, the console's `[ui] public_url`.
 accounts = [
     "ui",
     "oidc",
@@ -220,7 +150,6 @@ accounts = [
     "dep:password-hash",
     "jsonwebtoken/use_pem",
 ]
-# Every cloud module at once (ADR 0012). Unix only, since `refresh-lock` is.
 cloud = [
     "snapshot",
     "generation-pointer",
@@ -235,7 +164,6 @@ cloud = [
     "accounts",
 ]
 
-# `cargo test` runs the example's own tests too.
 [[example]]
 name = "golden_diff"
 test = true
@@ -244,12 +172,10 @@ test = true
 name = "split_agents"
 test = true
 
-# The vendored Kotlin grammar's C sources (ADR 0017).
 [build-dependencies]
 cc = "1.8.0"
 
 [dev-dependencies]
-# The OIDC tests' signing keys, generated in the test: ring is every build's rustls provider.
 ring = "0.17.14"
 rmcp = { version = "3.5.1", features = [
     "client",
@@ -257,25 +183,17 @@ rmcp = { version = "3.5.1", features = [
     "transport-streamable-http-client-reqwest",
 ] }
 
-# The profile that 'dist' will build with
 [profile.dist]
 inherits = "release"
 lto = "thin"
 
-# Keep indexing and contract code compact in development builds as the graph grows.
-# This also avoids paying for unoptimized serialization code on every CLI invocation.
 [profile.dev.package.meada]
 opt-level = 1
 
-# The argon2id hashes of local accounts (ADR 0024) at full speed in debug builds too: unoptimised,
-# one 19 MiB hash takes a large part of a second, and the console's tests hash many, some in a row
-# under one account's lock.
 [profile.dev.package.argon2]
 opt-level = 3
 [profile.dev.package.blake2]
 opt-level = 3
 
-# The values cache's deflate at full speed in debug builds too: unoptimised, a cold index of a
-# large repository spends seconds compressing entries that a release build writes in a fraction.
 [profile.dev.package.miniz_oxide]
 opt-level = 3

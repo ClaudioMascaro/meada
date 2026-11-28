@@ -1,7 +1,3 @@
-//! Entry points and their processes (spec #31): `meada export` carries each repository's
-//! processes, and `trace` reads one from `process::<entry point identity>`, over the chain
-//! fixture.
-
 use crate::common;
 
 use std::fs;
@@ -45,7 +41,6 @@ fn a_route_handler_is_no_export_entry_point() {
 
     let found = processes(&gateway);
 
-    // `listOrders` is exported and nothing calls it: it is the entry point of its route only.
     assert!(found.contains("\"entry_point\": \"example.com/chain/gateway::src/orders.ts::listOrders::http::GET::/api/orders\""));
     assert!(
         !found
@@ -102,7 +97,6 @@ fn an_ambiguous_call_is_one_step_listing_its_candidates() {
     let found = processes(&catalog);
 
     assert_golden("chain.trace-process-ambiguous.txt", &answer);
-    // The two methods have an ambiguous caller, so neither is an entry point.
     assert!(
         !found.contains(
             "\"entry_point\": \"example.com/chain/catalog::lib/ambiguous.ts::Cache.get\""
@@ -153,7 +147,6 @@ fn only_the_process_form_starts_a_process() {
         None,
     );
     let up = trace(&gateway, LIST_ORDERS, Direction::Up, None);
-    // The entry point's handler, named plainly, is an ordinary symbol start.
     let plain = trace(&gateway, "listOrders", Direction::Down, None);
 
     assert_golden("chain.trace-process-none.txt", &none);
@@ -188,7 +181,6 @@ fn a_symbol_reached_from_two_branches_is_expanded_once() {
 fn an_ambiguous_link_is_one_step_listing_its_providers() {
     let (web, _, _) = chain("processes_ambiguous_link");
 
-    // `dashboard` calls `/api/health`, which two gateway handlers serve: neither is followed.
     let found: serde_json::Value = serde_json::from_str(&processes(&web)).unwrap();
     let steps = found
         .as_array()
@@ -292,7 +284,6 @@ fn a_channel_handler_is_a_channel_entry_point_and_no_export() {
     assert_golden("chain-worker.processes.json", &found);
     assert!(found.contains("\"kind\": \"channel\""));
     assert!(found.contains("\"label\": \"channel::kafka::orders.created\""));
-    // No export entry point has the handler as its identity (its channel one ends in `::`).
     assert!(!found.contains(
         "\"entry_point\": \"example.com/chain/worker::src/consumer.ts::onOrderCreated\""
     ));

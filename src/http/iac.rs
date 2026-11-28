@@ -1,5 +1,3 @@
-//! IaC providers use evaluated route facts and indexing-time validated handler modules.
-
 use crate::contract::ConfigFacts;
 use crate::index::{Export, Provider};
 use crate::workspace::Repository;
@@ -101,7 +99,6 @@ pub(super) fn symbols(repo: &Repository, export: &Export) -> Vec<String> {
 
 type Aliases<'a> = HashMap<(&'a str, &'a str), Option<(&'a str, &'a str)>>;
 
-/// Stored exact exports resolve aliases/re-exports; conflicting or opaque exports stay open.
 fn aliases(exported: &[crate::resolve::Exported]) -> Aliases<'_> {
     let mut aliases = HashMap::new();
     for row in exported {

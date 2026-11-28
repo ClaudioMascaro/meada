@@ -1,26 +1,3 @@
-//! actix-web and Rocket providers (spec #30); the axum rules live in `rust/axum.rs`. A handler is
-//! a function a route attribute sits on (`#[get("/x")]`, the pack emits it as a call that
-//! decorates the function) or a function a route builder names
-//! (`.route(path, web::get().to(h))`). Where it is served follows the value of the app, scope,
-//! resource or Rocket instance it is registered on, through the same mounts and prefixes as axum
-//! (`prefixes`): a `web::scope(prefix)` is mounted under the prefix of what takes it, a
-//! `.configure(f)` mounts the service configuration `f` receives, and
-//! `mount(prefix, routes![a, b])` puts the listed handlers under the prefix.
-//!
-//! What a value is made by is asked once, `Code::origins` with `Follow::Values`: the calls the
-//! flow reaches, each with the name it has outside the repository. That name is read as a path
-//! (`Code::outside` with the call's `by_path`), so a function of the file spelled like a crate
-//! (`fn rocket()` calling `rocket::build()`) does not hide the crate. A route attribute and a
-//! builder the reader meets in place are read the same way; a type written on a parameter is
-//! read as a value (`Code::outside` without the flag).
-//!
-//! A handler is a node of its own: one a call names (as an argument, `routes![..]` included)
-//! is served only where a mount Meada reads puts it, and nowhere when it reads none. One no call
-//! names is served at its own path, with no prefix.
-//!
-//! The frameworks and clients are this module's table (`frameworks`). The one constant a kind
-//! reads from the Rust pack is `VERBS`, the verbs its parse-time fold of `Method::GET` knows.
-
 mod axum;
 pub(super) mod frameworks;
 
@@ -37,17 +14,12 @@ use crate::lang::{Call, Class, Import, Imported, Receiver, Value};
 use crate::resolve::{Code, Follow, Of, Outside, scope_of};
 use frameworks::Made;
 
-/// How many values the expansions of `items` (constants, the functions a call answers) may add,
-/// over every call of the repository; past it a list is read no further.
 // ponytail: a crafted repository must not make every call expand a long constant; what is
 // left unread is taken as registered where Meada does not see it, so it is served nowhere.
 const ITEM_WORK: usize = 1 << 14;
 
-/// The methods `actix_web::web` has a route builder for: `web::get()`, `web::post()`.
 const METHODS: &[&str] = &["get", "post", "put", "patch", "delete", "head", "trace"];
 
-/// What the outside name of a call makes, when it makes an app, a scope, a resource or a Rocket
-/// instance.
 fn made_of(outside: &Outside) -> Option<Made> {
     let made = frameworks::made(&outside.spelled)?;
     matches!(
@@ -63,24 +35,18 @@ enum Framework {
     Rocket,
 }
 
-/// Where routes are registered or served, a node of the mounts.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Place<'a> {
-    /// The call that makes an app, a scope, a resource or a Rocket instance.
     Made(CallAt<'a>),
-    /// The service configuration the function (file, qualified name) receives.
     Config(&'a str, &'a str),
-    /// The function (file, qualified name) a route attribute sits on.
     Handler(&'a str, &'a str),
 }
 
-/// A function with route attributes: the routes they give it, as method and path.
 struct Handler {
     framework: Framework,
     routes: Vec<(String, String)>,
 }
 
-/// A route a builder registers: `.route(path, web::get().to(h))`.
 struct Route<'a> {
     path: &'a str,
     scope: &'a str,
@@ -95,20 +61,12 @@ struct Web<'c, 'a> {
     handlers: BTreeMap<(&'a str, &'a str), Handler>,
     mounts: Mounts<'a, Place<'a>>,
     routes: Vec<Route<'a>>,
-    /// What `items` may still visit.
     work: Cell<usize>,
-    /// The names the files of each crate mention, by crate root; `None` for a crate one of
-    /// whose files does not tell.
     mentioned: OnceCell<HashMap<&'a str, Option<BTreeSet<&'a str>>>>,
-    /// The scopes of each file that hold a service configuration (`config`), by file, read the
-    /// first time a call of the file is asked about.
     configs: RefCell<HashMap<&'a str, BTreeSet<&'a str>>>,
-    /// Whether an import of the pack names `ServiceConfig`, which may bind it under another name.
     imports_config: OnceCell<bool>,
 }
 
-/// `path` with each `{name}` or `{name:regex}` as one parameter, whatever the regex holds;
-/// `None` when a brace is not closed.
 pub(super) fn actix_path(path: &str) -> Option<String> {
     let (mut out, mut open) = (String::new(), 0usize);
     for c in path.chars() {
@@ -127,10 +85,8 @@ pub(super) fn actix_path(path: &str) -> Option<String> {
     (open == 0).then_some(out)
 }
 
-/// The type of actix-web's service configuration, by its last segment.
 const CONFIG: &str = "ServiceConfig";
 
-/// Whether an import writes `ServiceConfig` anywhere it may spell it.
 fn names_config(import: &Import) -> bool {
     let named = match &import.name {
         Imported::Name(name) | Imported::Path(name) => name.contains(CONFIG),
@@ -141,7 +97,6 @@ fn names_config(import: &Import) -> bool {
     named || import.local.contains(CONFIG) || import.source.contains(CONFIG)
 }
 
-/// The values `value` holds, the items of a tuple or a list (`.service((a, b))`) included.
 fn leaves(value: &Value) -> Vec<&Value> {
     let (mut out, mut work) = (Vec::new(), vec![value]);
     while let Some(value) = work.pop() {
@@ -167,21 +122,16 @@ impl<'c, 'a> Web<'c, 'a> {
         }
     }
 
-    /// Takes `n` from the budget of `items`; false once it is spent.
     fn charge(&self, n: usize) -> bool {
         let left = self.work.get();
         self.work.set(left.saturating_sub(n));
         left >= n
     }
 
-    /// The root of the crate `path` belongs to, as its module tree says (`crate`).
     fn root(&self, path: &'a str) -> &'a str {
         self.code.import_file(path, "crate").unwrap_or(path)
     }
 
-    /// Whether code Meada does not read may register the function `name` of `path`: a file of
-    /// its crate (of any crate, when the file is one another crate may import) mentions the
-    /// name (`Facts::mentions`), or does not say what it mentions.
     fn mentioned(&self, path: &'a str, name: &str) -> bool {
         let crates = self.mentioned.get_or_init(|| {
             let mut crates: HashMap<&str, Option<BTreeSet<&str>>> = HashMap::new();
@@ -205,8 +155,6 @@ impl<'c, 'a> Web<'c, 'a> {
         }
     }
 
-    /// The crate a bare route attribute comes from, when the `#[macro_use] extern crate x;` of
-    /// its crate's root brings it in.
     fn macro_use(&self, path: &'a str) -> Option<&'a str> {
         let root = self.code.files().get(self.root(path))?;
         let krates = root.macro_use.iter();
@@ -215,7 +163,6 @@ impl<'c, 'a> Web<'c, 'a> {
         krates.next().is_none().then_some(first.as_str())
     }
 
-    /// What the call `at` makes, when it makes an app, a scope, a resource or a Rocket instance.
     fn made(&self, (path, n): CallAt<'a>) -> Option<Made> {
         let call = &self.code.files()[path].calls[n];
         made_of(
@@ -233,14 +180,11 @@ impl<'c, 'a> Web<'c, 'a> {
         }
     }
 
-    /// The function `name`, written in `scope`, is the service configuration of: a parameter
-    /// whose type is actix-web's `ServiceConfig`.
     fn config(&self, path: &'a str, scope: &'a str, name: &str) -> bool {
         let receivers = &self.code.files()[path].receivers;
         (receivers.iter()).any(|r| r.scope == scope && r.name == name && self.configures(path, r))
     }
 
-    /// Whether the receiver `r` of `path` is written with actix-web's `ServiceConfig` type.
     fn configures(&self, path: &'a str, r: &'a Receiver) -> bool {
         matches!(&r.class, Class::Type(t)
         if self.code.outside(path, &r.scope, t, false).is_some_and(|o| {
@@ -248,13 +192,9 @@ impl<'c, 'a> Web<'c, 'a> {
         }))
     }
 
-    /// Whether `scope` of `path` binds a name to actix-web's `ServiceConfig` (`config`): without
-    /// one, no value written there is a service configuration (`configuration`).
     fn holds_config(&self, path: &'a str, scope: &str) -> bool {
         let mut configs = self.configs.borrow_mut();
         let scopes = configs.entry(path).or_insert_with(|| {
-            // A type spelled `ServiceConfig` outside is written so, or bound by an import that
-            // names it: without such an import, a written type that does not name it is skipped.
             let renamed = *self.imports_config.get_or_init(|| {
                 let files = self.code.files().values();
                 files.flat_map(|f| &f.imports).any(names_config)
@@ -269,8 +209,6 @@ impl<'c, 'a> Web<'c, 'a> {
         scopes.contains(scope)
     }
 
-    /// The places the value a method is called on may be: the apps, scopes, resources and
-    /// Rocket instances the value flow reaches, and the service configuration it is.
     fn places(&self, path: &'a str, scope: &'a str, value: &'a Value) -> Vec<Place<'a>> {
         let origins = self.code.origins(
             path,
@@ -290,8 +228,6 @@ impl<'c, 'a> Web<'c, 'a> {
         out
     }
 
-    /// Whether `value` is the service configuration the function `scope` receives, or the
-    /// result of its methods called on it (`cfg.service(a).route(..)`).
     fn configuration(&self, path: &'a str, scope: &'a str, value: &'a Value) -> bool {
         let code = self.code;
         let invocation = match value {
@@ -316,10 +252,6 @@ impl<'c, 'a> Web<'c, 'a> {
         passed && matches!(start, Some(Value::Ref(name)) if self.config(path, scope, name))
     }
 
-    /// The items `value`, written in `scope` of `path`, lists or names: a tuple's or a list's
-    /// (`routes![a, b]`), those of a constant it names, and those of what a function of the
-    /// repository that the call answers exactly returns. Each with the file and scope it is
-    /// written in.
     fn items(
         &self,
         path: &'a str,
@@ -331,8 +263,6 @@ impl<'c, 'a> Web<'c, 'a> {
         for leaf in leaves(value) {
             match leaf {
                 Value::Call(invocation) => {
-                    // A function of the repository the call answers exactly: what it returns,
-                    // else the call itself.
                     let function = code.definition(path, scope, &invocation.callee);
                     let at = code
                         .call_index(path, &invocation.range)
@@ -368,8 +298,6 @@ impl<'c, 'a> Web<'c, 'a> {
         out
     }
 
-    /// The attributed handlers: a function with route attributes of actix-web or Rocket, and
-    /// the method and path of each.
     fn attributed(&mut self) {
         let code = self.code;
         for (&path, facts) in code.files() {
@@ -380,7 +308,6 @@ impl<'c, 'a> Web<'c, 'a> {
                 let Some(call_at) = code.call(path, n) else {
                     continue;
                 };
-                // A bare attribute no `use` binds comes from the crate `#[macro_use]` names.
                 let bare = (!call.by_path
                     && code.definition(path, &call.scope, &call.callee).is_none())
                 .then(|| self.macro_use(path))
@@ -412,7 +339,6 @@ impl<'c, 'a> Web<'c, 'a> {
                 };
                 let methods = match (attribute, framework) {
                     ("route", Framework::Actix) => {
-                        // One method per `method = ".."`, none readable if any is not.
                         let given = call.kwargs.iter().filter(|(k, _)| k == "method");
                         let given: Option<Vec<String>> = given
                             .map(|(_, v)| path_literal(code.value(path, &call.scope, v)))
@@ -433,7 +359,6 @@ impl<'c, 'a> Web<'c, 'a> {
                         framework,
                         routes: Vec::new(),
                     });
-                // An attribute of the other framework on the same function is not read.
                 if handler.framework != framework {
                     continue;
                 }
@@ -444,13 +369,11 @@ impl<'c, 'a> Web<'c, 'a> {
         }
     }
 
-    /// Mounts `child` on each of `parents`, under `segment`.
     fn mount(&mut self, child: Place<'a>, parents: &[Place<'a>], segment: &Option<String>) {
         let mounted = self.mounts.entry(child).or_default();
         mounted.extend(parents.iter().map(|&at| (at, segment.clone())));
     }
 
-    /// The handler a value names, when it is an attributed one of `framework`.
     fn handler_named(
         &self,
         (path, scope, value): (&'a str, &'a str, &'a Value),
@@ -463,8 +386,6 @@ impl<'c, 'a> Web<'c, 'a> {
         Some((Place::Handler(target.path, target.name), handler.framework))
     }
 
-    /// Reads every call: a function an attribute sits on that any call names is registered
-    /// (served where a mount reads, nowhere else), and the calls that register or mount.
     fn read(&mut self) {
         let code = self.code;
         let named: BTreeSet<&str> = (self.handlers.keys())
@@ -479,7 +400,6 @@ impl<'c, 'a> Web<'c, 'a> {
                     continue;
                 }
                 for arg in &call.args {
-                    // Only a name, a call or a list holding one can name a handler.
                     let mut names = leaves(arg).into_iter();
                     if !names.any(|l| matches!(l, Value::Ref(_) | Value::Call(_))) {
                         continue;
@@ -515,12 +435,9 @@ impl<'c, 'a> Web<'c, 'a> {
         }
     }
 
-    /// `f(cfg)`: the service configuration a function passes on to a function of the repository
-    /// (answered exactly) that takes one there is mounted where the first is.
     fn pass_config(&mut self, path: &'a str, call: &'a Call) {
         let code = self.code;
         let scope = call.scope.as_str();
-        // An argument is a configuration only in a scope that binds one.
         if call.receiver.is_some() || !self.holds_config(path, scope) {
             return;
         }
@@ -548,14 +465,11 @@ impl<'c, 'a> Web<'c, 'a> {
         }
     }
 
-    /// `parents` of the kinds `kinds`.
     fn only(&self, parents: &[Place<'a>], kinds: &[Made]) -> Vec<Place<'a>> {
         let of = |p: &Place<'a>| self.kind(*p).is_some_and(|k| kinds.contains(&k));
         parents.iter().copied().filter(of).collect()
     }
 
-    /// `x.service(h)`, `x.service(web::scope(prefix)...)`, `x.service(web::resource(path)...)`
-    /// and a tuple of them.
     fn service(&mut self, path: &'a str, call: &'a Call, parents: &[Place<'a>]) {
         let parents = self.only(parents, &[Made::App, Made::Scope, Made::Config]);
         if parents.is_empty() {
@@ -587,8 +501,6 @@ impl<'c, 'a> Web<'c, 'a> {
                 ) else {
                     continue;
                 };
-                // The segment a scope or a resource puts before its routes is the one it is
-                // made with; one Meada cannot read is mounted nowhere.
                 let (made, at) = (child.0, child.1);
                 let segment = code.call(made, at).and_then(|c| {
                     let first = c.args.first()?;
@@ -599,8 +511,6 @@ impl<'c, 'a> Web<'c, 'a> {
         }
     }
 
-    /// `x.route(path, web::get().to(h))` on an app, a scope or a service configuration, and
-    /// `resource.route(web::get().to(h))`.
     fn route(&mut self, path: &'a str, call: &'a Call, parents: &[Place<'a>]) {
         let code = self.code;
         let scope = call.scope.as_str();
@@ -632,8 +542,6 @@ impl<'c, 'a> Web<'c, 'a> {
         });
     }
 
-    /// The method a route builder serves, the handler it names and the call naming it:
-    /// `web::get().to(h)`, `web::route().to(h)` (every method) or `web::method(Method::X).to(h)`.
     fn builder(&self, path: &'a str, value: &'a Value) -> Option<(String, &'a Value, &'a Call)> {
         let code = self.code;
         let Value::Call(invocation) = value else {
@@ -663,8 +571,6 @@ impl<'c, 'a> Web<'c, 'a> {
         Some((method, handler, to))
     }
 
-    /// `x.configure(f)`: the service configuration `f` receives is mounted on `x`, with no
-    /// segment.
     fn configure(&mut self, path: &'a str, call: &'a Call, parents: &[Place<'a>]) {
         let parents = self.only(parents, &[Made::App, Made::Scope, Made::Config]);
         let [Value::Ref(name)] = call.args.as_slice() else {
@@ -679,7 +585,6 @@ impl<'c, 'a> Web<'c, 'a> {
         }
     }
 
-    /// `rocket.mount(prefix, routes![a, b])`.
     fn rocket(&mut self, path: &'a str, call: &'a Call, parents: &[Place<'a>]) {
         let code = self.code;
         let scope = call.scope.as_str();
@@ -700,10 +605,6 @@ impl<'c, 'a> Web<'c, 'a> {
 
     fn found(&self) -> Vec<Found> {
         let code = self.code;
-        // An app and a Rocket instance nothing mounts are served at their root; a scope, a
-        // resource or a configuration, only where a mount puts it. A handler no code mentions is
-        // served at its own path; one that some code mentions without Meada reading a
-        // registration may be registered there, so it is served nowhere.
         let root = |place: Place<'a>| match place {
             Place::Handler(path, name) => (!self.mentioned(path, name)).then(String::new),
             Place::Made(_) | Place::Config(..) => {
@@ -747,7 +648,6 @@ impl<'c, 'a> Web<'c, 'a> {
     }
 }
 
-/// actix-web and Rocket providers: see the module.
 pub(super) fn providers(code: &Code) -> Vec<Found> {
     if !code.pack().extensions().contains(&"rs") {
         return Vec::new();

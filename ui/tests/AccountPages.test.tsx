@@ -75,7 +75,7 @@ test.each(['en', 'pt-BR'] as const)('the forced change page asks for the current
     expect(input.type).toBe('password');
   }
   expect((getByLabelText(host, t.newPassword) as HTMLInputElement).autocomplete).toBe('new-password');
-  expect(host.querySelectorAll('a')).toHaveLength(1); // the skip link alone
+  expect(host.querySelectorAll('a')).toHaveLength(1);
   expect(queryByRole(host, 'navigation')).toBeNull();
   expect(queryByRole(host, 'button', { name: copy[locale].signOut })).toBeNull();
 });
@@ -168,7 +168,6 @@ test.each(['en', 'pt-BR'] as const)('the profile verifies a GitHub login with a 
   expect(JSON.parse(init.body)).toEqual({ token: 'ghp_secret0123' });
   expect(new Headers(init.headers).get('Authorization')).toBe('Bearer t1');
   expect(fetch.mock.calls[2]![0]).toBe('/api/v1/session');
-  // The fresh session token carrying the login replaces the old one; the pasted token is kept nowhere.
   expect(auth.token).toBe('t2');
   expect(input.value).toBe('');
   expect(host.textContent).toContain(t.githubVerified);

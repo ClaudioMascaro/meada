@@ -1,10 +1,3 @@
-//! The names a file mentions (`Facts::mentions`, spec #30): those it writes where they refer to
-//! something, in an expression, a receiver, a path, a `use` or a macro's tokens. A name a
-//! binding pattern, a parameter or a field declares is no mention, and neither is a reference
-//! a local of the name hides (a `let` before it in its block, a parameter of the function or the
-//! closure around it, a `match`, `if let`, `while let` or `for` pattern). The HTTP kind reads
-//! them to tell a handler no code may register (`http/rust.rs`).
-
 use std::collections::{BTreeSet, HashMap};
 use std::ops::Range;
 
@@ -13,26 +6,17 @@ use tree_sitter::Node;
 use super::{bind, field, route_attribute, text};
 use crate::lang::{children, named};
 
-/// How many distinct names a file may mention before `Facts::mentions` tells nothing of it.
 // ponytail: a generated file with more is read as mentioning every name (none of its crate's
 // handlers is then taken as unregistered); raise it if a real file reaches it.
 pub(super) const MENTIONS: usize = 1 << 14;
 
-/// The owner of what no function encloses.
 const TOP: usize = usize::MAX;
 
-/// A node on the way down, with what a lookup would find: tree-sitter's `parent` and sibling
-/// lookups walk down from the root, so each costs the depth of the node (a file nested deep would
-/// cost depth times nodes).
 struct Seen<'t> {
     node: Node<'t>,
     owner: usize,
     parent: Option<Node<'t>>,
-    /// The entry before it among its parent's children (every token, in a token tree).
     before: Option<Node<'t>>,
-    /// Where the bindings of an `if let`, `while let` or guard's pattern end, for the `let` of
-    /// such a condition: with the block they guard (the `else` sees none of them), or with the
-    /// arm. `None` ends them with the condition itself.
     guard: Option<usize>,
 }
 
@@ -48,11 +32,7 @@ impl<'t> Seen<'t> {
     }
 }
 
-/// The names `root` mentions, apart from the functions it defines and its route attributes;
-/// `None` past `MENTIONS` names.
 pub(super) fn mentions(root: Node, src: &[u8]) -> Option<BTreeSet<String>> {
-    // Where the locals of each name are in scope, by the function that owns them (its start):
-    // a function written inside another sees none of the outer one's locals.
     let mut scopes: HashMap<usize, HashMap<String, Vec<Range<usize>>>> = HashMap::new();
     let mut bind_in = |pattern: Node, scope: Range<usize>, owner: usize| {
         let mut names = Vec::new();
@@ -62,10 +42,7 @@ pub(super) fn mentions(root: Node, src: &[u8]) -> Option<BTreeSet<String>> {
             at.entry(name).or_default().push(scope.clone());
         }
     };
-    // Each reference: its name, owner and start, and whether a local can hide it (a path's
-    // segments and a `use` are read among modules and types).
     let mut references: Vec<(&str, usize, usize, bool)> = Vec::new();
-    // Explicit stack instead of recursion: generated code can nest deeper than the call stack.
     let mut stack = vec![Seen {
         node: root,
         owner: TOP,
@@ -189,8 +166,6 @@ pub(super) fn mentions(root: Node, src: &[u8]) -> Option<BTreeSet<String>> {
     Some(out)
 }
 
-/// Whether `node` is the name an item other than a function declares (a function's is never
-/// visited): a `const`, a `static`, a module, an enum variant, a crate.
 fn declares(node: Node, parent: Option<Node>) -> bool {
     parent.is_some_and(|p| {
         matches!(
@@ -200,7 +175,6 @@ fn declares(node: Node, parent: Option<Node>) -> bool {
     })
 }
 
-/// `ranges` sorted and joined where they meet.
 fn merged(mut ranges: Vec<Range<usize>>) -> Vec<Range<usize>> {
     ranges.sort_by_key(|r| r.start);
     let mut out: Vec<Range<usize>> = Vec::new();
@@ -213,7 +187,6 @@ fn merged(mut ranges: Vec<Range<usize>>) -> Vec<Range<usize>> {
     out
 }
 
-/// Whether one of `ranges` (sorted and apart) holds `at`.
 fn covers(ranges: &[Range<usize>], at: usize) -> bool {
     let after = ranges.partition_point(|r| r.start <= at);
     after > 0 && ranges[after - 1].end > at
@@ -257,8 +230,6 @@ mod tests {
 
     #[test]
     fn a_reference_a_local_does_not_reach_is_a_mention() {
-        // Before the `let`, in the `else`, in a function written inside, as a path segment, in
-        // a `use` and after `::` in a macro's tokens.
         let cases = [
             "fn a() { g(h); let h = 1; }",
             "fn b(x: Option<u8>) { if let Some(h) = x {} else { g(h) } }",
@@ -276,8 +247,6 @@ mod tests {
 
     #[test]
     fn the_names_of_a_file_are_read_in_the_same_time_at_any_depth() {
-        // Each of these used to ask for a parent or a sibling: an identifier, a `let`, an
-        // `if let` and the tokens of a macro.
         let body = "let y = x; if let Some(z) = y { g(z); } m![a::x, y];\n".repeat(500);
         same_time_at_any_depth(&body, |src, tree| {
             let start = Instant::now();

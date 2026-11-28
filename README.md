@@ -190,3 +190,30 @@ Meada (invariante 1, [ADR 0002](docs/adr/0002-product-invariants.md)).
 - [Participar](https://claudiomascaro.github.io/meada/contributing/)
 
 [Apache-2.0](LICENSE).
+
+## Mapa do repositório
+
+### Interface local e invariantes
+
+O script de build compila uma única gramática Kotlin, a partir do parser e do scanner vendorizados. O Cargo recompila essa etapa quando o diretório de fontes muda. `[build.rs:main]`
+
+### Limites entre componentes
+
+- [Motor de consultas, indexação e servidor MCP](./src/README.md)
+- [Tipos e validação compartilhados entre Rust e WASM](./meada-core/README.md)
+- [Console de administração no navegador](./ui/README.md)
+- [Instalação com Docker Compose e Helm](./deploy/README.md)
+- [Verificadores e ferramentas de manutenção](./scripts/README.md)
+- [Comparação de exportações e divisão dos mapas](./examples/README.md)
+
+### Invariantes globais
+
+A CLI e o servidor MCP usam o mesmo motor. Cada índice pertence a um repositório. O núcleo de tipos e validação também compila para o navegador. `[src/engine.rs:Engine]` `[src/index.rs:open]` `[meada-core/src/wasm.rs:validate]`
+
+### Efeitos colaterais
+
+A indexação lê os repositórios e grava os índices SQLite. O servidor HTTP consulta índices existentes em modo de leitura. `[src/index.rs:refresh]` `[src/engine.rs:open_manifest]`
+
+### Verificação
+
+Na raiz, execute `cargo test`. Para módulos opcionais, consulte a matriz de features de [CI](./.github/workflows/ci.yml).

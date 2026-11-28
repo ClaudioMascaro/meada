@@ -4,26 +4,17 @@ import { catalogRoute, checkBody } from './catalog';
 import type { CatalogAnswer, CheckAnswer, CheckState } from './catalog';
 
 export interface CatalogView {
-  /** The newest page's answer: `pending` says why nothing is selectable. */
   answer?: CatalogAnswer;
-  /** The repositories listed now (the prefix searched, the pages read), in the server's order. */
   listed: string[];
-  /** Every identity the server said the session may select since the last reload: a search never forgets one. */
   eligible: ReadonlySet<string>;
-  /** What `catalog/check` said of the identities verified since the last reload. */
   checked: ReadonlyMap<string, CheckState>;
   problem?: unknown;
   search: (prefix: string) => void;
   more: () => void;
-  /** Reads the catalog again and drops what was verified: the roles may have changed. */
   reload: () => void;
   verify: (identities: readonly string[]) => Promise<void>;
 }
 
-/**
- * The catalog the console serves (#341), read a page at a time. The selection rules are not here:
- * the server lists only what the session may select and `meada-core` marks a selection against it.
- */
 export function useCatalog(api: Api): CatalogView {
   const [prefix, setPrefix] = useState('');
   const [after, setAfter] = useState<string>();

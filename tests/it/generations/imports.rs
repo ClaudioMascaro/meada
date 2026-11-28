@@ -1,5 +1,3 @@
-//! Immutable workspace imports through the binary, racing against the real configured S3.
-
 use super::{Fleet, MANIFEST, meada_in};
 use crate::snapshot::KEY_ID;
 use std::io::{BufRead, BufReader, Write};
@@ -21,8 +19,6 @@ fn headers(reader: &mut impl BufRead) -> Vec<u8> {
     }
 }
 
-/// Hold both genuine missing-object replies before allowing either importer to upload. All
-/// signed bytes and buffered response bodies still pass between the CLI and real RustFS.
 fn missing_together(to: &str) -> (String, std::thread::JoinHandle<()>) {
     let target = reqwest::Url::parse(to).unwrap();
     assert_eq!(target.scheme(), "http", "the local race fixture uses HTTP");
@@ -203,8 +199,6 @@ fn concurrent_imports_keep_the_first_author_time_and_message() {
     );
 }
 
-/// A local current-version swap during the informational Valkey probe cannot mix the reported
-/// workspace with the readiness exit code. The same managed version is read once per command.
 #[test]
 fn status_reports_and_probes_the_same_pulled_workspace_after_a_concurrent_swap() {
     use super::{BOOTSTRAP, import, on_bootstrap, send, store_bootstrap, workspace_pointer};
@@ -269,12 +263,10 @@ fn status_reports_and_probes_the_same_pulled_workspace_after_a_concurrent_swap()
         "{stdout}"
     );
     assert_eq!(output.status.code(), Some(0), "{stdout}; {stderr}");
-    // The swapped version really is unready for a later command.
     let (_, _, code) = on_bootstrap(dir, &["status"]);
     assert_eq!(code, Some(1));
 }
 
-/// The one fixture table is also read by Vitest through the actual WebAssembly bundle.
 #[test]
 fn workspace_import_and_wasm_share_every_validation_fixture() {
     #[derive(serde::Deserialize)]
@@ -284,8 +276,6 @@ fn workspace_import_and_wasm_share_every_validation_fixture() {
         text: String,
         errors: std::collections::BTreeMap<String, Vec<String>>,
     }
-    // The authorization and composition rows (#323) hold entries, not text: `meada-core`'s
-    // seam reads them.
     let rows: Vec<serde_json::Value> =
         serde_json::from_str(include_str!("../../fixtures/workspace-validation.json")).unwrap();
     let cases: Vec<Case> = (rows.into_iter())

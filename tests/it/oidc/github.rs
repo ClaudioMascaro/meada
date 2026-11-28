@@ -1,14 +1,3 @@
-//! The GitHub grant at admission on nodes (#332, ADR 0016): `meada mcp --listen` over the chain
-//! with `[oidc.github]`, its permissions set seeded by `meada github-app roles` against
-//! `github_app`'s fake GitHub API, through the local Valkey and Postgres
-//! (`MEADA_TEST_VALKEY_URL`, `MEADA_TEST_POSTGRES_URL`), each test in a schema and a key prefix of
-//! its own. Postgres is made unreachable through a loopback relay the test closes, and
-//! `MEADA_PERMISSIONS_POLL_MS` (debug builds) shortens the poll and the floor of
-//! `max_age_seconds`, so a test crosses the age in seconds. No test reads the module's tables:
-//! the hostile rows are written, and what a token reads is seen through the node's answers.
-//! Without a service the tests print why and skip; with `MEADA_TEST_SERVICES_REQUIRED=1` they
-//! fail.
-
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -22,20 +11,14 @@ use crate::manifest::{MANIFEST, chain_manifest, run};
 use crate::postgres::Relay;
 use crate::server::Server;
 
-/// The git host of the chain's identities, and of `[oidc.github]`.
 pub(crate) const HOST: &str = "example.com";
 const GATEWAY: &str = "example.com/chain/gateway";
 const CATALOG: &str = "example.com/chain/catalog";
 const WORKER: &str = "example.com/chain/worker";
-/// The claim carrying a token's GitHub login.
 pub(crate) const LOGIN_CLAIM: &str = "github_login";
-/// The poll of every process here, in milliseconds.
 pub(crate) const POLL_MS: &str = "200";
 const EN: &str = "en_US.UTF-8";
 
-/// The data layer and the fake GitHub of one case: the Valkey key prefix and the Postgres schema
-/// of its own, the fake API with App 1 installed on the owners `chain` and `team`, and the real
-/// Postgres URL.
 pub(crate) struct Github {
     pub(crate) api: Api,
     case: String,
@@ -62,8 +45,6 @@ impl Github {
         })
     }
 
-    /// `[oidc.github]` for `host` (`roles` as TOML, `max_age_seconds`), then `[postgres]` over
-    /// the URL in `pg-url` beside the manifest: what follows an `[oidc]` section's keys.
     pub(crate) fn sections(&self, host: &str, roles: &str, max_age: u64) -> String {
         format!(
             "\n[oidc.github]\nhost = \"{host}\"\nlogin_claim = \"{LOGIN_CLAIM}\"\nroles = {roles}\n\
@@ -72,7 +53,6 @@ impl Github {
         )
     }
 
-    /// `[valkey]` and the `[[github_app]]` block for `host` the role check lists through.
     pub(crate) fn job(&self, host: &str) -> String {
         format!(
             "\n[valkey]\nurl = \"{}\"\nkey_prefix = \"{}\"\n{}",
@@ -82,7 +62,6 @@ impl Github {
         )
     }
 
-    /// The `[[github_app]]` block for `host` alone, for a manifest with a `[valkey]` of its own.
     pub(crate) fn app(&self, host: &str) -> String {
         format!(
             "\n[[github_app]]\nhost = \"{host}\"\napi = \"{}\"\napp_id = 1\n\
@@ -92,7 +71,6 @@ impl Github {
         )
     }
 
-    /// The fake lists `collaborators` (login, `role_name`) for `repo`, `<owner>/<repo>`.
     pub(crate) fn list(&self, repo: &str, collaborators: &[(&str, &str)]) {
         let rows = (collaborators.iter())
             .map(|(l, r)| (l.to_string(), r.to_string()))
@@ -100,8 +78,6 @@ impl Github {
         (self.api).with(|s| s.collaborators.insert(repo.to_string(), rows));
     }
 
-    /// `meada postgres migrate` over `manifest` in `dir`, the Postgres URL file beside it
-    /// pointing at `url`.
     pub(crate) fn migrate(&self, dir: &Path, manifest: &str, url: &str) {
         let ops = dir.join(manifest).parent().unwrap().to_path_buf();
         fs::write(ops.join("pg-url"), url).unwrap();
@@ -111,7 +87,6 @@ impl Github {
         assert_eq!(code, 0, "{stderr}");
     }
 
-    /// `migrate`, then `meada github-app roles` over `manifest`: the role check's line.
     pub(crate) fn seed(&self, dir: &Path, manifest: &str, url: &str) -> String {
         self.migrate(dir, manifest, url);
         let env = [("MEADA_PERMISSIONS_POLL_MS", POLL_MS)];
@@ -121,8 +96,6 @@ impl Github {
         stdout
     }
 
-    /// Asserts `stderr` holds no token or part of one, no login the fake lists, and neither the
-    /// Postgres URL nor its user and password.
     pub(crate) fn clean(&self, stderr: &str, tokens: &[String]) {
         self.api.clean(stderr);
         for token in tokens {
@@ -143,8 +116,6 @@ impl Github {
     }
 }
 
-/// A case: the chain, indexed, with `[oidc]` for `issuer` (one audience, `PUBLIC`, so a token
-/// reaches every path) and `github`'s sections.
 fn node_manifest(case: &str, issuer: &str, github: &Github, roles: &str, max_age: u64) -> PathBuf {
     let dir = chain_manifest(case);
     assert!(run(&dir, "index").2);
@@ -159,7 +130,6 @@ fn node_manifest(case: &str, issuer: &str, github: &Github, roles: &str, max_age
     dir
 }
 
-/// The node of `dir`, polling every `POLL_MS`, with `env` besides.
 fn node(dir: &Path, env: &[(&str, &str)]) -> Server {
     let args = ["--listen", "127.0.0.1:0", "--workspace", MANIFEST];
     let mut env = env.to_vec();
@@ -167,8 +137,6 @@ fn node(dir: &Path, env: &[(&str, &str)]) -> Server {
     Server::start_args(dir, &args, &env)
 }
 
-/// A token of `issuer` whose claims grant `identities`, with `login` as its login claim when
-/// given (any JSON value).
 fn token(signing: &EncodingKey, issuer: &str, identities: &[&str], login: Option<Value>) -> String {
     let mut claims = json!({
         "iss": issuer, "aud": PUBLIC, "exp": jsonwebtoken::get_current_timestamp() + 300,
@@ -180,14 +148,12 @@ fn token(signing: &EncodingKey, issuer: &str, identities: &[&str], login: Option
     sign(signing, "k1", Algorithm::ES256, &claims)
 }
 
-/// The identities `token` reads at `server`: the root's 404 list.
 fn listed(server: &Server, token: &str) -> String {
     let answer = ask(&format!("{}/", server.url), Some(token), &[], None);
     assert_eq!(answer.status, 404, "{answer:?}");
     answer.body
 }
 
-/// Waits until `token` reads `expected` at `server`, failing after `within`; how long it took.
 fn until(server: &Server, token: &str, expected: &str, within: Duration) -> Duration {
     let start = Instant::now();
     loop {
@@ -203,13 +169,10 @@ fn until(server: &Server, token: &str, expected: &str, within: Duration) -> Dura
     }
 }
 
-/// `POLL_MS` as a number.
 fn poll_ms() -> u64 {
     POLL_MS.parse().unwrap()
 }
 
-/// Sleeps `polls` poll intervals; true when the sleep overran by more than two intervals, the
-/// environment being too slow to tell the windows apart, and the caller skips.
 fn nap_too_slow(polls: u64) -> bool {
     let poll = poll_ms();
     let began = Instant::now();
@@ -222,7 +185,6 @@ fn nap_too_slow(polls: u64) -> bool {
     slow
 }
 
-/// The 404 list of `identities`, in the manifest's order.
 fn lines(identities: &[&str]) -> String {
     (SERVED.lines())
         .filter(|i| identities.contains(i))
@@ -230,13 +192,6 @@ fn lines(identities: &[&str]) -> String {
         .collect()
 }
 
-/// A token whose login holds `write` on `WEB` and the custom role `Custom Reviewer` on the
-/// gateway, and whose claims grant names the worker, reads all three (its login in another case
-/// than GitHub's): the root's 404 lists them, a trace from `WEB` keeps the gateway's link, and the
-/// catalog, where its role (`triage`) is outside `roles`, is a 403. A token without the login
-/// claim, with an empty, 40-character, non-string or `ana.souza` value, reads its claims grant
-/// only; a machine token with `*` reads everything; a new set without the gateway's role revokes
-/// it. stderr names no token, login or URL.
 #[test]
 fn a_token_reads_the_union_of_its_claims_and_its_login_s_roles() {
     let Some(github) = Github::new("gh_union") else {
@@ -306,12 +261,10 @@ fn a_token_reads_the_union_of_its_claims_and_its_login_s_roles() {
         assert_eq!(answer.status, 403, "{login:?}");
         sent.push(claims_only);
     }
-    // bia's role on `WEB` is `triage`, outside `roles`.
     let bia = token(&signing, &issuer.base, &[], Some(json!("bia_acme")));
     assert_eq!(listed(&server, &bia), "");
     let machine = token(&signing, &issuer.base, &["*"], None);
     assert_eq!(listed(&server, &machine), SERVED);
-    // A set replacing this one revokes what it no longer lists.
     github.list("chain/gateway", &[]);
     github.seed(&dir, MANIFEST, &github.url);
     until(
@@ -324,10 +277,6 @@ fn a_token_reads_the_union_of_its_claims_and_its_login_s_roles() {
     github.clean(&server.stderr(), &sent);
 }
 
-/// With Postgres made unreachable through the relay, the GitHub grant holds until the set's age
-/// passes `max_age_seconds` (5, under the debug knob), with one stderr line per failed poll; then
-/// only the claims grant answers, and a machine token's `*` still reads everything. Once Postgres
-/// answers again, a new set restores it.
 #[test]
 fn the_github_grant_ages_out_while_postgres_is_unreachable() {
     let Some(github) = Github::new("gh_age") else {
@@ -350,8 +299,6 @@ fn the_github_grant_ages_out_while_postgres_is_unreachable() {
     until(&server, &ana, &lines(&[WORKER]), Duration::from_secs(10));
     let machine = token(&signing, &issuer.base, &["*"], None);
     assert_eq!(listed(&server, &machine), SERVED);
-    // The set aged out on Postgres's clock: no sooner than five seconds after the check began.
-    // max_age is 5 s (the manifest above), less 100 ms of slack.
     assert!(
         seeded.elapsed() >= Duration::from_millis(5000 - 100),
         "{:?}",
@@ -380,9 +327,6 @@ fn the_github_grant_ages_out_while_postgres_is_unreachable() {
     github.clean(&stderr, &[ana, machine]);
 }
 
-/// A node starts and serves with Postgres never reached, its GitHub grant empty and a machine
-/// token's `*` whole; over a schema newer than it knows (`MEADA_POSTGRES_VERSION_MAX`), it names
-/// both versions once on stderr, however many polls, and its GitHub grant stays empty.
 #[test]
 fn a_node_serves_without_postgres_and_names_an_unknown_version_once() {
     let Some(github) = Github::new("gh_down") else {
@@ -430,9 +374,6 @@ fn a_node_serves_without_postgres_and_names_an_unknown_version_once() {
     github.clean(&stderr, &[ana, machine]);
 }
 
-/// Every row is hostile: a set whose `finished` is ahead of Postgres's clock grants nothing and
-/// is named once per poll by its table; once it is not, the set loads, a row granting `*` or an
-/// identity off the host is skipped with one line naming its table, and the rest grants.
 #[test]
 fn a_future_set_and_hostile_rows_grant_nothing() {
     let Some(github) = Github::new("gh_hostile") else {

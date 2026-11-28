@@ -1,6 +1,3 @@
-//! Gateway prefixes (spec #19): `[serve] prefix` and `[serve] strip` declare how a gateway
-//! rewrites the paths of a provider, and a consumer calling the public path links through it.
-
 use crate::common;
 
 use std::fs;
@@ -9,8 +6,6 @@ use std::path::PathBuf;
 use common::{age, assert_golden, fixture_repo, without_processes};
 use meada::engine::Engine;
 
-/// The consumer `gateway-client` with its providers next to it: (client, orders, billing). The
-/// ledger, a third provider, is their sibling too.
 fn gateway(case: &str) -> (PathBuf, PathBuf, PathBuf) {
     let origin = |name| Some(format!("https://example.com/acme/{name}.git"));
     fixture_repo(case, "gateway-ledger", origin("ledger").as_deref());
@@ -104,7 +99,6 @@ fn a_decision_for_the_provider_behind_a_colliding_gateway_path_applies() {
     let (client, ..) = gateway("gateway_decide");
     let audit = "example.com/acme/client::src/client.ts::audit::fetch#0";
 
-    // The candidates are sorted by repository: billing, behind its gateway prefix, is first.
     let (_, stderr, ok) = common::meada(&client, &["decide", "--item", audit], "1\n", |c| {
         c.env("LANG", "en_US.UTF-8");
     });
@@ -129,8 +123,6 @@ fn a_decision_for_the_provider_behind_a_colliding_gateway_path_applies() {
     );
 }
 
-/// A `dynamic-url` decision to a candidate that fits by its gateway path applies: replay keeps
-/// the candidates `meada decide` lists (#806).
 #[test]
 fn a_dynamic_url_decision_for_a_candidate_by_its_gateway_path_applies() {
     let (client, ..) = gateway("gateway_dynamic_decided");

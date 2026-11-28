@@ -15,8 +15,7 @@ FLAGS = "routine product e2e cli console accounts deploy container goldens".spli
 SHA = re.compile(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}")
 CLOUD = "snapshot valkey generation-pointer refresh-lock oidc github-app postgres directory ui workspaces proposals accounts".split()
 DEPLOY_SCRIPTS = {"scripts/compose-check", "scripts/helm-check", "scripts/container-smoke", "scripts/ui-tarball"}
-CHANGELOG_ITEM_LINES = 10  # one Unreleased item per change: a longer one is several changes
-# Harness tooling, self-tested by `static`, never product.
+CHANGELOG_ITEM_LINES = 10
 HARNESS_SCRIPTS = (".claude/skills/verify-blackbox/scripts/", ".claude/skills/meada-feedback/scripts/")
 PROVE_SKILL = ".claude/skills/prove-meada"
 PROVE_CI_INPUTS = {
@@ -27,13 +26,9 @@ PROVE_CI_INPUTS = {
     f"{PROVE_SKILL}/scripts/a7-a8-audit.py", f"{PROVE_SKILL}/scripts/a7-a8-mutations.json",
     f"{PROVE_SKILL}/scripts/a7-tf-set/terraform-names.tsv",
 }
-# What a scoped check always runs besides its scopes: the stored-format golden and the docs
-# tests fail on changes whose module name no scope holds.
 ALWAYS_SCOPED = ("stored_format", "docs::")
-# One lock per machine for the heavy commands, and the mark of a process that holds it.
 LOCK, HELD = "MEADA_CHECK_LOCK", "MEADA_CHECK_LOCK_HELD"
 DEPLOY_WORKFLOWS = {f".github/workflows/{name}.yml" for name in ("compose", "helm", "container", "release")}
-# A machine that leaves the push gate to CI (a small one, where the full gate gets OOM-killed).
 CI_GATE = Path.home() / ".config/meada/ci-gate"
 
 
@@ -61,7 +56,6 @@ def empty_tree():
 
 
 def names(args):
-    # Disabling rename detection preserves both the removed and added path in the policy.
     return [p for p in git("diff", "--name-only", "--no-renames", "-z", *args, "--").split("\0") if p]
 
 
@@ -79,7 +73,6 @@ def light(path):
 
 
 def proof_driver(path):
-    # The Proof workflow builds and starts every surface, so a change to it selects them all.
     return (path in {"scripts/prove-ci", ".github/workflows/proof.yml"}
             or (path.startswith((".claude/skills/prove-meada/scripts/", ".agents/skills/prove-meada/scripts/"))
                 and Path(path).suffix != ".md"
@@ -108,8 +101,6 @@ def scopes(paths):
             elif path.endswith("corpus.tsv"):
                 out["cli"] = all_repos = True
             elif path.endswith("prove.py"):
-                # Its `run`, `rebless` and `deploy`; the console drivers `aws-sdk.py`, `config_uses.py`
-                # and `images.py` import it.
                 out["cli"] = out["console"] = out["goldens"] = out["deploy"] = all_repos = True
             else:
                 for key in ("cli", "console", "accounts", "deploy", "container", "goldens"):
@@ -125,7 +116,6 @@ def scopes(paths):
             out["console"] = True
             out["accounts"] |= bool(re.match(r"src/(accounts|postgres|audit|oidc|grant)(\.rs|/)", path))
         elif path.startswith("tests/") and not path.startswith(("tests/golden/", "tests/fixtures/")):
-            # Unit and integration tests retain the product gate, without requesting E2E.
             continue
         else:
             out["cli"] = out["console"] = all_repos = True
@@ -153,12 +143,11 @@ def ci_selection(event, payload):
         labels = {label["name"] for label in pr.get("labels", [])}
         relevant = any(not light(p) or proof_driver(p) for p in paths) and any(
             out[k] for k in ("cli", "console", "deploy", "container", "goldens"))
-        # Only a new relevant update should repeat E2E on an already-labeled PR.
         if action == "synchronize" and payload.get("before"):
             try:
                 before = commit(payload["before"])
             except RuntimeError:
-                pass  # Missing/zero/unavailable previous heads use the full PR diff.
+                pass
             else:
                 updates = names([before, head])
                 update = scopes(updates)
@@ -171,8 +160,6 @@ def ci_selection(event, payload):
         before = payload.get("before")
         branch = (payload.get("repository") or {}).get("default_branch")
         default, ref = f"refs/remotes/origin/{branch}", str(payload.get("ref", ""))
-        # Any branch but the default one is read as its pull request is: its whole change against
-        # the default branch (a loop branch's gates, the `diff` workflow's tests).
         whole = ref.startswith("refs/heads/") and ref != f"refs/heads/{branch}"
         if whole and subprocess.run(["git", "rev-parse", "--verify", "-q", default],
                                     stdout=subprocess.DEVNULL).returncode == 0:
@@ -185,7 +172,6 @@ def ci_selection(event, payload):
         paths = names(args)
         out.update(scopes(paths), routine=True, base=base, head=head)
         return out, args, paths
-    # Manual corpus audits use an explicit workflow job, never automatic selectors.
     head = commit(git("rev-parse", "HEAD"))
     out.update(base=head, head=head)
     return out, [head, head], []
@@ -196,7 +182,6 @@ def local_selection(unpushed=False):
         raise RuntimeError("unstaged changes: stage the complete candidate before running scripts/check")
     if git("ls-files", "--others", "--exclude-standard", "-z"):
         raise RuntimeError("untracked files: stage or remove them before running scripts/check")
-    # An unborn branch is allowed only with a nonempty staged candidate.
     exists = subprocess.run(["git", "rev-parse", "--verify", "HEAD"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if exists.returncode:
         branch = git("symbolic-ref", "-q", "HEAD")
@@ -205,10 +190,8 @@ def local_selection(unpushed=False):
             raise RuntimeError("HEAD is invalid rather than an unborn branch")
     head = commit(exists.stdout.decode().strip()) if exists.returncode == 0 else empty_tree()
     if unpushed:
-        # Every commit the branch has not pushed: the push gate covers what per-commit scopes skipped.
         if git("diff", "--cached", "--name-only", "-z"):
             raise RuntimeError("staged changes: commit them before checking the unpushed commits")
-        # A branch with no upstream (a fresh cloud session) is compared with origin/main.
         upstream = subprocess.run(["git", "rev-parse", "--verify", "-q", "@{upstream}"],
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         args = [commit(git("merge-base", "HEAD", "@{upstream}" if upstream.returncode == 0 else "origin/main")), head]
@@ -302,10 +285,10 @@ def static(args, paths, tree):
     root = Path.cwd().resolve()
     for name in paths:
         if fixture(name):
-            continue  # Product inputs include malformed files, Helm templates and CloudFormation tags.
+            continue
         path = Path(name)
         if not path.exists() and not path.is_symlink():
-            continue  # Deleted paths still contribute to the scope.
+            continue
         target = path.resolve(strict=True)
         if not target.is_relative_to(root):
             raise RuntimeError(f"{name}: a touched symlink leaves the repository")
@@ -323,12 +306,11 @@ def static(args, paths, tree):
             tomllib.loads(path.read_text())
         elif suffix in {".yaml", ".yml"}:
             if name.startswith("deploy/helm/") and "/templates/" in name:
-                continue  # The existing renderer below validates Go templates as rendered YAML.
+                continue
             try:
                 import yaml
             except ImportError as error:
                 raise RuntimeError("YAML validation requires PyYAML; install scripts/docs/requirements.txt in a venv") from error
-            # Compose only: Compose and CloudFormation carry tags (`!reset`, `!Ref`) no constructor knows.
             list(yaml.compose_all(path.read_text(), Loader=yaml.SafeLoader))
         elif suffix == ".py" or (not suffix and path.read_bytes()[:100].startswith(b"#!/usr/bin/env python")):
             compile(path.read_bytes(), name, "exec")
@@ -336,7 +318,6 @@ def static(args, paths, tree):
             run("node", "--check", name)
         elif suffix in {".sh", ".bash"} or (not suffix and path.read_bytes()[:100].startswith((b"#!/bin/sh", b"#!/bin/bash", b"#!/usr/bin/env bash"))):
             run("bash" if suffix == ".bash" or b"bash" in path.read_bytes().splitlines()[0] else "sh", "-n", name)
-    # A prove-meada driver with a self-test (`ci.py`) runs it here too: it needs no Meada.
     selftested = (*HARNESS_SCRIPTS, ".claude/skills/prove-meada/scripts/")
     for script in sorted({p for p in paths if p.startswith(selftested) and p.endswith(".py")}):
         if Path(script).exists() and "--selftest" in Path(script).read_text():
@@ -458,7 +439,6 @@ def selftest():
         (["ui/src/AccountPages.tsx"], True, True, True),
         (["scripts/gate"], False, False, False),
         (["tests/it/query.rs"], True, False, False),
-        # Rust the static path compiles only in part still builds with the product.
         (["tests/it/docs.rs"], True, False, False),
         (["examples/split_agents.rs"], True, True, True),
         (["tests/golden/query.txt"], True, True, True),
@@ -498,15 +478,12 @@ def selftest():
         os.environ[LOCK] = os.path.join(empty, "lock")
         os.environ.pop(HELD, None)
         try:
-            # CI runs the command directly: its runner holds one job.
             os.environ["GITHUB_ACTIONS"] = "true"
             bounded("true")
             assert not os.path.exists(os.environ[LOCK])
             del os.environ["GITHUB_ACTIONS"]
-            # No `bounded` on PATH: the command runs, under the lock where `flock` and `nice` exist.
             bounded("true")
             assert os.path.exists(os.environ[LOCK]) == bool(shutil.which("flock") and shutil.which("nice"))
-            # A command that holds the lock runs its own heavy commands without asking for it again.
             os.environ[HELD] = "1"
             Path(os.environ[LOCK]).unlink(missing_ok=True)
             bounded("true")
@@ -540,7 +517,6 @@ def selftest():
                 except RuntimeError:
                     return
                 raise AssertionError("unsafe input was accepted")
-            # Each data-only input, on its own, takes the actual static route to the selftest.
             write("scripts/prove-ci", 'from pathlib import Path\nPath("ran").touch()\n')
             for input_path in ("SKILL.md", "references/scope.md", "scripts/proof_result.py", "scripts/a7-a8-mutations.json",
                                "scripts/a7-tf-set/terraform-names.tsv"):
@@ -549,13 +525,13 @@ def selftest():
                 Path("ran").unlink()
             Path("scripts/prove-ci").unlink()
             write("README.md", "base\n")
-            refused(local_selection)  # Untracked files cannot be omitted from the gate.
+            refused(local_selection)
             git("add", ".")
             args, paths, _ = local_selection()
             assert paths == ["README.md"] and args[0] == "--cached"
             base = save("README.md", "base\n")
             args, paths, _ = local_selection()
-            assert paths == ["README.md"]  # Initial clean commit uses an empty tree.
+            assert paths == ["README.md"]
             head = save("src/main.rs", "fn main() {}\n")
             payload = {"action": "opened", "pull_request": {"base": {"sha": base}, "head": {"sha": head}, "draft": False, "labels": [{"name": "e2e"}]}}
             def select(action="opened", **values):
@@ -582,7 +558,6 @@ def selftest():
             assert select("synchronize", before="0" * 40)["e2e"]
             assert select("synchronize", before="f" * 40)["e2e"]
             assert select("synchronize", before=None)["e2e"]
-            # Compare against the PR's declared base, even when it is not the default branch.
             git("checkout", "-qb", "advanced-base", base)
             advanced = save("src/only-base.rs", "base change\n")
             payload["pull_request"]["base"]["sha"] = advanced
@@ -619,9 +594,6 @@ def selftest():
             refused(lambda: ci_selection("push", {"before": "f" * 40, "after": docs}))
             pushed = ci_selection("push", {"before": "0" * 40, "after": docs})[0]
             assert pushed["routine"] and not pushed["e2e"] and pushed["product"]
-            # A push to any branch but the default one covers its whole change against the default
-            # branch, as its pull request does: a later push of docs alone keeps the checks its
-            # earlier code needs.
             git("update-ref", "refs/remotes/origin/main", base)
             def pushed_to(ref):
                 return ci_selection("push", {"ref": ref, "before": code, "after": docs,
@@ -658,8 +630,6 @@ def selftest():
             assert set(outputs) == set(FLAGS) | {"base", "head", "repos"}
             assert outputs["routine"] == outputs["product"] == "true" and outputs["e2e"] == "false"
             assert "Selected checks" in Path("summary").read_text()
-            # A scoped run in CI reads the event too (the `diff` workflow): the local selection
-            # would refuse this tree's untracked files, and a push of docs alone selects no build.
             write("event.json", json.dumps({"before": code, "after": docs}))
             command = subprocess.run([sys.executable, str(old / "scripts/check"), "--scope", "auto"], env=env,
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -685,20 +655,19 @@ def selftest():
             git("branch", "-q", "--set-upstream-to=pushed")
             commit_file("src/main.rs")
             commit_file("docs/notes.md")
-            assert local_selection()[1] == ["docs/notes.md"]  # a clean tree alone checks the last commit
+            assert local_selection()[1] == ["docs/notes.md"]
             git("update-ref", "refs/remotes/origin/main", "HEAD~1")
-            assert local_selection(unpushed=True)[1] == ["docs/notes.md", "src/main.rs"]  # the upstream wins
+            assert local_selection(unpushed=True)[1] == ["docs/notes.md", "src/main.rs"]
             git("branch", "-q", "--unset-upstream")
             git("update-ref", "refs/remotes/origin/main", "pushed")
-            assert local_selection(unpushed=True)[1] == ["docs/notes.md", "src/main.rs"]  # no upstream: origin/main
-            # An upstream whose branch is gone, and a detached HEAD, fall back to origin/main too.
+            assert local_selection(unpushed=True)[1] == ["docs/notes.md", "src/main.rs"]
             git("branch", "-q", "pushed2", "HEAD~2")
             git("branch", "-q", "--set-upstream-to=pushed2")
             git("update-ref", "refs/remotes/origin/main", "HEAD~1")
             git("branch", "-q", "-D", "pushed2")
-            assert local_selection(unpushed=True)[1] == ["docs/notes.md"]  # upstream gone: origin/main
+            assert local_selection(unpushed=True)[1] == ["docs/notes.md"]
             git("checkout", "-q", "--detach")
-            assert local_selection(unpushed=True)[1] == ["docs/notes.md"]  # detached HEAD: origin/main
+            assert local_selection(unpushed=True)[1] == ["docs/notes.md"]
         finally:
             os.chdir(old)
     print("scripts/check selftest: path policy and disposable Git/event cases passed.")
@@ -741,7 +710,6 @@ def main():
         print("\n".join(lines))
         return
     static(args, paths, tree)
-    # Tests read docs/reference (the output grammar), so a named scope runs there too.
     if not options.static and options.scope and (
             selected["product"] or any(p.startswith("docs/reference/") for p in paths)):
         names = [s for s in options.scope if s != "auto"]
@@ -750,7 +718,6 @@ def main():
             print(f"--scope auto: {' '.join(names)}", flush=True)
         cloud = cloud_features(paths)
         if cloud:
-            # A scoped run builds the default features: no test behind a cloud feature compiles.
             notice(f"not run here, the tests behind the cloud features {' '.join(cloud)}: "
                    "the pull request's `cloud` job runs them")
         for command in scoped_commands(names):

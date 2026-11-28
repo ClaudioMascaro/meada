@@ -1,25 +1,3 @@
-//! Local accounts (ADR 0024, feature `accounts`): usernames and passwords in the data layer, and
-//! the session tokens the console signs with Ed25519 for them. The `accounts` module of ADR 0012's
-//! table, section `[accounts]`, which needs `[postgres]` and sits beside `[oidc]` only with
-//! `break_glass = true` (the break-glass account, #563).
-//!
-//! `File` is the section and `File::validate` its `Config`: where the signing key's public and
-//! private halves and the default account's initial password come from, each a variable or a
-//! file (at most one of each pair), never a value, and whether it is break glass.
-//! `Manifest::read` checks the section's needs (`under_break_glass` before the section is read)
-//! and gives it its `[postgres]`. Only the console reads the keys (`Config::keys`), once, at start:
-//! a missing, unreadable, non-Ed25519 or mismatched pair refuses the start, naming the key and
-//! never its value. A node or the proposal server parses the section and reads no key.
-//!
-//! `Keys` signs and verifies session tokens: EdDSA JWTs, issuer the console's `[ui] public_url`,
-//! audience `CONSOLE`, subject `local:<username>`, the role, the groups, a change-required mark
-//! when set, issued at and expiry `SESSION_HOURS` later. `policy` is the password policy, one
-//! pure function, over the common-password list embedded beside this file
-//! (`accounts/common-passwords.txt`, its source and licence in `accounts/common-passwords.md`);
-//! `hash` and `verify` are argon2id at OWASP's parameters, and `weaker` tells a stored hash to
-//! redo at the next sign-in. `store` is the accounts table, its lockout counted under the row's
-//! lock (`LOCKOUT_FAILURES`, `LOCKOUT_MINUTES`). `reset_admin` is `meada ui reset-admin`.
-
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::OnceLock;
@@ -35,34 +13,23 @@ use crate::msg::Msg;
 
 pub(crate) mod store;
 
-/// The default account's username.
 pub const DEFAULT_USERNAME: &str = "admin";
-/// The variable `admin_password_env` names by default.
 pub const ADMIN_PASSWORD_ENV: &str = "MEADA_ADMIN_PASSWORD";
-/// The audience of a session token: the console's surface.
 pub const CONSOLE: &str = "meada:console";
-/// The audience of an agent token for the nodes' surface (#560), and the surface's name in a
-/// request and its answer.
 pub const NODES: &str = "meada:nodes";
 pub const NODES_SURFACE: &str = "nodes";
-/// The audience of an agent token for the proposal server's surface (#562), and the surface's
-/// name in a request and its answer.
 pub const PROPOSALS: &str = "meada:proposals";
 pub const PROPOSALS_SURFACE: &str = "proposals";
-/// How long a session token lives.
 pub const SESSION_HOURS: u64 = 8;
-/// How long an agent token lives when its request names no validity, and the most it may.
 // ponytail: a bearer token's lifetime is bounded; a week is the longest an agent token lives.
 pub const AGENT_HOURS: u64 = 8;
 pub const AGENT_HOURS_MAX: u64 = 168;
-/// What a password holds, in Unicode scalar values (OWASP ASVS).
 // ponytail: OWASP ASVS's bounds; a longer password is refused before any hashing.
 pub const PASSWORD_MIN: usize = 12;
 pub const PASSWORD_MAX: usize = 128;
-/// The most characters of a username.
 // ponytail: a username is a short login name, not free text.
 pub const USERNAME_MAX: usize = 64;
-/// What every local account's subject starts with, so it never equals an identity provider's.
+
 pub const SUBJECT_PREFIX: &str = "local:";
 
 // ponytail: the most bytes of a key file; an Ed25519 key in PEM is about 120 bytes.
@@ -70,7 +37,7 @@ const KEY_MAX: u64 = 16 << 10;
 // ponytail: the most bytes of `admin_password_file`: `PASSWORD_MAX` characters of four bytes,
 // with room for a newline; a longer file is refused, naming it.
 const PASSWORD_FILE_MAX: u64 = 1024;
-/// argon2id at OWASP's recommended parameters: 19 MiB, two iterations, one lane.
+
 const ARGON2_MEMORY_KIB: u32 = 19 * 1024;
 const ARGON2_ITERATIONS: u32 = 2;
 const ARGON2_LANES: u32 = 1;
@@ -86,13 +53,9 @@ const HASH_LANES_MAX: u32 = 4;
 pub const LOCKOUT_FAILURES: i32 = 10;
 // ponytail: how long a lock lasts, never extended by an attempt while it holds.
 pub const LOCKOUT_MINUTES: i32 = 15;
-/// The characters of a password `meada ui reset-admin` generates: 32 symbols, five bits each,
-/// none easily misread (no `l`, `o`, `0` or `1`).
+
 const GENERATED: &[u8; 32] = b"abcdefghijkmnpqrstuvwxyz23456789";
-/// How many characters it has: 24 of five bits, 120 bits.
 const GENERATED_LENGTH: usize = 24;
-/// The common-password list: lowercase, sorted by bytes, one entry per line
-/// (`accounts/common-passwords.md`).
 const COMMON: &str = include_str!("accounts/common-passwords.txt");
 
 /// A local account's role.
@@ -121,32 +84,26 @@ impl Role {
     }
 }
 
-/// Whether `name` is a username: 1 to `USERNAME_MAX` lowercase ASCII letters, digits, `.`, `-`
-/// and `_`.
 pub fn username_ok(name: &str) -> bool {
     (1..=USERNAME_MAX).contains(&name.len())
         && (name.bytes())
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b))
 }
 
-/// The subject of the local account `username`: `local:<username>`.
 pub fn subject(username: &str) -> String {
     format!("{SUBJECT_PREFIX}{username}")
 }
 
-/// The username a local account's subject names, when it is one.
 pub fn username_of(subject: &str) -> Option<&str> {
     subject
         .strip_prefix(SUBJECT_PREFIX)
         .filter(|u| username_ok(u))
 }
 
-/// Whether every one of `groups` is a name an entry's owner may be (ADR 0015).
 pub fn groups_ok(groups: &[String]) -> bool {
     (groups.iter()).all(|g| meada_core::manifest::owner_problem(g).is_none())
 }
 
-/// `[accounts]` as written.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct File {
@@ -158,13 +115,10 @@ pub struct File {
     admin_password_file: Option<String>,
     #[serde(default)]
     break_glass: bool,
-    /// `[accounts.groups]`: a group to the identities it grants, as `[oidc.groups]` (#558).
     groups: Option<HashMap<String, Vec<String>>>,
-    /// `[accounts.github]`: the GitHub grant provider of local accounts (#561).
     github: Option<GithubFile>,
 }
 
-/// `[accounts.github]` as written: `[oidc.github]`'s keys without `login_claim`, plus `api`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct GithubFile {
@@ -174,13 +128,9 @@ struct GithubFile {
     max_age_seconds: Option<i64>,
 }
 
-/// The GitHub REST endpoint `[accounts.github] api` defaults to on `github.com`.
 pub const GITHUB_API: &str = "https://api.github.com";
 
 impl GithubFile {
-    /// The GitHub grant provider the table configures, and the REST endpoint of its host the
-    /// console verifies a login on: `GITHUB_API` by default on `github.com`, required on any other
-    /// host, `https` or loopback `http` as every module endpoint.
     fn validate(self) -> Result<(crate::grant::Github, String), Problem> {
         let keys = [
             "accounts.github",
@@ -231,7 +181,6 @@ pub struct Config {
 }
 
 impl File {
-    /// The section checked; each file is relative to `base`.
     pub fn validate(self, base: &Path) -> Result<Config, Problem> {
         let pair = |env: Option<String>, file: Option<String>, keys: (&'static str, &str)| {
             let both = || (keys.0, Msg::AccountsBoth(keys.1).text());
@@ -269,10 +218,6 @@ impl File {
     }
 }
 
-/// The dotted name of the first grant table (`[accounts.groups]`, `[accounts.github]`) the
-/// manifest `table` has under an `[accounts]` with `break_glass = true`, read before the section
-/// is: the break-glass account is the global operator and needs no grant, so either is refused,
-/// naming it, whatever else the section says.
 pub fn under_break_glass(table: &toml::Table) -> Option<&'static str> {
     let accounts = table.get("accounts").and_then(toml::Value::as_table)?;
     if accounts.get("break_glass").and_then(toml::Value::as_bool) != Some(true) {
@@ -284,9 +229,6 @@ pub fn under_break_glass(table: &toml::Table) -> Option<&'static str> {
         .map(|(_, dotted)| dotted)
 }
 
-/// Whether `token`'s `iss` claim, read without any check, is `issuer`. It routes a bearer to the
-/// one verifier that may check it (under break glass, the console's own key or the identity
-/// provider's), so neither ever sees the other's tokens; it admits nothing by itself.
 pub fn issued_by(token: &str, issuer: &str) -> bool {
     #[derive(Deserialize)]
     struct Issued {
@@ -296,7 +238,6 @@ pub fn issued_by(token: &str, issuer: &str) -> bool {
     claims.is_ok_and(|claims| claims.iss.as_deref() == Some(issuer))
 }
 
-/// The key of a secret of the section: `<name>_env` or `<name>_file`.
 fn key_of(secret: &Secret, env: &'static str, file: &'static str) -> &'static str {
     match secret {
         Secret::Env(_) => env,
@@ -304,13 +245,10 @@ fn key_of(secret: &Secret, env: &'static str, file: &'static str) -> &'static st
     }
 }
 
-/// `secret`'s value, read now (at most `max` bytes for a file), or the problem naming its key and
-/// never its value: an unset variable, an unreadable file.
 fn read(secret: &Secret, keys: (&'static str, &'static str), max: u64) -> Result<String, Problem> {
     let key = key_of(secret, keys.0, keys.1);
     match secret.read(max) {
         Ok(Some(value)) => Ok(value),
-        // Only a variable reads as nothing: a file is its text or the problem naming it.
         Ok(None) => {
             let unset = match secret {
                 Secret::Env(var) => var.clone(),
@@ -322,11 +260,9 @@ fn read(secret: &Secret, keys: (&'static str, &'static str), max: u64) -> Result
     }
 }
 
-/// The keys of the public and the private half.
 const PUBLIC: (&str, &str) = ("accounts.public_key_env", "accounts.public_key_file");
 const PRIVATE: (&str, &str) = ("accounts.private_key_env", "accounts.private_key_file");
 
-/// `secret`, the half of the pair `keys` names, or the problem that the section names none.
 fn named(
     secret: &Option<Secret>,
     keys: (&'static str, &'static str),
@@ -343,9 +279,6 @@ fn named(
 }
 
 impl Config {
-    /// The signing key's public half, read now: the start check of every surface that admits a
-    /// Meada-signed token. It must be named, read and Ed25519 in PEM; a problem names its key and
-    /// never the value. The private half is never read here.
     pub fn public(&self) -> Result<Public, Problem> {
         let public = named(&self.public_key, PUBLIC, false)?;
         let key = key_of(&public, PUBLIC.0, PUBLIC.1);
@@ -354,9 +287,6 @@ impl Config {
         decoding.map(Public).map_err(|_| not_ed25519())
     }
 
-    /// The signing key pair, read now: the console's start check. Each half must be named, read,
-    /// Ed25519 in PEM, and the private half must sign what the public half verifies; a problem
-    /// names its key and never the value.
     pub fn keys(&self) -> Result<Keys, Problem> {
         named(&self.public_key, PUBLIC, false)?;
         let private = named(&self.private_key, PRIVATE, true)?;
@@ -365,8 +295,6 @@ impl Config {
         let not_ed25519 = |key, private| (key, Msg::AccountsNotEd25519 { private }.text());
         let encoding = EncodingKey::from_ed_pem(read(&private, PRIVATE, KEY_MAX)?.as_bytes())
             .map_err(|_| not_ed25519(private_key, true))?;
-        // The private half's own check happens when it signs: a probe signed now and verified
-        // with the public half proves both.
         let probe = jsonwebtoken::encode(
             &Header::new(Algorithm::EdDSA),
             &Probe { probe: 1 },
@@ -383,10 +311,6 @@ impl Config {
         Ok(Keys { encoding, public })
     }
 
-    /// What a surface that admits agent tokens admits with this section and no `[oidc]`: the
-    /// public half read now (`public`), the console's `[ui] public_url`, `issuer`, every token's
-    /// issuer, and the surface's `audience` (`NODES` for a node, #560; `PROPOSALS` for the
-    /// proposal server, #562).
     pub fn agents(&self, issuer: &str, audience: &'static str) -> Result<Agents, Problem> {
         let public = self.public()?;
         let issuer = issuer.trim_end_matches('/').to_string();
@@ -397,12 +321,8 @@ impl Config {
         })
     }
 
-    /// The default account's initial password the deployer set: `None` when the variable is
-    /// unset or empty (the console generates the first password), the problem naming the key
-    /// when the file cannot be read. Read only when the default account is created.
     pub fn admin_password(&self) -> Result<Option<String>, Problem> {
         match &self.admin_password {
-            // A value that is not UTF-8 is refused, never taken for an unset variable.
             Secret::Env(var) => match std::env::var(var) {
                 Ok(value) => Ok(Some(value).filter(|v| !v.is_empty())),
                 Err(std::env::VarError::NotPresent) => Ok(None),
@@ -414,13 +334,11 @@ impl Config {
         }
     }
 
-    /// The key that names the initial password, for a policy refusal.
     pub fn admin_password_key(&self) -> &'static str {
         key_of(&self.admin_password, ADMIN_PASSWORD.0, ADMIN_PASSWORD.1)
     }
 }
 
-/// The keys of the initial password: the variable's and the file's.
 const ADMIN_PASSWORD: (&str, &str) = (
     "accounts.admin_password_env",
     "accounts.admin_password_file",
@@ -454,7 +372,6 @@ pub struct Claims {
 }
 
 impl Claims {
-    /// The username the subject names.
     pub fn username(&self) -> &str {
         username_of(&self.sub).unwrap_or_default()
     }
@@ -470,8 +387,6 @@ pub struct Holder<'a> {
 }
 
 impl Holder<'_> {
-    /// The claims of a token for this holder from `issuer` for `audience`, issued now and valid
-    /// `hours`.
     fn claims(
         &self,
         issuer: &str,
@@ -514,9 +429,6 @@ pub struct Agents {
 }
 
 impl Agents {
-    /// The claims of `headers`' bearer when it is an agent token for this surface of this
-    /// console (`Public::verify` with the surface's audience), never one awaiting a password
-    /// change; else whether a bearer was sent, for the challenge of the 401.
     pub fn admit(&self, headers: &hyper::HeaderMap) -> Result<Claims, bool> {
         match crate::oidc::bearer(headers) {
             Ok(Some(token)) => (self.public.verify(token, &self.issuer, self.audience))
@@ -528,9 +440,6 @@ impl Agents {
     }
 }
 
-/// The `WWW-Authenticate` value of a 401 for a missing or refused bearer: `Bearer`, with
-/// `error="invalid_token"` when one was `sent` (RFC 6750). Every surface of local accounts
-/// answers with it: the console, a node and the proposal server.
 pub fn challenge(sent: bool) -> &'static str {
     match sent {
         false => "Bearer",
@@ -539,17 +448,12 @@ pub fn challenge(sent: bool) -> &'static str {
 }
 
 impl Keys {
-    /// The public key's fingerprint (#558), which the admission view shows so an operator can tell
-    /// which key pair the console holds: `blake3:` and the hex BLAKE3 hash of the raw 32-byte
-    /// Ed25519 public key (the last 32 bytes of its DER). Never a secret.
     pub fn fingerprint(&self) -> String {
         let raw = (self.public.0.try_get_as_bytes())
             .expect("an Ed25519 key read from PEM holds its raw bytes");
         format!("blake3:{}", blake3::hash(raw).to_hex())
     }
 
-    /// A session token for `holder` from `issuer`, now: the token and its expiry in seconds
-    /// since the epoch.
     pub fn session(
         &self,
         issuer: &str,
@@ -560,9 +464,6 @@ impl Keys {
         self.signed(&claims)
     }
 
-    /// An agent token for `holder` from `issuer` for the surface `audience`, valid `hours` from
-    /// now (#560): the session token's claims with that audience, a random token id and never a
-    /// change-required mark. The token, its expiry in seconds since the epoch and its id.
     pub fn agent(
         &self,
         issuer: &str,
@@ -579,25 +480,18 @@ impl Keys {
         Ok((token, exp, id))
     }
 
-    /// `claims` signed with EdDSA, and their expiry.
     fn signed(&self, claims: &Claims) -> Result<(String, u64), String> {
         let header = Header::new(Algorithm::EdDSA);
         let token = jsonwebtoken::encode(&header, claims, &self.encoding);
         Ok((token.map_err(|e| e.to_string())?, claims.exp))
     }
 
-    /// `Public::verify` with this pair's public half.
     pub fn verify(&self, token: &str, issuer: &str, audience: &str) -> Option<Claims> {
         self.public.verify(token, issuer, audience)
     }
 }
 
 impl Public {
-    /// The claims of `token` when it passes: EdDSA only, no `crit`, signed by this key's pair,
-    /// issued by `issuer` for `audience`, `exp` and `nbf` with the identity provider's leeway, a
-    /// subject `local:<username>`, a role, groups that are owner names, and a verified login that
-    /// is a login when there is one (#561). Nothing says why a token fails: every failure is the
-    /// same 401.
     pub fn verify(&self, token: &str, issuer: &str, audience: &str) -> Option<Claims> {
         let header = jsonwebtoken::decode_header(token).ok()?;
         if header.alg != Algorithm::EdDSA || header.crit.is_some() {
@@ -617,23 +511,16 @@ impl Public {
     }
 }
 
-/// A password the policy refuses, and why: the first rule it fails.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Rule {
-    /// Fewer than `PASSWORD_MIN` characters.
     Short,
-    /// More than `PASSWORD_MAX` characters.
     Long,
-    /// The username, ignoring case.
     Username,
-    /// An entry of the common-password list, ignoring case.
     Common,
-    /// The current password, in a change: not `policy`'s, which has no current password.
     Current,
 }
 
 impl Rule {
-    /// The rule's name in an API error.
     pub fn code(self) -> &'static str {
         match self {
             Rule::Short => "too_short",
@@ -644,7 +531,6 @@ impl Rule {
         }
     }
 
-    /// The message naming the rule, never the password.
     pub fn text(self) -> String {
         match self {
             Rule::Short => Msg::AccountsPasswordShort(PASSWORD_MIN).text(),
@@ -656,10 +542,6 @@ impl Rule {
     }
 }
 
-/// The password policy (OWASP ASVS), shared by every route and the CLI: 12 to 128 characters
-/// counted as Unicode scalar values, any character, no composition rule and no truncation;
-/// refused when it is the username ignoring case, or an entry of the common-password list
-/// ignoring case. The first rule it fails, in that order.
 pub fn policy(password: &str, username: &str) -> Result<(), Rule> {
     let length = password.chars().count();
     let lower = password.to_lowercase();
@@ -676,21 +558,16 @@ pub fn policy(password: &str, username: &str) -> Result<(), Rule> {
     }
 }
 
-/// The entries of the common-password list, split once.
 fn common() -> &'static [&'static str] {
     static LIST: OnceLock<Vec<&'static str>> = OnceLock::new();
     LIST.get_or_init(|| COMMON.lines().collect())
 }
 
-/// A password for the default account's first start and `meada ui reset-admin`:
-/// `GENERATED_LENGTH` characters of `GENERATED` from the operating system's generator, one the
-/// policy takes.
 pub fn generated() -> String {
     use password_hash::rand_core::RngCore;
     loop {
         let mut bytes = [0u8; GENERATED_LENGTH];
         OsRng.fill_bytes(&mut bytes);
-        // 256 is a multiple of 32: every symbol is as likely as every other.
         let password: String = (bytes.iter())
             .map(|b| GENERATED[usize::from(*b) % GENERATED.len()] as char)
             .collect();
@@ -700,23 +577,18 @@ pub fn generated() -> String {
     }
 }
 
-/// argon2id at OWASP's recommended parameters.
 fn argon2() -> Argon2<'static> {
     let params = Params::new(ARGON2_MEMORY_KIB, ARGON2_ITERATIONS, ARGON2_LANES, None)
         .expect("valid argon2 parameters");
     Argon2::new(argon2::Algorithm::Argon2id, Version::V0x13, params)
 }
 
-/// The PHC string of `password` under argon2id, with a fresh salt: the parameters ride in it, so
-/// they can be raised later.
 pub fn hash(password: &str) -> Result<String, String> {
     let salt = SaltString::generate(&mut OsRng);
     let hashed = argon2().hash_password(password.as_bytes(), &salt);
     hashed.map(|h| h.to_string()).map_err(|e| e.to_string())
 }
 
-/// Whether `password` is the one `phc`, an argon2id PHC string, hashes, with `phc`'s own
-/// parameters. A string that is no stored hash (`is_hash`) matches nothing.
 pub fn verify(password: &str, phc: &str) -> bool {
     stored(phc).is_some_and(|parsed| {
         argon2()
@@ -725,13 +597,10 @@ pub fn verify(password: &str, phc: &str) -> bool {
     })
 }
 
-/// Whether `phc` is what a stored hash must be: an argon2id PHC string whose parameters cost no
-/// more than `HASH_MEMORY_MAX_KIB`, `HASH_ITERATIONS_MAX` and `HASH_LANES_MAX`.
 pub fn is_hash(phc: &str) -> bool {
     stored(phc).is_some()
 }
 
-/// `phc` parsed when it is a stored hash (`is_hash`).
 fn stored(phc: &str) -> Option<PasswordHash<'_>> {
     let parsed = PasswordHash::new(phc).ok()?;
     let params = Params::try_from(&parsed).ok()?;
@@ -741,8 +610,6 @@ fn stored(phc: &str) -> Option<PasswordHash<'_>> {
     (parsed.algorithm.as_str() == "argon2id" && bounded).then_some(parsed)
 }
 
-/// Whether the stored hash `phc` is weaker than the console's own parameters (less memory, fewer
-/// iterations, or an older argon2 version), so a sign-in that proves its password redoes it.
 pub fn weaker(phc: &str) -> bool {
     stored(phc).is_some_and(|parsed| {
         let params = Params::try_from(&parsed).ok();
@@ -752,8 +619,6 @@ pub fn weaker(phc: &str) -> bool {
     })
 }
 
-/// A fixed hash the sign-in checks an unknown username against, so that every refusal costs one
-/// hash. Computed once, at the console's start.
 pub fn dummy() -> &'static str {
     static DUMMY: OnceLock<String> = OnceLock::new();
     DUMMY.get_or_init(|| hash("meada: no such account").expect("a hash"))
@@ -811,9 +676,6 @@ mod tests {
         }
     }
 
-    /// `[accounts.github]` (#561): `[oidc.github]`'s keys without `login_claim`, plus `api`,
-    /// GitHub's by default on `github.com` and required on another host, `https` or loopback
-    /// `http`; each bad key named with this table's prefix.
     #[test]
     fn the_github_table_defaults_its_api_on_github_com_and_names_each_bad_key() {
         let table = |rest: &str| format!("[github]\n{rest}");
@@ -867,13 +729,10 @@ mod tests {
                 "{rest}"
             );
         }
-        // `login_claim` belongs to an identity provider's token, which local accounts have not.
         let claim = "login_claim = \"login\"\nmax_age_seconds = 60\n";
         assert!(toml::from_str::<File>(&table(claim)).is_err());
     }
 
-    /// `break_glass` is off unless set; set, it refuses the grant tables, named before the section
-    /// is read; without it they are left to the section (#563).
     #[test]
     fn break_glass_is_off_by_default_and_refuses_the_grant_tables() {
         assert!(!section("").unwrap().break_glass);
@@ -896,7 +755,6 @@ mod tests {
             ("[accounts]\nbreak_glass = true\n", None),
             ("[accounts]\n[accounts.groups]\nops = [\"*\"]\n", None),
             ("[accounts]\nbreak_glass = false\n[accounts.github]\n", None),
-            // Not a boolean: the section's own parse names it.
             (
                 "[accounts]\nbreak_glass = \"yes\"\n[accounts.groups]\n",
                 None,
@@ -915,9 +773,7 @@ mod tests {
         for (password, username, expected) in [
             ("", "alice", Err(Rule::Short)),
             ("elevenchars", "alice", Err(Rule::Short)),
-            // Characters, not bytes: eleven two-byte characters are still short.
             ("ééééééééééé", "alice", Err(Rule::Short)),
-            // A common password too short to reach the list: the length rule names it.
             ("password", "alice", Err(Rule::Short)),
             (long.as_str(), "alice", Err(Rule::Long)),
             (longest.as_str(), "alice", Ok(())),
@@ -926,16 +782,13 @@ mod tests {
             ("ALICE.SMITH-1", "alice.smith-1", Err(Rule::Username)),
             ("alice.smith-1", "alice.smith-1", Err(Rule::Username)),
             ("alice.smith-12", "alice.smith-1", Ok(())),
-            // The username comes before the list: a common username is named as the username.
             ("password1234", "password1234", Err(Rule::Username)),
-            // The list's entries, ignoring case, and its first and last.
             ("password1234", "alice", Err(Rule::Common)),
             ("PassWord1234", "alice", Err(Rule::Common)),
             ("QWERTYUIOPASDFGHJKL", "alice", Err(Rule::Common)),
             ("123456789012", "alice", Err(Rule::Common)),
             (common()[0], "alice", Err(Rule::Common)),
             (common()[common().len() - 1], "alice", Err(Rule::Common)),
-            // Near an entry is not an entry.
             ("password12345x", "alice", Ok(())),
             ("password1234 ", "alice", Ok(())),
         ] {
@@ -956,9 +809,6 @@ mod tests {
         assert!(!Rule::Common.text().contains("password1234"));
     }
 
-    /// The embedded list is what `common-passwords.md` says: sorted by bytes without repeats,
-    /// lowercase, each entry 12 to 128 characters with no whitespace at either end, so a
-    /// regenerated list that breaks the filter fails here.
     #[test]
     fn the_common_password_list_is_sorted_lowercase_and_past_the_length_rule() {
         let list = common();
@@ -1016,7 +866,6 @@ mod tests {
         }
     }
 
-    /// A fresh Ed25519 key pair in PEM: the private half (PKCS #8) and the public half (SPKI).
     pub(crate) fn pair() -> (String, String) {
         use ring::signature::KeyPair;
         let rng = ring::rand::SystemRandom::new();
@@ -1046,8 +895,6 @@ mod tests {
         format!("-----BEGIN {label}-----\n{text}\n-----END {label}-----\n")
     }
 
-    /// The fingerprint is the BLAKE3 hash of the raw public key, the last 32 bytes of its DER,
-    /// as `openssl pkey -pubin -outform DER | tail -c 32 | b3sum` computes it.
     #[test]
     fn the_fingerprint_hashes_the_raw_public_key() {
         let (private, public) = pair();
@@ -1066,7 +913,6 @@ mod tests {
         assert_ne!(other.keys().unwrap().fingerprint(), keys.fingerprint());
     }
 
-    /// `text`, standard base64 with padding, decoded.
     fn decoded(text: &str) -> Vec<u8> {
         const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         let sextets: Vec<u32> = (text.bytes().filter(|b| *b != b'='))
@@ -1080,7 +926,6 @@ mod tests {
         bytes
     }
 
-    /// `[accounts]` over the key files `public` and `private` written under a directory of `case`.
     fn keyed(case: &str, public: &str, private: &str) -> Config {
         let dir =
             std::env::temp_dir().join(format!("meada-accounts-{case}-{}", std::process::id()));
@@ -1107,7 +952,6 @@ mod tests {
         assert!(message.contains("Ed25519 public key"), "{message}");
         let (key, _) = refused(keyed("garbage", &public, "not a key"));
         assert_eq!(key, "accounts.private_key_file");
-        // No value reaches a message.
         for (_, message) in [
             refused(keyed("leak1", &other_public, &private)),
             refused(keyed("leak2", &public, "not a key")),
@@ -1197,7 +1041,6 @@ mod tests {
             .keys()
             .unwrap();
         assert!(other.verify(&token, issuer, CONSOLE).is_none());
-        // Without the mark, the claim is absent.
         let (plain, _) = keys
             .session(issuer, &holder("alice", Role::Operator, &[], None), false)
             .unwrap();
@@ -1209,7 +1052,6 @@ mod tests {
                 .unwrap()
                 .change_required
         );
-        // Expired, or not yet valid, past the leeway; HS256 and a subject that is no local one.
         let sign = |claims: serde_json::Value| {
             jsonwebtoken::encode(&Header::new(Algorithm::EdDSA), &claims, &keys.encoding).unwrap()
         };
@@ -1229,7 +1071,6 @@ mod tests {
             ("sub", serde_json::json!("alice")),
             ("sub", serde_json::json!("local:Alice")),
             ("role", serde_json::json!("root")),
-            // A login claim that is no stored login (#561): uppercase, a bad character, a number.
             ("login", serde_json::json!("Ana")),
             ("login", serde_json::json!("ana smith")),
             ("login", serde_json::json!(7)),
@@ -1251,17 +1092,12 @@ mod tests {
         )
         .unwrap();
         assert!(keys.verify(&hs256, issuer, CONSOLE).is_none());
-        // A header naming critical extensions is refused, whatever it names.
         let mut critical = Header::new(Algorithm::EdDSA);
         critical.crit = Some(vec!["exp".into()]);
         let crit = jsonwebtoken::encode(&critical, &base, &keys.encoding).unwrap();
         assert!(keys.verify(&crit, issuer, CONSOLE).is_none());
     }
 
-    /// An agent token (#560) carries the session token's claims with its surface's audience, a
-    /// random id and no change-required mark, lives `hours`, and a node admits it with the public
-    /// half alone (the private file gone), the issuer's trailing slash aside; the console's
-    /// audience refuses it, and a node refuses a session token, no bearer and another scheme.
     #[test]
     fn an_agent_token_is_for_its_surface_alone_with_a_random_id() {
         let (private, public) = pair();
@@ -1291,7 +1127,6 @@ mod tests {
             ("local:alice", Role::Viewer, &groups[..])
         );
         assert_eq!(claims.jti.as_deref(), Some(id.as_str()));
-        // The verified login rides in the token (#561).
         assert_eq!(claims.login.as_deref(), Some("ana"));
         assert!(!claims.change_required);
         assert_eq!((claims.exp, exp - claims.iat), (exp, 24 * 3600));
@@ -1312,8 +1147,6 @@ mod tests {
         assert_eq!(send(&format!("Bearer {session}")).err(), Some(true));
         assert_eq!(send("Bearer ").err(), Some(true));
         assert_eq!(send(&format!("Basic {token}")).err(), Some(false));
-        // The proposal server's surface (#562) admits its own agent tokens alone, and a node
-        // refuses them.
         let (proposal, _, _) = (keys.agent(
             issuer,
             &holder("alice", Role::Operator, &groups, Some("ana")),
@@ -1336,12 +1169,9 @@ mod tests {
         );
         assert_eq!(bearer(&token).err(), Some(true));
         assert_eq!(bearer(&session).err(), Some(true));
-        // The public half alone: a node never needs the private one.
         assert!(config.keys().is_err());
     }
 
-    /// A bearer is routed by its issuer read without a check: this console's session token by
-    /// its own issuer, never another's; what is no JWT, or has no issuer, by none.
     #[test]
     fn a_token_is_routed_by_its_unchecked_issuer() {
         let (private, public) = pair();
@@ -1371,7 +1201,6 @@ mod tests {
         assert!(is_hash(&phc));
         assert!(verify("correct horse battery", &phc));
         assert!(!verify("correct horse batterY", &phc));
-        // A fresh salt per hash.
         assert_ne!(hash("correct horse battery").unwrap(), phc);
         for bad in [
             "",
@@ -1381,8 +1210,6 @@ mod tests {
             assert!(!is_hash(bad) && !verify("not a hash", bad), "{bad}");
         }
         assert!(is_hash(dummy()));
-        // A hostile row's parameters are bounded: one past a ceiling is no stored hash and is
-        // never computed; the iteration and lane ceilings themselves pass.
         let salt = SaltString::generate(&mut OsRng);
         let with = |m: u32, t: u32, p: u32| {
             let params = Params::new(m, t, p, None).unwrap();
@@ -1414,9 +1241,6 @@ mod tests {
         }
     }
 
-    /// A stored hash with less memory, fewer iterations or an older version than the console's
-    /// own is weaker, and redone at the next sign-in; the console's own, or a costlier one within
-    /// the bounds, is not; a string that is no stored hash is not either (it admits nothing).
     #[test]
     fn a_hash_below_the_console_s_parameters_is_weaker() {
         let salt = SaltString::generate(&mut OsRng);

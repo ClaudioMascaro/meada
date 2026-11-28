@@ -21,7 +21,6 @@ from prove import git, free_port, Http, answer, mcp_answers, status_before_855
 from console import http, query_equal
 
 REMOTE = 'example.com/neutral-sdk/'
-# SDK service, JS constructor stem, Terraform type/name field, contract kind/name.
 SERVICES = {
     'sns': ('SNS', 'aws_sns_topic', 'name', 'channel::sns', 'dispatch'),
     'events': ('EventBridge', 'aws_cloudwatch_event_bus', 'name', 'channel::eventbridge', 'audit-bus'),
@@ -31,7 +30,6 @@ SERVICES = {
     'ssm': ('SSM', 'aws_ssm_parameter', 'name', 'resource::ssm', '/audit/setting'),
     'secretsmanager': ('SecretsManager', 'aws_secretsmanager_secret', 'name', 'resource::secretsmanager', 'audit/credential'),
 }
-# Independently selected AWS low-level operation/argument matrix, not a feature fixture.
 OPERATIONS = [
     ('sns', 'Publish', 'publish', 'TopicArn', 'providers'),
     ('events', 'PutEvents', 'put_events', 'EventBusName', 'providers'),
@@ -149,7 +147,6 @@ def seed(run):
             expected.append({'file': f'app.{language}', 'symbol': symbol, 'role': role,
                              'contract': prefix if unresolved else f'{prefix}::{name}',
                              'operation': operation, 'environment': None, 'unresolved': unresolved, 'via': 'sdk:aws'})
-        # Each service has a literal sibling and an unresolved environment side.
         for service in SERVICES:
             service, operation, pyop, key, role = next(o for o in OPERATIONS if o[0] == service and o[3] not in ['RequestItems', 'TransactItems'])
             prefix = SERVICES[service][3]
@@ -163,7 +160,6 @@ def seed(run):
             expected.append({'file': f'app.{language}', 'symbol': symbol, 'role': role,
                              'contract': prefix, 'operation': operation, 'environment': variable, 'unresolved': True})
             expected[-1]['via'] = 'env:' + variable
-        # Origin and hidden-name refusals: all contain a real supported operation/name.
         if language == 'py':
             controls = {
                 'parameter': 'def py_refuse_parameter(s3_client):\n    return s3_client.get_object(Bucket="audit-bucket")\n',
@@ -304,8 +300,6 @@ def main():
     binary, base = str(Path(args.head_bin).resolve()), str(Path(args.base_bin).resolve())
     try:
         infra, app, peer, control, expected, refused = seed(run)
-        # ADR 0025/0026 forbid process-environment resolution. Explicit values that
-        # would match real provisioners make an accidental runtime lookup observable.
         for row in expected:
             if row['environment']:
                 service = row['symbol'].split('_env_', 1)[1]
@@ -323,8 +317,6 @@ def main():
         combined = dict(head['app'])
         for role in ['providers', 'consumers']:
             combined[role] = head['app'][role] + head['peer'][role] + head['infra'][role]
-        # Exports project links touching their repository. Infra owns every
-        # provisioner; app owns all readers. These give complete global arrays.
         combined['provisions'] = head['infra'].get('provisions', [])
         mapped = inspect(probe, combined, expected, refused)
         for name in ['app', 'peer', 'infra']:
@@ -385,7 +377,6 @@ def main():
         offset += 2 * len(SERVICES)
         for i, (symbol, _) in enumerate(literal_sites):
             probe.check(symbol + ': upward trace reaches provisioning link', 'provisions ' in texts[offset + i], texts[offset + i])
-        # Existing SQS/code-only flows answer to the authorized base on identical files.
         controls = [{'tool': 'context', 'arguments': {'symbol': symbol, 'budget': 8000}}
                     for symbol in ['send_job', 'read_job', 'send_ts']]
         controls += [{'tool': 'trace', 'arguments': {'from': 'read_job', 'direction': 'up', 'budget': 8000}}]

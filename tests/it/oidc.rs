@@ -1,7 +1,3 @@
-//! The OIDC module (ADR 0012, spec #259, feature `oidc`): `meada mcp --listen` over the chain
-//! with `[oidc]`, against an issuer and a JWKS the test serves on loopback, signed with keys it
-//! generates. Pinned paths need the generation pointer, so their test runs with
-//! `generation-pointer` against the local services too.
 #![cfg(feature = "oidc")]
 
 use std::fs;
@@ -23,21 +19,16 @@ pub(crate) mod github;
 #[cfg(all(feature = "ui", feature = "directory"))]
 mod overage;
 
-/// A node with `[accounts]` and no `[oidc]`: the agent tokens for the nodes (#560).
 #[cfg(feature = "accounts")]
 pub(crate) mod accounts;
 
 const WEB: &str = "example.com/chain/web";
 const PUBLIC: &str = "https://meada.example";
 const METADATA: &str = "https://meada.example/.well-known/oauth-protected-resource";
-/// The path of the protected resource metadata, under a server's root.
 const METADATA_PATH: &str = ".well-known/oauth-protected-resource";
 const SERVED: &str = "example.com/chain/web\nexample.com/chain/gateway\nexample.com/chain/catalog\n\
                       example.com/chain/worker\n";
 
-/// An issuer on loopback: OpenID discovery at its root and the JWKS it holds, which a test may
-/// rotate, or set to `None` to answer 500. `log` holds every request it received, its request
-/// line and headers as sent.
 pub(crate) struct Issuer {
     pub(crate) base: String,
     jwks: Arc<Mutex<Option<String>>>,
@@ -91,7 +82,6 @@ impl Issuer {
     }
 }
 
-/// A P-256 key generated now: the signing key and its public JWK, with `kid`.
 pub(crate) fn key(kid: &str) -> (EncodingKey, Jwk) {
     let rng = ring::rand::SystemRandom::new();
     let alg = &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING;
@@ -112,9 +102,6 @@ pub(crate) fn sign(key: &EncodingKey, kid: &str, alg: Algorithm, claims: &Value)
     jsonwebtoken::encode(&header, claims, key).unwrap()
 }
 
-/// A token of the console's local accounts (ADR 0024) for `issuer` and `audience`, with
-/// `claims` added: the default account's, signed with an Ed25519 key generated now, which no
-/// identity provider holds.
 #[cfg(feature = "accounts")]
 pub(crate) fn ed25519_token(issuer: &str, audience: &str, claims: Value) -> String {
     let rng = ring::rand::SystemRandom::new();
@@ -131,11 +118,8 @@ pub(crate) fn ed25519_token(issuer: &str, audience: &str, claims: Value) -> Stri
     jsonwebtoken::encode(&Header::new(Algorithm::EdDSA), &all, &key).unwrap()
 }
 
-/// The scope every server here requires.
 const SCOPE: &str = "meada:read";
 
-/// The claims of a token of `issuer` for the resource at `path`, granting `identities`, with
-/// the required scope.
 fn claims(issuer: &str, path: &str, identities: &[&str]) -> Value {
     json!({
         "iss": issuer, "aud": format!("{PUBLIC}/{path}"),
@@ -144,7 +128,6 @@ fn claims(issuer: &str, path: &str, identities: &[&str]) -> Value {
     })
 }
 
-/// The chain's manifest, indexed, with an `[oidc]` section for `issuer`.
 fn oidc_manifest(case: &str, issuer: &str) -> std::path::PathBuf {
     let dir = chain_manifest(case);
     assert!(run(&dir, "index").2);
@@ -152,7 +135,6 @@ fn oidc_manifest(case: &str, issuer: &str) -> std::path::PathBuf {
     dir
 }
 
-/// `[oidc]` for `issuer`, requiring `SCOPE`, appended to the manifest `manifest` of `dir`.
 fn append(dir: &Path, manifest: &str, issuer: &str) {
     let file = dir.join(manifest);
     let section = format!(
@@ -167,16 +149,12 @@ fn start(dir: &Path) -> Server {
     Server::start_args(dir, &args, &[])
 }
 
-/// A tool and its arguments, `tools/call`ed alone.
 pub(crate) type Call = Option<(&'static str, Value)>;
 
-/// `trace` from `dashboard`, which crosses every link of the chain.
 pub(crate) fn trace() -> Call {
     Some(("trace", json!({"from": "dashboard"})))
 }
 
-/// What `url` answers with `token` and `headers` (values as bytes, so not always UTF-8): its
-/// status, `WWW-Authenticate` and body. With `call`, that tool call POSTed alone, else a GET.
 pub(crate) fn ask(url: &str, token: Option<&str>, headers: &[(&str, &[u8])], call: Call) -> Answer {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .http_status_as_error(false)
@@ -230,8 +208,6 @@ pub(crate) fn ask(url: &str, token: Option<&str>, headers: &[(&str, &[u8])], cal
     }
 }
 
-/// The status and `WWW-Authenticate` of a GET of `url` sending `headers` as raw lines, for the
-/// shapes an HTTP client refuses to send (two `Authorization` headers, a value not in UTF-8).
 fn raw(url: &str, headers: &[&[u8]]) -> (u16, Option<String>) {
     let (host, path) = url
         .strip_prefix("http://")
@@ -264,12 +240,10 @@ pub(crate) struct Answer {
     pub(crate) status: u16,
     challenge: Option<String>,
     kind: String,
-    /// Every header but `date`, in the order sent.
     headers: Vec<String>,
     pub(crate) body: String,
 }
 
-/// The text of a tool result POSTed alone.
 pub(crate) fn traced(answer: &Answer) -> String {
     assert_eq!(answer.status, 200, "{answer:?}");
     let json: Value = serde_json::from_str(&answer.body).unwrap();
@@ -286,7 +260,6 @@ fn golden() -> String {
     .unwrap()
 }
 
-/// The tool calls on `/WEB` that, with every repository granted, each reach a peer.
 fn reaching() -> [Call; 3] {
     [
         trace(),
@@ -295,15 +268,12 @@ fn reaching() -> [Call; 3] {
     ]
 }
 
-/// What `token` reads at `url` through each call of `reaching`.
 fn answers(url: &str, token: &str) -> Vec<String> {
     (reaching().into_iter())
         .map(|call| traced(&ask(url, Some(token), &[], call)))
         .collect()
 }
 
-/// Fails when `answer` names a chain repository other than `WEB`, a path only a peer holds, or
-/// a missing peer, or does not name `WEB` (an error would pass otherwise).
 pub(crate) fn web_only(answer: &str) {
     assert!(answer.contains(WEB), "{answer}");
     for leak in [
@@ -321,8 +291,6 @@ pub(crate) fn web_only(answer: &str) {
     }
 }
 
-/// The challenges at `path`: no token, a refused one, a token without the identity, and one
-/// without the scope.
 fn missing(path: &str) -> Option<String> {
     Some(format!(
         "Bearer resource_metadata=\"{METADATA}/{path}\", scope=\"{SCOPE}\""
@@ -349,14 +317,12 @@ fn unscoped(path: &str) -> Option<String> {
     ))
 }
 
-/// A token of `issuer` for `path`, granting `WEB`, without the required scope.
 fn scopeless(issuer: &str, signing: &EncodingKey, path: &str) -> String {
     let mut claims = claims(issuer, path, &[WEB]);
     claims["scope"] = "openid".into();
     sign(signing, "k1", Algorithm::ES256, &claims)
 }
 
-/// The tokens a refusal test sends: each is refused with 401 `invalid_token` at `/<path>`.
 fn refused_tokens(issuer: &str, signing: &EncodingKey, path: &str) -> Vec<(&'static str, String)> {
     let good = claims(issuer, path, &[WEB]);
     let edit = |change: &dyn Fn(&mut Value)| {
@@ -383,7 +349,6 @@ fn refused_tokens(issuer: &str, signing: &EncodingKey, path: &str) -> Vec<(&'sta
             "wrong audience",
             edit(&|c| c["aud"] = format!("{PUBLIC}/other").into()),
         ),
-        // {"alg":"none","typ":"JWT","kid":"k1"}
         (
             "alg none",
             format!("eyJhbGciOiJub25lIiwidHlwIjoiSldUIiwia2lkIjoiazEifQ.{payload}."),
@@ -392,10 +357,6 @@ fn refused_tokens(issuer: &str, signing: &EncodingKey, path: &str) -> Vec<(&'sta
     ]
 }
 
-/// No token, a refused one, a token in the query string, a token for another repository and an
-/// `Origin` get their answers at `/WEB`; the 404s need a token and list only what it may read;
-/// a `*` token's `trace` equals the golden; both metadata documents answer without a token;
-/// and no part of any token sent reaches stderr, the JWKS refresh failure included.
 #[test]
 fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
     let (signing, jwk) = key("k1");
@@ -405,7 +366,6 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
     let at = |path: &str| format!("{}/{path}", server.url);
     let mut sent = Vec::new();
 
-    // The metadata of `/WEB` and of a pin of it, with no token.
     for path in [WEB.to_string(), format!("{WEB}@0123456789abcdef")] {
         let answer = ask(
             &at(&format!(".well-known/oauth-protected-resource/{path}")),
@@ -429,7 +389,6 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
         );
     }
 
-    // No token, at the endpoint, the root and an unknown path: 401, no listing.
     let answer = ask(&at(WEB), None, &[], trace());
     assert_eq!((answer.status, answer.challenge), (401, missing(WEB)));
     let answer = ask(&format!("{}/", server.url), None, &[], None);
@@ -443,11 +402,9 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
     assert!(!answer.body.contains(WEB), "{}", answer.body);
     let answer = ask(&at("example.com/chain/nope"), None, &[], None);
     assert_eq!(answer.challenge, missing("example.com/chain/nope"));
-    // A CR LF in the path stays encoded in the one challenge header.
     let answer = ask(&at("x%0D%0AX-Evil:%201"), None, &[], None);
     assert_eq!(answer.challenge, missing("x%0D%0AX-Evil:%201"));
 
-    // A valid token in the query string is not read.
     let valid = sign(
         &signing,
         "k1",
@@ -473,20 +430,17 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
         assert_eq!(answer.body, "unauthorized\n", "{case}");
         sent.push(token);
     }
-    // Two `Authorization` headers, or one that is not UTF-8, carrying a valid token.
     let header = format!("Authorization: Bearer {valid}").into_bytes();
     let twice = raw(&at(WEB), &[&header, &header]);
     assert_eq!(twice, (401, invalid(WEB)));
     let mut bytes = header.clone();
     bytes.push(0xff);
     assert_eq!(raw(&at(WEB), &[&bytes]), (401, invalid(WEB)));
-    // A valid token without the required scope.
     let token = scopeless(&issuer.base, &signing, WEB);
     let answer = ask(&at(WEB), Some(&token), &[], trace());
     assert_eq!((answer.status, answer.challenge), (403, unscoped(WEB)));
     sent.push(token);
 
-    // A `*` token reads the whole chain, as the golden has it.
     assert_eq!(traced(&ask(&at(WEB), Some(&valid), &[], trace())), golden());
     let other = sign(
         &signing,
@@ -497,7 +451,6 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
     sent.push(other.clone());
     let answer = ask(&at(WEB), Some(&other), &[], trace());
     assert_eq!((answer.status, answer.challenge), (403, forbidden(WEB)));
-    // A browser's request is refused whatever its token.
     let answer = ask(
         &at(WEB),
         Some(&valid),
@@ -506,7 +459,6 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
     );
     assert_eq!(answer.status, 403);
 
-    // The 404s list only what the token may read: `/`'s token addresses the root.
     let root = |identities: &[&str]| {
         let mut claims = claims(&issuer.base, "", identities);
         claims["aud"] = PUBLIC.into();
@@ -535,7 +487,6 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
     assert_eq!((answer.status, answer.body), (404, format!("{WEB}\n")));
     sent.push(token);
 
-    // An unknown `kid` while the JWKS fails: the cached keys stay, and stderr says so.
     issuer.serve(None);
     let (rotated, _) = key("k2");
     let token = sign(
@@ -560,8 +511,6 @@ fn a_bearer_token_admits_what_its_claim_lists_and_leaks_nowhere() {
     }
 }
 
-/// A key the JWKS gains after the start signs a token Meada accepts: the unknown `kid`
-/// fetches the JWKS again.
 #[test]
 fn a_rotated_key_is_picked_up_on_its_first_token() {
     let (signing, jwk) = key("k1");
@@ -586,10 +535,6 @@ fn a_rotated_key_is_picked_up_on_its_first_token() {
     }
 }
 
-/// With `[oidc]`, a node ignores `[accounts]` under break glass (#563, ADR 0024): it starts though
-/// neither key file exists, reads neither, admits the identity provider's token as before, and
-/// refuses a token signed with Ed25519 for the console's issuer, whether its audience is this
-/// node's resource or the nodes' agent surface, as any token the identity provider did not sign.
 #[cfg(feature = "accounts")]
 #[test]
 fn a_node_with_oidc_ignores_accounts_under_break_glass() {
@@ -627,11 +572,6 @@ fn a_node_with_oidc_ignores_accounts_under_break_glass() {
     );
 }
 
-/// Behind `/WEB`, a token reads only the repositories its claim lists (#290): listing all four,
-/// each answer reaches a peer, the trace as the golden has it; granting `WEB` and the gateway,
-/// the trace keeps their link and names nothing of catalog or worker, nor catalog as a missing
-/// peer though the gateway's `meada.toml` names it; granting `WEB` alone, no answer names a
-/// peer, a path only a peer holds or a missing peer.
 #[test]
 fn a_grant_scopes_the_workspace_of_every_answer() {
     let (signing, jwk) = key("k1");
@@ -670,9 +610,6 @@ fn a_grant_scopes_the_workspace_of_every_answer() {
     }
 }
 
-/// A grant scopes config values (#639) as it scopes symbols: every repository of the chain holds
-/// a value naming it, and `search` with the kind `value` behind `/WEB` lists the four under a
-/// grant of all, and only `WEB`'s under a grant of `WEB` alone.
 #[test]
 fn a_grant_scopes_the_config_values_of_a_search() {
     let (signing, jwk) = key("k1");
@@ -700,7 +637,6 @@ fn a_grant_scopes_the_config_values_of_a_search() {
     web_only(&traced(&ask(&at, Some(&grant(&[WEB])), &[], search())));
 }
 
-/// The same grant over a generation made by hand (`--generations`, no store needed).
 #[cfg(feature = "snapshot")]
 #[test]
 fn a_grant_scopes_the_workspace_of_a_generation() {
@@ -720,13 +656,8 @@ fn a_grant_scopes_the_workspace_of_a_generation() {
     }
 }
 
-/// The CI kind under a grant (#829, ADR 0028), on a node at `url` that serves the reproduction of
-/// #816: behind a caller, a grant that reads the repository of the pipelines reads the link, and
-/// one that does not reads no link to it and no consumer of it; behind the pipelines, `context`
-/// and `trace` list only the consumers of a repository the grant reads.
 fn ci_grants(url: &str, issuer: &str, signing: &EncodingKey) {
     use crate::ci_served::{APP_A, APP_B, PUBLISH, WORKFLOWS, about_the_call, no_provider};
-    // The two CI jobs of `APP_B` that call `PUBLISH`, as `context` on it lists them.
     const CONSUMERS_OF_APP_B: [&str; 2] = [
         "github.com/acme/app-b .github/workflows/ci.yml:11 jobs[\"publish-prd\"] \
          [exact: @v1 (indexed 2344e45), permissions mismatch: id-token write against none] \
@@ -767,7 +698,6 @@ fn ci_grants(url: &str, issuer: &str, signing: &EncodingKey) {
     }
 }
 
-/// A grant scopes the CI sides (#829) as it scopes every answer.
 #[test]
 fn a_grant_scopes_the_ci_sides_of_every_answer() {
     use crate::ci_served::{LISTED, listed};
@@ -781,10 +711,6 @@ fn a_grant_scopes_the_ci_sides_of_every_answer() {
     ci_grants(&server.url, &issuer.base, &signing);
 }
 
-/// The same grants over a generation made by hand, and its named workspaces (#342): one whose
-/// version records the callers with the repository of the pipelines answers the link, and one
-/// that records the callers alone answers no link to it and no consumer of it, to a token that
-/// reads every repository.
 #[cfg(feature = "snapshot")]
 #[test]
 fn a_grant_and_a_named_workspace_scope_the_ci_sides_of_a_generation() {
@@ -833,8 +759,6 @@ fn a_grant_and_a_named_workspace_scope_the_ci_sides_of_a_generation() {
     }
 }
 
-/// A grant of three of twelve repositories reads those three, and a grant of all of them reads
-/// the whole chain: past ten repositories the grant still decides what an answer exposes.
 fn wide_grants(dir: &Path, manifest: &str, issuer: &Issuer, signing: &EncodingKey) {
     append(dir, manifest, &issuer.base);
     #[cfg(feature = "snapshot")]
@@ -876,7 +800,6 @@ fn wide_grants(dir: &Path, manifest: &str, issuer: &Issuer, signing: &EncodingKe
     );
 }
 
-/// The same over twelve repositories: the manifest, then (feature `snapshot`) a generation.
 #[test]
 fn a_grant_scopes_a_workspace_past_ten_repositories() {
     let (signing, jwk) = key("k1");
@@ -906,12 +829,9 @@ fn a_grant_scopes_a_generation_past_ten_repositories() {
     wide_grants(&dir, &manifest, &issuer, &signing);
 }
 
-/// The group `append_groups` maps to `WEB`, and one it leaves unmapped.
 const MAPPED: &str = "team-web-7c1d";
 const UNMAPPED: &str = "team-none-5e2a";
 
-/// `append`'s `[oidc]` with `groups_claim = "groups"` and `[oidc.groups]` mapping `MAPPED` to
-/// `WEB`.
 fn append_groups(dir: &Path, manifest: &str, issuer: &str) {
     append(dir, manifest, issuer);
     let file = dir.join(manifest);
@@ -919,9 +839,6 @@ fn append_groups(dir: &Path, manifest: &str, issuer: &str) {
     fs::write(&file, fs::read_to_string(&file).unwrap() + &groups).unwrap();
 }
 
-/// A token carrying only groups (`MAPPED` and `UNMAPPED`, no `meada_repositories`) reads `/WEB`,
-/// gets 403 on another repository and sees only `WEB` in the root's 404; stderr names neither
-/// group.
 fn grants_web_through_its_groups(server: Server, issuer: &str, signing: &EncodingKey) {
     let token = |path: &str| {
         let mut claims = claims(issuer, path, &[]);
@@ -945,7 +862,6 @@ fn grants_web_through_its_groups(server: Server, issuer: &str, signing: &Encodin
     }
 }
 
-/// `append_groups`'s `[oidc]`, with `kind` as its first lines and `table` after it.
 fn append_typed(dir: &Path, issuer: &str, (kind, table): (&str, &str)) {
     append_groups(dir, MANIFEST, issuer);
     let file = dir.join(MANIFEST);
@@ -954,12 +870,6 @@ fn append_typed(dir: &Path, issuer: &str, (kind, table): (&str, &str)) {
     fs::write(&file, src + table).unwrap();
 }
 
-/// What a server in `dir`, with `append_typed`'s `[oidc]`, answers to the cases of the tests
-/// above: the metadata, the 401s and 403s, the 404 lists, a `*` token's trace, the groups' grant,
-/// a token in Entra ID's overage (`_claim_names`, no `groups`) and, on a second server, a key the
-/// JWKS gains after the start, each answer labelled; then the first server's stderr after the
-/// address, a failed JWKS refresh included, which holds no part of a token sent, no group and no
-/// claim value. `issuer` serves `jwk` alone again when it returns.
 fn transcript(
     dir: &Path,
     issuer: &Issuer,
@@ -1099,7 +1009,6 @@ fn transcript(
         .collect();
     let origin = [("Origin", &b"https://evil.example"[..])];
     answers.push(("origin".into(), ask(&at(WEB), Some(&all), &origin, trace())));
-    // Two `Authorization` headers, then a value not in UTF-8.
     let header = format!("Authorization: Bearer {all}").into_bytes();
     let mut bytes = header.clone();
     bytes.push(0xff);
@@ -1117,7 +1026,6 @@ fn transcript(
         };
         answers.push((case.into(), answer));
     }
-    // An unknown `kid` while the JWKS fails.
     issuer.serve(None);
     let (rotated, _) = key("k2");
     let unknown = sign(&rotated, "k2", Algorithm::ES256, &claims(base, WEB, &[WEB]));
@@ -1137,7 +1045,6 @@ fn transcript(
         assert!(!stderr.contains(claim), "{claim} on stderr: {stderr}");
     }
 
-    // A key the JWKS gains after the start, on a server that has not fetched it again yet.
     let server = start(dir);
     let (added, added_jwk) = key("k2");
     issuer.serve(Some(set(&[jwk, &added_jwk])));
@@ -1148,11 +1055,6 @@ fn transcript(
     (answers, stderr)
 }
 
-/// The identity provider's `type` changes no answer (ADR 0016): with no `type`, `generic`,
-/// `okta`, `keycloak`, and `entra` with and without `[oidc.entra] overage = "ignore"`, every case
-/// of `transcript` answers byte for byte as the manifest without the key, stderr included, and a
-/// JWKS past its cap refuses the start with the same stderr. A token in overage (`_claim_names`,
-/// no `groups`) has no groups.
 #[test]
 fn the_identity_provider_type_changes_no_answer() {
     let (signing, jwk) = key("k1");
@@ -1173,7 +1075,6 @@ fn the_identity_provider_type_changes_no_answer() {
         ("type = \"entra\"\n", ""),
         ("type = \"entra\"\n", "[oidc.entra]\noverage = \"ignore\"\n"),
     ] {
-        // A JWKS past its cap refuses the start with the same stderr.
         fs::write(dir.join(MANIFEST), &today).unwrap();
         append_typed(&dir, &oversized.base, typed);
         let args = ["mcp", "--listen", "127.0.0.1:0", "--workspace", MANIFEST];
@@ -1209,7 +1110,6 @@ fn the_identity_provider_type_changes_no_answer() {
     }
 }
 
-/// `[oidc.groups]` grants what a token's groups map to (#291).
 #[test]
 fn a_token_reads_what_its_groups_map_to() {
     let (signing, jwk) = key("k1");
@@ -1220,7 +1120,6 @@ fn a_token_reads_what_its_groups_map_to() {
     grants_web_through_its_groups(start(&dir), &issuer.base, &signing);
 }
 
-/// The same token gets the same grant on a generation made by hand (`--generations`).
 #[cfg(feature = "snapshot")]
 #[test]
 fn a_token_reads_what_its_groups_map_to_on_a_generation() {
@@ -1232,7 +1131,6 @@ fn a_token_reads_what_its_groups_map_to_on_a_generation() {
     grants_web_through_its_groups(server, &issuer.base, &signing);
 }
 
-/// A JWKS past its cap, or an issuer that does not answer, refuses the start: nothing listens.
 #[test]
 fn an_oversized_jwks_refuses_the_start() {
     let issuer = Issuer::new(format!(
@@ -1248,7 +1146,6 @@ fn an_oversized_jwks_refuses_the_start() {
         stderr.contains("JWKS") && stderr.contains("limit"),
         "{stderr}"
     );
-    // No issuer at all.
     let gone = TcpListener::bind("127.0.0.1:0").unwrap();
     let base = format!("http://{}", gone.local_addr().unwrap());
     drop(gone);
@@ -1260,9 +1157,6 @@ fn an_oversized_jwks_refuses_the_start() {
     assert!(stderr.contains("metadata could not be read"), "{stderr}");
 }
 
-/// On a node with pins, `/<identity>@<generation>` takes the token of `/<identity>` and its
-/// own, refuses the others as `/<identity>` does, serves its metadata, and its 404 for a
-/// generation the node does not hold needs a token.
 #[cfg(feature = "generation-pointer")]
 #[test]
 fn a_pinned_path_is_admitted_as_its_identity_is() {
@@ -1302,7 +1196,6 @@ fn a_pinned_path_is_admitted_as_its_identity_is() {
             "{case}"
         );
     }
-    // `/WEB`'s audience and the pin's own both read the pin.
     for audience in [WEB, pinned.as_str()] {
         let token = sign(
             &signing,
@@ -1316,7 +1209,6 @@ fn a_pinned_path_is_admitted_as_its_identity_is() {
             "{audience}"
         );
     }
-    // A token granting `WEB` alone reads none of the peers at the pin.
     let web = sign(
         &signing,
         "k1",
@@ -1338,8 +1230,6 @@ fn a_pinned_path_is_admitted_as_its_identity_is() {
     );
     assert_eq!((answer.status, answer.challenge), (403, unscoped(&pinned)));
 
-    // A generation the node does not hold: 401 without a token, 403 with one that does not
-    // grant the identity, the 404 with one that does.
     let gone = format!("{WEB}@ffffffffffffffff");
     let answer = ask(&at(&gone), None, &[], None);
     assert_eq!((answer.status, answer.challenge), (401, missing(&gone)));
@@ -1359,7 +1249,6 @@ fn a_pinned_path_is_admitted_as_its_identity_is() {
         answer.body,
         format!("generation ffffffffffffffff is not held here\ncurrent: {g1}\nheld: {g1}\n")
     );
-    // An identity the pinned generation lacks lists only what the token may read.
     let none = format!("example.com/chain/none@{g1}");
     let token = sign(
         &signing,
@@ -1371,12 +1260,6 @@ fn a_pinned_path_is_admitted_as_its_identity_is() {
     assert_eq!((answer.status, answer.body), (404, format!("{WEB}\n")));
 }
 
-/// A named workspace's route on a node (#510, ADR 0020's discovery rule): a context recording
-/// `WEB` whose version also held the gateway, which the sponsor rule excluded, is the unknown-id
-/// 404 to a grant that reads `WEB` alone and is left out of its 404 list, while a grant that
-/// reads both is admitted to `WEB`; the excluded gateway is the 404 to every grant. A pin of the
-/// generation answers the same. The generation is made by hand; the pins' `[valkey]` is never
-/// reached.
 #[cfg(feature = "generation-pointer")]
 #[test]
 fn a_context_with_an_excluded_entry_is_seen_only_by_a_grant_reading_it() {
@@ -1421,7 +1304,6 @@ fn a_context_with_an_excluded_entry_is_seen_only_by_a_grant_reading_it() {
         json["result"]["_meta"]["meada/workspace"].clone()
     };
 
-    // A grant reading `WEB` alone: the context is the unknown id, absent from the list.
     let unknown = ask(
         &route("0123456789abcdef", WEB),
         Some(&reads_web),
@@ -1441,7 +1323,6 @@ fn a_context_with_an_excluded_entry_is_seen_only_by_a_grant_reading_it() {
     let hidden = ask(&pinned(EXCLUDING, WEB), Some(&reads_web), &[], call());
     assert_eq!(hidden.status, 404, "{hidden:?}");
     assert!(!hidden.body.contains(EXCLUDING), "{}", hidden.body);
-    // A grant reading both: admitted to `WEB`, and the list holds both contexts.
     for url in [route(EXCLUDING, WEB), pinned(EXCLUDING, WEB)] {
         let answer = ask(&url, Some(&reads_both), &[], call());
         assert_eq!(workspace(&answer), json!(EXCLUDING), "{url}");
@@ -1456,7 +1337,6 @@ fn a_context_with_an_excluded_entry_is_seen_only_by_a_grant_reading_it() {
         (unknown.status, unknown.body.as_str()),
         (404, "c000000000000001\nc000000000000002\n")
     );
-    // The excluded gateway has no bundle in the context: the unknown-id 404 to every grant.
     for identities in [&[WEB, GATEWAY][..], &["*"]] {
         let gateway = token(GATEWAY, identities);
         for pin in [false, true] {

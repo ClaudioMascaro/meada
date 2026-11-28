@@ -1,4 +1,3 @@
-{{- /* The [catalog] and [workspaces] sections of named workspaces (ADR 0021): the console's and the refresh job's bootstrap carry them, a node's never does. */ -}}
 {{- define "meada.namedWorkspaces" -}}
 {{- with .Values.modules.workspaces }}
 {{- if .enabled }}
@@ -14,7 +13,6 @@ max_entries = {{ .maxEntries }}
 {{- end }}
 {{- end }}
 {{- end -}}
-{{- /* [workspaces] needs [ui] with operations in every process that reads it, the refresh job included. */ -}}
 {{- define "meada.jobUi" -}}
 {{- if .Values.modules.workspaces.enabled }}
 

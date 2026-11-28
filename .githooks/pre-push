@@ -1,8 +1,4 @@
 #!/bin/sh
-# Blocks a push whose added lines or commit messages contain a term from a private list: names
-# from the maintainer's private repositories that must never reach this public repository.
-# The list lives outside the repository, one term per line (blank lines and `#` comments are
-# ignored). Without the list the hook does nothing.
 set -eu
 
 list="${MEADA_PRIVATE_TERMS:-$HOME/.config/meada/private-terms}"

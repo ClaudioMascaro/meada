@@ -1,12 +1,3 @@
-//! The catalog in the console (#341, ADR 0021 contract 1): `meada github-app roles` with
-//! `[catalog]` against `github_app`'s fake GitHub API writes the permissions set, and the console
-//! (`oidc`'s loopback issuer, the local Valkey and Postgres) answers `GET /api/v1/catalog` and
-//! `POST /api/v1/catalog/check` from it, per caller, with the rows of the shared Y/A/B table
-//! (`tests/fixtures/named-workspaces.json`, the same rows `grant::permissions`'s unit test reads).
-//! What a caller may select is seen through the console's routes, never the module's tables.
-//! Without a service the tests print why and skip; with `MEADA_TEST_SERVICES_REQUIRED=1` they
-//! fail.
-
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
@@ -21,29 +12,22 @@ use crate::oidc::{Issuer, key, set, sign};
 use crate::server::Server;
 use crate::ui::{Reply, send, send_body};
 
-/// The table's git host, `[oidc.github] host` here.
 const HOST: &str = "github.com";
-/// The fake's installation on the owner `acme`.
 const INSTALLATION: u64 = 15;
 
 fn table() -> Value {
     serde_json::from_str(include_str!("../../../fixtures/named-workspaces.json")).unwrap()
 }
 
-/// One case: the fake GitHub with the table's repositories covered, the job's manifest, the
-/// console running over the set the job wrote and the key that signs its tokens.
 struct Case {
     github: Github,
     dir: PathBuf,
     console: Server,
     signing: EncodingKey,
-    /// Serves the keys the console verifies tokens with, for the case's life.
     issuer: Issuer,
     table: Value,
 }
 
-/// The console's manifest: `[oidc]` as `oidc` has it, `[oidc.github]` with `roles` and
-/// `max_age`, the job's sections, `[catalog]` and `[ui]` with the group `admins` as operators.
 fn console_manifest(case: &str, issuer: &str, github: &Github, max_age: u64) -> PathBuf {
     let roles = "[\"write\", \"maintain\", \"admin\"]";
     let head = format!(
@@ -59,15 +43,12 @@ fn console_manifest(case: &str, issuer: &str, github: &Github, max_age: u64) -> 
         dir.join("ops/console.toml"),
     )
     .unwrap();
-    // The job reads the same sections: no `[ui]`, no operators.
     let job = format!("index_dir = \"../roles-indexes\"\n{head}");
     fs::write(dir.join("ops/roles.toml"), job).unwrap();
     dir
 }
 
 impl Case {
-    /// The case `name`: the table's repositories and collaborators on the fake, a repository
-    /// `acme/c` nobody collaborates on and one `other/z` no pattern admits, the set seeded once.
     fn new(name: &str, max_age: u64) -> Option<Self> {
         let github = Github::new(name)?;
         let (signing, jwk) = key("catalog");
@@ -123,7 +104,6 @@ impl Case {
         })
     }
 
-    /// `meada github-app roles` over the job's manifest: the line on stdout.
     fn seed(&self) -> String {
         let env = [("MEADA_PERMISSIONS_POLL_MS", POLL_MS)];
         let roles = ["github-app", "roles", "--workspace", "ops/roles.toml"];
@@ -132,8 +112,6 @@ impl Case {
         stdout
     }
 
-    /// A token of the table's caller `name`: its login claim when it has one, its claims grant
-    /// and the group `admins` for the platform administrator.
     fn token(&self, name: &str) -> String {
         let caller = &self.table["callers"][name];
         let mut claims = claims(&self.issuer.base, &[]);
@@ -157,7 +135,6 @@ impl Case {
         sign(&self.signing, "catalog", Algorithm::ES256, &claims)
     }
 
-    /// The identity the table calls `short`.
     fn identity(&self, short: &str) -> String {
         self.table["identities"][short]
             .as_str()
@@ -177,16 +154,12 @@ impl Case {
         send_body(&self.console, "POST", path, &headers, &body.to_string())
     }
 
-    /// `GET /api/v1/catalog` with `query`, once the console has read a set (the catalog is
-    /// pending `no_set` until its first poll finds one).
     fn catalog(&self, token: &str, query: &str) -> Value {
         let reply = self.get(&format!("/api/v1/catalog{query}"), token);
         assert_eq!(reply.status, 200, "{}", reply.body);
         reply.json()
     }
 
-    /// Waits until `token`'s catalog is pending `reason` (`None`: no longer pending `no_set`,
-    /// whatever else it says); that answer.
     fn until(&self, token: &str, reason: Option<&str>) -> Value {
         let start = Instant::now();
         loop {
@@ -202,7 +175,6 @@ impl Case {
 }
 
 impl Case {
-    /// Waits until `token`'s catalog is ready; that answer.
     fn ready(&self, token: &str) -> Value {
         let start = Instant::now();
         loop {
@@ -216,7 +188,6 @@ impl Case {
     }
 }
 
-/// The identities of a catalog answer, in order.
 fn listed(answer: &Value) -> Vec<String> {
     let rows = answer["repositories"].as_array().unwrap();
     rows.iter()
@@ -224,13 +195,6 @@ fn listed(answer: &Value) -> Vec<String> {
         .collect()
 }
 
-/// For every caller of the table: the catalog lists exactly the repositories its login holds an
-/// accepted role on, direct or through a group alike (`dave` and `alice`), none through a
-/// rejected role (`zed`), a claims grant (`claims`) or a token without a login (`nologin`,
-/// pending `missing_login`); the platform administrator lists the whole catalog, including the
-/// repository nobody collaborates on. A repository no pattern admits (`other/z`) and one that is
-/// allowed but not covered are in nobody's catalog. The check agrees with the creation table
-/// row by row, and a caller never reads another repository's name.
 #[test]
 fn the_catalog_lists_what_each_caller_may_select() {
     let Some(case) = Case::new("ui_catalog_table", 3600) else {
@@ -278,7 +242,6 @@ fn the_catalog_lists_what_each_caller_may_select() {
         );
         assert_eq!(answer["next"], Value::Null, "{name}");
         assert!(answer["set"]["max_age_seconds"] == 3600 && answer["set"]["finished"].is_string());
-        // No repository outside what the caller may select is named anywhere in the answer.
         for hidden in all
             .iter()
             .chain([&format!("{HOST}/acme/c"), &format!("{HOST}/other/z")])
@@ -322,7 +285,6 @@ fn the_catalog_lists_what_each_caller_may_select() {
                 assert_eq!(answer["reason"], Value::Null, "{name}");
             }
         }
-        // An identity the caller may not select reads `unavailable` and nothing more.
         let results = answer["results"].as_array().unwrap();
         assert!(
             results.iter().all(|r| r.as_object().unwrap().len() == 2),
@@ -330,7 +292,6 @@ fn the_catalog_lists_what_each_caller_may_select() {
         );
     }
 
-    // Not an identity of the catalog at all reads like one the caller may not select.
     let bob = case.token("bob");
     let asked = [
         case.identity("A"),
@@ -351,10 +312,6 @@ fn the_catalog_lists_what_each_caller_may_select() {
     case.github.clean(&stderr, &sent);
 }
 
-/// Pagination is bounded and opaque: `limit` 1 to 100, a cursor that decodes to an identity, `q`
-/// a prefix; anything else is a 400 with a fixed message. A catalog read and a check need a
-/// token, a write needs `Origin`, and the console never asks GitHub: the fake sees no request
-/// while the console answers.
 #[test]
 fn the_catalog_pages_with_bounded_opaque_cursors_and_calls_nobody() {
     let Some(case) = Case::new("ui_catalog_pages", 3600) else {
@@ -423,7 +380,6 @@ fn the_catalog_pages_with_bounded_opaque_cursors_and_calls_nobody() {
     let huge = json!({"identities": ["x".repeat(20 << 10)]});
     assert_eq!(case.post("/api/v1/catalog/check", &root, huge).status, 413);
 
-    // No token: 401 before anything; no `Origin` on the POST: 403.
     let bare = send(&case.console, "GET", "/api/v1/catalog", &[]);
     assert_eq!(bare.status, 401);
     let unsigned = [("Authorization", bearer(&root))];
@@ -438,8 +394,6 @@ fn the_catalog_pages_with_bounded_opaque_cursors_and_calls_nobody() {
     );
     assert_eq!(reply.status, 403);
 
-    // The console's `config` names the picker and its `manifest` keeps the allow list from
-    // anyone but the platform administrator.
     let config = send(&case.console, "GET", "/api/v1/config", &[]);
     assert_eq!(config.json()["catalog"], true);
     let alice = case.token("alice");
@@ -460,10 +414,6 @@ fn the_catalog_pages_with_bounded_opaque_cursors_and_calls_nobody() {
     );
 }
 
-/// A set past `max_age_seconds` makes the catalog pending `stale_set` for everyone, the
-/// administrator included, with nothing listed and every check `pending`, never a revived older
-/// grant; a new set restores it. A run that fails leaves the old set standing. The set's age is
-/// shown.
 #[test]
 fn a_stale_set_makes_the_catalog_pending_and_a_new_set_restores_it() {
     let Some(case) = Case::new("ui_catalog_stale", 4) else {
@@ -476,7 +426,6 @@ fn a_stale_set_makes_the_catalog_pending_and_a_new_set_restores_it() {
     assert_eq!(listed(&fresh), [case.identity("A"), case.identity("Y")]);
     assert_eq!(fresh["set"]["max_age_seconds"], 4);
 
-    // A failed run (every listing 503) writes nothing: the set it leaves ages out all the same.
     case.github.api.with(|s| s.listing_status = Some(503));
     let env = [("MEADA_PERMISSIONS_POLL_MS", POLL_MS)];
     let roles = ["github-app", "roles", "--workspace", "ops/roles.toml"];
@@ -511,9 +460,6 @@ fn a_stale_set_makes_the_catalog_pending_and_a_new_set_restores_it() {
     assert_eq!(asked["github_grant"], "current");
 }
 
-/// A group, a role claim and a claims grant name no repository the catalog lets a caller select:
-/// a token granting all three repositories by claims and carrying groups named as the
-/// repositories' teams, with the login of someone holding a role on `Y` alone, selects `Y` only.
 #[test]
 fn agent_metadata_and_raw_group_names_establish_no_entitlement() {
     let Some(case) = Case::new("ui_catalog_claims", 3600) else {

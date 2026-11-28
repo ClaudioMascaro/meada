@@ -74,7 +74,6 @@ pub fn cut_of(lines: &[String], total: usize, cap: usize, budget: usize) -> (usi
     let note = |shown: usize| note(shown, total, budget);
     let mut shown = lines.len();
     if all > cap {
-        // The note's length depends on `shown`'s digits: reserve for the widest.
         let room = cap.saturating_sub(note(total).len());
         let mut used = 0;
         shown = lines
@@ -106,11 +105,6 @@ pub fn label(id: &str) -> &str {
     id.rsplit_once("::").map_or(id, |(_, name)| name)
 }
 
-/// `<repository>::<path>::<Class>.<method>` of a symbol id that names a method, without its
-/// parameters. A name with no dot (a free function of no package) has no key; top-level
-/// overloads of one file, whose names carry the package, are a set like a class's. A name
-/// that continues after its parameters (a route handler inside `module()`) names a nested
-/// symbol, not an overload, and has no key.
 fn overload_key(id: &str) -> Option<&str> {
     let name = id.splitn(3, "::").nth(2)?;
     let key = id.get(..id.len() - name.len())?;

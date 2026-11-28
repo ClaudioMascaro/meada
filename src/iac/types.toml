@@ -1,30 +1,3 @@
-# The type table (ADR 0025, ADR 0026, #656): what an IaC type provisions. Embedded in the binary
-# (`iac::types`), versioned with the code; a type it does not list is still an IaC node, with its
-# references and config values, and holds no contract side.
-#
-# One `[[entry]]` per type:
-#
-# - `format`: the IaC format the type belongs to: `terraform` (a `resource` block of a `.tf` or
-#   `.tofu` file; OpenTofu shares the types).
-# - `type`: the type as the format writes it (`aws_sqs_queue`).
-# - `contract`: `channel` (a queue, topic, bus or stream) or `resource` (a bucket, table,
-#   database, cache or secret), the contract kind of ADR 0026.
-# - `kind`: the broker of the channel or the kind of the resource, a name of ADR 0026's tables;
-#   the contract is `channel::<kind>::<name>` or `resource::<kind>::<name>`.
-# - `name`: the argument that holds the physical name, evaluated as ADR 0025 says.
-# - `forms`: how to read a name out of an ARN or a URL that the argument (or, later, a config
-#   value) holds, each a template where `{name}` is the name and `*` any other part; both match
-#   one or more characters other than `:` and `/`. A text fits a form when it is the form, or the
-#   form followed by `/` and anything (an object key under a bucket). A text that fits no form is
-#   the name as it is.
-#
-# `{path}` captures a name including `/` and must fit the whole text; `?` matches one
-# ASCII alphanumeric character (the six-character Secrets Manager ARN suffix).
-#
-# GCP structured identities use the contract kind's validated projection: subscriptions keep
-# `subscriptions/<id>`, and Cloud SQL databases combine their instance and name.
-# Every entry has a fixture case in `tests/fixtures/{provision-infra,aws-infra,gcp-infra,azure-infra}/`
-# (`types::tests::every_entry_has_a_fixture_case`).
 
 [[entry]]
 format = "kubernetes"
@@ -60,7 +33,6 @@ forms = [
   "https://s3.*.amazonaws.com/{name}",
 ]
 
-# Workloads (#662): image paths are read by their format reader; [] names every list item.
 [[workload]]
 format = "terraform"
 type = "aws_lambda_function"
@@ -189,7 +161,6 @@ kind = "secretsmanager"
 name = "name"
 forms = ["arn:*:secretsmanager:*:*:secret:{path}-??????"]
 
-# CloudFormation/SAM aliases of the curated AWS provisioner inventory (#664).
 
 [[entry]]
 format = "cloudformation"
@@ -437,7 +408,6 @@ images = []
 code = "zip_deploy_file"
 code_file = true
 
-# Curated custom resources (#671); every row is exercised by custom-inventory.
 
 [[entry]]
 format = "kubernetes"
@@ -792,7 +762,6 @@ kind = "keyvault"
 name = "metadata.annotations[\"crossplane.io/external-name\"]"
 basis = "terraform:azurerm_key_vault_secret"
 
-# Registry sources read only these declared inputs; no module is downloaded or evaluated.
 [[module]]
 source = "terraform-aws-modules/sqs/aws"
 entry = "terraform:aws_sqs_queue"
@@ -834,7 +803,6 @@ entry = "terraform:aws_ecs_task_definition"
 input = "name"
 create = ["create", "create_service", "create_task_definition"]
 
-# Rabbit topology roles are distinct from channel provisioners.
 [[topology]]
 format = "kubernetes"
 type = "Queue.rabbitmq.com"

@@ -1,7 +1,3 @@
-//! URLs as real code builds them (spec #3, HTTP contract kind): paths in imported constants,
-//! client wrappers around `fetch`, Express routers under mount prefixes, inline route
-//! handlers, and links Meada can only infer, leave ambiguous or leave out.
-
 use crate::common;
 
 use std::path::PathBuf;
@@ -9,7 +5,6 @@ use std::path::PathBuf;
 use common::{assert_golden, fixture_repo, without_processes};
 use meada::engine::{Direction, Engine, Start};
 
-/// The Next.js provider of `tests/fixtures/http-api`, in the case directory.
 fn api(case: &str) -> PathBuf {
     fixture_repo(case, "http-api", Some("https://example.com/acme/api.git"))
 }
@@ -129,8 +124,6 @@ fn string_url_conversions_respect_bindings_and_global_writes_in_javascript_and_t
     }
 }
 
-/// Annex B makes a block function a function-scoped binding in non-strict JavaScript.
-/// Modules, directive prologues and class bodies keep the declaration inside its block.
 #[test]
 fn block_string_functions_follow_the_enclosing_javascript_strict_mode() {
     let repo = fixture_repo("urls_string_block_functions", "http-url-builder", None);
@@ -227,8 +220,6 @@ fn block_string_functions_follow_the_enclosing_javascript_strict_mode() {
     }
 }
 
-/// A binding named URL is the runtime constructor only when its export proves it. Unknown
-/// packages, repository aliases and other exports must not invent consumers or links (#709).
 #[test]
 fn only_proven_runtime_url_bindings_produce_http_contracts() {
     let case = "urls_runtime_bindings";
@@ -359,7 +350,6 @@ fn only_proven_runtime_url_bindings_produce_http_contracts() {
     }
 }
 
-/// Less common binding syntax must hide the runtime just like a parameter or declaration.
 #[test]
 fn loop_import_equals_and_named_expression_url_bindings_stay_opaque() {
     let repo = fixture_repo(
@@ -434,7 +424,6 @@ fn constants_fold_into_urls_across_files() {
     assert_golden("http-paths.export.json", &without_processes(&export));
 }
 
-/// The Express provider of `tests/fixtures/http-express`, in the case directory.
 fn backend(case: &str) -> PathBuf {
     fixture_repo(
         case,
@@ -443,7 +432,6 @@ fn backend(case: &str) -> PathBuf {
     )
 }
 
-/// The client wrapper consumer of `tests/fixtures/http-wrappers`, in the case directory.
 fn wrappers(case: &str) -> PathBuf {
     fixture_repo(
         case,
@@ -479,8 +467,6 @@ fn wrapper_expansion_climbs_only_calls_that_resolved_exactly() {
         .filter_map(|c| c["contract"].as_str())
         .collect();
     consumers.sort();
-    // Both this.get and api.get on new Api() resolve to their wrappers. The unknown store.get
-    // and the unimported fetchJson stay by name, so their /reports and /bare paths stay absent.
     assert_eq!(consumers, ["http::GET::/list", "http::GET::/orders"]);
 }
 
@@ -511,7 +497,6 @@ fn inline_handlers_are_definitions_named_by_method_and_full_path() {
     );
 }
 
-/// The consumer of `tests/fixtures/http-client`, with both providers next to it.
 fn client(case: &str) -> Engine {
     let client = fixture_repo(
         case,
@@ -591,11 +576,9 @@ fn a_route_of_every_method_links_a_consumer_of_any_method() {
         "http-any-client.export.json",
         &without_processes(&engine.export().unwrap()),
     );
-    // A route named with any method starts at the provider of every method.
     let up = engine.trace(Start::From("POST /health"), Direction::Up, None);
     assert_golden("http-any-client.trace-up.txt", &up.unwrap());
     let items = engine.open_items().unwrap();
-    // The peer's own unresolved calls are items too: only the client's are read here.
     let candidates: Vec<&str> = (items
         .iter()
         .filter(|i| i.repository == "example.com/acme/client"))
@@ -723,7 +706,6 @@ fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
         out.sort();
         out
     };
-    // The builder imported, called in the argument, held by a constant, and with a lone `return`.
     assert_eq!(
         linked("src/pages.ts"),
         [
@@ -738,11 +720,7 @@ fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
         linked("src/env.ts"),
         ["http::GET::/api/owners", "http::GET::/api/vets"]
     );
-    // An arrow function with a block body folds when the block is one `return` and not otherwise.
     assert_eq!(linked("src/block.ts"), ["http::GET::/api/vets"]);
-    // `new URL(x)` of one argument is `x` (WHATWG URL Standard), through `toString()`, `href`,
-    // `String(u)`, a template string and a client wrapper; `searchParams`, `search` and `hash`
-    // keep the path.
     assert_eq!(
         linked("src/whatwg.ts"),
         [
@@ -754,10 +732,6 @@ fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
             "http::GET::/api/vets",
         ]
     );
-    // `new URL(reference, base)` is the join of the two (RFC 3986 section 5.2). Over a literal base
-    // an absolute reference is itself, `//host/x` takes its host, `/x` replaces the path and `x`
-    // joins the base's directory, in the argument, through a constant and a client wrapper. Over
-    // an environment read or a hole an absolute path keeps the lead; the rest is unresolved.
     let consumers: std::collections::BTreeMap<String, Option<&str>> =
         (json["consumers"].as_array().unwrap())
             .iter()
@@ -792,9 +766,6 @@ fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
         expected.map(|(k, v)| (k.to_string(), v)).into();
     assert_eq!(consumers, expected);
     assert_eq!(linked("src/join.ts").len(), 11);
-    // An unknown return, a name match and a name a parameter, a `catch` binding or a local
-    // hides fold nothing; neither does a `new URL` written through its path or host, nor a `URL`
-    // the file declares or imports from the repository.
     for file in [
         "src/statements.ts",
         "src/names.ts",
@@ -807,9 +778,6 @@ fn a_url_a_function_only_builds_folds_at_the_call_and_through_a_constant() {
     }
 }
 
-/// Backstage (#615): each backend plugin's router is served under `/api/<pluginId>`, and so is
-/// the router of a module of that plugin (#813); a URL from `discovery.getBaseUrl('<pluginId>')`
-/// starts there; a plugin whose `pluginId` is no literal keeps its routes at the root.
 #[test]
 fn backstage_plugins_serve_under_api_and_their_plugin_id() {
     let repo = fixture_repo(
@@ -826,8 +794,6 @@ fn backstage_plugins_serve_under_api_and_their_plugin_id() {
         .filter_map(|p| p["contract"].as_str())
         .collect();
     providers.sort();
-    // `legacy` reads its `pluginId` from the environment, `shared` imports it and `chained` binds
-    // it to another constant: their routers stay at the root.
     assert_eq!(
         providers,
         [
@@ -877,7 +843,6 @@ fn backstage_plugins_serve_under_api_and_their_plugin_id() {
             ),
         ]
     );
-    // Each names the mount: through `getBaseUrl`, or by a route the plugin's mount serves.
     for link in json["links"].as_array().unwrap() {
         let reason = link["reason"].as_str().unwrap();
         let plugin = ["orders", "catalog", "approval"]
@@ -887,9 +852,6 @@ fn backstage_plugins_serve_under_api_and_their_plugin_id() {
         let mount = format!("host unresolved (Backstage plugin {plugin} at /api/{plugin})");
         assert!(reason.starts_with(&mount), "{reason}");
     }
-    // A `getBaseUrl` of something other than the discovery service folds nothing, nor does a base
-    // another argument gives, so the path after it is an open item (#801); a path under a mount
-    // that no route of the plugin serves names no plugin.
     let consumer = |name: &str| {
         let all = json["consumers"].as_array().unwrap();
         let site = |c: &&serde_json::Value| c["site"].as_str().unwrap().contains(name);
@@ -902,7 +864,6 @@ fn backstage_plugins_serve_under_api_and_their_plugin_id() {
         (Some("http::GET::/api/orders/notes"), None)
     );
     assert_eq!(consumer("::withHeader::"), (None, None));
-    // `meada status` names each plugin it left at the root, and no other.
     let status = meada::engine::status(&repo).unwrap();
     let left: Vec<&str> = (status.lines())
         .filter(|l| l.contains("Backstage"))
@@ -922,10 +883,6 @@ fn backstage_plugins_serve_under_api_and_their_plugin_id() {
     );
 }
 
-/// Backstage's proxy plugin (#616): `getBaseUrl('proxy')` plus `/<endpoint>` and
-/// `/api/proxy/<endpoint>` are calls to the `target` of the endpoint in `app-config*.yaml`. A
-/// `${VAR}` target goes through the peer's `base_url_env`, a literal URL is a host, and any
-/// other target leaves the call unlinked, which `meada status` says.
 #[test]
 fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
     let case = "urls_backstage_proxy";
@@ -986,7 +943,6 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         unread("/shortrewrite"),
     );
     let mut expected = [
-        // `/inventoryx` is no `/inventory`.
         (
             "otherEndpoint",
             "http::GET::/api/proxy/inventoryx/clusters",
@@ -1010,9 +966,6 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
             "http::GET::/api/proxy/legacy/clusters",
             Some(legacy.as_str()),
         ),
-        // A `pathRewrite` that only strips the endpoint is what the proxy does anyway: the call
-        // goes to the stripped path. Any other rewrite changes the path the target sees, which
-        // Meada does not evaluate; `/slashed` strips `<ep>/`, so a path without it is no strip.
         (
             "viaStripped",
             "http::GET::/clusters",
@@ -1034,8 +987,6 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
             "http::GET::/api/proxy/twice/clusters",
             Some(twice.as_str()),
         ),
-        // `ignorePath` drops the path; a target `app-config.production.yaml` gives otherwise is
-        // not known to be the one deployed (`/stock`, the same in both, is).
         (
             "viaIgnorePath",
             "http::GET::/api/proxy/ignored/clusters",
@@ -1046,9 +997,6 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
             "http::GET::/api/proxy/disputed/clusters",
             Some(disputed.as_str()),
         ),
-        // A string is `{ target }` with the default `pathRewrite`, under `endpoints`: a host, or a
-        // variable written as `${VAR}` or `$env`. The options another file gives the same
-        // endpoint apply to it.
         ("viaShort", "http::GET::/clusters", short.as_deref()),
         (
             "viaShortEnv",
@@ -1080,7 +1028,6 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
             "http::GET::/clusters",
             shortstripped_via.as_deref(),
         ),
-        // An endpoint in an included partial, whole or as the string a key path selects.
         (
             "viaIncluded",
             "http::GET::/clusters",
@@ -1091,8 +1038,6 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
             "http::GET::/clusters",
             includedshort_via.as_deref(),
         ),
-        // Both shapes, in one file (`/oldshape`, `/prodshape`) or across files (`/localshape`,
-        // alone in its file): only `endpoints` is read, so a legacy key is no endpoint.
         (
             "viaOldShape",
             "http::GET::/api/proxy/oldshape/clusters",
@@ -1108,15 +1053,12 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
             "http::GET::/api/proxy/localshape/clusters",
             None,
         ),
-        // A part Meada cannot read in the endpoint, or right after it, names no endpoint.
         ("holeAfterEndpoint", "http::GET::/api/proxy/{}", None),
         ("holeInEndpoint", "http::GET::/api/proxy/{}/clusters", None),
     ];
     expected.sort();
     assert_eq!(consumers, expected.map(|(f, c, v)| (f.to_string(), c, v)));
 
-    // The two calls of the issue and the template link to the peer; the unread target links
-    // nothing.
     let links: Vec<_> = (json["links"].as_array().unwrap())
         .iter()
         .map(|l| {
@@ -1201,7 +1143,6 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
         ]
     );
     let status = meada::engine::status(&web).unwrap();
-    // Every line of the status: each unread endpoint once, and nothing else.
     let why = "its target or the path it gets is not read (a target neither ${VAR} nor an http(s) \
                URL, a pathRewrite that does more than strip the endpoint, ignorePath, \
                prependPath, or app-config files that disagree)";
@@ -1233,10 +1174,6 @@ fn proxy_endpoints_send_a_call_to_the_target_the_app_config_gives() {
     assert_eq!(status.lines().collect::<Vec<_>>(), expected, "{status}");
 }
 
-/// Backstage's legacy proxy shape (#690): with no `proxy.endpoints` in any file, the keys of
-/// `proxy` that start with `/` are the endpoints, as strings (`{ target }`) or objects, inline or
-/// in an included partial, in any `app-config*.yaml`, with the same `pathRewrite`, `ignorePath`
-/// and `prependPath` rules as `endpoints`.
 #[test]
 fn the_legacy_proxy_shape_and_its_strings_send_a_call_to_their_target() {
     let case = "urls_backstage_proxy_legacy";
@@ -1283,11 +1220,9 @@ fn the_legacy_proxy_shape_and_its_strings_send_a_call_to_their_target() {
     let mut expected = vec![
         served("viaInventory", env("/inventory")),
         served("viaDiscovery", env("/inventory")),
-        // A string is `{ target }`: a host, or a variable.
         served("viaStock", host("stock.example.com", "/stock")),
         served("viaStockEnv", env("/stockenv")),
         served("viaStripped", host("stock.example.com", "/stripped")),
-        // An endpoint in an included partial, and in another file.
         served("viaIncluded", env("/included")),
         served("viaFromFile", env("/fromfile")),
         served(
@@ -1295,7 +1230,6 @@ fn the_legacy_proxy_shape_and_its_strings_send_a_call_to_their_target() {
             host("stock.example.com", "/fromfileshort"),
         ),
         served("viaLocal", host("local.example.com", "/local")),
-        // The rules of the object form, also over a string another file gives the options.
         unlinked("viaRewritten", "rewritten"),
         unlinked("viaIgnored", "ignored"),
         unlinked("viaPrepended", "prepended"),
@@ -1330,7 +1264,6 @@ fn the_legacy_proxy_shape_and_its_strings_send_a_call_to_their_target() {
         ]
         .map(|(f, l)| (f.to_string(), l))
     );
-    // `meada status` names each unread endpoint of the legacy shape, as it does one of `endpoints`.
     let status = meada::engine::status(&web).unwrap();
     let unread: Vec<_> = (status.lines())
         .filter_map(|l| l.trim().strip_prefix("Backstage proxy endpoint "))
@@ -1350,9 +1283,6 @@ fn the_legacy_proxy_shape_and_its_strings_send_a_call_to_their_target() {
     );
 }
 
-/// A `proxy.endpoints` that exists, empty or not an object, is the table Backstage's proxy backend
-/// reads (#690), so the legacy keys of another file are no endpoints, and the call stays
-/// unlinked.
 #[test]
 fn an_empty_endpoints_table_still_hides_the_legacy_keys_of_another_file() {
     for fixture in ["ts-backstage-proxy-empty", "ts-backstage-proxy-scalar"] {
@@ -1382,10 +1312,6 @@ fn an_empty_endpoints_table_still_hides_the_legacy_keys_of_another_file() {
     }
 }
 
-/// A `proxy.endpoints`, a whole `proxy` or a whole root behind an include Meada does not follow
-/// may hold the table Backstage's proxy backend reads, and Backstage reads it (or refuses to
-/// start) whatever it gives (#709): the legacy keys beside it or in another file are no
-/// endpoints, the call stays unlinked and `meada status` names the include.
 #[test]
 fn an_endpoints_table_behind_an_include_not_followed_hides_the_legacy_keys() {
     for (n, (fixture, include)) in [
@@ -1439,8 +1365,6 @@ fn an_endpoints_table_behind_an_include_not_followed_hides_the_legacy_keys() {
     }
 }
 
-/// Backstage transforms only the children of an included value. Including that same value at
-/// the root or at `proxy` is not a cycle and must not hide a legacy table from another file.
 #[test]
 fn a_self_include_at_the_root_or_proxy_keeps_legacy_endpoints() {
     for (n, config) in [
@@ -1493,9 +1417,6 @@ fn a_self_include_at_the_root_or_proxy_keeps_legacy_endpoints() {
     }
 }
 
-/// An include at `proxy.endpoints` whose `#` key path ends at a key the partial lacks gives
-/// Backstage `undefined`, a key its loader leaves out rather than a failed load (#709): no table
-/// stands there, so the legacy key beside it links the call, and `meada status` names the include.
 #[test]
 fn an_endpoints_include_whose_last_key_is_absent_leaves_the_legacy_keys_read() {
     let case = "urls_backstage_proxy_keypath";
@@ -1525,10 +1446,6 @@ fn an_endpoints_include_whose_last_key_is_absent_leaves_the_legacy_keys_read() {
     assert!(status.contains("./partials/proxy.yaml#nope"), "{status}");
 }
 
-/// Backstage's `$include` (#689): an include Meada does not follow leaves its subtree unread, and
-/// `meada status` names it with its reason, one fixture case per reason. A read through the
-/// include it follows is the variable the partial names; one under an include it does not follow
-/// stays a hole.
 #[test]
 fn backstage_includes_not_followed_are_named_with_their_reason() {
     let repo = fixture_repo(
@@ -1537,7 +1454,6 @@ fn backstage_includes_not_followed_are_named_with_their_reason() {
         Some("https://example.com/backstage/includes.git"),
     );
     std::os::unix::fs::symlink("ok.yaml", repo.join("partials/link.yaml")).unwrap();
-    // Two of these graft more than `lang::MAX_BYTES` into one root.
     let big = format!("url: u\npad: '{}'\n", "x".repeat(600 * 1024));
     std::fs::write(repo.join("partials/big.yaml"), big).unwrap();
 

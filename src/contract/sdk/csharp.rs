@@ -1,4 +1,3 @@
-//! C# request initializers, constructor calls and framework environment reads.
 use crate::lang::{Invocation, Value};
 use crate::resolve::Code;
 
@@ -70,7 +69,6 @@ pub(super) fn environment<'a>(
             None => return false,
         },
     };
-    // Resolve in the original scope, so a local/type hiding an imported alias wins.
     crate::names::known(code, path, scope, head, |s| s == "System.Environment").is_some()
 }
 

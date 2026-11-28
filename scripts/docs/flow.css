@@ -1,4 +1,4 @@
-/* Read-only engineering maps: a local canvas, not another application shell. */
+
 .graph-explorer { margin: 1.8rem 0 2.3rem; --flow-surface: #fafbf8; --flow-node: #fff; --flow-ink: #263d34; --flow-muted: #53695b; --flow-rule: #c9d8cd; --flow-control: #f0f4ee; }
 [data-md-color-scheme="slate"] .graph-explorer { --flow-surface: #192b22; --flow-node: #253e30; --flow-ink: #e4ece3; --flow-muted: #becdbf; --flow-rule: #4b6955; --flow-control: #304b39; }
 .graph-explorer .meada-flow:empty { display: none; }
@@ -44,7 +44,7 @@
 .flow-canvas .react-flow__handle { width: 5px; height: 5px; border: 0; background: var(--flow-rule); pointer-events: none; }
 .flow-canvas .react-flow__edge-text { fill: var(--flow-ink); font: 13px "IBM Plex Sans", sans-serif; }
 .flow-canvas .react-flow__edge-textbg { fill: var(--flow-surface); }
-/* Material constrains article SVG widths; Flow's absolute edge layer has no intrinsic width. */
+
 .flow-canvas .react-flow__edges svg { max-width: none; }
 .flow-edge--planned .react-flow__edge-path { stroke: #927138; stroke-dasharray: 6 5; }
 .flow-edge--failure .react-flow__edge-path { stroke: #a35a43; }

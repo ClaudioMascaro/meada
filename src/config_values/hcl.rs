@@ -1,23 +1,3 @@
-//! Terraform and OpenTofu files as config values (#640, ADR 0025): every attribute of every
-//! block of a `.tf`, `.tofu`, `.tfvars` or `*.auto.tfvars` file is a row, its key path running
-//! over the block's type and labels and the attribute's name (`resource.aws_sqs_queue.orders.name`),
-//! a block repeated under the same type and labels `[n]` as the JSON syntax writes it. `hcl-edit`
-//! parses (a span for every node, so a line and the text as written); `hcl-rs` reads the string a
-//! heredoc of literals holds. `.tf.json`, `.tofu.json` and `.tfvars.json` go through the JSON
-//! reader in the parent module, whose key paths are the same.
-//!
-//! A literal keeps its type (`string`, `number`, `boolean`; null is left out). What is not a
-//! literal is stored as written under a type of its own, until static evaluation resolves it:
-//! `expression` (a reference, a call, an operator, a `for`), `template` (a string or heredoc with
-//! an interpolation or a directive). A list or an object of literal keys is read element by
-//! element, as YAML is; an object with a key that is no literal is one `expression`.
-//!
-//! A sensitive `variable` (`is_sensitive`) keeps its `default` redacted, as does one another file
-//! of its directory marks sensitive when that directory holds an override file, and a `.tfvars`
-//! file every value it gives to a sensitive variable (`Sensitive`): key path, type and line, no
-//! value.
-//! An `aws_ssm_parameter` resource with literal `type = "SecureString"` redacts its `value`.
-
 use std::collections::{BTreeSet, HashMap};
 
 use hcl::eval::{Context, Evaluate};
@@ -30,22 +10,14 @@ use hcl_edit::template::Element;
 use super::{ANY_VARIABLE, Row, STORED_EXPANSION, STORED_SLACK, VALUE_MAX, is_tfvars, key_path};
 use crate::document::events::Step;
 
-/// How many brackets (`{`, `[`, `(`) may be open inside each other in one file; deeper, the file
-/// is unreadable. The parser and the walk below recurse once per level.
 // ponytail: real Terraform nests a dozen levels; 64 keeps the parser's recursion shallow in a
 // debug build's test thread.
 const NESTING_MAX: usize = 64;
 
-/// The key comparisons building the objects of one file may take: `hcl-edit` and `hcl-rs` check
-/// each key of an object against the keys before it, so an object of n keys costs about n²; past
-/// it the file is unreadable, before it is parsed.
 // ponytail: an object of a few hundred keys costs a few hundred thousand; 2^24 lets one of 4,096
 // keys through and stops a file of one object of 100,000 keys, which takes minutes to parse.
 const OBJECT_WORK_MAX: usize = 1 << 24;
 
-/// The limits `hcl-edit` 0.10 puts on a file, past which the parser fails and the file is
-/// unreadable: chained operators (`MAX_OPERATOR_DEPTH`) and nested expressions, templates and
-/// blocks (`MAX_NESTING_DEPTH`). Named here for the test that feeds them; the parser enforces them.
 #[cfg(test)]
 const PARSER_OPERATOR_DEPTH: usize = 128;
 #[cfg(test)]
@@ -53,17 +25,12 @@ const PARSER_NESTING_DEPTH: usize = 64;
 
 type Fail = (usize, String);
 
-/// Whether the file at `path` is read as HCL: `*.tf`, `*.tofu`, `*.tfvars`.
 pub(super) fn is_hcl(path: &str) -> bool {
     [".tf", ".tofu", ".tfvars"]
         .iter()
         .any(|e| path.ends_with(e))
 }
 
-/// The rows of the HCL file at `path`: `Err` with the line and the reason when it does not
-/// parse, nests past `NESTING_MAX`, holds objects past `OBJECT_WORK_MAX` or stores past the
-/// budget. `sensitive` are the variables marked sensitive elsewhere (`Sensitive`): the values a
-/// `.tfvars` file gives them and the defaults a Terraform file declares for them are redacted.
 pub(super) fn read(path: &str, src: &[u8], sensitive: &BTreeSet<String>) -> Result<Vec<Row>, Fail> {
     let text = std::str::from_utf8(src).map_err(|e| {
         let line = src[..e.valid_up_to()]
@@ -113,8 +80,6 @@ pub(super) fn read(path: &str, src: &[u8], sensitive: &BTreeSet<String>) -> Resu
     Ok(walk.rows)
 }
 
-/// The byte offset where brackets nest past `NESTING_MAX`, counting every `{`, `[` and `(`
-/// even inside a string: a count that is only ever too high.
 pub(crate) fn nested_past(text: &str) -> Option<usize> {
     let mut depth = 0usize;
     for (at, b) in text.bytes().enumerate() {
@@ -132,38 +97,21 @@ pub(crate) fn nested_past(text: &str) -> Option<usize> {
     None
 }
 
-/// The byte offset of the key where the objects of `text` pass `OBJECT_WORK_MAX`.
 pub(crate) fn wide_past(text: &str) -> Option<usize> {
     wide_past_with(text, OBJECT_WORK_MAX)
 }
 
-/// The byte offset of the key where the key comparisons of the object literals of `text` pass
-/// `max`, each key of an object compared with the keys before it. Strings, heredocs, comments and
-/// block bodies hold no key; an interpolation is read as an expression. Every `=` or `:` that is
-/// no operator counts in the object around it, a conditional's or a `for`'s too: a count that may
-/// be too high but is never too low. A heredoc whose first line could end it is past `max` at
-/// once: `hcl-edit` ends it there only when no later line can, which the scan does not follow.
 fn wide_past_with(text: &str, max: usize) -> Option<usize> {
-    /// What the scan is inside of.
     enum Frame<'t> {
-        /// A bracket: an object literal's `{` with its keys so far, or a block body's `{`, a `[`
-        /// or a `(`, which hold none.
         Bracket(Option<usize>),
-        /// A `${` or `%{` of a string or heredoc: an expression up to its `}`.
         Interpolation,
-        /// A quoted string.
         Quote,
-        /// A heredoc and its identifier.
         Heredoc(&'t str),
-        /// The body of a template directive, from its `%{ if }`, `%{ for }` or `%{ else }` to
-        /// the directive that ends it: text that no quote or heredoc end closes.
         Body,
     }
     let bytes = text.as_bytes();
     let end_of_line = |at: usize| text[at..].find('\n').map_or(bytes.len(), |n| at + n);
     let word = |b: u8| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-');
-    // Where the heredoc of identifier `id` ends when its line starts at `start`: after `id`, past
-    // spaces or tabs, when no identifier character follows. Code may follow.
     let ends = |start: usize, id: &str| {
         let indent = (bytes.get(start..)?.iter()).take_while(|b| matches!(b, b' ' | b'\t'));
         let start = start + indent.count();
@@ -173,7 +121,6 @@ fn wide_past_with(text: &str, max: usize) -> Option<usize> {
         ends.then_some(after)
     };
     let mut stack = Vec::new();
-    // The work so far, and the last byte of code that is no space or comment, and where.
     let (mut work, mut last, mut last_at, mut at) = (0usize, b'\n', 0, 0);
     while let Some(&b) = bytes.get(at) {
         let next = bytes.get(at + 1).copied().unwrap_or(0);
@@ -193,8 +140,6 @@ fn wide_past_with(text: &str, max: usize) -> Option<usize> {
                 if matches!(b, b'$' | b'%') && next == b && bytes.get(at + 2) == Some(&b'{') {
                     at += 2;
                 } else if matches!(b, b'$' | b'%') && next == b'{' {
-                    // As `hcl-edit` reads a directive, `if` or `for` opens a body, `else` goes
-                    // on with one and any other keyword ends it.
                     let keyword = (b == b'%').then(|| directive(&text[at + 2..]));
                     if keyword.is_some_and(|k| k.starts_with("if") || k.starts_with("for")) {
                         stack.push(Frame::Body);
@@ -229,9 +174,6 @@ fn wide_past_with(text: &str, max: usize) -> Option<usize> {
                             at = end_of_line(at);
                         }
                     }
-                    // A `{` after an identifier or a label opens a block, unless the identifier
-                    // is the `in` or `if` of a `for`, which an expression follows. An identifier
-                    // starts with a letter or `_`; one ending in `-` may be a subtraction.
                     b'{' => {
                         let start = (0..=last_at).rev().take_while(|&i| word(bytes[i])).last();
                         let identifier = start.filter(|&s| {
@@ -273,8 +215,6 @@ fn wide_past_with(text: &str, max: usize) -> Option<usize> {
     None
 }
 
-/// The text of a template directive after its `%{`, past the `~` and the spaces and comments
-/// `hcl-edit` skips before its keyword.
 fn directive(text: &str) -> &str {
     let mut rest = text.strip_prefix('~').unwrap_or(text);
     loop {
@@ -289,20 +229,16 @@ fn directive(text: &str) -> &str {
     }
 }
 
-/// Whether `c` may continue an HCL identifier, as `hcl-edit` reads one.
 fn id_continue(c: char) -> bool {
     c.is_ascii_alphanumeric()
         || matches!(c, '_' | '-')
         || (!c.is_ascii() && hcl_edit::Ident::try_new(format!("_{c}")).is_ok())
 }
 
-/// Which attributes of a body are secret.
 #[derive(Clone, Copy)]
 enum Hide<'a> {
     Nothing,
-    /// The attribute of this name: a sensitive variable's `default` or a SecureString's `value`.
     Attribute(&'a str),
-    /// Every attribute named in the set: the values a `.tfvars` file gives sensitive variables.
     Names(&'a BTreeSet<String>),
 }
 
@@ -318,13 +254,10 @@ impl Hide<'_> {
 
 struct Walk<'a> {
     text: &'a str,
-    /// The offset of every `\n`, for the line of a span.
     newlines: Vec<usize>,
     budget: usize,
-    /// What the rows may still store.
     left: usize,
     rows: Vec<Row>,
-    /// The variables marked sensitive elsewhere (`read`).
     sensitive: &'a BTreeSet<String>,
 }
 
@@ -333,7 +266,6 @@ impl Walk<'_> {
         self.newlines.partition_point(|&n| n < offset) + 1
     }
 
-    /// Adds the row at `path`; `value` is `None` for a secret. The text is cut at `VALUE_MAX`.
     fn leaf(
         &mut self,
         path: &[Step],
@@ -365,10 +297,6 @@ impl Walk<'_> {
         Ok(())
     }
 
-    /// The structures of `body` under `path`: an attribute is a leaf, or a collection read
-    /// element by element; a block adds its type and labels, and an index when the same type and
-    /// labels repeat in this body. `hidden` is a secret subtree, `hide` the attributes of this
-    /// body that are secret.
     fn body(
         &mut self,
         body: &Body,
@@ -405,8 +333,6 @@ impl Walk<'_> {
                         path.push(Step::Index(*n));
                         *n += 1;
                     }
-                    // A variable's `default` is secret when the variable is sensitive, here or
-                    // in another file of the directory (`Sensitive`).
                     let sensitive = depth == 0
                         && b.ident.as_str() == "variable"
                         && b.labels.len() == 1
@@ -491,7 +417,6 @@ impl Walk<'_> {
             Expression::HeredocTemplate(h)
                 if h.template.iter().all(|e| matches!(e, Element::Literal(_))) =>
             {
-                // A heredoc of literals is the string HCL reads: its indentation stripped.
                 match hcl::Expression::from(expr.clone()).evaluate(&Context::new()) {
                     Ok(hcl::Value::String(s)) => {
                         self.leaf(path, shown(hidden, Some(&s)), "string", offset)
@@ -507,9 +432,6 @@ impl Walk<'_> {
     }
 }
 
-/// Whether a `variable` block whose `sensitive` attribute is `attribute` is sensitive
-/// (`super::is_sensitive`): an expression other than a literal counts as `true`, which can only
-/// redact too much.
 pub(crate) fn is_sensitive(attribute: Option<&Expression>) -> bool {
     let literal = attribute.map(|e| match e {
         Expression::Null(_) => serde_json::Value::Null,
@@ -520,7 +442,6 @@ pub(crate) fn is_sensitive(attribute: Option<&Expression>) -> bool {
     super::is_sensitive(literal.as_ref())
 }
 
-/// `text`, unless it is secret.
 fn shown(hidden: bool, text: Option<&str>) -> Option<&str> {
     text.filter(|_| !hidden)
 }
@@ -530,7 +451,6 @@ mod tests {
     use super::super::{Outcome, VALUE_MAX, read, read_with};
     use super::*;
 
-    /// `(key path, value, type, line)` of the rows of `text` read as the file `path`.
     fn rows(path: &str, text: &str) -> Vec<(String, Option<String>, &'static str, usize)> {
         let (outcome, rows) = read(path, text.as_bytes());
         assert!(matches!(outcome, Outcome::Read { .. }), "{outcome:?}");
@@ -812,8 +732,6 @@ mod tests {
         assert!(!format!("{found:?}").contains("hunter2"));
     }
 
-    /// Terraform converts the string `"true"` to the boolean, and refuses every value but a
-    /// boolean or its string: only an absent, `false` or `"false"` attribute shows the default.
     #[test]
     fn a_variable_is_sensitive_unless_its_attribute_is_false() {
         let text = concat!(
@@ -870,14 +788,10 @@ mod tests {
             );
             assert!(!format!("{found:?}").contains("hunter2"));
         }
-        // A `.tf` file's top-level attribute of the same name is not a tfvars value.
         let (_, found) = read_with("main.tf", b"db_password = \"x\"\n", &sensitive, || false);
         assert!(found[0].value.is_some());
     }
 
-    /// A Terraform file read against the variables another file of its directory marks
-    /// sensitive (an override file) keeps their defaults redacted, in HCL and in JSON, and every
-    /// default against `ANY_VARIABLE`; the other values stay.
     #[test]
     fn a_terraform_file_redacts_the_defaults_of_the_variables_marked_sensitive_elsewhere() {
         let tf = concat!(
@@ -944,7 +858,6 @@ mod tests {
         );
         assert_eq!(by("resource.aws_sqs_queue.orders.tags[1]").kind, "string");
         assert_eq!(by("resource.aws_sqs_queue.orders.tags[2]").kind, "template");
-        // A tfvars.json file is redacted for the sensitive variables like a tfvars file.
         let sensitive: BTreeSet<String> = ["token".to_string()].into();
         let (_, found) = read_with(
             "prod.tfvars.json",
@@ -957,14 +870,10 @@ mod tests {
             ("token", None)
         );
         assert_eq!(found[1].value.as_deref(), Some("eu"));
-        // The same name in an ordinary JSON file is no secret.
         let (_, found) = read_with("prod.json", br#"{"token": "abc"}"#, &sensitive, || false);
         assert_eq!(found[0].value.as_deref(), Some("abc"));
     }
 
-    /// HCL JSON permits an array of bodies at the root of a file as wherever a body goes: its
-    /// secrets stay redacted (a sensitive default, here or by another file's mark, a SecureString
-    /// parameter) and its defaults are literals.
     #[test]
     fn a_terraform_json_file_whose_root_is_an_array_keeps_its_secrets() {
         let text = r#"[{"variable": {"token": {"sensitive": true, "default": "s3cret"}}},
@@ -1034,8 +943,6 @@ mod tests {
         );
     }
 
-    /// Brackets nest at most `NESTING_MAX` deep: one more is unreadable at the file's line, and
-    /// the file at the limit reads.
     #[test]
     fn a_file_nested_past_the_ceiling_is_unreadable() {
         let nest = |n: usize| format!("x = {}1{}\n", "[".repeat(n), "]".repeat(n));
@@ -1053,8 +960,6 @@ mod tests {
         assert_eq!(found[0].key.len(), 1 + 3 * NESTING_MAX);
     }
 
-    /// An object of n keys costs n² key comparisons to build: a file whose objects pass
-    /// `OBJECT_WORK_MAX` is unreadable at the key that passes it, and one at the ceiling reads.
     #[test]
     fn a_file_whose_objects_pass_the_work_ceiling_is_unreadable() {
         let object = |n: usize| {
@@ -1076,9 +981,6 @@ mod tests {
         );
     }
 
-    /// The keys counted are those of object literals, wherever they are (a value, a `for` over
-    /// one, an interpolation): a block body, a string, a heredoc, a comment and an operator hold
-    /// none.
     #[test]
     fn only_the_keys_of_object_literals_count_toward_the_work() {
         let keys = |n: usize| (0..n).map(|i| format!("k{i} = {i}\n")).collect::<String>();
@@ -1086,7 +988,6 @@ mod tests {
             .map(|i| format!("k{i} = {i}"))
             .collect::<Vec<_>>()
             .join(", ");
-        // Eleven keys cost 121, past a ceiling of 100; ten cost exactly 100.
         assert_eq!(
             wide_past_with(&format!("x = {{\n{}}}\n", keys(10)), 100),
             None
@@ -1099,19 +1000,15 @@ mod tests {
             format!("x = \"${{ {{ {listed} }} }}\"\n"),
             format!("x = \"${{jsonencode({{ {listed} }})}}\"\n"),
             format!("x = <<EOT\n${{ {{ {listed} }} }}\nEOT\n"),
-            // A heredoc ends at its identifier with code after it, indented or not.
             format!("x = [<<EOT\nfoo\nEOT, {{ {listed} }}]\n"),
             format!("x = [<<EOT\nfoo\n\t  EOT, {{ {listed} }}]\n"),
             format!("x = [for k in [1] : k if {{ {listed} }}]\n"),
-            // A `{` after an operator, a number or a word ending in `-` is a value's.
             format!("x = -{{ {listed} }}\n"),
             format!("x = 1 - {{ {listed} }}\n"),
             format!("x = 1-{{ {listed} }}\n"),
             format!("x = a / {{ {listed} }}\n"),
             format!("x = \"a\" / {{ {listed} }}\n"),
             format!("x = a- {{ {listed} }}\n"),
-            // A directive's body is text up to the directive that ends it, past a quote or a
-            // heredoc's end, whatever space, comment or `~` precedes its keyword.
             format!("x = \"%{{ if c }}A\"B%{{ endif }}\"\ny = {{ {listed} }}\n"),
             format!("x = \"%{{~ /* a */ if c ~}}A\"B%{{~ endif ~}}\"\ny = {{ {listed} }}\n"),
             format!("x = \"%{{ # a\n if c }}A\"B%{{ endif }}\"\ny = {{ {listed} }}\n"),
@@ -1121,8 +1018,6 @@ mod tests {
                 "x = \"%{{ if a }}%{{ if b }}\"%{{ endif }}\"%{{ endif }}\"\ny = {{ {listed} }}\n"
             ),
             format!("x = <<EOT\n%{{ if c }}\nEOT\n\"\n%{{ endif }}\nEOT\ny = {{ {listed} }}\n"),
-            // `hcl-edit` ends a heredoc on its first line only when no later line ends it, so a
-            // heredoc whose first line could end it is past the ceiling whatever follows.
             format!("x = <<EOT\nEOT/*\nEOT\ny = {{ {listed} }}\n"),
             format!("x = <<EOT\n  EOT\"\nEOT\ny = {{ {listed} }}\n\"\n"),
             format!("x = <<-EOT\nEOT<<Z\nEOT\ny = {{ {listed} }}\nZ\n"),
@@ -1152,8 +1047,6 @@ mod tests {
             format!("x = {{ # a = 1\n // b = 2\n /* {} */ k = 1 }}\n", keys(100)),
             format!("x = {{ k = {operators} }}\n"),
             "x = \"$${a = 1, b = 2}\"\n".to_string(),
-            // A heredoc whose end is never seen leaves the rest unread, and its identifier
-            // followed by an identifier character is no end.
             format!("x = <<EOT\n{}", keys(100)),
             format!("x = <<EOT\nEOT_ = {{ {listed} }}\nEOT\n"),
             format!("x = <<EOT\nEOT\u{e9} = {{ {listed} }}\nEOT\n"),
@@ -1163,7 +1056,6 @@ mod tests {
             .filter(|text| wide_past_with(text, 2).is_some())
             .collect();
         assert!(counted.is_empty(), "{counted:#?}");
-        // As the parser reads a directive's body, the quote in it ends nothing: `y` is read.
         let (outcome, _) = read("a.tf", b"x = \"%{ if c }A\"B%{ endif }\"\ny = 1\n");
         assert!(
             matches!(outcome, Outcome::Read { values: 2, .. }),
@@ -1171,9 +1063,6 @@ mod tests {
         );
     }
 
-    /// `hcl-edit` has two limits of its own: 128 chained operators and 64 levels of expression,
-    /// template and block nesting (not counted as brackets). Past either the file is unreadable,
-    /// with the parser's reason; at the limit it reads.
     #[test]
     fn a_file_past_the_parsers_own_limits_is_unreadable() {
         let sum = |n: usize| format!("x = a{}\n", " + a".repeat(n));
@@ -1201,8 +1090,6 @@ mod tests {
         );
     }
 
-    /// Long labels nested deep in a heap of blocks repeat in every key path below them: past the
-    /// stored budget the file stops.
     #[test]
     fn a_file_whose_key_paths_store_past_the_budget_is_unreadable() {
         let label = "k".repeat(3000);

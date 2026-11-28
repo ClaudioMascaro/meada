@@ -1,8 +1,3 @@
-//! The other forms of `uses` (#826, ADR 0028): an action of the workspace, a local call, `$/`,
-//! a CI step's `./<folder>` and `docker://`, each read as GitHub resolves it or left unresolved.
-//! The cases sit in `forms.yml` of `acme/app-a` (a pipeline that is not reusable) and of
-//! `acme/workflows` (a reusable one), and in the actions of `acme/workflows`.
-
 use std::fs;
 
 use meada::engine::{Direction, Engine};
@@ -15,7 +10,6 @@ const FORMS: &str = ".github/workflows/forms.yml";
 const WORKFLOWS: &str = "github.com/acme/workflows";
 const APP_A: &str = "github.com/acme/app-a";
 
-/// The consumers of `export` in the file `path`: address and contract, `None` for unresolved.
 pub(crate) fn consumers(export: &Value, path: &str) -> Vec<(String, Option<String>)> {
     let repository = export["repository"].as_str().unwrap();
     let prefix = format!("{repository}::{path}::");
@@ -28,7 +22,6 @@ pub(crate) fn consumers(export: &Value, path: &str) -> Vec<(String, Option<Strin
     .collect()
 }
 
-/// The links of `export` that leave the file `path`: address, provider, level and reason.
 fn links(export: &Value, path: &str) -> Vec<(String, String, String, String)> {
     let repository = export["repository"].as_str().unwrap();
     let prefix = format!("{repository}::{path}::");
@@ -59,9 +52,6 @@ fn link(address: &str, provider: &str, reason: &str) -> (String, String, String,
     )
 }
 
-/// A pipeline that is not reusable, whose CI job checks its own repository out at the default
-/// path: every form a CI step takes. `actions/checkout`, `docker://`, a path that leaves the
-/// root and an action of `other-org` hold no side.
 #[test]
 fn a_ci_step_consumes_the_action_its_uses_names() {
     let [workflows, _, app_a, ..] = reproduction("ci_uses_steps");
@@ -97,15 +87,12 @@ fn a_ci_step_consumes_the_action_its_uses_names() {
                 &format!("{WORKFLOWS}::tools/setup/action.yml::."),
                 &format!("@v2 (indexed {at})")
             ),
-            // The own repository, with no ref to show or to compare.
             link("jobs.actions.steps[3]", &local, "own repository"),
             link("jobs.actions.steps[4]", &local, "own repository"),
         ]
     );
 }
 
-/// A reusable pipeline and two composite actions: a local call and `$/` link inside their
-/// repository, and a CI step's `./<folder>` stays unresolved in both.
 #[test]
 fn a_local_call_and_a_rooted_call_link_inside_their_repository() {
     let [workflows, ..] = reproduction("ci_uses_local");
@@ -148,7 +135,6 @@ fn a_local_call_and_a_rooted_call_link_inside_their_repository() {
             ),
         ]
     );
-    // A call that names its own repository by owner and name writes a ref as any peer's does.
     assert_eq!(
         links(&export, "tools/setup/action.yml"),
         [link(
@@ -159,8 +145,6 @@ fn a_local_call_and_a_rooted_call_link_inside_their_repository() {
     );
 }
 
-/// An action at the root has the repository identity alone as its path, one in a folder the
-/// folder, and a folder with both file names has one provider: `action.yml`.
 #[test]
 fn an_action_provides_the_contract_of_its_folder() {
     let [workflows, ..] = reproduction("ci_uses_providers");
@@ -216,7 +200,6 @@ fn context_on_an_action_lists_every_ci_step_that_calls_it() {
         ],
         "{answer}"
     );
-    // The calling side names the contract without a ref, then its provider.
     let step = engine
         .context(&format!("{WORKFLOWS}::action.yml::runs.steps[0]"), None)
         .unwrap();
@@ -234,9 +217,6 @@ fn context_on_an_action_lists_every_ci_step_that_calls_it() {
     );
 }
 
-/// The five positions of a CI step's `./<folder>`: the one where the CI runner's workspace is
-/// known to be the file's repository is covered above; the others are open items with no
-/// candidate, also when the workspace holds a route any unresolved call could reach.
 #[test]
 fn a_steps_local_folder_is_an_open_item_where_the_workspace_is_not_known() {
     let [workflows, _, app_a, ..] = reproduction("ci_uses_unresolved");
@@ -314,18 +294,14 @@ fn a_steps_local_folder_is_an_open_item_where_the_workspace_is_not_known() {
         );
         assert!(listed(&answer, "  provider: ").is_empty(), "{answer}");
     }
-    // `docker://` and a path that leaves the root are no open item either.
     for other in ["docker", "outside", "alpine"] {
         let answer = engine.search(other, Some("unresolved"), None).unwrap();
         assert_eq!(answer, format!("no matches for `{other}`\n"));
     }
-    // An open item of the kind is no contract to list: the default search and the kind
-    // `contract` answer as before it.
     for kind in [None, Some("contract")] {
         let answer = engine.search("steps", kind, None).unwrap();
         assert!(!answer.contains("(unresolved)"), "{answer}");
     }
-    // `meada decide` shows the cause and offers nothing.
     let (list, _, ok) = meada(&app_a, &["decide", "--list"], "", |_| {});
     let shown =
         format!("{FORMS}:22  - uses: ./tools/local\n  kind = \"dynamic-url\"\n  {no_checkout}\n");
@@ -333,8 +309,6 @@ fn a_steps_local_folder_is_an_open_item_where_the_workspace_is_not_known() {
     let _ = workflows;
 }
 
-/// GitHub reads an input's key in any case (`INPUT_REPOSITORY`): a checkout that writes
-/// `REPOSITORY` or `Path` names what one in lower case does.
 #[test]
 fn a_checkout_names_its_inputs_in_any_case() {
     let [_, _, app_a, ..] = reproduction("ci_uses_key_case");
@@ -356,8 +330,6 @@ fn a_checkout_names_its_inputs_in_any_case() {
     }
 }
 
-/// A repository without `origin` names no host: its local calls link, its calls by owner and
-/// name hold no side.
 #[test]
 fn a_repository_without_origin_links_its_local_calls() {
     let root = fixture_repo("ci_uses_no_origin", "ci-workflows", None);
@@ -388,8 +360,6 @@ fn a_repository_without_origin_links_its_local_calls() {
     assert!(consumers(&export, "tools/setup/action.yml").is_empty());
 }
 
-/// `acme/app-a` calls the action `tools/setup`, whose CI step calls the action `tools/login`:
-/// the chain crosses both, as it crosses reusable pipelines.
 #[test]
 fn trace_follows_a_chain_through_composite_actions() {
     let [workflows, _, app_a, ..] = reproduction("ci_uses_trace");
@@ -436,7 +406,6 @@ fn trace_follows_a_chain_through_composite_actions() {
     );
 }
 
-/// The answers on the forms, whole: what the output grammar documents of them.
 #[test]
 fn the_forms_answer_as_their_goldens() {
     let [workflows, _, app_a, ..] = reproduction("ci_uses_goldens");

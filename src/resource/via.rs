@@ -1,5 +1,3 @@
-//! The resource kind's indexed declaration locations and their context (#641).
-
 use std::collections::BTreeSet;
 
 use crate::config_values::sites;

@@ -1,42 +1,21 @@
-//! The values a Swift file writes (spec #29, #119): what the contract kinds read of a call, its
-//! receiver and its arguments, and what a local holds (`Facts::bound`) or a function returns
-//! (`Def::return_values`). A string literal is its parts, a name is `Value::Ref`, a call is
-//! `Value::Call`, and a closure is the `Kind::Inline` definition the walk makes of it, when it
-//! is written in code (`Ctx::inline`). A label before an argument makes it a keyword argument
-//! (`get("users", use: list)`), the implicit member of an enum (`.GET`) is `Value::Member` with no type, and anything else is
-//! `Unknown`.
-//!
-//! An environment read is `ProcessInfo.processInfo.environment["X"]` (also `Foundation.`-qualified),
-//! the string `Str([Env(X)])`, also through `!`, parentheses, string methods that keep the text
-//! (`trimmingCharacters`, `replacingOccurrences`, `lowercased`, `uppercased`) and a `??` whose
-//! fallback is a plain string literal. A method's argument that may read again (a read, a hole or
-//! a name of the code, which may hold one) and a fallback that is not a plain literal make the
-//! whole a hole: which of them is the base is unknown. The read is found bottom-up, each link of
-//! a chain once. Meada never reads the variable. Vapor's `Environment.get` is no read.
-
 use tree_sitter::Node;
 
 use super::{bound, call, callee, children, named, parts, qualify, text, unbacktick};
 use crate::lang::{Call, Invocation, Part, Value};
 
-/// How deep a value is read: a chain or a nest of calls past it is `Unknown`.
 // ponytail: real source nests a handful of calls; this keeps a crafted chain linear.
 const VALUE_DEPTH: usize = 32;
 
-/// Where a value is written: the definition around it, and whether a closure there is a
-/// definition of its own (code, not a type's property initializer).
 #[derive(Clone, Copy)]
 pub(super) struct Ctx<'s> {
     pub scope: &'s str,
     pub inline: bool,
 }
 
-/// The name of the `Kind::Inline` definition of the closure `node` written in `scope`.
 pub(super) fn inline_name(scope: &str, node: Node) -> String {
     qualify(scope, &format!("@{}", node.start_byte()))
 }
 
-/// Gives the call `at`, made by `function` with `suffixes`, its receiver and its arguments.
 pub(super) fn fill(at: &mut Call, function: Node, suffixes: &[Node], src: &[u8], ctx: Ctx) {
     fill_at(at, function, suffixes, src, ctx, 0);
 }
@@ -71,7 +50,6 @@ fn fill_at(at: &mut Call, function: Node, suffixes: &[Node], src: &[u8], ctx: Ct
     }
 }
 
-/// The value the expression `node` writes.
 pub(super) fn value(node: Node, src: &[u8], ctx: Ctx) -> Value {
     value_at(node, src, ctx, 0)
 }
@@ -90,7 +68,6 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
         }
         "simple_identifier" => Value::Ref(unbacktick(text(node, src))),
         "self_expression" => Value::Ref("self".into()),
-        // `URL(string: s)!`: the force unwrap is its operand.
         "postfix_expression"
             if (node.child_by_field_name("operation")).is_some_and(|o| o.kind() == "bang") =>
         {
@@ -137,7 +114,6 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
         "try_expression" | "await_expression" => node
             .child_by_field_name("expr")
             .map_or(Value::Unknown, |e| value_at(e, src, ctx, depth + 1)),
-        // `.GET`, an implicit member.
         "prefix_expression" if text(node, src).starts_with('.') => {
             match node.child_by_field_name("target") {
                 Some(t) if t.kind() == "simple_identifier" => {
@@ -146,7 +122,6 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
                 _ => Value::Unknown,
             }
         }
-        // `(read)`, and `read ?? "fallback"`: a fallback but a text-only literal is a hole.
         "tuple_expression" => match &named(node).collect::<Vec<_>>()[..] {
             [only] => {
                 let value = value_at(*only, src, ctx, depth + 1);
@@ -183,8 +158,6 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
                 return Value::Unknown;
             };
             fill_at(&mut at, function, &suffixes, src, ctx, depth);
-            // A string method keeps the read it is called on; an argument that may read again
-            // makes it a hole, since which read is the base is unknown.
             let method = at.callee.rsplit('.').next().unwrap_or(&at.callee);
             if let [_] = suffixes[..]
                 && STRING_METHODS.contains(&method)
@@ -208,10 +181,8 @@ fn value_at(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Value {
     }
 }
 
-/// The expression `ProcessInfo.processInfo.environment` is subscripted on.
 const ENVIRONMENT: &str = "ProcessInfo.processInfo.environment";
 
-/// The methods of `String` an environment read goes through with its text kept.
 const STRING_METHODS: &[&str] = &[
     "trimmingCharacters",
     "replacingOccurrences",
@@ -219,8 +190,6 @@ const STRING_METHODS: &[&str] = &[
     "uppercased",
 ];
 
-/// The environment read `ProcessInfo.processInfo.environment["X"]` the subscript `node` is:
-/// `Env(X)`, `Hole` when the key is no text-only literal, `None` when it is no read.
 // ponytail: `ProcessInfo` is Foundation's by its name alone; a type of the repository named so
 // would be read as it.
 fn subscript_read(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Option<Part> {
@@ -249,8 +218,6 @@ fn subscript_read(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Option<Part
     Some(Part::env_key(&literal).unwrap_or(Part::Hole))
 }
 
-/// `value` when it is one environment read (a string of one `Env` or `Hole` part, see the
-/// module), `Unknown` otherwise.
 fn env(value: Value) -> Value {
     match read(&value) {
         Some(_) => value,
@@ -258,7 +225,6 @@ fn env(value: Value) -> Value {
     }
 }
 
-/// The parts of `value` when it is one environment read.
 pub(super) fn read(value: &Value) -> Option<&[Part]> {
     match value {
         Value::Str(p)
@@ -273,9 +239,6 @@ pub(super) fn read(value: &Value) -> Option<&[Part]> {
     }
 }
 
-/// Whether `value` may read the environment: a read or a hole in it, or a name of the code (a
-/// local or a parameter may hold a read; a member of a type, `CharacterSet.whitespaces`, does
-/// not), at any depth of a call.
 fn may_read(value: &Value) -> bool {
     match value {
         Value::Str(parts) => (parts.iter())
@@ -290,8 +253,6 @@ fn may_read(value: &Value) -> bool {
     }
 }
 
-/// The parts of a string literal: its text, a name interpolated, and a hole for any other
-/// expression or an escape.
 fn string(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Vec<Part> {
     let mut out: Vec<Part> = Vec::new();
     for child in named(node) {
@@ -312,7 +273,6 @@ fn string(node: Node, src: &[u8], ctx: Ctx, depth: usize) -> Vec<Part> {
     out
 }
 
-/// Adds `part` to `out`, joining text to the text before it.
 fn push(out: &mut Vec<Part>, part: Part) {
     match (out.last_mut(), part) {
         (Some(Part::Text(last)), Part::Text(more)) => last.push_str(&more),
@@ -320,8 +280,6 @@ fn push(out: &mut Vec<Part>, part: Part) {
     }
 }
 
-/// The value a function with a declared result returns when its body is one expression
-/// (`func admin(_ r: RoutesBuilder) -> RoutesBuilder { r.grouped("admin") }`).
 pub(super) fn implicit_return(function: Node, src: &[u8], ctx: Ctx) -> Option<Value> {
     if !children(function).any(|c| c.kind() == "->") {
         return None;
@@ -331,13 +289,11 @@ pub(super) fn implicit_return(function: Node, src: &[u8], ctx: Ctx) -> Option<Va
     let [only] = named(statements).collect::<Vec<_>>()[..] else {
         return None;
     };
-    // A declaration or a statement is no result; a closure's `return` is read where it stands.
     let kind = only.kind();
     (kind.ends_with("_expression") || kind.ends_with("_literal") || kind == "simple_identifier")
         .then(|| value(only, src, ctx))
 }
 
-/// The value a property or a local of one name is initialized with.
 pub(super) fn initializer(node: Node, src: &[u8], ctx: Ctx) -> Option<Value> {
     let initial = node.child_by_field_name("value")?;
     (bound(node, src).len() == 1).then(|| value(initial, src, ctx))

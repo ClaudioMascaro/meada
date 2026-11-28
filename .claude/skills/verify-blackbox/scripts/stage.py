@@ -52,7 +52,6 @@ def ours(target, root, chosen):
 
 def stage(name):
     root = Path(git(Path.cwd(), "rev-parse", "--show-toplevel"))
-    # A worktree's build may land in the main checkout's target/ (`bounded` puts it there).
     common = Path(git(root, "rev-parse", "--path-format=absolute", "--git-common-dir"))
     chosen = Path(os.environ["CARGO_TARGET_DIR"]) if os.environ.get("CARGO_TARGET_DIR") else None
     targets = [t for t in (chosen, root / "target", common.parent / "target") if t]

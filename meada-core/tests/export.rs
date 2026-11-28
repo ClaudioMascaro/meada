@@ -1,7 +1,3 @@
-//! An export at the crate's public seam: what the binary writes reads back into the export types
-//! and writes again to the same bytes, and a document that does not fit them is refused, naming
-//! the field.
-
 use std::fs;
 use std::path::Path;
 
@@ -64,7 +60,6 @@ fn a_valid_export_reads() {
     assert_eq!(export.write().unwrap(), EXPORT);
 }
 
-/// `commit` and `dirty` are optional and left out when absent; `format` is not (#512).
 #[test]
 fn an_export_without_a_commit_writes_neither_provenance_field() {
     let bare = EXPORT.replace(

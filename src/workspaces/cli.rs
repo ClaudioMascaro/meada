@@ -21,7 +21,6 @@ use crate::workspace::Manifest;
 
 const ADMINISTRATOR: Authority = Authority::PlatformAdministrator;
 
-/// The sections a command reads, from the bootstrap manifest.
 struct Env {
     manifest: Manifest,
     author: String,
@@ -141,7 +140,6 @@ impl std::fmt::Display for OpError {
 
 impl std::error::Error for OpError {}
 
-/// A manifest file read within the named text's bound, as the entries of a version.
 fn entries_of(env: &Env, file: &Path) -> crate::Result<Vec<Json>> {
     let bytes = crate::config::read_bounded(file, named::TEXT_MAX as u64 + 1)?;
     let text = String::from_utf8(bytes).map_err(|_| Msg::WorkspacesBody.text())?;
@@ -154,8 +152,6 @@ fn entries_of(env: &Env, file: &Path) -> crate::Result<Vec<Json>> {
     }
 }
 
-/// The audit of a write by `env`'s author: `action` with `arguments`, `op` run once the record
-/// is inserted.
 fn audited<T>(
     env: &Env,
     manifest: &Path,
@@ -288,7 +284,6 @@ pub fn create(
     Ok(format!("{line}\n"))
 }
 
-/// What a write on an existing workspace resolved before its transaction.
 struct Resolved {
     base: i64,
     current: String,
@@ -305,7 +300,6 @@ fn resolve(env: &Env, id: &str, base: i64) -> Result<Resolved, OpError> {
     }
 }
 
-/// Runs `op` on workspace `id` at `base`; the new base.
 fn transact(env: &Env, id: &str, resolved: &Resolved, op: &Op<'_>) -> Result<ops::Done, OpError> {
     let target = Target {
         id,

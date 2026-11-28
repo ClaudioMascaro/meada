@@ -35,26 +35,17 @@ pub use crate::partial::with_every_row;
 pub type Report = (Vec<Evaluation>, Vec<Vec<String>>);
 
 pub struct Engine {
-    /// The index of each repository of the workspace, one connection each (SQLite attaches at
-    /// most 10 databases to one), in `workspace.repos` order: the first is where Meada runs.
     dbs: Vec<Connection>,
     workspace: Workspace,
     root: PathBuf,
     identity: String,
-    /// Opened from a manifest (server mode): every index read-only, never refreshed.
     read_only: bool,
-    /// Where the export's `commit` and `dirty` come from (ADR 0004, #512).
     commit_source: CommitSource,
 }
 
-/// Where an engine learns the indexed commit of the repository where Meada runs.
 enum CommitSource {
-    /// Locally: from the checkout, around the refresh `export` makes.
     Checkout,
-    /// Server mode: the commit `meada index --workspace` recorded beside the index.
     Recorded,
-    /// At a generation: the `head` its document records for each repository, in workspace
-    /// order.
     #[cfg(feature = "snapshot")]
     Generation(Vec<Option<String>>),
 }
@@ -81,10 +72,6 @@ impl Engine {
         )
     }
 
-    /// `open_manifest` over `listed`, the manifest at `manifest` as `served` read it when the
-    /// server started, with the repositories `reads` (`Manifest::workspace`): only `repo`'s
-    /// mirror is checked again (`Repository::recheck`), and every index is opened as
-    /// `open_manifest` opens it. A call of `meada mcp --listen`.
     pub(crate) fn open_listed(
         listed: &Manifest,
         repo: &str,
@@ -96,12 +83,6 @@ impl Engine {
         Self::read(workspace, Fix::Index(&manifest.display().to_string()))
     }
 
-    /// `open_manifest` over the generation `held` (`--generations`, feature `snapshot`), `repo`
-    /// first, for one answer: the repositories, mirrors and indexes are the ones the generation
-    /// recorded that `reads` (`Manifest::workspace`), and every index opens read-only. Nothing
-    /// is read before the indexes; the mirrors are not touched with `git`, since the pull
-    /// checked them. A call of `meada mcp --listen --generations` answers from the generation
-    /// its request was routed by.
     #[cfg(feature = "snapshot")]
     pub(crate) fn open_held(
         held: &crate::snapshot::serve::Held,
@@ -117,8 +98,6 @@ impl Engine {
         Ok(engine.at_generation(held))
     }
 
-    /// `open_held` over one named workspace of the generation (#342): `listed` is the workspace
-    /// `Held::context` built, `repo` first.
     #[cfg(feature = "snapshot")]
     pub(crate) fn open_context(
         held: &crate::snapshot::serve::Held,
@@ -135,7 +114,6 @@ impl Engine {
         Ok(engine.at_generation(held))
     }
 
-    /// The engine with its indexed commit the one the generation `held` records.
     #[cfg(feature = "snapshot")]
     fn at_generation(mut self, held: &crate::snapshot::serve::Held) -> Self {
         let heads = self.workspace.repos.iter().map(|r| held.head(&r.identity));
@@ -152,8 +130,6 @@ impl Engine {
         Self::open_held(&crate::snapshot::serve::held(&local)?, repo, &|_| true)
     }
 
-    /// Opens every index of `workspace` read-only; `fix` says where an index that cannot be
-    /// read is fixed.
     fn read(workspace: Workspace, fix: Fix) -> Result<Self> {
         let dbs = (workspace.repos.iter())
             .map(|r| index::open_read(&r.index, &r.identity, fix))
@@ -169,16 +145,12 @@ impl Engine {
         })
     }
 
-    /// Opens every index of `workspace` where its repository says it lives
-    /// (`Repository::index`).
     fn over(workspace: Workspace) -> Result<Self> {
-        // Opening builds a missing index, or rebuilds one of another schema.
         Self::over_with(workspace, |r| {
             index::open(&r.index, &r.root, &r.identity, &r.config.serve)
         })
     }
 
-    /// `over`, each index opened by `open`, one repository at a time in workspace order.
     fn over_with(
         workspace: Workspace,
         open: impl Fn(&Repository) -> Result<Connection>,
@@ -207,8 +179,6 @@ impl Engine {
             return Ok(());
         }
         let serve = |root: &Path| -> Result<_> { Ok(config::load(root)?.serve) };
-        // The peers' connections stay open for the session (#443): `exports` reads the same
-        // handles, so a peer is never refreshed in one file and read from another.
         for (peer, db) in self.workspace.repos[1..].iter().zip(&self.dbs[1..]) {
             index::refresh(db, &peer.root, &peer.identity, &|| serve(&peer.root))?;
         }
@@ -239,7 +209,6 @@ impl Engine {
         let mut exports = self.exports()?;
         let here = format!("{}::", self.identity);
         let (all, mut evaluations) = self.links_and_decisions(&exports);
-        // The processes cross repositories: they walk every link, not only the local ones.
         let graph = trace::Graph::new(&self.workspace, &exports, &all);
         let processes = (exports[0].entry_points.iter())
             .map(|e| graph.export_process(e))
@@ -259,7 +228,6 @@ impl Engine {
             .collect();
         let links = all.into_iter();
         let links = links.filter(|l| contract::link_in_repository(l, &self.identity));
-        // A use read from a pipeline or an action sits on the CI node that holds its key.
         let holders: HashMap<&str, &str> = (exports.iter().flat_map(|e| &e.config_uses))
             .filter_map(|u| Some((u.site.as_str(), u.holder.as_deref()?)))
             .collect();
@@ -290,14 +258,9 @@ impl Engine {
         Ok(written.write()?)
     }
 
-    /// The indexed commit of a local checkout and whether it was dirty, read after the refresh:
-    /// `before` is what `HEAD` named before it. Both are known only when `HEAD` did not move
-    /// and the index is fresh, as `meada index --workspace` decides before recording.
     fn checkout_commit(&self, before: Option<String>) -> Option<(String, bool)> {
         let before = before?;
-        // By the `[serve]` table the refresh read (#758), not the one read at the open.
         let serve = config::load(&self.root).map(|config| config.serve);
-        // A freshness check that fails leaves the commit unknown rather than failing the export.
         let fresh = serve
             .and_then(|serve| index::fresh(&self.dbs[0], &self.root, &self.identity, &serve))
             .unwrap_or(false);
@@ -307,7 +270,6 @@ impl Engine {
         repo::changed(&self.root).ok().map(|dirty| (before, dirty))
     }
 
-    /// Read each repository's index in workspace order and retain its identity on failure.
     fn each_index<T>(
         &self,
         read: impl Fn(&Connection, &Repository) -> Result<T>,
@@ -317,8 +279,6 @@ impl Engine {
             .collect()
     }
 
-    /// The index content of every repository of the workspace, with the contracts its
-    /// `meada.toml` declares, in workspace order.
     fn exports(&self) -> Result<Vec<Export>> {
         let mut exports = self.each_index(|db, m| {
             let mut export = index::export(db, &m.identity)?;
@@ -330,16 +290,11 @@ impl Engine {
             }
             Ok(export)
         })?;
-        // Each kind's step over the whole workspace, once every repository has declared.
         contract::workspace_steps(&mut exports, &self.workspace.repos);
         self.commits(&mut exports);
         Ok(exports)
     }
 
-    /// The exports a query reads (#396, `partial.rs`): every repository's contract rows, with
-    /// the symbols the kinds look up (`ContractKind::symbols_read`) and the calls its decisions
-    /// name, declared and stepped as `exports` does. The query reads the code rows of its
-    /// answer into it before it looks them up.
     fn partial(&self) -> Result<Partial<'_>> {
         let mut partial = Partial::open(&self.dbs, &self.workspace.repos)?;
         for (n, repo) in self.workspace.repos.iter().enumerate() {
@@ -366,9 +321,6 @@ impl Engine {
         Ok(partial)
     }
 
-    /// Sets the indexed commit of each repository that holds a provider of a kind that reads
-    /// it (`ContractKind::reads_commit`), from where this engine learns commits: the checkout,
-    /// the commit recorded beside the index, or the generation's document.
     fn commits(&self, exports: &mut [Export]) {
         let read: Vec<_> = (KINDS.iter().filter(|k| k.reads_commit()))
             .map(|k| format!("{}::", k.prefix()))
@@ -390,14 +342,10 @@ impl Engine {
         }
     }
 
-    /// Every link of the workspace, sorted.
     fn links(&self, exports: &[Export]) -> Vec<Link> {
         self.links_and_decisions(exports).0
     }
 
-    /// Every link of the workspace, sorted, with the decisions replayed and the passes of the
-    /// kinds after them (`ContractKind::after_links`), and the decisions of each repository
-    /// that did not apply, in workspace order.
     fn links_and_decisions(&self, exports: &[Export]) -> (Vec<Link>, Vec<Evaluation>) {
         let (mut links, mut evaluations) =
             decisions::replay(self.core_links(exports), &self.workspace, exports, |d| {
@@ -423,8 +371,6 @@ impl Engine {
         (links, evaluations)
     }
 
-    /// Every link of the workspace as the core derives it from the stored contracts, before
-    /// any decision.
     fn core_links(&self, exports: &[Export]) -> Vec<Link> {
         let repos = &self.workspace.repos;
         let providers: Vec<_> = exports
@@ -471,7 +417,6 @@ impl Engine {
         self.report()
     }
 
-    /// `status_report` over the indexes as they are, refreshed or not.
     fn report(&self) -> Result<Report> {
         let exports = self.exports()?;
         let (links, evaluations) = self.links_and_decisions(&exports);
@@ -552,7 +497,6 @@ impl Engine {
         &self.root
     }
 
-    /// The setting the index stored for the file at `path` of the repository where Meada runs.
     pub(crate) fn stored_setting(&self, path: &str) -> Option<String> {
         index::stored_setting(&self.dbs[0], path)
     }
@@ -583,8 +527,6 @@ impl Engine {
             .collect())
     }
 
-    /// The items of the workspace as the core sees them, in id order, each with whether a
-    /// decision applies to it (its call has a `decided` link once the decisions replay).
     fn items(&self) -> Result<Vec<(OpenItem, bool)>> {
         self.refresh()?;
         let mut partial = self.partial()?;
@@ -689,10 +631,6 @@ impl Engine {
             .collect())
     }
 
-    /// Reads what each block of `blocks` touches and what the affected walk from them needs,
-    /// then hands `then`, per block, the graph, its changes, the ids they root, the paths left
-    /// open and what its lockfiles root. `base` is the revision the changes start from, which a
-    /// lockfile is compared with.
     pub(crate) fn walked<R>(
         &self,
         blocks: &[Vec<(String, Change)>],
@@ -719,7 +657,6 @@ impl Engine {
                 .map(|changes| trace::affected::attribute(&graph, changes, base, facts, facts_at))
                 .collect::<Result<_>>()?
         };
-        // The files a lockfile roots are read as whole files are.
         for a in &attributed {
             trace::starts(
                 &mut partial,
@@ -736,7 +673,6 @@ impl Engine {
         };
         let every: Vec<String> = rooted.iter().flat_map(|(roots, _)| roots.clone()).collect();
         trace::read_affected(&mut partial, &links, every)?;
-        // What the changed lines read, so the answer can place it.
         let read: Vec<String> = {
             let graph = trace::Graph::new(&self.workspace, &partial.exports, &links);
             (blocks.iter().zip(&rooted))
@@ -752,7 +688,6 @@ impl Engine {
             .collect())
     }
 
-    /// `trace`'s body: `changes` holds what a change start touches.
     fn traced(
         &self,
         start: Start,
@@ -763,7 +698,6 @@ impl Engine {
         self.refresh()?;
         let mut partial = self.partial()?;
         let links = self.links(&partial.exports);
-        // A CI contract starts at the pipeline that provides it, as the pipeline's name does.
         let node = match start {
             Start::From(from) => trace::provider_node(&partial.exports, from),
             Start::Uncommitted | Start::Changes => None,
@@ -802,9 +736,6 @@ impl Engine {
         }
         let exports = partial.exports;
         let graph = trace::Graph::new(&self.workspace, &exports, &links);
-        // An IaC node (#649) by its address, when nothing of the code has that name: its
-        // references, walked within its root module. Decided on the whole answer, before any
-        // budget cuts it.
         if let Start::From(from) = start
             && none
             && graph.answer(start, None, direction, Some(usize::MAX / 8))
@@ -884,7 +815,6 @@ impl Engine {
             }
             return Ok(search::answer(query, hits, budget));
         }
-        // Whether symbols match, and the prefix of the contracts that do.
         let (symbols, contracts) = match (kind, selected) {
             (None, _) => (true, Some(String::new())),
             (Some("symbol"), _) => (true, None),
@@ -900,10 +830,8 @@ impl Engine {
         self.refresh()?;
         let exports = self.partial()?.exports;
         let needle = query.to_lowercase();
-        // (rank, identity to break ties, line)
         let mut hits: Vec<Hit> = Vec::new();
         let orphans = iac::orphans::Scope::new(&exports);
-        // An unresolved consumer a kind owns is an open item, and no contract to list.
         let owned: HashSet<String> = (KINDS.iter())
             .flat_map(|kind| kind.unresolved_causes(&exports).into_keys())
             .collect();
@@ -932,7 +860,6 @@ impl Engine {
                 .providers
                 .iter()
                 .map(|p| (p.contract.clone(), &p.site, Some(Role::Provider), false));
-            // An unresolved consumer has no contract: it shows as `(unresolved) <callee>`.
             let listed = |c: &&Consumer| c.contract.is_some() || !owned.contains(&c.site);
             let consumed = export.consumers.iter().filter(listed).map(|c| {
                 let contract = c.contract.clone();
@@ -986,11 +913,9 @@ impl Engine {
                     }
                     None if *site == repo.identity => REPOSITORY_LEVEL.into(),
                     None => match export.document_of(site) {
-                        // A route or channel side only a document lists.
                         Some(doc) => format!("{doc} {DOCUMENTED_ONLY}"),
                         None => {
                             contract::place(&contract, &repo.identity, site).unwrap_or_else(|| {
-                                // A route file that serves the contract with no function of its own.
                                 site.rsplit_once("::")
                                     .map_or(site.as_str(), |(_, p)| p)
                                     .to_string()
@@ -998,7 +923,6 @@ impl Engine {
                         }
                     },
                 };
-                // A policy grant is no orphan (ADR 0026): it carries no orphan note.
                 let note = match grant {
                     true => "",
                     false => orphans.use_note(&contract),
@@ -1034,14 +958,12 @@ impl Engine {
                 }
             }
         }
-        // With no kind, config values answer only when no symbol and no contract does (ADR 0025).
         if kind.is_none() && hits.is_empty() {
             return self.search_values(query, budget);
         }
         Ok(search::answer(query, hits, budget))
     }
 
-    /// Each repository's identity and index, in workspace order.
     fn indexes(&self) -> Vec<(&str, &Connection)> {
         (self.workspace.repos.iter())
             .map(|r| r.identity.as_str())
@@ -1049,8 +971,6 @@ impl Engine {
             .collect()
     }
 
-    /// The config values (#639) of every repository whose value or key path matches `query`,
-    /// lowercased, as `config_values::matches` finds them, each row read only when shown.
     fn search_values(&self, query: &str, budget: Option<usize>) -> Result<String> {
         let indexes = self.indexes();
         let mut hits = Vec::new();
@@ -1067,12 +987,9 @@ impl Engine {
         })
     }
 
-    /// The documents read (spec #21) whose path or `info.title` matches `query`, one line each,
-    /// as `<repository> <path> (<format> <version>, routes: <n>) <title>`.
     fn search_documents(&self, query: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
         let needle = query.to_lowercase();
-        // (rank, path to break ties, line)
         let mut hits: Vec<Hit> = Vec::new();
         for (export, repo) in self.partial()?.exports.iter().zip(&self.workspace.repos) {
             for doc in &export.documents {
@@ -1098,9 +1015,6 @@ impl Engine {
         Ok(search::answer(query, hits, budget))
     }
 
-    /// The drift (spec #23) whose route path or missing field path matches `query`, one line
-    /// per missing path, as `<repository> <path>:<line> <caller> <route> missing <path>
-    /// (<level>)`.
     fn search_drift(&self, query: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
         let mut partial = self.partial()?;
@@ -1112,12 +1026,9 @@ impl Engine {
         Ok(search::answer(query, hits, budget))
     }
 
-    /// The communities (spec #31) whose name matches `query`, one line each, as `<repository>
-    /// <name> (members: <n>)`.
     fn search_communities(&self, query: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
         let needle = query.to_lowercase();
-        // (rank, repository and name to break ties, line)
         let mut hits: Vec<Hit> = Vec::new();
         for (repo, db) in self.workspace.repos.iter().zip(&self.dbs) {
             for (name, n) in partial::community_sizes(db)? {
@@ -1132,12 +1043,9 @@ impl Engine {
         Ok(search::answer(query, hits, budget))
     }
 
-    /// The processes (spec #31) whose entry point's label matches `query`, one line each, as
-    /// `<repository> <label> process::<identity> (<kind>)`: the identity `trace` starts from.
     fn search_processes(&self, query: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
         let needle = query.to_lowercase();
-        // (rank, identity to break ties, line)
         let mut hits: Vec<Hit> = Vec::new();
         for export in self.partial()?.exports {
             for e in &export.entry_points {
@@ -1152,10 +1060,6 @@ impl Engine {
         Ok(search::answer(query, hits, budget))
     }
 
-    /// The symbols whose span text is the same in two or more places of the workspace (across
-    /// repositories and within one), as groups: a header `<n> copies`, then one line per member in
-    /// the symbol format. A group is listed when any member's name or path matches `query`; groups
-    /// go by span length, longest first, then smallest member identity, members by identity.
     fn search_duplicates(&self, query: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
         let needle = query.to_lowercase();
@@ -1167,8 +1071,6 @@ impl Engine {
                 .iter()
                 .any(|n| rank(n, &needle).is_some())
         };
-        // The hashes of the symbols that match, then every symbol with one of them: the groups
-        // a match belongs to, whatever repository holds the other members.
         let mut hashes = HashSet::new();
         for db in &self.dbs {
             partial::each_symbol(db, |symbol| {
@@ -1181,8 +1083,6 @@ impl Engine {
         let exports = (self.dbs.iter())
             .map(|db| partial::symbols_hashed(db, &hashes))
             .collect::<Result<Vec<_>>>()?;
-        // Symbols by hash, as (repository position, symbol); lines are built for the groups
-        // that survive, so a query reads only the files of the answer.
         let mut groups: HashMap<&str, Vec<(usize, &Symbol)>> = HashMap::new();
         for (n, symbols) in exports.iter().enumerate() {
             for symbol in symbols {
@@ -1196,7 +1096,6 @@ impl Engine {
             .filter(|g| g.len() > 1)
             .filter(|g| g.iter().any(|(_, symbol)| matches(symbol)))
             .collect();
-        // Overloads share an identity, so the position in the file settles ties.
         let place = |(_, s): &(usize, &Symbol)| (s.id.clone(), s.span.path.clone(), s.span.start);
         for group in &mut groups {
             group.sort_by_key(place);
@@ -1222,10 +1121,8 @@ impl Engine {
         Ok(render::budgeted(&lines, budget))
     }
 
-    /// The open items of `kind` whose enclosing symbol or call expression matches `query`.
     fn search_items(&self, query: &str, kind: ItemKind, budget: Option<usize>) -> Result<String> {
         let needle = query.to_lowercase();
-        // (rank, id, line)
         let mut hits: Vec<Hit> = Vec::new();
         for item in self.open_items()?.into_iter().filter(|i| i.kind == kind) {
             let name = item.enclosing.as_ref().map(|e| e.name.to_lowercase());
@@ -1241,7 +1138,6 @@ impl Engine {
             .min() else {
                 continue;
             };
-            // An item no decision closes says why, where another names the command.
             let close = match &item.cause {
                 Some(cause) => format!("{cause} (`{}`)", item.id),
                 None => format!("run `meada decide --item {}`", item.id),
@@ -1260,21 +1156,6 @@ impl Engine {
         Ok(search::answer(query, hits, budget))
     }
 
-    /// The resource, channel or route `contract`: one line per provider and consumer across the
-    /// workspace, providers first, as `<repository> <role> <path>:<line> <name>`, where `role`
-    /// is `writer` or `reader` (a resource, `<name>` its `via` symbol), `producer` or
-    /// `consumer` (a channel, `<name>` the symbol around the producing call, or the handler) or
-    /// `provider` (a route, `<name>` its handler; its consumers are calls, which `trace` and
-    /// the `contracts:` of their symbols show, so `consumer` is `None` and they are left out).
-    /// A side only a document lists is `<repository> <role> <document> (documented only)`;
-    /// the shape a document gives a side follows it, `response` for a route and `payload`
-    /// for a channel.
-    /// A side declared with no `via` is `<repository> <role> (repository-level)`, a handler at
-    /// the top level of a file `<repository> <role> <path> (top level)`. The kind also lists the
-    /// sides linked to the contract through another name (`ContractKind::related_sides`), each
-    /// followed by `[<level>: <reason>]`; a channel's are the producers a consumer's wildcard
-    /// pattern matches, the wildcard consumers that match it, and the publishes its bindings
-    /// route to it, then the bindings themselves.
     fn contract_sides(
         &self,
         exports: &[Export],
@@ -1285,15 +1166,11 @@ impl Engine {
     ) -> Vec<String> {
         let carried = view.carried;
         let orphans = iac::orphans::Scope::new(exports);
-        // Providers, then consumers, then the bindings that reach a queue; each with the lines
-        // of the payload shape a document gives it.
         let mut sides: Vec<(u8, String, Vec<String>)> = Vec::new();
         let mut prepared = kind.workspace_related_sides(exports, links, contract);
         for (n, (export, repo)) in exports.iter().zip(&self.workspace.repos).enumerate() {
             let mut files = Files::new(&repo.root);
             let related = prepared.as_mut().map(|rows| std::mem::take(&mut rows[n]));
-            // The IaC nodes by identity, the first of an identity kept: written out for an
-            // export with a side on one.
             let nodes = std::cell::OnceCell::new();
             let nodes = || {
                 nodes.get_or_init(|| {
@@ -1319,10 +1196,8 @@ impl Engine {
                 } else if site == repo.identity {
                     REPOSITORY_LEVEL.into()
                 } else if let Some(doc) = export.document_of(site) {
-                    // A side only a document lists.
                     format!("{doc} {DOCUMENTED_ONLY}")
                 } else if let Some(place) = contract::place(contract, &repo.identity, site) {
-                    // A dependency entry of a manifest.
                     place
                 } else {
                     format!("{} (top level)", label(site))
@@ -1417,16 +1292,12 @@ impl Engine {
     /// line's range names).
     pub fn context(&self, symbol: &str, budget: Option<usize>) -> Result<String> {
         self.refresh()?;
-        // A read-only engine never refreshes, so it has nothing to retry with.
         self.context_fresh(symbol, budget, !self.read_only)
     }
 
     fn context_fresh(&self, symbol: &str, budget: Option<usize>, retry: bool) -> Result<String> {
         let mut partial = self.partial()?;
         let repos = &self.workspace.repos;
-        // A contract listed by its sides, as `search` prints it. One its kind lists by its
-        // providers alone (its consumers are calls) is followed by the linked consumers that
-        // read fields of the carried shape, with their drift, placed at their call (`View`).
         let contract = contract::typed(symbol);
         if let Some(kind) = contract::kind_of(contract)
             && let Some(view) = kind.view(contract)
@@ -1544,7 +1415,6 @@ impl Engine {
             .collect();
         let [(n, symbol_found)] = found[..] else {
             if found.is_empty() {
-                // An IaC node (#649) by its address, when no symbol has that name.
                 if let Some(mut lines) = iac::context(&self.indexes(), &partial.exports, symbol)? {
                     let nodes = iac::found(&partial.exports, symbol);
                     if let [(n, node)] = &nodes[..] {
@@ -1556,7 +1426,6 @@ impl Engine {
                                 kind.context_at(&partial.exports, repos, &links, &identity, root)
                             })
                             .collect();
-                        // The values are the last block of `lines`.
                         let values = |l: &String| l == "values:" || l == "values: none";
                         let at = (node.sides_first())
                             .then(|| lines.iter().rposition(values))
@@ -1624,7 +1493,6 @@ impl Engine {
                 found.len()
             )];
             lines.extend(found.iter().map(|&(n, s)| {
-                // `<path>::<name>`, or the identity when another repository has the same one.
                 let name = match found.iter().filter(|(_, o)| short(o) == short(s)).count() {
                     1 => short(s),
                     _ => s.id.clone(),
@@ -1634,12 +1502,10 @@ impl Engine {
             }));
             return Ok(render::budgeted(&lines, budget));
         };
-        // Owned: the partial export grows below, as the answer reads its rows.
         let symbol_found = &symbol_found.clone();
         let repo = &repos[n];
         let text = span_text(&repo.root, &exports[n], symbol_found);
         if text.is_none() && retry {
-            // The file changed without its mtime or size showing it: hash it again.
             index::forget(&self.dbs[n], &symbol_found.span.path)?;
             self.refresh()?;
             return self.context_fresh(symbol, budget, false);
@@ -1648,20 +1514,14 @@ impl Engine {
         let identity = &repo.identity;
         let name = label(&symbol_found.id);
         let header = match &text {
-            // The range holds exactly the lines the cut note counts (`render::cut` takes its
-            // `<m>` from `span.len()`), so a cut or omitted span is read from those lines.
             Some((first, span)) => format!(
                 "{identity} {}:{first}-{} {name}",
                 symbol_found.span.path,
                 first + span.len().saturating_sub(1)
             ),
-            // The stored offsets no longer describe the file.
             None => line(identity, &mut files, symbol_found, name),
         };
         let links = self.links(&partial.exports);
-        // What the answer looks up: the calls that may reach the symbol and those it makes,
-        // the symbols they reach or are made by, what the kinds' sections read, and what is
-        // upstream of it for its processes.
         let id = symbol_found.id.as_str();
         let callers = partial.callers(Some(n), &[id], true)?;
         partial.callers_of(&callers)?;
@@ -1682,9 +1542,6 @@ impl Engine {
         let export = &exports[n];
         let community = partial::community_of(&self.dbs[n], &symbol_found.id)?;
         let community = format!("community: {}", community.as_deref().unwrap_or("none"));
-        // Without the span text there is no span: the note is a line of the tail, kept in its
-        // output position and ahead of the callers, so the cut never rewrites it.
-        // In server mode nothing refreshes, so the file moved ahead of the index (ADR 0011).
         let unavailable = text.is_none().then(|| match self.read_only {
             true => "index behind the mirror: run meada index --workspace".to_string(),
             false => format!(
@@ -1722,10 +1579,6 @@ impl Engine {
     }
 }
 
-/// Each side of `contract` that `export` (one of the workspace's `exports`) holds, as `Engine::
-/// contract_sides` lists them: its site, order (provider, consumer, other), role words, tag and
-/// shape. The sides that hold it come from the engine, the others from the kind
-/// (`ContractKind::related_sides`).
 fn side_sites(
     exports: &[Export],
     links: &[Link],
@@ -1758,8 +1611,6 @@ fn sides_of<'e>(
 ) -> Vec<(&'e str, u8, String, String, Option<&'e crate::shape::Shape>)> {
     let provided = export.providers.iter().filter(|p| p.contract == contract);
     let provided = provided.map(|p| (p.site.as_str(), 0, provider.into(), p.shape.as_ref()));
-    // A site is listed once: a CI step that installs a package and runs its console script
-    // holds two rows of one contract.
     let mut listed = HashSet::new();
     let consumed = export.consumers.iter().filter_map(move |c| {
         let words = consumer.filter(|_| c.contract.as_deref() == Some(contract))?;
@@ -1784,7 +1635,6 @@ fn sides_of<'e>(
     own.chain(related).collect()
 }
 
-/// A contract ranks whole and by its kind's parts: `/users` is exact for `http::GET::/users`.
 fn contract_rank(contract: &str, needle: &str) -> Option<u8> {
     let lower = contract.to_lowercase();
     let (kind, id) = contract::parts(&lower);
@@ -1795,11 +1645,6 @@ fn contract_rank(contract: &str, needle: &str) -> Option<u8> {
         .min()
 }
 
-/// `contracts:` with what `symbol` provides, what its calls produce (a provider at a call, then
-/// what the kinds add for the call) and the contracts its calls consume, unresolved ones
-/// included, each followed by its inferred or decided links; `exports` and `links` are the
-/// workspace's.
-/// Nothing when it has none.
 fn contracts(
     repo: &Repository,
     export: &Export,
@@ -1823,8 +1668,6 @@ fn contracts(
                 .map_or_else(Vec::new, |s| shape_lines(identity, s, "response")),
         );
     }
-    // A provider can sit at a call (a channel producer): the symbol around it produces. A
-    // kind may add lines for the call.
     for call in export.calls.iter().filter(|c| c.caller == symbol.id) {
         let location = files.at(&call.span.path, call.span.start);
         for provider in export.providers.iter().filter(|p| p.site == call.id) {
@@ -1839,7 +1682,6 @@ fn contracts(
             .flat_map(|k| k.at_call(exports, export, &call.id));
         lines.extend(added.map(|line| format!("{identity} {location} {line}")));
     }
-    // A resource reader or a channel handler is a symbol, not a call site.
     let readers = export.consumers.iter().filter(|c| c.site == symbol.id);
     for contract in readers.filter_map(|c| c.contract.as_ref()) {
         let shown = contract::shown(contract);
@@ -1896,8 +1738,6 @@ fn contracts(
     section("contracts", lines)
 }
 
-/// The span's first line in its file and its lines, or `None` when its file under `root` no
-/// longer has the indexed hash.
 fn span_text(root: &Path, export: &Export, symbol: &Symbol) -> Option<(usize, Vec<String>)> {
     let path = &symbol.span.path;
     let indexed = export
@@ -1916,9 +1756,6 @@ fn span_text(root: &Path, export: &Export, symbol: &Symbol) -> Option<(usize, Ve
     Some((render::line_of(&src, symbol.span.start), lines))
 }
 
-/// `callers:`, `callees:` and, when the symbol has calls that decorate a definition, `annotations:`
-/// of the symbol `id`, inside the repository `identity`; then, where there are some, `used by:`
-/// and `uses:`, the rows of uses that are no calls, each with its kind.
 fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Vec<String> {
     let symbols: HashMap<&str, &Symbol> =
         export.symbols.iter().map(|s| (s.id.as_str(), s)).collect();
@@ -1942,7 +1779,6 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
             )
         })
         .collect();
-    // A use its file makes names the symbol holding it, as `trace` up does.
     used_by.sort_by_key(|c| (&c.span.path, c.span.start));
     let used_by: Vec<String> = (used_by.iter())
         .map(|c| {
@@ -1960,7 +1796,6 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
             )
         })
         .collect();
-    // A use its file makes is the holding symbol's, as `used by:` reads it.
     let (mut calls, uses): (Vec<_>, Vec<_>) = (export.calls.iter())
         .filter(|c| c.caller == id || c.kind.is_some() && c.holder.as_deref() == Some(id))
         .partition(|c| c.kind.is_none());
@@ -1978,14 +1813,12 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
         let mut lines: Vec<String> = calls
             .iter()
             .flat_map(|c| {
-                // An ambiguous call lists every candidate, marked, instead of a guess.
                 let targets: Vec<&Symbol> = c
                     .target
                     .iter()
                     .chain(&c.candidates)
                     .filter_map(|t| symbols.get(t.as_str()).copied())
                     .collect();
-                // An annotation says which definition it decorates.
                 let on = c
                     .decorates
                     .as_deref()
@@ -1995,7 +1828,6 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
                     let location = files.at(&c.span.path, c.span.start);
                     return vec![format!("{identity} {location} (unresolved) {callee}{on}")];
                 }
-                // Overloads of one method show as one set: the first by id stands for them.
                 render::overload_sets(targets, |t| &t.id)
                     .into_iter()
                     .map(|set| match set.as_slice() {
@@ -2021,7 +1853,6 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
     if !annotations.is_empty() {
         lines.extend(section("annotations", annotations));
     }
-    // Uses that are no calls (TS/JS), only where there are some.
     if !used_by.is_empty() {
         lines.extend(section("used by", used_by));
     }
@@ -2031,7 +1862,6 @@ fn relations(identity: &str, export: &Export, files: &mut Files, id: &str) -> Ve
     lines
 }
 
-/// `<repository> <path>:<line> <name>` for a symbol's definition.
 fn line(identity: &str, files: &mut Files, symbol: &Symbol, name: &str) -> String {
     let location = files.at(&symbol.span.path, symbol.span.start);
     format!("{identity} {location} {name}")
@@ -2061,8 +1891,6 @@ pub fn status(dir: &Path) -> Result<String> {
     Ok(status_lines(heads, report, &workspace.missing))
 }
 
-/// `status_report` of the workspace of `dir`, each index opened and refreshed in turn, so that
-/// a failure names the repository it came from: `<identity>: <error>`.
 fn fresh_report(dir: &Path) -> Result<Report> {
     let fresh = |r: &Repository| -> Result<Connection> {
         let db = index::open(&r.index, &r.root, &r.identity, &r.config.serve);
@@ -2101,7 +1929,6 @@ pub fn probe_workspace(manifest: &Path) -> Result<(String, bool)> {
 fn status_listed(listed: &Manifest, manifest: &Path) -> String {
     let shown = manifest.display().to_string();
     let missing = listed.missing();
-    // Informational: the exit code of the probe depends on local state only.
     #[cfg(feature = "valkey")]
     let valkey = (listed.valkey.as_ref())
         .map(|config| crate::valkey::status_line(config) + "\n")
@@ -2162,7 +1989,6 @@ pub fn index_workspace(manifest: &Path) -> Result<Vec<String>> {
         let db = index::open(&r.index, &r.root, &r.identity, &r.config.serve)?;
         let before = repo::head(&r.root).ok();
         index::refresh(&db, &r.root, &r.identity, &|| Ok(r.config.serve.clone()))?;
-        // Keep provenance on the same read snapshot while another indexing pass may write.
         db.execute_batch("BEGIN")?;
         let fresh = index::fresh(&db, &r.root, &r.identity, &r.config.serve)?;
         let head = repo::head(&r.root)
@@ -2208,7 +2034,6 @@ fn check_served(listed: &Manifest, manifest: &Path) -> Result<()> {
     if !problems.is_empty() {
         return Err(problems.join("\n").into());
     }
-    // The whole workspace opens too: what a call opens, whichever repository it names.
     let first = (listed.entries.first()).ok_or_else(|| format!("{shown}: no repository listed"))?;
     Engine::open_listed(listed, &first.repo, manifest, &|_| true)?;
     Ok(())
@@ -2251,7 +2076,6 @@ pub fn served_generation(manifest: &Path) -> Result<(PathBuf, Vec<String>)> {
         id: &held.id,
         dir: &dir,
     };
-    // The deployment workspace's repositories and the contexts' (#342), each checked once.
     let mut contexts = Vec::new();
     for id in held.context_ids() {
         contexts.extend(held.context(id)?);
@@ -2304,8 +2128,6 @@ pub fn status_generations(manifest: &Path) -> Result<String> {
     let (config, local) = serve::node(manifest)?;
     let node = pull::current(&local).ok().flatten();
     let current = node.as_ref().map(|(id, _)| id.clone());
-    // With `[generations]` the current id is Valkey's, and the store holds no `current`. A
-    // node fence above Valkey's is the stuck case (`{<key_prefix>}:fence` lost), named.
     #[cfg(feature = "generation-pointer")]
     let (reached, stuck) = match Manifest::read(manifest)? {
         Manifest {
@@ -2346,7 +2168,6 @@ pub fn status_generations(manifest: &Path) -> Result<String> {
     Ok(format!("{current}\n{held}\n{store}\n{stuck}"))
 }
 
-/// An index state as `status` shows it, `other` for an index of another schema.
 fn state_text(state: State, other: Msg) -> String {
     match state {
         State::Missing => Msg::NotIndexed.text(),
@@ -2356,11 +2177,6 @@ fn state_text(state: State, other: Msg) -> String {
     }
 }
 
-/// `status`'s text: how many repositories the workspace holds, the scope of its orphan lines;
-/// each repository's line, by identity in workspace order, followed by its decisions that are
-/// stale or waiting and its status lines (`Engine::status_report`), or, when the report was not
-/// evaluated, the one line `report` gives in their place after the last repository; then the
-/// missing peers.
 fn status_lines(
     heads: impl ExactSizeIterator<Item = (String, String)>,
     report: std::result::Result<Report, String>,
@@ -2383,8 +2199,6 @@ fn status_lines(
     lines.iter().map(|l| format!("{l}\n")).collect()
 }
 
-/// The `kind` words of `search` the engine answers itself: the first two come before the kinds'
-/// filter words, the rest after the kinds' own renderers (`document` sits between the two).
 const WORDS_BEFORE: [&str; 2] = ["symbol", "contract"];
 const WORDS_AFTER: [&str; 8] = [
     "drift",
@@ -2397,9 +2211,6 @@ const WORDS_AFTER: [&str; 8] = [
     "unresolved",
 ];
 
-/// Every `kind` word of `search`, in the order its error names them: the engine's own, the
-/// kinds' filter words in kinds order, `document`, the kinds' own-renderer words, then the rest
-/// of the engine's.
 pub(crate) fn kind_words() -> impl Iterator<Item = &'static str> {
     let kinds = |own: bool| {
         (KINDS.iter().map(|k| k.search_word()))
@@ -2413,7 +2224,6 @@ pub(crate) fn kind_words() -> impl Iterator<Item = &'static str> {
         .chain(WORDS_AFTER)
 }
 
-/// `to` as a path from `from`, with `/` separators: `.`, `../api`.
 fn relative(from: &Path, to: &Path) -> String {
     let from: Vec<_> = from.components().collect();
     let to: Vec<_> = to.components().collect();
@@ -2431,8 +2241,6 @@ fn relative(from: &Path, to: &Path) -> String {
     }
 }
 
-/// What the dependencies of the manifest providing the npm package `contract` resolve to, one
-/// line each: `  <name> resolves <range or -> to <version> (<origin>)`.
 fn resolved_lines(exports: &[Export], repos: &[Repository], contract: &str) -> Vec<String> {
     let mut lines = Vec::new();
     for (export, repo) in exports.iter().zip(repos) {
@@ -2456,7 +2264,6 @@ mod tests {
 
     use super::{Engine, kind_words};
 
-    /// No kind's search word is an engine word or another kind's: each `kind` selects one answer.
     #[test]
     fn no_search_word_of_a_kind_collides_with_an_engine_word() {
         let words: Vec<_> = kind_words().collect();
@@ -2476,7 +2283,6 @@ mod tests {
         .unwrap();
         let engine = Engine::open(&dir).unwrap();
         engine.refresh().unwrap();
-        // The retry of `context` would refresh the index: ask without it, as a race would.
         fs::write(
             dir.join("a.ts"),
             "export function add() {\n  return 2;\n}\n",

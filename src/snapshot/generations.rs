@@ -59,7 +59,6 @@ impl std::fmt::Display for OpError {
 
 impl std::error::Error for OpError {}
 
-/// The fewest generations `keep` may retain: the current one and the one it replaced.
 const KEEP_MIN: i64 = 2;
 const KEEP_DEFAULT: i64 = 3;
 // ponytail: the most generations `{<key_prefix>}:kept` may hold: every node holds every retained
@@ -98,14 +97,6 @@ pub fn kept(valkey: &valkey::Config) -> String {
     valkey.key("kept", true)
 }
 
-/// The pointer script. KEYS: current, retained, lock, kept. ARGV: id, fence, keep, lock token
-/// (empty for none). With a token it returns 0 unless the lock holds it, and -1 unless the fence is
-/// above the one `current` holds (compared as decimal text, so no fence loses precision as a
-/// Lua number; -2 when that one is no decimal). Then it removes every entry of the id from the
-/// list before pushing it, so the list holds each id once, removes the oldest entries whose id is
-/// not kept until at most `keep` of those remain (never a kept one) and sets the hash, all at
-/// once. Without a token (no `[refresh_lock]`) the fence is `0` and nothing
-/// is checked.
 const POINT: &str = r"
 if ARGV[4] ~= '' then
   if redis.call('GET', KEYS[3]) ~= ARGV[4] then
@@ -194,7 +185,6 @@ pub async fn read(valkey: &Valkey, config: &valkey::Config, keep: u64) -> Result
     let (id, fence) = current(valkey, config).await?;
     let retained = keys(config).1;
     let max = keep + KEPT_MAX;
-    // One entry past the most allowed, to tell a list that is too long.
     let range = cmd("LRANGE").arg(&retained).arg(0).arg(max).clone();
     let entries: Vec<Vec<u8>> =
         (valkey.query(&range).await).map_err(|e| format!("{retained}: {e}"))?;
@@ -215,7 +205,6 @@ pub async fn current(valkey: &Valkey, config: &valkey::Config) -> Result<(String
     pointer(&current, &fields)
 }
 
-/// The hash `{<key_prefix>}:current` (`key`), as `HMGET key id fence` returns it.
 pub(super) fn pointer(key: &str, fields: &[Option<Vec<u8>>]) -> Result<(String, u64), String> {
     let text = |bytes: &[u8]| std::str::from_utf8(bytes).ok().map(str::to_string);
     match fields {
@@ -231,8 +220,6 @@ pub(super) fn pointer(key: &str, fields: &[Option<Vec<u8>>]) -> Result<(String, 
     }
 }
 
-/// The ids of the list `{<key_prefix>}:retained` (`key`), each entry `<id>:<fence>`, in order and
-/// each once, at most `max` entries.
 fn listed(key: &str, entries: &[Vec<u8>], max: u64) -> Result<Vec<String>, String> {
     if entries.is_empty() {
         return Err(Msg::GenerationsEmpty(key).text());
@@ -254,8 +241,6 @@ fn listed(key: &str, entries: &[Vec<u8>], max: u64) -> Result<Vec<String>, Strin
     Ok(ids)
 }
 
-/// Retention state for an operational read, including each retained fence and kept mark.
-/// A deployment with no publish yet has no current pointer and an empty retained set.
 #[cfg(feature = "ui")]
 pub(crate) async fn inspect(
     valkey: &Valkey,
@@ -474,8 +459,6 @@ mod tests {
         bad_entry(&[0xff; 18]);
     }
 
-    /// The script against the local Valkey: each id once, newest first, trimmed to `keep`, and
-    /// the hash names the last one.
     #[tokio::test(flavor = "current_thread")]
     async fn the_script_keeps_each_id_once_newest_first_within_keep() {
         let Some(url) = crate::valkey::tests::service() else {
@@ -515,8 +498,6 @@ mod tests {
             .unwrap();
     }
 
-    /// With two kept generations and `keep = 2`, the trim leaves both kept ones and exactly the
-    /// two newest unkept ones, and `read` gives them all.
     #[tokio::test(flavor = "current_thread")]
     async fn the_trim_never_removes_a_kept_generation() {
         let Some(url) = crate::valkey::tests::service() else {
@@ -553,9 +534,6 @@ mod tests {
         valkey.query::<i64>(&del).await.unwrap();
     }
 
-    /// With a token, the script writes only while the lock holds it and the fence is above the
-    /// current one's, compared as decimals of any length; a refusal names the key and changes
-    /// nothing.
     #[tokio::test(flavor = "current_thread")]
     async fn a_token_write_needs_the_lock_and_a_higher_fence() {
         let Some(url) = crate::valkey::tests::service() else {
@@ -578,7 +556,6 @@ mod tests {
         }
         let token = "0123456789abcdef0123456789abcdef";
 
-        // No lock, or another token: refused, naming the lock.
         let e = point(&valkey, &config, 2, A, Some(token), 1).await;
         assert_eq!(e, Err(OpError::Refused(Msg::LockNotHeld(&lock).text())));
         valkey.query::<()>(&set(&lock, "another")).await.unwrap();
@@ -604,7 +581,6 @@ mod tests {
             .unwrap();
         assert_eq!(id(&valkey, &current).await.as_deref(), Some(B));
 
-        // Leading zeros and fences past a Lua number's precision compare as decimals.
         let hset = |fence: &str| cmd("HSET").arg(&current).arg("fence").arg(fence).clone();
         valkey.query::<i64>(&hset("011")).await.unwrap();
         assert!(
@@ -629,14 +605,12 @@ mod tests {
             .await
             .unwrap();
 
-        // A fence in `current` that is no decimal is refused as a bad pointer.
         valkey.query::<i64>(&hset("1e3")).await.unwrap();
         let e = point(&valkey, &config, 2, A, Some(token), 5).await;
         assert_eq!(
             e,
             Err(OpError::Failed(Msg::GenerationsBadPointer(&current).text()))
         );
-        // Without a token nothing is checked, as without the refresh lock.
         point(&valkey, &config, 2, A, None, 0).await.unwrap();
         valkey.query::<i64>(&del).await.unwrap();
     }

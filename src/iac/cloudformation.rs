@@ -1,24 +1,3 @@
-//! CloudFormation and SAM templates as IaC nodes (#653, ADR 0025): each resource of a template is
-//! a node addressed by its logical id, its type (`AWS::SQS::Queue`, `AWS::Serverless::Function`)
-//! as the node's type, with the references its intrinsic functions make and its physical name
-//! resolved within the template.
-//!
-//! A template is a YAML (with the short-form tags `!Ref`, `!Sub`, `!GetAtt`, ... read as their
-//! `Fn::` maps by `events::read_keyed`) or a JSON file with a `Resources` mapping that carries
-//! `AWSTemplateFormatVersion` or the SAM transform (`AWS::Serverless-2016-10-31`). Each template
-//! is an evaluation unit of its own, labelled by its path as its root, so a changed template is
-//! evaluated again alone.
-//!
-//! References, each `exact` and walked by `trace`: `Ref`, `Fn::GetAtt` (with the attribute in its
-//! `via`), the variables of `Fn::Sub` and `DependsOn`, anywhere in the resource.
-//!
-//! Evaluation resolves the property that holds a type's physical name (`NAMED`) with `Ref`,
-//! `Fn::Sub`, `Fn::GetAtt` and `Fn::Join` over the template's own values: a parameter's default
-//! (marked `Overridable`, since a deployer overrides it), another resource's name where the type
-//! says `Ref` or `Fn::GetAtt` gives it, and literals. A pseudo parameter (`AWS::Region`), an
-//! import, any other function, a parameter with no default or with `NoEcho`, and a resource whose
-//! name is generated are unresolved parts: a `*`, and the name a pattern.
-
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use serde_json::Value;
@@ -30,22 +9,16 @@ use super::{
 use crate::config_values;
 use crate::document::events::{self, Step, Syntax};
 
-/// The transform that makes a template a SAM one.
 const SAM: &str = "AWS::Serverless-2016-10-31";
 
-/// How deep intrinsic functions, and resources naming each other, nest in a name; a deeper one
-/// is unresolved.
 // ponytail: a name built from a few functions deep is real; the reader's nesting limit is 128
 // and every level is a call of the evaluator, so 32 bounds the stack.
 const INTRINSIC_DEPTH_MAX: usize = 32;
 
-/// The longest physical name kept, in bytes; a name that grows past it is unresolved.
 // ponytail: names are 255 bytes at most (a Secrets Manager name 512); 1 KiB leaves room for a
 // pattern's wildcards, and stops a `Fn::Join` of joins from building megabytes.
 pub(super) const PHYSICAL_NAME_MAX: usize = 1024;
 
-/// What the physical name of a resource type is: the property that holds it, and whether `Ref`
-/// returns it (S3, DynamoDB, Lambda) rather than an ARN, a URL or an id.
 // ponytail: a short table of the types the contract kinds will read; the type table (spec #642)
 // replaces it with the whole of AWS, and until then a type not here has no physical name.
 const NAMED: &[(&str, &str, bool)] = &[
@@ -79,20 +52,15 @@ const NAMED: &[(&str, &str, bool)] = &[
     ),
 ];
 
-/// Whether the file at `path` may hold a template: a YAML or JSON one.
 pub(crate) fn is_source(path: &str) -> bool {
     [".yaml", ".yml", ".json"].iter().any(|e| path.ends_with(e))
 }
 
-/// Whether the file `path` with bytes `src` is read for a template: it says
-/// `AWSTemplateFormatVersion` or the SAM transform somewhere. The rest cannot hold one.
 pub(crate) fn wanted(path: &str, src: &[u8]) -> bool {
     let has = |needle: &str| src.windows(needle.len()).any(|w| w == needle.as_bytes());
     is_source(path) && (has("AWSTemplateFormatVersion") || has(SAM))
 }
 
-/// Whether `doc` is a template: a mapping with `Resources` that carries `AWSTemplateFormatVersion`
-/// or the SAM transform (a string, or a list holding it).
 pub(crate) fn is_template(doc: &Value) -> bool {
     let Value::Object(map) = doc else {
         return false;
@@ -106,11 +74,6 @@ pub(crate) fn is_template(doc: &Value) -> bool {
         && (map.contains_key("AWSTemplateFormatVersion") || sam)
 }
 
-/// Whether the parameter `name` of the template `doc` says `NoEcho`: true, or a string that reads
-/// as true (`"true"`, and in any case `yes`, `on` and `y`, which CloudFormation's YAML 1.1 types
-/// as booleans when written plain and this reader cannot tell from a quoted one). Its default is
-/// a secret, redacted among the config values and used for no name; reading too much as true is
-/// the safe direction. `false` for a document that is no template.
 pub(crate) fn no_echo(doc: &Value, name: &str) -> bool {
     is_template(doc)
         && match &doc["Parameters"][name]["NoEcho"] {
@@ -120,17 +83,12 @@ pub(crate) fn no_echo(doc: &Value, name: &str) -> bool {
         }
 }
 
-/// A parameter of the template.
 struct Param {
-    /// The default as text; `None` for no default, one that is a collection, or a `NoEcho` one.
     default: Option<String>,
-    /// The line of its `Default`.
     line: usize,
-    /// Whether `Ref` gives no name from the default: a list parameter, or an SSM parameter value.
     list: bool,
 }
 
-/// A resource, as read.
 struct Resource {
     ty: String,
     body: serde_json::Map<String, Value>,
@@ -138,8 +96,6 @@ struct Resource {
     end_line: usize,
 }
 
-/// What a name evaluates to: its text with a `*` for each unresolved part, and the parameter
-/// defaults it went through.
 #[derive(Clone)]
 struct Part {
     text: String,
@@ -164,9 +120,6 @@ impl Part {
         }
     }
 
-    /// Appends `between` and `part`: false when the name would grow past `PHYSICAL_NAME_MAX` or
-    /// go through more than `OVERRIDABLE_MAX` defaults, which leaves it unresolved. The check comes
-    /// before the copy, so a join of many long parts copies none of them.
     fn push(&mut self, between: &str, part: &Part) -> bool {
         if self.text.len() + between.len() + part.text.len() > PHYSICAL_NAME_MAX {
             return false;
@@ -183,23 +136,18 @@ impl Part {
     }
 }
 
-/// The template's values the evaluation reads.
 struct Eval<'t> {
     path: &'t str,
     params: BTreeMap<String, Param>,
     resources: BTreeMap<String, Resource>,
-    /// The name of each resource already evaluated.
     memo: HashMap<String, Option<Part>>,
     evaluating: HashSet<String>,
 }
 
-/// The property that holds the physical name of the resource type `ty`, and whether `Ref`
-/// returns it.
 fn named(ty: &str) -> Option<(&'static str, bool)> {
     NAMED.iter().find(|n| n.0 == ty).map(|n| (n.1, n.2))
 }
 
-/// The text of a scalar a parameter's `Default` or a `Fn::Sub` takes: a string, number or boolean.
 pub(super) fn scalar_text(v: &Value) -> Option<String> {
     match v {
         Value::String(s) => Some(s.clone()),
@@ -209,9 +157,6 @@ pub(super) fn scalar_text(v: &Value) -> Option<String> {
     }
 }
 
-/// The resource and attribute `Fn::GetAtt` names: `[Resource, Attribute]` or `Resource.Attribute`
-/// (the attribute may hold dots). The attribute is `None` when it is computed (`[Resource, !Ref
-/// Param]`, the one function CloudFormation lets it use): the resource is still known.
 pub(super) fn get_att(arg: &Value) -> Option<(&str, Option<String>)> {
     match arg {
         Value::String(s) => s.split_once('.').map(|(r, a)| (r, Some(a.to_string()))),
@@ -224,7 +169,6 @@ pub(super) fn get_att(arg: &Value) -> Option<(&str, Option<String>)> {
     }
 }
 
-/// The text and the variable map of a `Fn::Sub` argument: a string, or `[string, {variables}]`.
 fn sub_arg(arg: &Value) -> Option<(&str, Option<&serde_json::Map<String, Value>>)> {
     match arg {
         Value::String(text) => Some((text, None)),
@@ -236,8 +180,6 @@ fn sub_arg(arg: &Value) -> Option<(&str, Option<&serde_json::Map<String, Value>>
     }
 }
 
-/// The `${...}` variables of a `Fn::Sub` string, and the text between them: `(literal, variable)`
-/// pairs, the last with no variable. `${!Text}` is the literal `${Text}`.
 fn sub_parts(text: &str) -> Vec<(String, Option<String>)> {
     let mut parts = Vec::new();
     let mut literal = String::new();
@@ -267,8 +209,6 @@ fn sub_parts(text: &str) -> Vec<(String, Option<String>)> {
 }
 
 impl Eval<'_> {
-    /// The name of the resource `id`, memoized: `None` for a type with no physical name, a
-    /// resource that sets none (the name is generated), or one that is no scalar.
     fn name_of(&mut self, id: &str, depth: usize) -> Option<Part> {
         if let Some(done) = self.memo.get(id) {
             return done.clone();
@@ -292,8 +232,6 @@ impl Eval<'_> {
         name
     }
 
-    /// `Ref name`: a parameter's default, the name of a resource whose `Ref` is its name, and
-    /// anything else (a pseudo parameter, an id, an ARN, a URL) unresolved.
     fn reference(&mut self, name: &str, depth: usize) -> Part {
         if let Some(p) = self.params.get(name) {
             let (Some(default), false) = (&p.default, p.list) else {
@@ -320,8 +258,6 @@ impl Eval<'_> {
         }
     }
 
-    /// `Fn::GetAtt resource.attribute`: the resource's name when the attribute is the property
-    /// that holds it, else unresolved.
     fn attribute(&mut self, resource: &str, attribute: &str, depth: usize) -> Part {
         let property = (self.resources.get(resource))
             .and_then(|r| named(&r.ty))
@@ -334,7 +270,6 @@ impl Eval<'_> {
         }
     }
 
-    /// The value of the expression `v` as a name.
     fn eval(&mut self, v: &Value, depth: usize) -> Part {
         if depth > INTRINSIC_DEPTH_MAX {
             return Part::unknown();
@@ -380,10 +315,6 @@ impl Eval<'_> {
         }
     }
 
-    /// `Fn::Sub text` with the variables `vars` it defines: each `${name}` is a variable it
-    /// defines, a `Ref`, or a `resource.attribute`. Each is evaluated once, however often the text
-    /// names it: a variable defined by a `Fn::Sub` naming its own variable twice would otherwise
-    /// cost twice per level.
     fn sub(
         &mut self,
         text: &str,
@@ -414,7 +345,6 @@ impl Eval<'_> {
         out
     }
 
-    /// A known target is not the URL/ARN CloudFormation would return at deployment time.
     fn environment_target(&mut self, value: &Value) -> Option<(String, String)> {
         let map = value.as_object()?;
         let (id, attribute) = if let Some(id) = map.get("Ref").and_then(Value::as_str) {
@@ -625,14 +555,11 @@ impl Eval<'_> {
     }
 }
 
-/// An intrinsic returning a whole environment map does not expose any of its keys.
 fn environment_map(value: &Value) -> Option<&serde_json::Map<String, Value>> {
     let map = value.as_object()?;
     (!(map.len() == 1 && map.keys().any(|k| k == "Ref" || k.starts_with("Fn::")))).then_some(map)
 }
 
-/// The resources `body`'s intrinsic functions reference, with the `via` of each: `Ref`,
-/// `Fn::GetAtt.<attribute>`, `Fn::Sub` and `DependsOn`; only those `known` names, never `id`.
 pub(super) fn referenced(
     id: &str,
     body: &serde_json::Map<String, Value>,
@@ -653,7 +580,6 @@ pub(super) fn referenced(
         }
         _ => {}
     }
-    // An explicit stack: a template nests as deep as the reader allows.
     let mut pending: Vec<&Value> = (body.iter())
         .filter(|(k, _)| *k != "DependsOn")
         .map(|(_, v)| v)
@@ -695,10 +621,7 @@ pub(super) fn referenced(
     found
 }
 
-/// The IaC nodes and references of the file `src` at `path`: none unless it is a template. The
-/// template is its own root, labelled by `path`.
 pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
-    // The first and last line of the scalars under each resource, and each parameter's default's.
     let mut spans: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     let mut defaults: BTreeMap<String, usize> = BTreeMap::new();
     let documents = events::read_keyed(Syntax::of(path), src, true, |scalar| match scalar.path {
@@ -741,26 +664,17 @@ pub(super) fn evaluate(path: &str, src: &[u8]) -> (Vec<Node>, Vec<Reference>) {
     nodes(&unit)
 }
 
-/// What the resources of one evaluation unit are read from: a template, or the `resources` section
-/// of a Serverless service (#654) rebuilt as one.
 pub(super) struct Unit<'a> {
     pub path: &'a str,
-    /// The template's `Parameters` and `Resources`.
     pub doc: &'a Value,
-    /// The first and last line of the scalars under each resource.
     pub spans: &'a BTreeMap<String, (usize, usize)>,
-    /// The line of each parameter's default.
     pub defaults: &'a BTreeMap<String, usize>,
     pub key_line: &'a compose::KeyLines<'a>,
-    /// The key path of the `Resources` mapping in the file.
     pub block: Vec<Step>,
-    /// How many resources become nodes at most.
     pub limit: usize,
-    /// How many bytes of addresses and names the nodes and references may take.
     pub budget: usize,
 }
 
-/// The nodes and references of the resources of `unit`.
 pub(super) fn nodes(unit: &Unit) -> (Vec<Node>, Vec<Reference>) {
     let Unit {
         path,
@@ -780,8 +694,6 @@ pub(super) fn nodes(unit: &Unit) -> (Vec<Node>, Vec<Reference>) {
                 Param {
                     default: p.get("Default").and_then(scalar_text).filter(|_| !no_echo),
                     line: defaults.get(name).copied().unwrap_or(1),
-                    // A list, or an SSM parameter's key: `Ref` returns a list, or what the
-                    // parameter store holds, not the default.
                     list: ty.starts_with("List<")
                         || ty == "CommaDelimitedList"
                         || ty.starts_with("AWS::SSM::Parameter::Value<"),
@@ -793,8 +705,6 @@ pub(super) fn nodes(unit: &Unit) -> (Vec<Node>, Vec<Reference>) {
     if let Some(Value::Object(declared)) = doc.get("Resources") {
         for (id, r) in declared.iter().take(unit.limit) {
             let Value::Object(body) = r else { continue };
-            // A type is `Provider::Service::Resource` or a custom `Custom::Name`; the `::` also
-            // tells these rows from the Kubernetes kinds.
             let Some(ty) = body
                 .get("Type")
                 .and_then(Value::as_str)
@@ -884,7 +794,6 @@ mod tests {
         )
     }
 
-    /// The name and whether it is a pattern of the resource `N` that `property` names.
     fn name(ty: &str, property: &str, value: &str) -> (Option<String>, bool) {
         let text = template(&format!(
             "  N:\n    Type: {ty}\n    Properties:\n      {property}: {value}\n  Other:\n    Type: AWS::S3::Bucket\n    Properties:\n      BucketName: other-bucket\n"
@@ -928,7 +837,6 @@ mod tests {
         assert_eq!(unit("t.json", json).0.len(), 1);
         assert!(wanted("a/t.json", json.as_bytes()) && !wanted("a/t.tf", json.as_bytes()));
         assert!(!wanted("a/t.yaml", one.as_bytes()));
-        // A resource with no `Type`, or one with no `::`, is no node.
         let text = "AWSTemplateFormatVersion: x\nResources:\n  A: {}\n  B:\n    Type: pod\n  C:\n    Type: Custom::Thing\n";
         let (nodes, _) = unit("t.yaml", text);
         assert_eq!(nodes.len(), 1);
@@ -953,7 +861,6 @@ mod tests {
             ),
             ("Parameters.Env", 5, false)
         );
-        // A literal name went through nothing.
         let (nodes, _) = unit(
             "t.yaml",
             &template("  N:\n    Type: AWS::SQS::Queue\n    Properties:\n      QueueName: plain\n"),
@@ -992,7 +899,6 @@ mod tests {
         assert_eq!(queue("!FindInMap [A, B, C]"), pattern("*"));
         assert_eq!(queue("!If [Cond, a, b]"), pattern("*"));
         assert_eq!(queue("{a: b, c: d}"), pattern("*"));
-        // A name the template leaves out, or sets to a list or nothing, has none.
         assert_eq!(queue("[a]"), (None, false));
         assert_eq!(queue("~"), (None, false));
     }
@@ -1016,7 +922,6 @@ mod tests {
 
     #[test]
     fn get_att_gives_the_name_a_type_says_and_ref_the_name_only_where_the_type_returns_it() {
-        // A bucket's `Ref` is its name; a queue's is its URL, a topic's its ARN.
         assert_eq!(queue("!Ref Other"), known("other-bucket"));
         assert_eq!(queue("!GetAtt Other.Arn"), pattern("*"));
         assert_eq!(queue("!GetAtt [Other, BucketName]"), known("other-bucket"));
@@ -1029,7 +934,6 @@ mod tests {
         let (nodes, _) = unit("t.yaml", &text);
         let n = nodes.iter().find(|n| n.address == "N").unwrap();
         assert_eq!(n.name.as_deref(), Some("*|jobs|*"));
-        // A type that holds its name in a `Ref` resolves through it.
         assert_eq!(
             name("AWS::SSM::Parameter", "Name", "!Ref Env"),
             known("prod")
@@ -1125,7 +1029,6 @@ mod tests {
             .iter()
             .map(|n| (n.name.as_deref().unwrap(), n.pattern))
             .collect();
-        // The cycle is cut where it comes back: `A` names `B`, which names `A` as unresolved.
         assert_eq!(names, [("*-b", true), ("*-b", true), ("*", true)]);
         assert!(references.iter().all(|r| r.source != r.target));
     }
@@ -1200,8 +1103,6 @@ mod tests {
         let nest = |n: usize| "{Fn::Join: ['', [".repeat(n) + "x" + &"]]}".repeat(n);
         assert_eq!(queue(&nest(INTRINSIC_DEPTH_MAX / 2 - 1)), known("x"));
         assert_eq!(queue(&nest(INTRINSIC_DEPTH_MAX + 2)), pattern("*"));
-        // Resources naming each other in a chain are cut at the same depth: `R000` names `R001`
-        // and so on, and is evaluated first.
         let chain = |n: usize| -> String {
             let mut text = String::new();
             for i in 0..n {
@@ -1240,10 +1141,8 @@ mod tests {
                 .map(|n| n.len()),
             Some(PHYSICAL_NAME_MAX)
         );
-        // A name built from many items stops as it passes the ceiling.
         let items = vec!["abcdefgh"; 100_000].join(", ");
         assert_eq!(queue(&format!("!Join ['-', [{items}]]")), pattern("*"));
-        // A literal, or a parameter's default, longer than a name may be is unresolved whole.
         let long = "x".repeat(PHYSICAL_NAME_MAX + 1);
         assert_eq!(queue(&long), pattern("*"));
         let text = format!(
@@ -1275,8 +1174,6 @@ mod tests {
         assert_eq!(name(OVERRIDABLE_MAX + 1), (Some("*".into()), true, 0));
     }
 
-    /// Each level defines the variable its text names twice: evaluated once per level, as the
-    /// text holds it, the name costs the depth; once per mention it would cost two to the depth.
     #[test]
     fn a_sub_naming_its_variable_twice_at_every_level_evaluates_in_linear_time() {
         let mut value = serde_json::json!("x");
@@ -1324,8 +1221,6 @@ mod tests {
 
     #[test]
     fn a_template_past_its_stored_budget_leaves_the_rest_out() {
-        // A parameter's default as long as a name may be, named by a short resource each: the
-        // names store far more than the template holds.
         let default = "n".repeat(PHYSICAL_NAME_MAX - 16);
         let count = ROOT_STORED_MAX / PHYSICAL_NAME_MAX + 50;
         let resources: String = (0..count)
@@ -1418,7 +1313,6 @@ mod tests {
         );
         let (nodes, _) = unit("t.yaml", &text);
         let n = nodes.iter().find(|n| n.address == "Bucket").unwrap();
-        // The helper's header is 15 lines, `Other` takes two: the key is line 18, its last scalar 22.
         assert_eq!((n.line, n.end_line), (18, 22));
     }
 

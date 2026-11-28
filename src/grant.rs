@@ -1,20 +1,3 @@
-//! The grant providers (ADR 0016, feature `oidc`), fed by neutral inputs: what a subject may read
-//! is computed from its groups and its GitHub login, whichever verifier admitted it. The
-//! identity provider (`oidc`) is one producer of those inputs: it reads them from a token's
-//! claims and hands them to `Providers::grant`.
-//!
-//! `Providers` holds what a deployment configures: the groups table (a group to the identities it
-//! grants, `*` for all; `[oidc.groups]`) and the GitHub grant provider (`Github`, reached through
-//! `Manifest::github`) with its permissions cache (`permissions`, feature `postgres`). One
-//! `Providers` serves a process: the node's gate, the console and the proposal server each build
-//! it once from their manifest (`Providers::of`) and hand it to their verifier.
-//!
-//! `Providers::grant` is the grant: the groups side (what the table maps the groups to) and, with
-//! the GitHub grant provider, the GitHub side (the identities the login holds an accepted role on
-//! in the newest permissions set, while it is at most `max_age_seconds` old, never `*`) and its
-//! state, both read at one instant. `Granted::union` is the grant every check reads. `Admitted`
-//! is the neutral admitted subject the console and the proposal server build their sessions from.
-
 use std::collections::{HashMap, HashSet};
 #[cfg(feature = "postgres")]
 use std::sync::Arc;
@@ -32,15 +15,10 @@ pub(crate) use permissions::poll_knob;
 // row).
 pub(crate) const ROLE_MAX: usize = 100;
 
-/// Whether `role` is a role name the GitHub grant provider's `roles` takes: 1 to `ROLE_MAX`
-/// characters with no control character. GitHub's `role_name`s are checked alike before they are
-/// stored.
 pub(crate) fn role_ok(role: &str) -> bool {
     (1..=ROLE_MAX).contains(&role.chars().count()) && !role.chars().any(char::is_control)
 }
 
-/// Whether `login` is a GitHub login as the GitHub grant provider stores and compares it: 1 to 39
-/// ASCII letters, digits, `-` and `_`, already lowercase. A verified login (#561) is one.
 #[cfg(feature = "accounts")]
 pub fn login_ok(login: &str) -> bool {
     permissions::login(Some(login)).as_deref() == Some(login)
@@ -54,7 +32,6 @@ pub enum Grant {
     Only(HashSet<String>),
 }
 
-/// The grant as `meada-core` takes it, for the rules the console and a node share.
 #[cfg(feature = "snapshot")]
 impl From<&Grant> for meada_core::authorize::Grant {
     fn from(grant: &Grant) -> Self {
@@ -73,7 +50,6 @@ impl Grant {
         }
     }
 
-    /// The grant of `identities`: all when one is `*`.
     fn of<'a>(identities: impl IntoIterator<Item = &'a str>) -> Self {
         let listed: HashSet<String> = identities.into_iter().map(str::to_string).collect();
         match listed.contains("*") {
@@ -82,7 +58,6 @@ impl Grant {
         }
     }
 
-    /// The union with `more` (ADR 0016): `*` stays all.
     fn with(&self, more: &[String]) -> Self {
         match self {
             Grant::All => Grant::All,
@@ -114,7 +89,6 @@ pub struct Github {
     pub catalog: bool,
 }
 
-/// The state of a GitHub grant: whether the permissions set it was read from is usable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 #[cfg_attr(not(feature = "postgres"), expect(dead_code))]
@@ -124,8 +98,6 @@ pub enum GrantState {
     Expired,
 }
 
-/// The GitHub side of a grant: the identities the login reads through GitHub, the grant's state
-/// read with them (`unread`, `current` or `expired`) and the GitHub grant provider's host.
 pub struct GithubGrant {
     pub identities: Vec<String>,
     #[cfg_attr(
@@ -140,27 +112,19 @@ pub struct GithubGrant {
     pub host: String,
 }
 
-/// A subject's grant by side (ADR 0016).
 pub struct Granted {
-    /// The groups side (with an identity provider, the claims grant): what the groups table maps
-    /// the subject's groups to, and the identities its verifier grants by name (`listing`).
     pub claims: Grant,
-    /// With the GitHub grant provider, the subject's login when it is a valid one.
     #[cfg_attr(not(any(feature = "ui", test)), expect(dead_code))]
     pub login: Option<String>,
-    /// With the GitHub grant provider, its grant (empty without a valid login or a current set).
     pub github: Option<GithubGrant>,
 }
 
 impl Granted {
-    /// The grant every check reads: the union of both sides.
     pub fn union(&self) -> Grant {
         let github = self.github.as_ref().map(|g| g.identities.as_slice());
         self.claims.with(github.unwrap_or_default())
     }
 
-    /// This grant with `identities` also granted on the groups side, `*` for all: what a
-    /// verifier grants by name (the identity provider's `identities_claim`).
     pub fn listing<'a>(mut self, identities: impl IntoIterator<Item = &'a str>) -> Self {
         self.claims = match (self.claims, Grant::of(identities)) {
             (Grant::Only(mut mine), Grant::Only(more)) => {
@@ -173,19 +137,13 @@ impl Granted {
     }
 }
 
-/// The grant providers of a process: the groups table and the GitHub grant provider with its
-/// permissions cache.
 pub struct Providers {
-    /// A group to the identities it grants.
     groups: Option<HashMap<String, Vec<String>>>,
-    /// The permissions cache of the GitHub grant provider (#332).
     #[cfg(feature = "postgres")]
     github: Option<Arc<permissions::Permissions>>,
 }
 
 impl Providers {
-    /// The grant providers of the groups table `groups` and the GitHub grant provider `github`:
-    /// its permissions cache over `github`'s `[postgres]`, empty until `listening`.
     pub fn new(groups: Option<HashMap<String, Vec<String>>>, github: Option<&Github>) -> Self {
         #[cfg(feature = "postgres")]
         let github = github
@@ -200,9 +158,6 @@ impl Providers {
         }
     }
 
-    /// The grant providers `manifest` configures: `[oidc.groups]` or `[accounts.groups]` (never
-    /// both: `[accounts]` sits beside `[oidc]` only under break glass, which refuses its groups)
-    /// and `Manifest::github`.
     pub fn of(manifest: &crate::workspace::Manifest) -> Self {
         let groups = (manifest.oidc.as_ref())
             .and_then(|oidc| oidc.groups.as_ref())
@@ -215,8 +170,6 @@ impl Providers {
         Self::new(groups, manifest.github())
     }
 
-    /// Starts reading the permissions set (#332), which admission never waits on: a listener
-    /// calls it once, after its address is the first line on stderr.
     pub fn listening(&self) {
         #[cfg(feature = "postgres")]
         if let Some(cache) = &self.github {
@@ -224,11 +177,6 @@ impl Providers {
         }
     }
 
-    /// The grant of a subject with `groups` and `login`, whichever verifier admitted it: the
-    /// identities the groups table maps `groups` to (a group it lacks grants nothing, `*` all)
-    /// and, with the GitHub grant provider, the GitHub grant of `login` when it is a valid one
-    /// (1 to 39 ASCII letters, digits, `-` and `_`, compared lowercased), read from the cache,
-    /// never from Postgres.
     pub fn grant(&self, groups: &[String], login: Option<&str>) -> Granted {
         let mapped = (self.groups.iter()).flat_map(|table| {
             (groups.iter().filter_map(|group| table.get(group)))
@@ -259,9 +207,6 @@ impl Providers {
         }
     }
 
-    /// A local account's grant by side (ADR 0024): what its `groups` map to and, with the GitHub
-    /// grant provider (`[accounts.github]`, #561), the GitHub grant of its verified `login`, when
-    /// a table bounds it (`bounds`); every repository otherwise.
     #[cfg(feature = "accounts")]
     pub fn local(&self, groups: &[String], login: Option<&str>) -> Granted {
         match self.bounds() {
@@ -274,14 +219,11 @@ impl Providers {
         }
     }
 
-    /// Whether a table bounds the grant: the groups table or the GitHub grant provider. Without
-    /// either, a local account reads every repository (ADR 0024).
     #[cfg(feature = "accounts")]
     pub fn bounds(&self) -> bool {
         self.groups.is_some() || self.github().is_some()
     }
 
-    /// With the GitHub grant provider, its host, whatever a subject's login (#332).
     #[cfg_attr(not(any(feature = "ui", test)), expect(dead_code))]
     pub fn github(&self) -> Option<&str> {
         #[cfg(feature = "postgres")]
@@ -291,15 +233,11 @@ impl Providers {
         None
     }
 
-    /// With the GitHub grant provider, the catalog as `login` may select from it (#341): the
-    /// whole fresh catalog for the platform administrator. `None` without the permissions cache.
     #[cfg(feature = "workspaces")]
     pub fn catalog(&self, login: Option<&str>, administrator: bool) -> Option<Catalog> {
         (self.github.as_ref()).map(|cache| cache.catalog(login, administrator))
     }
 
-    /// With the GitHub grant provider, the identities the newest set left out of the named
-    /// workspace `context` (#342).
     #[cfg(feature = "workspaces")]
     pub fn excluded_in(&self, context: &str) -> std::collections::BTreeSet<String> {
         (self.github.as_ref())
@@ -307,8 +245,6 @@ impl Providers {
             .unwrap_or_default()
     }
 
-    /// With the GitHub grant provider, the newest permissions set's workspace version and the
-    /// identities it excluded from it (#333), for the console's `excluded` flag.
     #[cfg(feature = "ui")]
     #[cfg_attr(not(feature = "generation-pointer"), expect(dead_code))]
     pub fn excluded(&self) -> Option<(String, std::collections::BTreeSet<String>)> {
@@ -319,8 +255,6 @@ impl Providers {
         None
     }
 
-    /// With the GitHub grant provider, the admission view's `github` (#332): its settings, the
-    /// grant's state and the newest set as loaded.
     #[cfg(feature = "ui")]
     pub fn admission(&self) -> Option<serde_json::Value> {
         #[cfg(feature = "postgres")]
@@ -331,8 +265,6 @@ impl Providers {
     }
 }
 
-/// The groups table `table` as an admission view shows it (#558): each group's identities that
-/// `reads` admits, `*` kept since it names none.
 #[cfg(feature = "ui")]
 pub fn bounded(
     table: &HashMap<String, Vec<String>>,
@@ -346,29 +278,19 @@ pub fn bounded(
         .collect()
 }
 
-/// A subject a verifier admitted, whichever verifier it was: what the console's session and the
-/// proposal server's are built from (ADR 0014, ADR 0022).
 #[cfg(feature = "ui")]
 pub struct Admitted {
-    /// Who it is, when the verifier names it.
     pub subject: Option<String>,
     /// The global operator.
     pub operator: bool,
-    /// The groups its grant read, sorted, without repeats.
     pub groups: Vec<String>,
-    /// With the GitHub grant provider, its login when it has a valid one (#332).
     pub login: Option<String>,
-    /// The union of the grant providers' grants.
     pub grant: Grant,
-    /// With the GitHub grant provider, its host and the GitHub grant's state read with the grant
-    /// itself, so a session never pairs a grant with another instant's state.
     pub github: Option<(String, GrantState)>,
 }
 
 #[cfg(feature = "ui")]
 impl Admitted {
-    /// `subject`, global operator when `operator`, whose grant the grant providers computed
-    /// from `groups` (`granted`).
     pub fn new(
         subject: Option<String>,
         operator: bool,
@@ -393,7 +315,6 @@ impl Admitted {
 mod tests {
     use super::*;
 
-    /// The identities of `grant`, sorted; `None` for all.
     pub(super) fn sorted(grant: &Grant) -> Option<Vec<String>> {
         match grant {
             Grant::All => None,
@@ -409,7 +330,6 @@ mod tests {
         Some(identities.iter().map(|s| s.to_string()).collect())
     }
 
-    /// A groups table mapping `g` to `b`, `h` to `b` and `c`, and `p` to `*`.
     pub(super) fn table() -> HashMap<String, Vec<String>> {
         let identities = |list: &[&str]| list.iter().map(|s| s.to_string()).collect();
         HashMap::from([
@@ -429,14 +349,11 @@ mod tests {
         let grant = |names: &[&str]| sorted(&providers.grant(&groups(names), None).union());
         assert_eq!(grant(&["g"]), only(&["b"]));
         assert_eq!(grant(&["g", "h"]), only(&["b", "c"]));
-        // `*` from any group is all, whatever the others map to.
         assert_eq!(grant(&["g", "p"]), None);
         assert_eq!(grant(&["p"]), None);
-        // A group the table lacks grants nothing; no group grants nothing.
         assert_eq!(grant(&["unmapped"]), only(&[]));
         assert_eq!(grant(&["unmapped", "g"]), only(&["b"]));
         assert_eq!(grant(&[]), only(&[]));
-        // Without a table no group grants anything.
         let bare = Providers::new(None, None);
         assert_eq!(
             sorted(&bare.grant(&groups(&["g"]), None).union()),

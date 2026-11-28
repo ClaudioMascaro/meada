@@ -1,6 +1,3 @@
-//! Provisioner sides and their links (ADR 0026): derived from stored IaC names and the
-//! workspace's contract sides, never mixed with consumer-to-provider links.
-
 use std::collections::HashMap;
 
 use meada_core::export::{IacNode, Level, Provision, Provisioner};
@@ -10,7 +7,6 @@ use super::{Node, types};
 use crate::Result;
 use crate::index::{Export, Span};
 
-/// A provisioner with the evaluated name's evidence, kept only during a query.
 pub(crate) struct Side {
     pub identity: String,
     pub contract: String,
@@ -33,8 +29,6 @@ impl Side {
     }
 
     pub(crate) fn matches(&self, contract: &str) -> bool {
-        // A written asterisk is not an unresolved part when evaluation says the name is
-        // literal. Preserve its literal identity instead of inventing wildcard evidence.
         if !self.pattern() && self.contract.contains('*') {
             return self.contract == contract;
         }
@@ -76,8 +70,6 @@ impl Side {
     }
 }
 
-/// Only resource blocks of known types with a physical name provision contracts.
-/// A data block names an existing resource; it does not create one.
 pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     let mut statement = db.prepare(&format!("SELECT {} FROM iac_nodes", super::COLUMNS))?;
     let mut sides = Vec::new();
@@ -93,8 +85,6 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
         let Some(name) = target.filter(|n| !n.is_empty()) else {
             continue;
         };
-        // A structured identifier the entry could not read is not a physical AWS name.
-        // It may name another service, so never invent a typed provisioner for it.
         if !entry.target_is_supported(name) {
             continue;
         }
@@ -118,7 +108,6 @@ pub(crate) fn read(db: &Connection, repository: &str) -> Result<Vec<Side>> {
     Ok(sides)
 }
 
-/// Directed and directionless uses both reach provisioners; neither invents a direction.
 pub(crate) fn uses(export: &Export) -> impl Iterator<Item = (&str, &str)> {
     directed_uses(export)
         .map(|(site, contract, _)| (site, contract))
@@ -130,9 +119,6 @@ pub(crate) fn uses(export: &Export) -> impl Iterator<Item = (&str, &str)> {
         )
 }
 
-/// The uses that open an orphan scope and that an orphan line may name, with their level: every
-/// directed use, and every config use but a name match, a plain name under a key that names the
-/// type (`inferred`), which still links (ADR 0026, "Orphan sides").
 pub(crate) fn orphan_uses(export: &Export) -> impl Iterator<Item = (&str, &str, Level)> {
     directed_uses(export).chain(
         export
@@ -175,8 +161,6 @@ fn directed_uses(export: &Export) -> impl Iterator<Item = (&str, &str, Level)> {
         )
 }
 
-/// Every use of the same contract reaches every provisioner, including one in its repository.
-/// Several roots are independent sides, never ambiguous candidates of one another.
 pub(crate) fn links(exports: &[Export]) -> Vec<Provision> {
     let mut links = raw_links(exports);
     if !exports.iter().flat_map(|e| &e.decisions.items).any(handles) {
@@ -336,18 +320,15 @@ fn raw_links(exports: &[Export]) -> Vec<Provision> {
     links
 }
 
-/// Either side can hold the unresolved name; the decision belongs to that side.
 #[derive(Clone, Copy)]
 enum Source<'a> {
     Provisioner(&'a Side),
     Use { site: &'a str, contract: &'a str },
 }
 
-/// Source locations are indexed once per repository, before placing any patterned item.
 struct Locations<'a> {
     spans: HashMap<&'a str, &'a Span>,
     nodes: HashMap<String, &'a Node>,
-    /// The place of a use at a config key: path, line and key path.
     keys: HashMap<&'a str, (&'a str, usize, &'a str)>,
 }
 
@@ -378,7 +359,6 @@ impl<'a> Locations<'a> {
             let place = (key.path.as_str(), key.line, key.key.as_str());
             keys.entry(key.id.as_str()).or_insert(place);
         }
-        // A patterned use read from a pipeline (ADR 0028) is placed as a declared one is.
         for u in &export.config_uses {
             let place = (u.path.as_str(), u.line, u.key.as_str());
             keys.entry(u.site.as_str()).or_insert(place);
@@ -426,8 +406,6 @@ impl Source<'_> {
         if let Self::Use { site, contract } = self
             && let Some(&(path, line, key)) = locations.keys.get(site)
         {
-            // A source line can contain redacted/cut values, even beside an ordinary key.
-            // Keep declaration metadata without rereading any configuration payload.
             return (
                 path.into(),
                 Some(line),
@@ -489,7 +467,6 @@ pub(crate) fn decision_context(links: &[Provision], identity: &str, root: &str) 
     }
 }
 
-/// Build source and literal-candidate indexes once, shared by every decision in this pass.
 struct Choices<'a> {
     sources: std::collections::BTreeMap<String, (&'a str, Source<'a>)>,
     targets: std::collections::BTreeMap<(&'a str, &'a str), (&'a str, &'a Side)>,
@@ -621,7 +598,6 @@ impl<'a> Choices<'a> {
     }
 }
 
-/// Existing decision transport and stale causes also cover pattern-to-use choices.
 pub(crate) fn reports(
     workspace: &crate::workspace::Workspace,
     exports: &[Export],
@@ -674,7 +650,6 @@ pub(crate) fn reports(
         .collect()
 }
 
-/// The decision transport places the patterned source, whichever direction it participates in.
 pub(crate) fn item_sites(exports: &[Export]) -> Vec<(usize, String)> {
     exports
         .iter()
@@ -739,7 +714,6 @@ pub(crate) fn items(
     items
 }
 
-/// A key is independently traceable; its repository-level site aggregates its config uses.
 pub(crate) fn at_site(link: &Provision, site: &str) -> bool {
     link.side == site
         || (link.at.is_some()
@@ -758,7 +732,6 @@ pub(crate) fn target<'a>(exports: &'a [Export], link: &Provision) -> Option<(usi
     })
 }
 
-/// Provisioners of the symbol's own contracts and of the calls it makes.
 pub(crate) fn context(exports: &[Export], symbol: &str) -> Vec<String> {
     let calls = exports
         .iter()

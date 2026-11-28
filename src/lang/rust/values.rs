@@ -1,18 +1,3 @@
-//! The values of the Rust pack: what a call is given and what it is called on, what a `let` or a
-//! `const` binds, and what a function returns, as far as the syntax tells. Contract kinds read
-//! them through the shared value flow (`Code::origins` with `Follow::Values`). A value is built
-//! once the whole file is read, since a path in it needs the file's `use` declarations
-//! (`normalize`).
-//!
-//! A call inside a value is a stub: its callee and its span, which the shared side matches to
-//! the file's calls. Its own arguments and receiver are on that call (`Call::args`,
-//! `Call::receiver`), so a chain of a thousand calls costs a thousand values, not a million.
-//!
-//! Strings fold the way a URL is written: literals, `+`, `format!` and `concat!` (a format
-//! string and comma-separated arguments, `{base}` captures included), `String::from` and the
-//! conversions that keep the text (`to_string`, `as_str`), a `String` a function builds
-//! (`builders.rs`) and the `Method::GET` constants of the HTTP crates.
-
 use std::collections::HashMap;
 
 use tree_sitter::Node;
@@ -25,31 +10,21 @@ use super::{
 use crate::lang::{Invocation, Part, Value, children, named, text};
 use crate::qualify;
 
-/// How many levels of wrappers (`(x)`, `&x`, `x?`, `a + b`) and arrays a value is read through;
-/// deeper is `Unknown`.
 // ponytail: real code wraps a value a few levels; a crafted file must not recurse without end.
 pub(super) const VALUE_DEPTH: usize = 64;
 
-/// How many handlers a `routes![..]` lists, and how many `method = ".."` a `#[route]` gives; a
-/// longer list or more methods is read as nothing (`Unknown`).
 // ponytail: real code lists a few hundred handlers and nine methods at most; a crafted file
 // must not multiply them with the routes of a function.
 pub(super) const ROUTE_ITEMS: usize = 1024;
 pub(super) const ROUTE_METHODS: usize = 16;
 
-/// The crates whose `Method` constants name an HTTP method (`VERBS`).
 const METHOD_CRATES: &[&str] = &["reqwest", "http", "hyper", "axum", "actix_web"];
 
-/// The methods that keep the text of a string, and those that keep it when called on a name
-/// (a conversion of a name may be to another type: `into`, `clone`).
 const KEEPS: &[&str] = &["to_string", "to_owned", "into", "clone", "as_str", "as_ref"];
 const KEEPS_NAMES: &[&str] = &["to_string", "to_owned", "as_str"];
 
-/// Rocket's macro that lists the handlers of the routes a `mount` serves.
 const ROUTES: &str = "routes";
 
-/// The methods an environment read goes through: those that keep the text of a string
-/// (`trim_end_matches`) and those that unwrap its `Result` (`unwrap_or(fallback)` among them).
 const ENV_METHODS: &[&str] = &[
     "trim",
     "trim_start",
@@ -69,11 +44,8 @@ const ENV_METHODS: &[&str] = &[
     "expect",
 ];
 
-/// The macros whose arguments are a format string and the values it prints.
 const FORMATS: &[&str] = &["format", "concat"];
 
-/// How many arguments and placeholders a `format!` or `concat!` is read with, and how big its
-/// text may be (`builders::size`); past any of them the value is unknown.
 // ponytail: a URL is built from a few arguments; a crafted file with 300k `{u}` captures must
 // not copy a builder for each.
 pub(super) const FORMAT_ARGS: usize = 64;
@@ -81,15 +53,12 @@ pub(super) const FORMAT_PLACEHOLDERS: usize = 256;
 
 const FORMAT_SIZE: usize = BUILDER_SIZE;
 
-/// Where a value is written: the scope, the module written in place and whether `self::` and
-/// `super::` can be read there, as a `Path` records them.
 pub(super) struct Where {
     pub scope: String,
     pub module: String,
     pub pure: bool,
 }
 
-/// The builders of a file by scope and name (`builders.rs`).
 pub(super) type Builders<'t> = HashMap<(String, String), Builder<'t>>;
 
 pub(super) struct Reader<'a, 't> {
@@ -97,13 +66,9 @@ pub(super) struct Reader<'a, 't> {
     scan: &'a Scan,
     heads: &'a mut Heads,
     builders: &'a Builders<'t>,
-    /// The parts each step of a builder (0 is what it began as) adds, read once.
     folded: HashMap<(String, String, usize), Vec<Part>>,
-    /// What each builder holds after 0, 1, 2.. of its pushes, folded as far as a read needed.
     prefixes: HashMap<(String, String), Vec<Vec<Part>>>,
-    /// How many builders are being read within one another.
     nest: usize,
-    /// What the builders' folds and reads have cost, in `size` units (`BUILDER_WORK`).
     work: usize,
 }
 
@@ -126,13 +91,10 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// The value of the expression `node`.
     pub fn value(&mut self, at: &Where, node: Node<'t>) -> Value {
         self.value_at(at, node, 0)
     }
 
-    /// Read the shape of the assignment before expanding the local it updates. Query
-    /// detection must leave the builder's depth budget and cached prefixes alone.
     pub fn query_write(
         &mut self,
         at: &Where,
@@ -224,7 +186,6 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// The normalized name of the path `node` (`crate.a.f`).
     fn path(&mut self, at: &Where, node: Node) -> Option<String> {
         let path = self.path_of(at, segments(node, self.src)?);
         normalize(&path, self.scan, self.heads, false)
@@ -240,7 +201,6 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// The normalized callee of a call to `function`, as `parse` spells it.
     fn callee(&mut self, at: &Where, function: Node) -> String {
         let function = match function.kind() {
             "generic_function" => field(function, "function").unwrap_or(function),
@@ -256,8 +216,6 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// A call: the text of a string it keeps (`String::from(x)`, `"x".to_string()`), else the
-    /// stub the shared side matches to the file's calls.
     fn call_value(&mut self, at: &Where, node: Node<'t>, level: usize) -> Value {
         let Some(function) = field(node, "function") else {
             return Value::Unknown;
@@ -313,15 +271,12 @@ impl<'a, 't> Reader<'a, 't> {
         })
     }
 
-    /// `a + b`: the parts of the two sides, where at least one is a string; a side that is not
-    /// is a hole.
     fn sum(&mut self, at: &Where, node: Node<'t>, level: usize) -> Value {
         let plus = field(node, "operator").is_some_and(|o| text(o, self.src) == "+");
         let (Some(left), Some(right), true) = (field(node, "left"), field(node, "right"), plus)
         else {
             return Value::Unknown;
         };
-        // Two names may add numbers: one side has to be a string.
         let sides = [left, right].map(|n| self.value_at(at, n, level + 1));
         if !sides.iter().any(|v| matches!(v, Value::Str(_))) {
             return Value::Unknown;
@@ -334,8 +289,6 @@ impl<'a, 't> Reader<'a, 't> {
         Value::Str(merge(parts))
     }
 
-    /// `Method::GET`, as a text, when the path names a constant of the `Method` of the HTTP
-    /// crates: through a `use` of the file, or written in full.
     fn http_method(&self, at: &Where, node: Node) -> Option<Value> {
         let segments = segments(node, self.src)?;
         let [.., kind, verb] = segments.as_slice() else {
@@ -350,14 +303,11 @@ impl<'a, 't> Reader<'a, 't> {
             .then(|| Value::Str(vec![Part::Text(verb.clone())]))
     }
 
-    /// The path `segments` names with the `use` of its head applied: the head is the one
-    /// `use` that imports it, or is a crate written in full.
     fn spelled<'s>(&self, at: &Where, segments: &'s [String]) -> Option<Vec<&'s str>>
     where
         'a: 's,
     {
         let head = segments.first()?;
-        // A parameter, a `let` or a closure binding hides what a bare name imports.
         if segments.len() == 1 && self.bound(at, head) {
             return None;
         }
@@ -379,7 +329,6 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// Whether a parameter or a binding of `name` is in scope at `at`, up to its module.
     fn bound(&self, at: &Where, name: &str) -> bool {
         let mut scope = at.scope.as_str();
         loop {
@@ -398,7 +347,6 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// The path the one `use` of `name` in scope at `at` imports.
     fn target(&self, at: &Where, name: &str) -> Option<&'a Vec<String>> {
         let mut scope = at.scope.as_str();
         loop {
@@ -416,11 +364,6 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// The environment read the expression `node` is, if it is one: `std::env::var("X")`,
-    /// `env::var("X")` after `use std::env`, `dotenvy::var("X")` or `env!("X")`, through
-    /// `unwrap`, `unwrap_or(..)`, `expect`, `?` and the string methods that keep the text. A
-    /// second read in an argument (a fallback) makes it a hole: which of the two is the base
-    /// is unknown. The value of the variable is never read.
     // ponytail: an argument is searched for the names `env`, `var` and `dotenvy`: one that only
     // looks like a read makes a hole, which is never wrong, only less.
     fn env_read(&mut self, at: &Where, node: Node<'t>, depth: usize) -> Option<Part> {
@@ -455,7 +398,6 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// `std::env::var("X")` and `dotenvy::var("X")`, written in full or through a `use`.
     fn env_var(&self, at: &Where, call: Node, function: Node) -> Option<Part> {
         let segments = segments(function, self.src)?;
         if !matches!(
@@ -475,13 +417,11 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// `env!("X")`: the variable the macro names.
     fn env_macro(&self, node: Node) -> Option<Part> {
         let tree = named(node).find(|c| c.kind() == "token_tree")?;
         self.env_name(tree).map(Part::Env)
     }
 
-    /// The name in the first argument of the token tree of `env!("X")` or `env!("X", "msg")`.
     fn env_name(&self, tree: Node) -> Option<String> {
         match arguments(tree)?.first()?.as_slice() {
             [name] => self.literal(*name),
@@ -489,7 +429,6 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// The text of the string literal `node`, if that is what it is.
     fn literal(&self, node: Node) -> Option<String> {
         match string(node, self.src) {
             Value::Str(parts) => match <[Part; 1]>::try_from(parts) {
@@ -500,9 +439,6 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// `format!` and `concat!`: a format string and the arguments that fill it. An argument
-    /// that is a literal or a plain name folds; any other is a hole, and so is a name with a
-    /// format spec. A macro of another name, or one the file defines, is unknown.
     fn macro_value(&mut self, at: &Where, node: Node<'t>) -> Value {
         let Some(name) = field(node, "macro").and_then(|m| self.macro_name(at, m)) else {
             return Value::Unknown;
@@ -526,7 +462,6 @@ impl<'a, 't> Reader<'a, 't> {
         };
         let parts = match name.as_str() {
             "format" => self.format(at, node.start_byte(), &args),
-            // `concat!` takes literals only: a name there is no string.
             _ if args.len() > FORMAT_ARGS => None,
             _ => {
                 let parts = args.iter().flat_map(|a| match a.as_slice() {
@@ -540,8 +475,6 @@ impl<'a, 't> Reader<'a, 't> {
         parts.map_or(Value::Unknown, Value::Str)
     }
 
-    /// Rocket's `routes![a, b::c]`, the one macro read for what it lists: the paths of the
-    /// handlers, each as the name `normalize` gives it. An item that is no plain path is unknown.
     fn routes(&mut self, at: &Where, node: Node<'t>) -> Value {
         let Some(args) = named(node)
             .find(|c| c.kind() == "token_tree")
@@ -558,7 +491,6 @@ impl<'a, 't> Reader<'a, 't> {
         Value::List(items)
     }
 
-    /// One handler of `routes!`: `a`, or a path with `::` between identifiers.
     fn route_item(&mut self, at: &Where, tokens: &[Node<'t>]) -> Value {
         let mut segments = Vec::new();
         for (n, token) in tokens.iter().enumerate().take(PATH_DEPTH * 2) {
@@ -570,7 +502,6 @@ impl<'a, 't> Reader<'a, 't> {
                 _ => return Value::Unknown,
             }
         }
-        // A path ends on an identifier, and a crafted one is not read past the depth limit.
         if tokens.len().is_multiple_of(2) || tokens.len() > PATH_DEPTH * 2 {
             return Value::Unknown;
         }
@@ -587,9 +518,6 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// The macro `path` names when it is the standard one: `format`, or `std::format` and its
-    /// likes (and Rocket's `routes`, however imported). A macro the file defines, or one a `use` imports from anywhere but the standard
-    /// library (`use my_macros::env;`), is another macro.
     fn macro_name(&self, at: &Where, path: Node) -> Option<String> {
         let name = match path.kind() {
             "identifier" => text(path, self.src).to_string(),
@@ -612,8 +540,6 @@ impl<'a, 't> Reader<'a, 't> {
         (path.kind() == "scoped_identifier" || rocket || self.std_macro(at, &name)).then_some(name)
     }
 
-    /// Whether the macro `name`, written bare, is the standard one: the file defines no macro
-    /// of the name, and no `use` in scope imports another (`use std::env;` imports std's).
     fn std_macro(&self, at: &Where, name: &str) -> bool {
         if self.scan.macros.contains(name) {
             return false;
@@ -630,7 +556,6 @@ impl<'a, 't> Reader<'a, 't> {
         )
     }
 
-    /// The parts of a format string filled with `args` (the first is the string).
     fn format(&mut self, at: &Where, pos: usize, args: &[Vec<Node<'t>>]) -> Option<Vec<Part>> {
         let ([template], rest) = (args.first()?.as_slice(), &args[1..]) else {
             return None;
@@ -668,7 +593,6 @@ impl<'a, 't> Reader<'a, 't> {
             } else if c == '{' {
                 let end = rest.find('}')?;
                 let (target, spec) = rest[1..end].split_once(':').unwrap_or((&rest[1..end], ""));
-                // `{:.*}` and `{:1$}` take other arguments than the one named.
                 if spec.contains(['*', '$']) {
                     return None;
                 }
@@ -688,7 +612,6 @@ impl<'a, 't> Reader<'a, 't> {
                 if !literal.is_empty() {
                     out.push(Part::Text(std::mem::take(&mut literal)));
                 }
-                // A spec (`{:?}`, `{x:>8}`) changes the text: whatever it prints is a hole.
                 match spec.is_empty() {
                     true => out.extend(value),
                     false => out.push(Part::Hole),
@@ -709,9 +632,7 @@ impl<'a, 't> Reader<'a, 't> {
         (size(&out) <= FORMAT_SIZE).then(|| merge(out))
     }
 
-    /// The parts of a macro argument: a literal, a plain name, else a hole.
     fn argument(&mut self, at: &Where, nodes: &[Node<'t>]) -> Vec<Part> {
-        // `env!("X")` is three tokens: the macro's name, `!` and its arguments.
         if let [name, bang, tree] = nodes
             && [name.kind(), bang.kind(), tree.kind()] == ["identifier", "!", "token_tree"]
             && text(*name, self.src) == "env"
@@ -728,7 +649,6 @@ impl<'a, 't> Reader<'a, 't> {
                 Value::Str(parts) => parts,
                 _ => vec![Part::Hole],
             },
-            // A suffix (`1u8`) or a radix (`0x10`) is not the digits it prints.
             "integer_literal" | "boolean_literal" => {
                 let text = text(*node, self.src);
                 match text.bytes().all(|b| b.is_ascii_digit()) || node.kind() == "boolean_literal" {
@@ -741,7 +661,6 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// The parts of the name `name`, read at `pos`: a builder's text, else the name.
     fn capture(&mut self, at: &Where, name: &str, pos: usize) -> Vec<Part> {
         match self.built(at, name, pos) {
             Some(parts) => parts,
@@ -749,14 +668,11 @@ impl<'a, 't> Reader<'a, 't> {
         }
     }
 
-    /// The text the builder `name` holds at `pos`: what it began as and the pushes before `pos`.
-    /// Each prefix of the pushes is folded once, from the one before it, and a read copies it.
     fn built(&mut self, at: &Where, name: &str, pos: usize) -> Option<Vec<Part>> {
         let builders = self.builders;
         if builders.is_empty() {
             return None;
         }
-        // A closure written in an argument is a scope of its own, inside the function.
         let mut scope = at.scope.as_str();
         let (key, builder) = loop {
             let key = (scope.to_string(), name.to_string());
@@ -806,7 +722,6 @@ impl<'a, 't> Reader<'a, 't> {
         Some(parts)
     }
 
-    /// The parts step `n` of the builder `key` adds, read once.
     fn step(
         &mut self,
         at: &Where,
@@ -833,8 +748,6 @@ impl<'a, 't> Reader<'a, 't> {
         parts
     }
 
-    /// The arguments of the call `node` and the value it is called on. A closure written as an
-    /// argument is the `Kind::Inline` definition `parse` made of it.
     pub fn call(&mut self, at: &Where, node: Node<'t>) -> (Vec<Value>, Option<Value>) {
         let function = field(node, "function").map(|f| match f.kind() {
             "generic_function" => field(f, "function").unwrap_or(f),
@@ -854,7 +767,6 @@ impl<'a, 't> Reader<'a, 't> {
         (args.collect(), receiver)
     }
 
-    /// What a function with this `body` returns: its tail expression and each `return`.
     pub fn returns(&mut self, at: &Where, body: Node<'t>) -> Vec<Value> {
         let mut out = Vec::new();
         let tail = named(body).filter(|n| !is_comment(*n)).last();
@@ -862,8 +774,6 @@ impl<'a, 't> Reader<'a, 't> {
         let mut stack = vec![body];
         while let Some(node) = stack.pop() {
             match node.kind() {
-                // Another function's `return` is not this one's, and a macro body is a token
-                // tree.
                 "function_item" | "closure_expression" | "macro_invocation" | "impl_item"
                 | "mod_item" | "trait_item" => {}
                 "return_expression" => {
@@ -877,8 +787,6 @@ impl<'a, 't> Reader<'a, 't> {
     }
 }
 
-/// Whether the expression `node` has a name that may read the environment (`env`, `var`,
-/// `dotenvy`), in any depth, a macro's tokens included.
 fn mentions_env(node: Node, src: &[u8]) -> bool {
     let mut stack = vec![node];
     while let Some(node) = stack.pop() {
@@ -894,15 +802,12 @@ fn is_comment(node: Node) -> bool {
     matches!(node.kind(), "line_comment" | "block_comment")
 }
 
-/// Whether `text` is a plain name (a format string's `{base}`).
 fn is_name(text: &str) -> bool {
     let mut chars = text.chars();
     chars.next().is_some_and(|c| c.is_alphabetic() || c == '_')
         && chars.all(|c| c.is_alphanumeric() || c == '_')
 }
 
-/// The comma-separated arguments of a macro's token tree; `None` for an empty one between two
-/// commas. A trailing comma adds none.
 fn arguments(tree: Node) -> Option<Vec<Vec<Node>>> {
     let tokens: Vec<Node> = children(tree).collect();
     let inside = tokens.get(1..tokens.len().checked_sub(1)?)?;
@@ -920,7 +825,6 @@ fn arguments(tree: Node) -> Option<Vec<Vec<Node>>> {
     (!args.iter().any(Vec::is_empty)).then_some(args)
 }
 
-/// `parts` with neighbouring texts joined.
 fn merge(parts: impl IntoIterator<Item = Part>) -> Vec<Part> {
     let mut out: Vec<Part> = Vec::new();
     for part in parts {
@@ -933,7 +837,6 @@ fn merge(parts: impl IntoIterator<Item = Part>) -> Vec<Part> {
     out
 }
 
-/// The text of a char literal that spells itself (`'/'`), else a hole.
 fn char_text(node: Node, src: &[u8]) -> Vec<Part> {
     let inner = text(node, src).trim_matches('\'');
     match inner.chars().count() == 1 && inner != "\\" {
@@ -942,14 +845,10 @@ fn char_text(node: Node, src: &[u8]) -> Vec<Part> {
     }
 }
 
-/// The name of the `Kind::Inline` definition the closure `node`, written as an argument within
-/// `scope`, makes.
 pub(super) fn inline(scope: &str, node: Node) -> String {
     qualify(scope, &format!("@{}", node.start_byte()))
 }
 
-/// The arguments of an attribute (`("/x", method = "GET")`): the string literals before the
-/// first `name = "literal"`, and those pairs as keyword arguments. Anything else is `Unknown`.
 pub(super) fn attribute(tree: Node, src: &[u8]) -> (Vec<Value>, Vec<(String, Value)>) {
     let (mut args, mut kwargs) = (Vec::new(), Vec::new());
     let literal = |n: &Node| match n.kind() {
@@ -975,8 +874,6 @@ pub(super) fn attribute(tree: Node, src: &[u8]) -> (Vec<Value>, Vec<(String, Val
     (args, kwargs)
 }
 
-/// A string literal as one text part; `Unknown` for one with an escape sequence, since its
-/// bytes are not what the source spells.
 fn string(node: Node, src: &[u8]) -> Value {
     let mut out = String::new();
     for part in named(node) {

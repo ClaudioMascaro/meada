@@ -1,5 +1,3 @@
-//! The built binary's messages follow `LANG` (ADR 0008).
-
 use crate::common;
 
 use std::fs;
@@ -10,8 +8,6 @@ use common::{
     assert_golden, chain, decisions, documented_chain, drift_chain, fixture_repo, loose_chain,
 };
 
-/// Runs `meada <arg>` in `repo` under `lang`; returns stdout and stderr, with the repository's
-/// path replaced by `<repo>`.
 fn meada(repo: &Path, lang: &str, arg: &str) -> String {
     let out = Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(repo)
@@ -27,7 +23,6 @@ fn meada(repo: &Path, lang: &str, arg: &str) -> String {
     text.replace(repo.to_str().unwrap(), "<repo>")
 }
 
-/// `LANG` values and the golden suffix each one gets; the last one falls back to English.
 const LANGS: [(&str, &str); 4] = [
     ("pt_BR.UTF-8", "pt"),
     ("en_US.UTF-8", "en"),
@@ -75,8 +70,6 @@ fn config_errors_follow_lang() {
     }
 }
 
-/// The default build's help: a feature's subcommand (`meada snapshot`, `meada github-app`,
-/// `meada ui`, `meada postgres`) is absent from it.
 #[cfg(not(any(
     feature = "snapshot",
     feature = "github-app",
@@ -94,9 +87,6 @@ fn help_follows_lang() {
     }
 }
 
-/// The English help of every command and subcommand, found by following each `Commands:` list
-/// from `meada --help` down: the CLI surface 1.0 freezes (a removed flag or a renamed command
-/// shows up as a diff). The default build only, like `help_follows_lang`.
 #[cfg(not(any(
     feature = "snapshot",
     feature = "github-app",
@@ -150,7 +140,6 @@ fn help_of_every_command_is_golden() {
     assert_golden("cli.help-all.en.txt", &all);
 }
 
-/// `meada ui` exists only in a build with the `ui` feature (ADR 0014).
 #[cfg(not(feature = "ui"))]
 #[test]
 fn the_console_subcommand_is_absent_without_its_feature() {
@@ -163,9 +152,6 @@ fn the_console_subcommand_is_absent_without_its_feature() {
     assert!(stderr.contains("unrecognized subcommand 'ui'"), "{stderr}");
 }
 
-/// `meada ui reset-admin` exists only in a build with the `accounts` feature (ADR 0024): a build
-/// with the console alone takes `reset-admin` for no argument it knows. Without `ui` there is no
-/// `meada ui` at all (`the_console_subcommand_is_absent_without_its_feature`).
 #[cfg(all(feature = "ui", not(feature = "accounts")))]
 #[test]
 fn the_default_account_recovery_is_absent_without_its_feature() {
@@ -181,8 +167,6 @@ fn the_default_account_recovery_is_absent_without_its_feature() {
     );
 }
 
-/// `meada workspaces mcp` exists only in a build with the `proposals` feature (ADR 0022): the
-/// default build has no `workspaces` at all, and a build with `workspaces` alone has no `mcp`.
 #[cfg(not(feature = "proposals"))]
 #[test]
 fn the_proposal_server_is_absent_without_its_feature() {
@@ -206,8 +190,6 @@ fn the_proposal_server_is_absent_without_its_feature() {
     assert!(stderr.contains(missing), "{stderr}");
 }
 
-/// Without the `refresh-lock` feature, `meada snapshot pointer` and `meada snapshot fence` do
-/// not exist.
 #[cfg(not(feature = "refresh-lock"))]
 #[test]
 fn the_operations_need_the_refresh_lock_feature() {
@@ -224,7 +206,6 @@ fn the_operations_need_the_refresh_lock_feature() {
     }
 }
 
-/// `meada <args>` in `dir` under `lang`: stdout, stderr and the exit code.
 fn run_lang(dir: &Path, lang: &str, args: &[&str]) -> (String, String, Option<i32>) {
     let out = Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(dir)
@@ -236,8 +217,6 @@ fn run_lang(dir: &Path, lang: &str, args: &[&str]) -> (String, String, Option<i3
     (text(&out.stdout), text(&out.stderr), out.status.code())
 }
 
-/// `[workspace]`'s errors under `pt_BR` and `en_US`: an unknown key, and `source = "store"`
-/// in a build without `generation-pointer`.
 #[test]
 fn workspace_section_errors_follow_lang() {
     use crate::manifest::{MANIFEST, chain_manifest};
@@ -268,8 +247,6 @@ fn workspace_section_errors_follow_lang() {
     }
 }
 
-/// The identity provider's `[oidc]` errors (ADR 0016) under `pt_BR` and `en_US`: a `type` it
-/// does not know, `[oidc.entra]` under another `type`, and an `overage` it does not take.
 #[cfg(feature = "oidc")]
 #[test]
 fn oidc_type_errors_follow_lang() {
@@ -304,8 +281,6 @@ fn oidc_type_errors_follow_lang() {
     }
 }
 
-/// `overage = "directory"` (#336) under `pt_BR` and `en_US`: without `groups_claim` and without
-/// `[directory]`.
 #[cfg(all(feature = "oidc", feature = "directory"))]
 #[test]
 fn oidc_overage_directory_errors_follow_lang() {
@@ -337,10 +312,6 @@ fn oidc_overage_directory_errors_follow_lang() {
     }
 }
 
-/// The GitHub grant provider and the role check (#331) under `pt_BR` and `en_US`:
-/// `[oidc.github]` without `[postgres]`, a key error, the role check without `[oidc.github]`,
-/// without a `[[github_app]]` block for its host and, under `[refresh_lock]`, without
-/// `MEADA_REFRESH_FENCE`; and a reader of the pulled version without the exclusions file.
 #[cfg(all(feature = "oidc", feature = "postgres"))]
 #[test]
 fn oidc_github_and_role_check_refusals_follow_lang() {
@@ -467,8 +438,6 @@ fn oidc_github_and_role_check_refusals_follow_lang() {
     }
 }
 
-/// An entry's `owner` (ADR 0015) under `pt_BR` and `en_US`: each rule it breaks, and the static
-/// manifest that holds one at all.
 #[test]
 fn owner_errors_follow_lang() {
     use crate::manifest::{MANIFEST, chain_manifest};
@@ -522,8 +491,6 @@ fn owner_errors_follow_lang() {
     }
 }
 
-/// An entry's `added_by` (#330) under `pt_BR` and `en_US`: each rule it breaks, and the static
-/// manifest that holds one at all.
 #[test]
 fn added_by_errors_follow_lang() {
     use crate::manifest::{MANIFEST, chain_manifest};
@@ -567,10 +534,6 @@ fn added_by_errors_follow_lang() {
     }
 }
 
-/// With `generation-pointer`, under `pt_BR` and `en_US`: `[workspace] source = "store"` without
-/// its sections and beside `[[repository]]`, a command that reads entries refusing it, and the
-/// refusals of `meada workspace` that need no service (a malformed id, checked first, and a
-/// bootstrap manifest without `[generations]`).
 #[cfg(feature = "generation-pointer")]
 #[test]
 fn workspace_refusals_follow_lang() {
@@ -626,7 +589,6 @@ fn workspace_refusals_follow_lang() {
                 "{manifest}: [workspace] source = \"store\": a managed workspace's nodes serve \
                  generations: run meada mcp --listen with --generations\n"
             ),
-            // The MCP surface is English whatever `LANG` says (ADR 0008).
             format!(
                 "{manifest}: [workspace] source = \"store\": a managed workspace's nodes serve \
                  generations: run meada mcp --listen with --generations\n"
@@ -683,9 +645,6 @@ fn workspace_refusals_follow_lang() {
     }
 }
 
-/// The operations' refusals that need no service, under `pt_BR` and `en_US`: a malformed id
-/// (checked first) and a manifest without `[refresh_lock]`, for `pointer set`, `retain` and
-/// `drop` and `fence recover`.
 #[cfg(feature = "refresh-lock")]
 #[test]
 fn operation_refusals_follow_lang() {
@@ -725,9 +684,6 @@ fn operation_refusals_follow_lang() {
     }
 }
 
-/// The operations' refusals against Valkey, under `pt_BR` and `en_US`: a generation not
-/// retained (`pointer set` and `drop`), the current one dropped, a full kept set, a lock whose
-/// holder is named, and one with no holder (taken by an older binary).
 #[cfg(feature = "refresh-lock")]
 #[test]
 fn operation_refusals_with_valkey_follow_lang() {
@@ -863,7 +819,6 @@ fn status_reports_stale_and_waiting_decisions_follow_lang() {
     let toml = web.join("meada.toml");
     let peer = "\n[[peer]]\nrepo = \"example.com/chain/billing\"\n";
     fs::write(&toml, fs::read_to_string(&toml).unwrap() + peer).unwrap();
-    // A third decision, for a call that does not exist, is stale.
     let file = web.join("meada.decisions.toml");
     let gone = "\n[[decision]]\nkind = \"dynamic-url\"\n\
                 call = \"example.com/chain/web::src/status.ts::gone::fetch#0\"\n\
@@ -902,9 +857,6 @@ fn status_reports_documents_follow_lang() {
     }
 }
 
-/// A file whose qualified names pass its pack's budget (C#, Java, Kotlin, Swift) and a C# file
-/// of a project that gives more usings than the pack takes are dropped, and `status` names each
-/// and its limit, as is a Kotlin file the grammar misreads.
 #[test]
 fn status_reports_a_file_over_a_pack_limit_follow_lang() {
     let repo = fixture_repo("cli_budget", "ts-basic", None);
@@ -914,7 +866,6 @@ fn status_reports_a_file_over_a_pack_limit_follow_lang() {
         source += &format!("public void M{n}() {{ F(); }}\n");
     }
     fs::write(repo.join("Broad.cs"), source + "}\n").unwrap();
-    // A long enclosing name repeated by every node under it, 64 KiB at a time.
     let name = "N".repeat(64 * 1024);
     let repeats = 4 * 1024 * 1024 / name.len() + 1;
     fs::write(
@@ -941,13 +892,11 @@ fn status_reports_a_file_over_a_pack_limit_follow_lang() {
         ),
     )
     .unwrap();
-    // A declaration the grammar reads as an infix call leaves the file out, and status says so.
     fs::write(
         repo.join("Misread.kt"),
         "package a\nfun f() {}\nval a = b class C\n",
     )
     .unwrap();
-    // A project whose global usings pass the count every file of it is dropped for.
     fs::create_dir_all(repo.join("many")).unwrap();
     fs::write(
         repo.join("many/Many.csproj"),
@@ -957,7 +906,6 @@ fn status_reports_a_file_over_a_pack_limit_follow_lang() {
     let usings: String = (0..=256).map(|n| format!("global using N{n};\n")).collect();
     fs::write(repo.join("many/Global.cs"), usings).unwrap();
     fs::write(repo.join("many/A.cs"), "class A { void M() {} }\n").unwrap();
-    // A file a pack leaves unbuilt on purpose is not this drop.
     fs::write(
         repo.join("cgo.go"),
         "package x\n\nimport \"C\"\n\nfunc F() {}\n",
@@ -969,13 +917,11 @@ fn status_reports_a_file_over_a_pack_limit_follow_lang() {
         assert!(!status.contains("cgo.go"), "{status}");
         assert_golden(&format!("cli.status-budget.{name}.txt"), &status);
     }
-    // The project back within the count: its files are indexed again, with no line.
     fs::write(repo.join("many/Global.cs"), "global using N0;\n").unwrap();
     meada(&repo, "en_US.UTF-8", "index");
     let status = meada(&repo, "en_US.UTF-8", "status");
     assert!(!status.contains("many/"), "{status}");
     assert!(status.contains("Broad.java"), "{status}");
-    // Edited past the count again: the unchanged file of the project is named too.
     let usings: String = (0..=256).map(|n| format!("global using N{n};\n")).collect();
     fs::write(repo.join("many/Global.cs"), usings).unwrap();
     meada(&repo, "en_US.UTF-8", "index");
@@ -998,7 +944,6 @@ fn status_reports_drift_follow_lang() {
     }
 }
 
-/// `[snapshot] node_name`'s error under `pt_BR` and `en_US`.
 #[cfg(feature = "snapshot")]
 #[test]
 fn a_bad_node_name_follows_lang() {
@@ -1026,9 +971,6 @@ fn a_bad_node_name_follows_lang() {
     }
 }
 
-/// `meada workspace apply` and `pull` against the services, under `pt_BR` and `en_US`: a
-/// version the store does not hold, no current version, a pointer whose fence is not above the
-/// current file's, and a pull that finds its version current.
 #[cfg(feature = "refresh-lock")]
 #[test]
 fn workspace_apply_and_pull_refusals_follow_lang() {
@@ -1102,7 +1044,6 @@ fn workspace_apply_and_pull_refusals_follow_lang() {
     }
 }
 
-/// `[postgres]` in a build without its feature, under `pt_BR` and `en_US`.
 #[cfg(not(feature = "postgres"))]
 #[test]
 fn the_postgres_section_without_its_feature_follows_lang() {
@@ -1131,7 +1072,6 @@ fn the_postgres_section_without_its_feature_follows_lang() {
     assert!(stderr.contains("unrecognized subcommand"), "{stderr}");
 }
 
-/// `[directory]` in a build without its feature, under `pt_BR` and `en_US` (#334).
 #[cfg(not(feature = "directory"))]
 #[test]
 fn the_directory_section_without_its_feature_follows_lang() {
@@ -1157,8 +1097,6 @@ fn the_directory_section_without_its_feature_follows_lang() {
     }
 }
 
-/// With `directory` (#334), under `pt_BR` and `en_US`: `[directory]` without the sections it
-/// needs, with both token keys and with a `user_attribute` it does not accept.
 #[cfg(all(feature = "directory", feature = "oidc"))]
 #[test]
 fn directory_refusals_follow_lang() {
@@ -1204,8 +1142,6 @@ fn directory_refusals_follow_lang() {
     }
 }
 
-/// With `postgres`, under `pt_BR` and `en_US`: a `[postgres]` key error, the URL refusals and,
-/// against the local Postgres, both version refusals.
 #[cfg(feature = "postgres")]
 #[test]
 fn postgres_refusals_follow_lang() {
@@ -1339,8 +1275,6 @@ fn postgres_refusals_follow_lang() {
     admin.run(&format!("DROP SCHEMA \"{schema}\" CASCADE"));
 }
 
-/// The audit's refusal (#328) under `pt_BR` and `en_US`: with `[postgres]` and Postgres
-/// unreachable, a CLI twin of a console write exits 1 naming Postgres and stores nothing.
 #[cfg(all(feature = "generation-pointer", feature = "postgres"))]
 #[test]
 fn the_audit_refusal_follows_lang() {
@@ -1399,8 +1333,6 @@ fn status_reports_orphans_follow_lang() {
     }
 }
 
-/// A reader that closes its end before `meada` prints (`meada export | head -1`) is no error: the
-/// rest of the output is dropped and the command ends as it would, with no panic.
 #[test]
 fn a_reader_that_closed_its_end_drops_the_output_quietly() {
     let repo = fixture_repo("cli_closed_pipe", "ts-basic", None);
@@ -1412,7 +1344,6 @@ fn a_reader_that_closed_its_end_drops_the_output_quietly() {
             .stderr(Stdio::piped())
             .spawn()
             .expect("meada runs");
-        // The read end closes before the index is read, so the first write fails.
         drop(child.stdout.take());
         let out = child.wait_with_output().expect("meada ends");
         let stderr = String::from_utf8_lossy(&out.stderr);
@@ -1424,7 +1355,6 @@ fn a_reader_that_closed_its_end_drops_the_output_quietly() {
     }
 }
 
-/// Runs `meada <args>` in `repo` under an English `LANG`; returns its output.
 fn meada_args(repo: &Path, args: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(repo)
@@ -1434,7 +1364,6 @@ fn meada_args(repo: &Path, args: &[&str]) -> std::process::Output {
         .expect("meada runs")
 }
 
-/// stdout of a run that succeeded with nothing on stderr.
 fn stdout_of(out: std::process::Output) -> String {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
@@ -1445,8 +1374,6 @@ fn stdout_of(out: std::process::Output) -> String {
     String::from_utf8(out.stdout).expect("UTF-8")
 }
 
-/// `meada trace` prints what the MCP tool answers, from `Engine::trace`, in both directions and
-/// under a budget.
 #[test]
 fn the_trace_command_prints_the_engine_answer() {
     use meada::engine::{Direction, Engine, Start};
@@ -1468,7 +1395,6 @@ fn the_trace_command_prints_the_engine_answer() {
     }
 }
 
-/// `meada trace --changes uncommitted` answers as the MCP tool's `changes: uncommitted`.
 #[test]
 fn trace_changes_uncommitted_prints_the_engine_answer() {
     use meada::engine::{Direction, Engine, Start};
@@ -1485,7 +1411,6 @@ fn trace_changes_uncommitted_prints_the_engine_answer() {
     assert_eq!(printed, answer);
 }
 
-/// `meada trace --changes <base>..<head>` and `--files` print `Engine::trace_changes`' answer.
 #[test]
 fn trace_takes_a_range_and_files() {
     use meada::engine::{Changes, Direction, Engine};

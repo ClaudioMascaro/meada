@@ -1,6 +1,3 @@
-//! A chart's declared environment key (`[[helm_env]]`) names Kafka topics: the values of each
-//! chart environment, `declared` when every environment agrees (front 6, Task 4).
-
 use std::path::{Path, PathBuf};
 
 use meada::engine::Engine;
@@ -10,7 +7,6 @@ use crate::common::{fixture_repo, of_files};
 
 const CHART: &str = "svc/chart/api";
 
-/// The `helm-env` fixture, copied for `case`.
 fn fixture(case: &str) -> PathBuf {
     fixture_repo(
         case,
@@ -23,7 +19,6 @@ fn export_of(engine: &Engine) -> Value {
     serde_json::from_str(&engine.export().unwrap()).unwrap()
 }
 
-/// The export of the fixture copied for `case`, after `change` edits the copy.
 fn export(case: &str, change: impl FnOnce(&Path)) -> Value {
     let repo = fixture(case);
     change(&repo);
@@ -36,7 +31,6 @@ fn write(repo: &Path, file: &str, text: &str) {
     std::fs::write(path, text).unwrap();
 }
 
-/// A values file whose declared key holds `envs`, one `NAME: value` per line.
 fn values(envs: &[(&str, &str)]) -> String {
     let lines: String = envs
         .iter()
@@ -45,7 +39,6 @@ fn values(envs: &[(&str, &str)]) -> String {
     format!("lib-chart:\n  envs:\n{lines}")
 }
 
-/// A compose service that builds `svc` with `environment` set.
 fn compose(repo: &Path, environment: &[(&str, &str)]) {
     let lines: String = environment
         .iter()
@@ -56,7 +49,6 @@ fn compose(repo: &Path, environment: &[(&str, &str)]) {
     write(repo, "docker-compose.yml", &text);
 }
 
-/// The channel contracts of the consumers in `file`, sorted.
 fn consumed(export: &Value, file: &str) -> Vec<String> {
     let at = format!("::{file}::");
     let mut found: Vec<String> = (export["consumers"].as_array().unwrap().iter())
@@ -69,7 +61,6 @@ fn consumed(export: &Value, file: &str) -> Vec<String> {
     found
 }
 
-/// The consumer in `file` of `contract`.
 fn consumer<'e>(export: &'e Value, file: &str, contract: &str) -> &'e Value {
     let at = format!("::{file}::");
     (export["consumers"].as_array().unwrap().iter())
@@ -77,7 +68,6 @@ fn consumer<'e>(export: &'e Value, file: &str, contract: &str) -> &'e Value {
         .unwrap_or_else(|| panic!("no {contract} consumer in {file}: {export}"))
 }
 
-/// The level of the link from the `tools` writer `function` to the reader in `svc/consumer.go`.
 fn level_from(export: &Value, function: &str) -> String {
     let from = format!("::tools/writers.go::{function}::");
     let found = (export["links"].as_array().unwrap().iter())
@@ -92,7 +82,6 @@ fn level_from(export: &Value, function: &str) -> String {
     found["level"].as_str().unwrap().to_string()
 }
 
-/// The `executions` rows whose workload is a chart environment of the declared key.
 fn helm_rows(export: &Value) -> Vec<&Value> {
     (export["executions"].as_array().into_iter().flatten())
         .filter(|x| {
@@ -161,7 +150,6 @@ fn the_base_values_file_lies_under_each_environment() {
     assert_eq!(level_from(&export, "Created"), "declared");
 }
 
-/// A base `values.yaml` holding only a comment is Helm's empty map: the environments stand.
 #[test]
 fn a_comment_only_base_values_file_is_an_empty_map() {
     let export = export("helm_env_empty_base", |repo| {
@@ -174,7 +162,6 @@ fn a_comment_only_base_values_file_is_an_empty_map() {
     assert_eq!(level_from(&export, "Created"), "declared");
 }
 
-/// An environment file holding nothing is the base alone, as Helm lays it.
 #[test]
 fn an_empty_environment_values_file_is_the_base() {
     let export = export("helm_env_empty_env", |repo| {
@@ -353,8 +340,6 @@ fn a_nested_package_gets_no_environment_from_the_chart() {
     );
 }
 
-/// A change to a file of a package nested under the chart's package reaches none of the chart's
-/// environments; a change to the owning package's own file reaches them (`trace --affected`).
 #[test]
 fn only_the_owning_package_reaches_the_chart_environments() {
     let repo = fixture("helm_env_affected_scope");
@@ -371,7 +356,6 @@ fn only_the_owning_package_reaches_the_chart_environments() {
     assert!(!chart(&owned).is_empty(), "{owned}");
 }
 
-/// Every link whose kind is not a channel, as text.
 fn other_links(export: &Value) -> Vec<String> {
     (export["links"].as_array().unwrap().iter())
         .filter(|l| !l["contract"].as_str().unwrap().starts_with("channel::"))
@@ -408,7 +392,6 @@ fn http_and_resources_ignore_helm_environments() {
         );
     });
     assert_eq!(other_links(&with), other_links(&without));
-    // The chart's channel value does name the topic in the same fixture.
     assert_eq!(level_from(&with, "Created"), "declared");
 }
 

@@ -1,9 +1,3 @@
-//! Groups of local accounts (#558, ADR 0024): the global operator assigns them, `[accounts.groups]`
-//! maps them to identities as `[oidc.groups]` does, and a local session's grant is what they map
-//! to, bounding every view; a viewer whose group owns an entry its grant reads is a team operator
-//! (ADR 0015). Each test runs against the local Postgres of `MEADA_TEST_POSTGRES_URL` in a schema
-//! of its own, and skips without it; the managed workspace also needs the fleet's Valkey and store.
-
 use std::fs;
 use std::path::Path;
 
@@ -19,11 +13,8 @@ use crate::server::Server;
 use crate::ui::playground::{CATALOG, GATEWAY, WEB, body, chain_console, query};
 use crate::ui::{Reply, send, ui_section};
 
-/// The password every account here is created with, no change required.
 const PASSWORD: &str = "a long team passphrase";
 
-/// `[accounts.groups]`: `team-web` reads the web and the catalog, `team-gw` the gateway,
-/// `team-all` everything.
 fn table() -> String {
     format!(
         "\n[accounts.groups]\n\"team-web\" = [\"{WEB}\", \"{CATALOG}\"]\n\"team-gw\" = [\"{GATEWAY}\"]\n\
@@ -31,8 +22,6 @@ fn table() -> String {
     )
 }
 
-/// `manifest` (a bootstrap manifest under `dir`) with Postgres, `[accounts]` and `table` appended: the Postgres schema and the key pair's PEM texts, which no output
-/// may carry; `None` without Postgres.
 fn accounts(
     dir: &Path,
     manifest: &str,
@@ -51,7 +40,6 @@ fn accounts(
     Some((audit, keys))
 }
 
-/// `POST accounts` creating `username` of `role` in `groups`, no change required.
 fn create(console: &Server, admin: &str, username: &str, role: &str, groups: &[&str]) -> Reply {
     let body = json!({"username": username, "role": role, "groups": groups, "password": PASSWORD,
                       "change_required": false});
@@ -68,7 +56,6 @@ fn get(console: &Server, route: &str, token: &str) -> Value {
     reply.json()
 }
 
-/// The identities of the manifest view's `[[repository]]` entries.
 fn entries(console: &Server, token: &str) -> Vec<String> {
     let manifest = get(console, "manifest", token);
     (manifest["manifest"]["repository"]
@@ -79,18 +66,11 @@ fn entries(console: &Server, token: &str) -> Vec<String> {
     .collect()
 }
 
-/// Without `[accounts.groups]` every local account reads every repository, whatever its groups;
-/// with it, a viewer's grant is what its groups map to, and bounds the manifest view, the
-/// admission view, the repositories, the playground and the exports (the graph views' source);
-/// the global operator reads everything. A group change is recorded `account.groups`, lists at
-/// once, and reaches reads at the next sign-in. A group that is no owner name is a 422.
 #[test]
 fn a_local_viewer_s_groups_bound_every_view() {
     let case = "accounts_groups_views";
-    // Account administration needs no `operations` (#557).
     let dir = chain_console(case, "", &ui_section());
     assert!(crate::manifest::run(&dir, "index").2, "index");
-    // First without the table: groups grant nothing yet, so every account reads everything.
     let Some((audit, pems)) = accounts(&dir, MANIFEST, case, "") else {
         return;
     };
@@ -116,7 +96,6 @@ fn a_local_viewer_s_groups_bound_every_view() {
     assert_eq!(entries(&console, &vera).len(), 4);
     drop(console);
 
-    // With the table: the grant is what the groups map to.
     let text = fs::read_to_string(dir.join(MANIFEST)).unwrap();
     fs::write(dir.join(MANIFEST), text + &table()).unwrap();
     let console = start(&dir, &env);
@@ -131,7 +110,6 @@ fn a_local_viewer_s_groups_bound_every_view() {
     assert_eq!(get(&console, "session", &admin)["grant"], json!([]));
     assert_eq!(get(&console, "session", &admin)["role"], "operator");
 
-    // The manifest view: the entries and the groups table bounded, whole for the operator.
     assert_eq!(entries(&console, &vera), [WEB, CATALOG]);
     let manifest = get(&console, "manifest", &vera);
     assert_eq!(
@@ -146,7 +124,6 @@ fn a_local_viewer_s_groups_bound_every_view() {
         json!([GATEWAY])
     );
 
-    // The admission view: the mode, the key's fingerprint and the groups table bounded.
     let admission = get(&console, "admission", &vera);
     assert_eq!(admission["accounts"]["mode"], "accounts");
     let fingerprint = admission["accounts"]["public_key"].as_str().unwrap();
@@ -161,7 +138,6 @@ fn a_local_viewer_s_groups_bound_every_view() {
     let admission = get(&console, "admission", &admin);
     assert_eq!(admission["groups"]["team-gw"], json!([GATEWAY]));
     assert_eq!(admission["accounts"]["public_key"], fingerprint);
-    // `admission/check` stays an identity provider's feature.
     let check = post(
         &console,
         "admission/check",
@@ -170,7 +146,6 @@ fn a_local_viewer_s_groups_bound_every_view() {
     );
     assert_eq!(check.status, 404, "{}", check.body);
 
-    // The repositories.
     let repositories = ask(&console, "/api/v1/repositories", &vera);
     assert_eq!(repositories.status, 200, "{}", repositories.body);
     assert!(repositories.body.contains(WEB), "{}", repositories.body);
@@ -180,7 +155,6 @@ fn a_local_viewer_s_groups_bound_every_view() {
         repositories.body
     );
 
-    // The playground and the exports, which the graph views draw.
     let bearer = format!("Bearer {vera}");
     let viewer = [("Authorization", bearer.as_str())];
     let trace = query(
@@ -203,7 +177,6 @@ fn a_local_viewer_s_groups_bound_every_view() {
     let route = format!("/api/v1/repositories/{GATEWAY}/export");
     assert_eq!(send(&console, "GET", &route, &viewer).status, 404);
 
-    // The `groups` action: owner names only, sorted without repeats, recorded.
     for bad in [json!([" padded"]), json!([""]), json!(["line\nbreak"])] {
         let reply = act(
             &console,
@@ -227,7 +200,6 @@ fn a_local_viewer_s_groups_bound_every_view() {
         .find(|a| a["username"] == "vera")
         .unwrap();
     assert_eq!(vera_listed["groups"], json!(["team-gw"]));
-    // Only the global operator assigns groups.
     let own = act(
         &console,
         &vera,
@@ -259,7 +231,6 @@ fn a_local_viewer_s_groups_bound_every_view() {
         ])),
         "{records:?}"
     );
-    // Reads follow the token until the next sign-in.
     assert_eq!(
         get(&console, "session", &vera)["grant"],
         json!([CATALOG, WEB])
@@ -276,20 +247,10 @@ fn a_local_viewer_s_groups_bound_every_view() {
     }
 }
 
-/// Every record of the audit page, as text.
 fn records_text(console: &Server, admin: &str) -> String {
     get(console, "audit?limit=100", admin).to_string()
 }
 
-/// A managed workspace (`source = "store"`) whose current version gives each chain repository an
-/// owner: a local viewer of `team-web`, whose grant reads the web, is a team operator. `session`
-/// lists its teams; every view of the workspace, its versions, the store, the repositories, the
-/// fleet and the credentials leaves out what its grant does not read; a save of its own entry
-/// passes, authored by its local subject, and an ownerless one or another team's is refused with
-/// ADR 0015's reason.
-/// A viewer of a group that owns nothing stays one, and the global operator stays one whatever it
-/// owns. Taking the group away takes the role away from the next write at once (the account row
-/// is read), while the token's reads keep it until the next sign-in.
 #[cfg(feature = "refresh-lock")]
 #[test]
 fn a_local_viewer_whose_group_owns_an_entry_is_a_team_operator() {
@@ -330,7 +291,6 @@ fn a_local_viewer_whose_group_owns_an_entry_is_a_team_operator() {
          app_id = 1\nprivate_key_file = \"absent-private-key.pem\"\n"
     );
     fs::write(fleet.dir.join("ops/console.toml"), bootstrap).unwrap();
-    // `team-web` reads the worker, which `team-gw` owns.
     let team = format!(
         "\n[accounts.groups]\n\"team-web\" = [\"{WEB}\", \"{CATALOG}\", \"{WORKER}\"]\n\
          \"team-gw\" = [\"{GATEWAY}\"]\n"
@@ -371,7 +331,6 @@ fn a_local_viewer_whose_group_owns_an_entry_is_a_team_operator() {
     let bo = get(&console, "session", &signed_in(&console, "bo"));
     assert_eq!((&bo["role"], &bo["grant"]), (&json!("viewer"), &json!([])));
     assert!(bo.get("teams").is_none(), "{bo}");
-    // The global operator stays one whatever it owns.
     let given = act(
         &console,
         &admin,
@@ -384,7 +343,6 @@ fn a_local_viewer_whose_group_owns_an_entry_is_a_team_operator() {
     assert_eq!(session["role"], "operator", "{session}");
     assert!(session.get("teams").is_none(), "{session}");
 
-    // Every view of the managed workspace leaves out what the grant does not read.
     for route in [
         "workspace".to_string(),
         "workspace/versions".to_string(),
@@ -409,8 +367,6 @@ fn a_local_viewer_whose_group_owns_an_entry_is_a_team_operator() {
         assert!(!credentials.to_string().contains("private-owner"));
     }
 
-    // A save of its own entry passes; an ownerless one, and another team's, are refused, naming
-    // why.
     let read = |path: &str| {
         let others = [2, 3].map(|n| entry(CHAIN[n], owners[n], "")).concat();
         entry(CHAIN[0], owners[0], path) + &others
@@ -451,7 +407,6 @@ fn a_local_viewer_whose_group_owns_an_entry_is_a_team_operator() {
         refused.body
     );
 
-    // The group taken away: the next write is a viewer's, at once; reads keep the token's role.
     let taken = act(
         &console,
         &admin,
@@ -480,9 +435,6 @@ fn a_local_viewer_whose_group_owns_an_entry_is_a_team_operator() {
     );
 }
 
-/// `[accounts.groups]` is read as `[oidc.groups]` is, a group to an array of identities: one of
-/// another shape is an error naming the table's key; under break glass the table is refused
-/// before it is read (`break_glass::break_glass_needs_oidc_and_refuses_the_grant_tables`).
 #[test]
 fn the_groups_table_takes_arrays_of_identities() {
     use crate::manifest::run_args;

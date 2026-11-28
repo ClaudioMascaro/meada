@@ -1,21 +1,14 @@
 import type { GuidedCopy } from './guided-i18n';
 
-/**
- * The guided form's view of a named entry (#345): the JSON `namedEntriesJson` gives and
- * `namedEntriesText` takes. The form only reshapes it. Whether a value is valid, what an entry may
- * hold and what the session may select are decided by `meada-core` (WebAssembly) and by the server.
- */
 export interface PeerDecl { repo: string; base_url_env?: string[] }
 export interface ResourceDecl { kind: string; id: string; role: string; via?: string[] }
 export interface ServeDecl { hosts?: string[]; prefix?: string; strip?: string }
 export interface Entry { repo: string; serve?: ServeDecl; resource?: ResourceDecl[]; peer?: PeerDecl[] }
 
-/** The lines of a textarea: trimmed, empty ones dropped. */
 export function lines(text: string): string[] {
   return text.split('\n').map(line => line.trim()).filter(line => line !== '');
 }
 
-/** An entry without the keys that hold nothing, so a field that is emptied is a field that is absent from the text. */
 export function normalize(entry: Entry): Entry {
   const next: Entry = { repo: entry.repo };
   if (entry.serve) {
@@ -34,7 +27,6 @@ export function normalize(entry: Entry): Entry {
   return next;
 }
 
-/** The entries as the JSON the core takes. */
 export function entriesJson(entries: readonly Entry[]): string {
   return JSON.stringify(entries.map(normalize));
 }
@@ -47,15 +39,12 @@ export function removeAt<T>(items: readonly T[], at: number): T[] {
   return items.filter((_, index) => index !== at);
 }
 
-/** The change a diff reports for an entry's key, in words. */
 function keyText(key: string, t: GuidedCopy): string {
   return key === 'serve' ? t.keyServe : key === 'resource' ? t.keyResource : key === 'peer' ? t.keyPeer : key === 'repository' ? t.keyOrder : key;
 }
 
-/** What `namedDiff` computed. */
 export interface NamedDiff { added: string[]; removed: string[]; changed: { repo: string; keys: string[] }[] }
 
-/** A diff in words, one line each, in text and never by color alone. */
 export function diffLines(diff: NamedDiff, t: GuidedCopy): string[] {
   return [
     ...diff.added.map(repo => `${t.diffAdded}: ${repo}`),

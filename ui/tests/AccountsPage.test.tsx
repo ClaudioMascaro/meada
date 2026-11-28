@@ -31,7 +31,6 @@ const cy: ManagedAccount = { ...ana, username: 'cy', state: 'locked', locked_unt
 beforeEach(() => { sessionStorage.clear(); });
 afterEach(async () => { await act(() => root.render(null)); vi.unstubAllGlobals(); });
 
-/** The fetch fake: the first answer lists the accounts, every later one is `answers`' next. */
 function serve(...answers: Response[]) {
   const fetch = vi.fn().mockResolvedValueOnce(Response.json({ accounts: [ana, bob, cy] }));
   for (const answer of answers) fetch.mockResolvedValueOnce(answer);
@@ -63,7 +62,7 @@ test('the create check holds the username pattern and the password length in sca
   for (const bad of ['', 'Ana', 'a b', 'ána', 'a'.repeat(65), 'a/b']) expect(createCheck(bad, 'a'.repeat(12), t)).toBe(t.usernameInvalid);
   expect(createCheck('ana', 'a'.repeat(11), t)).toBe(t.passwordLength);
   expect(createCheck('ana', 'a'.repeat(129), t)).toBe(t.passwordLength);
-  expect(createCheck('ana', '😀'.repeat(12), t)).toBeUndefined(); // 12 scalar values, 24 UTF-16 units
+  expect(createCheck('ana', '😀'.repeat(12), t)).toBeUndefined();
   expect(parseGroups(' team-a, team-b  team-a,,')).toEqual(['team-a', 'team-b']);
 });
 
@@ -85,7 +84,7 @@ test.each(['en', 'pt-BR'] as const)('the list shows every account with its state
   expect(rows).toHaveLength(3);
   expect(rows[1]!.textContent).toContain(t.suspended);
   expect(rows[2]!.textContent).toContain(`${t.lockedUntil} 2026-11-01T12:15:00Z`);
-  expect(within(rows[1]!).queryByRole('button', { name: `${t.suspend}: bob` })).toBeNull(); // a suspended account offers reactivation
+  expect(within(rows[1]!).queryByRole('button', { name: `${t.suspend}: bob` })).toBeNull();
   for (const name of [`${t.setRole}: ana`, `${t.setGroups}: ana`, `${t.suspend}: ana`, `${t.resetPassword}: ana`, `${t.reactivate}: bob`]) {
     expect(getByRole(host, 'button', { name }).tabIndex).toBeGreaterThanOrEqual(0);
   }
@@ -105,13 +104,13 @@ test('the create form starts with the change-required box checked and asks the s
   type(t.username, 'ana'); type(t.temporaryPassword, 'short');
   await act(async () => { fireEvent.submit(getByRole(host, 'button', { name: t.create }).closest('form')!); });
   expect(getByRole(host, 'alert').textContent).toBe(t.passwordLength);
-  expect(fetch).toHaveBeenCalledTimes(1); // the list alone
+  expect(fetch).toHaveBeenCalledTimes(1);
   type(t.groupsLabel, 'team-web, team-ui'); type(t.temporaryPassword, 'a long enough password');
   fireEvent.click(box);
   await act(async () => { fireEvent.submit(getByRole(host, 'button', { name: t.create }).closest('form')!); });
   expect(sent(fetch, 1)).toEqual({ route: '/api/v1/accounts', body: { username: 'ana', role: 'viewer', groups: ['team-web', 'team-ui'], password: 'a long enough password', change_required: false } });
   await waitFor(() => expect(getByRole(host, 'status').textContent).toBe(t.created));
-  expect(fetch).toHaveBeenCalledTimes(3); // the list again
+  expect(fetch).toHaveBeenCalledTimes(3);
 });
 
 test('a refused creation shows the server rule in the page language, or the server message unchanged', async () => {
@@ -180,7 +179,7 @@ test('suspend, reactivate and reset password each go through the dialog; last_op
   fireEvent.change(within(dialog).getByLabelText(t.temporaryPassword), { target: { value: 'short' } });
   await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: t.confirm, hidden: true })); });
   expect(within(dialog).getByRole('alert', { hidden: true }).textContent).toBe(t.passwordLength);
-  expect(fetch).toHaveBeenCalledTimes(4); // list, suspend, reactivate, list again: the short password never left
+  expect(fetch).toHaveBeenCalledTimes(4);
   fireEvent.change(within(dialog).getByLabelText(t.temporaryPassword), { target: { value: 'a new temporary password' } });
   fireEvent.click(within(dialog).getByLabelText(t.changeRequired));
   await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: t.confirm, hidden: true })); });
@@ -209,7 +208,6 @@ test.each(['en', 'pt-BR'] as const)('the list shows each verified GitHub login a
   const rows = getAllByRole(host, 'row').slice(1);
   expect(rows[0]!.textContent).toContain('ana-souza');
   expect(rows[1]!.textContent).toContain(t.none);
-  // Only an account with a verified login offers its removal.
   expect(within(rows[1]!).queryByRole('button', { name: `${t.removeGithub}: bob` })).toBeNull();
   await act(async () => { fireEvent.click(getByRole(host, 'button', { name: `${t.removeGithub}: ana` })); });
   const dialog = getByRole(host, 'dialog', { hidden: true });

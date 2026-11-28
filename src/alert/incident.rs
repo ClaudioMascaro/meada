@@ -1,4 +1,3 @@
-//! Literal incident-provider configuration. No provider or template code is executed.
 use super::config::{self, Matcher, Op, Route, Rule, Spans, Stream, Summary};
 use crate::document::events::Step;
 use hcl_edit::Span;
@@ -82,7 +81,6 @@ fn literal_body(
     }
     let mut counts = BTreeMap::new();
     for block in body.blocks() {
-        // Dynamic blocks cannot establish a literal event shape.
         let key = block.ident.as_str();
         let index = counts.entry(key).or_insert(0usize);
         let at = format!("{prefix}.{key}[{index}]");
@@ -125,8 +123,6 @@ fn literal_value(value: &Expression) -> Value {
             Value::Object(out)
         }
         Expression::Traversal(t) => {
-            // Only a same-module resource identity is useful as a routing scope. It is not
-            // the value of an expression, and cannot become a tag or an event field.
             use hcl_edit::expr::TraversalOperator;
             if let Expression::Variable(root) = &t.expr {
                 let parts = t
@@ -496,7 +492,6 @@ fn pagerduty(
                 None
             } else {
                 target.map(|target| {
-                    // Actions that change event data make the downstream input unread.
                     if actions.is_some_and(|a| {
                         ["extraction", "variable", "severity", "event_action"]
                             .iter()

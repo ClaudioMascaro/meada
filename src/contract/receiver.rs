@@ -1,11 +1,7 @@
-//! Private, persisted receiver evidence. Kinds interpret it; indexing and workload lookup
-//! only carry the pieces and preserve their scope. Public exports keep the written operation.
-
 use serde::{Deserialize, Serialize};
 
 use crate::names::Argument;
 
-/// A kind's receiver subtype and the name arguments folded in its exact construction frame.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ReceiverIdentity {
@@ -19,7 +15,6 @@ pub enum ReceiverIdentity {
     },
 }
 
-/// The execution scope in which companion environment values may be combined.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EnvironmentScope {
     pub(crate) workload: String,
@@ -27,7 +22,6 @@ pub struct EnvironmentScope {
     pub(crate) container: String,
 }
 
-/// A certain, stored environment value or typed target, with its execution scope.
 pub struct EnvironmentValue {
     pub(crate) scope: EnvironmentScope,
     pub(crate) value: Option<String>,

@@ -11,9 +11,6 @@ import { Auth } from '../src/auth';
 import config from './fixtures/config.json';
 import { workspaceCopy } from '../src/workspace-i18n';
 
-// The workspace views under the GitHub grant provider (#333): the editor attributes and authorizes
-// additions with the core's functions given the session's login and host, shows each entry's
-// `added_by`, and every view marks the entries the last role check left out (`excluded`).
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 const host = document.createElement('div'); document.body.append(host);
 const root = createRoot(host);
@@ -28,7 +25,6 @@ const x = { repo: 'g.com/t/x', path: 'x', owner: 'team-a', added_by: 'ana-souza'
 const y = { repo: 'g.com/t/y', path: 'y', owner: 'team-b' };
 const w = { repo: 'a.com/t/w', path: 'w', owner: 'team-a' };
 const version = (id: string, repositories: object[]) => ({ id, author: 'alice', time: '2026-10-23T10:00:00Z', message: id, repositories });
-// What the routes answer: the current version marks `x` as left out of the last refresh, an older one carries no mark.
 const current = version('1111111111111111', [{ ...x, excluded: true }, y, w]);
 const older = version('2222222222222222', [x, y, w]);
 const github = { login: 'ana-souza', github_host: 'g.com', github_grant: 'current' as const };
@@ -94,7 +90,6 @@ test('an addition on the host outside the grant is accepted with a login whateve
   await type(entries, typed);
   const diff = getByRole(form, 'region', { name: t.editorDiff }).textContent!;
   expect(diff).toContain('g.com/t/new'); expect(diff).not.toContain(t.refusedMark);
-  // Off the host, the same addition is outside the grant.
   await type(entries, entries.value.replace('g.com/t/new', 'a.com/t/new'));
   expect(getByRole(form, 'region', { name: t.editorDiff }).textContent).toContain(t.reason_outside_grant);
   await type(entries, typed);
@@ -114,7 +109,7 @@ test.each(['pt-BR', 'en'] as const)('a server outside_grant for an identity alre
   await render(team, locale, fetch);
   const { t, entries, save } = await editor(locale);
   await type(entries, entries.value + addition('g.com/t/vault'));
-  expect(save.hasAttribute('disabled')).toBe(false); // the editor cannot predict it
+  expect(save.hasAttribute('disabled')).toBe(false);
   await act(() => fireEvent.click(save));
   await act(() => fireEvent.click(getByRole(getByRole(host, 'dialog'), 'button', { name: t.confirmSave })));
   const alert = getByRole(getByRole(host, 'dialog'), 'alert');
@@ -132,7 +127,6 @@ test.each(['pt-BR', 'en'] as const)('the team editor shows each entry’s added_
   const row = (repo: string) => within(table).getByText(repo).closest('tr')!.textContent!;
   expect(row('g.com/t/x')).toContain('ana-souza'); expect(row('g.com/t/x')).toContain(t.excluded);
   expect(row('g.com/t/y')).toContain(t.noAddedBy); expect(row('g.com/t/y')).not.toContain(t.excluded);
-  // `excluded` is response metadata: never in the text, so never in a save.
   expect(entries.value).toBe(entriesText(JSON.stringify([x, y, w])));
   expect(entries.value).not.toContain('excluded');
 });

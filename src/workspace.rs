@@ -1,9 +1,3 @@
-//! The workspace: the repositories one query can see. It holds the repository where Meada
-//! runs, its peers through their `meada.toml` files (transitively), and the sibling clones
-//! whose own `meada.toml` names a repository already in it. Discovery reads only local files.
-//! In server mode (ADR 0011) the workspace is instead every repository a workspace manifest
-//! (`meada.workspace.toml`) lists, and nothing is discovered.
-
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -37,9 +31,6 @@ pub struct Repository {
 }
 
 impl Repository {
-    /// The repository checked out at `root`, read locally, its index in its own `.meada/`. The
-    /// developer owns the checkout, so its `meada.toml` and `meada.decisions.toml` are read with
-    /// symbolic links followed, unlike a mirror's (`mirror`).
     fn local(root: PathBuf, identity: String) -> Result<Self> {
         Ok(Self {
             config: config::load(&root)?,
@@ -50,8 +41,6 @@ impl Repository {
         })
     }
 
-    /// A mirror `Manifest::read` served, checked again (server mode, at query time): it still
-    /// exists, as the root of a checkout whose remote is its identity.
     pub fn recheck(&self) -> std::result::Result<(), String> {
         let shown = self.root.display().to_string();
         if !self.root.exists() {
@@ -84,7 +73,6 @@ pub struct Missing {
 }
 
 impl Missing {
-    /// `missing peer: <repo>, named by <repo>`, as `status` and the trace footer show it.
     pub fn text(&self) -> String {
         Msg::MissingPeer {
             repo: &self.repo,
@@ -95,7 +83,6 @@ impl Missing {
 }
 
 impl Workspace {
-    /// The workspace of the repository containing `dir`.
     pub fn discover(dir: &Path) -> Result<Self> {
         let start = repo::root(dir)?;
         let mut found = Finder::default();
@@ -104,7 +91,6 @@ impl Workspace {
         let mut missing = Vec::new();
         let mut next = 0;
         loop {
-            // Peers, transitively.
             while next < repos.len() {
                 let wanted: Vec<_> = repos[next]
                     .config
@@ -127,7 +113,6 @@ impl Workspace {
                 }
                 next += 1;
             }
-            // Sibling clones that consume from the workspace; their peers come next round.
             let mut joined = false;
             let roots: Vec<PathBuf> = repos.iter().map(|m| m.root.clone()).collect();
             for root in &roots {
@@ -149,7 +134,6 @@ impl Workspace {
                         .any(|p| repos.iter().any(|m| m.identity == p.repo))
                     {
                         let identity = found.identity(&sibling);
-                        // Another clone of a repository already in: one index per identity.
                         if repos.iter().any(|m| m.identity == identity) {
                             continue;
                         }
@@ -265,7 +249,6 @@ pub struct Listed {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ManifestFile {
-    // Required, but checked by `read`: serde would name it after the last table of the file.
     index_dir: Option<String>,
     #[serde(default, rename = "repository")]
     repositories: Vec<EntryFile>,
@@ -299,7 +282,6 @@ struct ManifestFile {
     workspace: Option<WorkspaceFile>,
 }
 
-/// The `[workspace]` section (ADR 0014), read in every build: where the repositories come from.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WorkspaceFile {
@@ -310,14 +292,11 @@ struct WorkspaceFile {
 #[derive(Deserialize, Default, PartialEq)]
 #[serde(rename_all = "lowercase")]
 enum Source {
-    /// The file's own `[[repository]]` entries.
     #[default]
     File,
-    /// The current workspace version in the snapshot store.
     Store,
 }
 
-/// An entry's blocks as the configuration of a mirror with no `meada.toml`.
 fn config_of(entry: EntryFile) -> Config {
     let peers = entry.peers.into_iter().map(|p| config::Peer {
         repo: p.repo,
@@ -337,19 +316,13 @@ fn config_of(entry: EntryFile) -> Config {
 }
 
 impl Manifest {
-    /// The manifest at `file`; `index_dir` and each `path` are absolute or relative to its
-    /// directory. A parse error names the file, the line and the key, as `meada.toml`'s do.
     pub fn read(file: &Path) -> Result<Self> {
         Self::read_from(file, false)
     }
 
-    /// `read`, and with `pulled` and `source = "store"` the entries of the workspace version
-    /// pulled under `<index_dir>/workspace/` (`versions::pulled`), read from disk.
     fn read_from(file: &Path, pulled: bool) -> Result<Self> {
         let src = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
         modules::check(file, &src)?;
-        // A grant table under break glass (ADR 0024) is named as such before the section is read,
-        // which would otherwise call it an unknown key.
         #[cfg(feature = "accounts")]
         if let Ok(table) = toml::from_str::<toml::Table>(&src)
             && let Some(dotted) = crate::accounts::under_break_glass(&table)
@@ -391,8 +364,6 @@ impl Manifest {
         let ui = crate::ui::validated(file, &src, base, parsed.ui)?;
         #[cfg(feature = "postgres")]
         let postgres = modules::validated(file, &src, parsed.postgres, |p| p.validate(base))?;
-        // `[oidc.github]` keeps its permissions set in the data layer (ADR 0016); without the
-        // `postgres` feature its own check already named it.
         #[cfg(all(feature = "oidc", feature = "postgres"))]
         let mut oidc = oidc;
         #[cfg(all(feature = "oidc", feature = "postgres"))]
@@ -406,9 +377,6 @@ impl Manifest {
             }
             github.postgres = postgres.clone();
         }
-        // `[accounts]` (ADR 0024) keeps its accounts in the data layer, and local sign-in is off
-        // once an identity provider is configured: beside `[oidc]` only with `break_glass`, which
-        // means nothing without it.
         #[cfg(feature = "accounts")]
         let accounts = {
             let mut section =
@@ -427,10 +395,6 @@ impl Manifest {
                     return Err(config::error_at(file, &src, key, &needs));
                 }
                 accounts.postgres = postgres.clone();
-                // `[accounts.github]` (#561) keeps its permissions set in the data layer, as
-                // `[oidc.github]` does; `[accounts]` already needed `[postgres]`. It never sits
-                // beside `[oidc.github]`: `[accounts]` beside `[oidc]` is break glass, which
-                // refuses the table.
                 if let Some(github) = accounts.github.as_mut() {
                     github.postgres = postgres.clone();
                 }
@@ -439,15 +403,10 @@ impl Manifest {
         };
         #[cfg(feature = "oidc")]
         let github = oidc.as_ref().is_some_and(|o| o.github.is_some());
-        // The GitHub grant provider of local accounts counts as the provider (#561), for named
-        // workspaces too (#562).
         #[cfg(feature = "accounts")]
         let github = github || accounts.as_ref().is_some_and(|a| a.github.is_some());
         #[cfg(not(feature = "oidc"))]
         let github = false;
-        // `[catalog]` (#341) names its patterns on the GitHub grant provider's `host`
-        // (`[oidc.github]`, or `[accounts.github]`, #562) and is read by the role check and the
-        // console beside it.
         #[cfg(all(feature = "workspaces", feature = "accounts"))]
         let mut accounts = accounts;
         #[cfg(feature = "workspaces")]
@@ -457,7 +416,6 @@ impl Manifest {
             let provider = provider.or(accounts.as_mut().and_then(|a| a.github.as_mut()));
             let host = provider.as_ref().map(|g| g.host.clone());
             if parsed.catalog.is_some() && host.is_none() {
-                // Either table in a build with local accounts (#562).
                 #[cfg(feature = "accounts")]
                 {
                     let what = Msg::NeedsGithubProvider("catalog").text();
@@ -477,7 +435,6 @@ impl Manifest {
         let directory = modules::validated(file, &src, parsed.directory, |d| d.validate(base))?;
         #[cfg(feature = "directory")]
         if directory.is_some() {
-            // Without the `oidc` feature an `[oidc]` section was already the error naming it.
             #[cfg(feature = "oidc")]
             let no_oidc = oidc.is_none();
             #[cfg(not(feature = "oidc"))]
@@ -486,8 +443,6 @@ impl Manifest {
             let missing: Vec<&str> = (missing.iter()).filter(|m| m.1).map(|m| m.0).collect();
             modules::needs(file, &src, "directory", &missing)?;
         }
-        // `[oidc.entra] overage = "directory"` (#336) reads the directory `[directory]` names, in
-        // the data layer `[postgres]` names; `[directory]` already needed both.
         #[cfg(all(feature = "oidc", feature = "directory"))]
         if let Some(overage) = oidc.as_mut().and_then(|o| o.overage.as_mut()) {
             match (&directory, &postgres) {
@@ -504,8 +459,6 @@ impl Manifest {
                 }
             }
         }
-        // The `[[github_app]]` blocks are checked, `[valkey]` among their needs; only
-        // `github_apps` keeps them.
         #[cfg(feature = "github-app")]
         crate::github_app::validated(file, &src, base, parsed.github_apps, valkey.is_some())?;
         let store = parsed.workspace.is_some_and(|w| w.source == Source::Store);
@@ -527,9 +480,6 @@ impl Manifest {
                 return Err(config::error_at(file, &src, "repository", &beside));
             }
         }
-        // `[workspaces]` (#342) rides on the console's writes, the catalog (and so the GitHub
-        // grant provider it needs) and the managed workspace; each missing piece is an error
-        // naming both sections.
         #[cfg(feature = "workspaces")]
         let workspaces = {
             let section = modules::validated(file, &src, parsed.workspaces, |w| w.validate())?;
@@ -545,7 +495,6 @@ impl Manifest {
                     let why = Msg::WorkspacesNeedsStore.text();
                     return Err(config::error_at(file, &src, "workspaces", &why));
                 }
-                // The first segment `-` is the named workspaces' route (ADR 0021).
                 if let Some(entry) =
                     (parsed.repositories.iter()).find(|e| e.repo.split('/').next() == Some("-"))
                 {
@@ -555,7 +504,6 @@ impl Manifest {
             }
             section
         };
-        // `[proposals]` (ADR 0022) answers over the named workspaces and nothing else.
         #[cfg(feature = "proposals")]
         let proposals = {
             let section = modules::validated(file, &src, parsed.proposals, |p| p.validate())?;
@@ -564,7 +512,6 @@ impl Manifest {
             }
             section
         };
-        // Only a workspace version has owners (ADR 0015): a static manifest has no editor.
         if parsed.repositories.iter().any(|e| e.owner.is_some()) {
             let owner = Msg::WorkspaceOwnerStatic.text();
             return Err(config::error_at(file, &src, "repository.owner", &owner));
@@ -594,15 +541,11 @@ impl Manifest {
         #[cfg(feature = "generation-pointer")]
         if store && pulled {
             let dir = index_dir.join(crate::snapshot::versions::DIR);
-            // Under the GitHub grant provider without the additions the role check left out
-            // (#331).
             let read = match github {
                 true => crate::snapshot::versions::eligible(&dir)?,
                 false => crate::snapshot::versions::pulled(&dir)?,
             };
             let not_pulled = || crate::snapshot::versions::not_pulled(file, &dir);
-            // With `[workspaces]` a deployment with no current version is an empty deployment
-            // workspace, so a deployment may start from named workspaces alone (ADR 0021).
             #[cfg(feature = "workspaces")]
             let read = match (read, workspaces.is_some()) {
                 (None, true) => Some((String::new(), Vec::new(), String::new())),
@@ -624,8 +567,6 @@ impl Manifest {
             entries_src = text;
             version = Some(id).filter(|id| !id.is_empty());
         }
-        // The named workspaces the last pull read, and the repositories only they select
-        // (`member`): after the deployment's own, sorted by identity (ADR 0021).
         #[cfg(feature = "workspaces")]
         let mut contexts = Vec::new();
         #[cfg(feature = "workspaces")]
@@ -654,10 +595,8 @@ impl Manifest {
         }
         #[cfg(not(feature = "generation-pointer"))]
         let _ = (pulled, github);
-        // Each entry's blocks as written, in manifest order: the typed read checked them.
         #[cfg(feature = "snapshot")]
         let mut written = crate::snapshot::entry_blocks(&entries_src).into_iter();
-        // Before any `git` call: a mirror another user owns is read all the same (ADR 0011).
         (parsed.repositories.iter()).for_each(|e| repo::trust(&base.join(&e.path)));
         let problems = entry_problems(parsed.repositories.iter().map(|e| e.repo.as_str()));
         #[cfg(feature = "workspaces")]
@@ -688,7 +627,6 @@ impl Manifest {
                 }
             })
             .collect();
-        // No index lands inside a listed directory: mirrors may be read-only mounts.
         let roots: Vec<(PathBuf, String)> = (entries.iter())
             .filter_map(|l| {
                 let path = base.join(&l.path);
@@ -705,7 +643,6 @@ impl Manifest {
                 continue;
             };
             let index = dir.display().to_string();
-            // Not served, so nothing of it is ignored either.
             listed.ignored.clear();
             listed.repository = Err(Msg::IndexInMirror {
                 index: &index,
@@ -749,9 +686,6 @@ impl Manifest {
         })
     }
 
-    /// This manifest with every Postgres connection it configures read-only: `[postgres]` and
-    /// the copies `read` gives the GitHub grant provider and the overage lookup. The proposal
-    /// server's (ADR 0022), where Postgres itself refuses a write.
     #[cfg(feature = "proposals")]
     pub fn read_only(mut self) -> Self {
         use crate::postgres::Config;
@@ -769,17 +703,10 @@ impl Manifest {
         self
     }
 
-    /// `read` for a command that reads the repositories (`index`, `status`, `export` and
-    /// `snapshot publish`): with `[workspace] source = "store"` they are the workspace version
-    /// `meada workspace pull` left under `<index_dir>/workspace/`, read once from disk, their
-    /// paths relative to `file`'s directory; without one it is refused, naming the pull.
     pub fn read_listed(file: &Path) -> Result<Self> {
         Self::read_from(file, true)
     }
 
-    /// Whether the readers of the pulled version leave out what the exclusions file names: the
-    /// GitHub grant provider (`[oidc.github]` or `[accounts.github]`) with `source = "store"`
-    /// (#331).
     #[cfg(feature = "generation-pointer")]
     pub(crate) fn excludes(&self) -> bool {
         #[cfg(feature = "oidc")]
@@ -789,10 +716,6 @@ impl Manifest {
         self.store && github
     }
 
-    /// The GitHub grant provider (ADR 0016), as `read` validated it with its `[postgres]` and
-    /// `[catalog]`: `[oidc.github]`, or `[accounts.github]` (#561, never both). Every reader of
-    /// the provider's settings (the grant at admission, the role check, the catalog, named
-    /// workspaces, the proposal server, `status`) reaches it here.
     #[cfg(feature = "oidc")]
     pub(crate) fn github(&self) -> Option<&crate::grant::Github> {
         let github = self.oidc.as_ref().and_then(|oidc| oidc.github.as_ref());
@@ -801,7 +724,6 @@ impl Manifest {
         github
     }
 
-    /// `github`, to change.
     #[cfg(feature = "proposals")]
     fn github_mut(&mut self) -> Option<&mut crate::grant::Github> {
         if let Some(github) = self.oidc.as_mut().and_then(|oidc| oidc.github.as_mut()) {
@@ -814,9 +736,6 @@ impl Manifest {
         None
     }
 
-    /// The `[valkey]` section and the `[[github_app]]` blocks of the manifest at `file`,
-    /// checked as `read` checks them, without reading any mirror: what each git credential
-    /// request needs (`meada github-app`), where `read` would run `git` in every mirror.
     #[cfg(feature = "github-app")]
     pub(crate) fn github_apps(
         file: &Path,
@@ -834,8 +753,6 @@ impl Manifest {
         Ok((valkey, apps))
     }
 
-    /// The `[postgres]` section of the manifest at `file`, checked as `read` checks it, without
-    /// reading any mirror: what `meada postgres migrate` needs.
     #[cfg(feature = "postgres")]
     pub(crate) fn postgres(file: &Path) -> Result<Option<crate::postgres::Config>> {
         let src = fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
@@ -845,12 +762,6 @@ impl Manifest {
         modules::validated(file, &src, parsed.postgres, |p| p.validate(base))
     }
 
-    /// The workspace of a pulled generation (`meada snapshot pull`, ADR 0012), which `dir`
-    /// (`<local_dir>/<generation id>`) holds and `document` records: per entry, the mirror at
-    /// `<bundle id>/mirror` and the index at `<bundle id>/index.db`, the entry's blocks as the
-    /// document records them, or the mirror's own `meada.toml` whole. It touches no mirror
-    /// with `git`: the pull checked each one. The paths are built only from ids and identities
-    /// checked here, since the document came from a store.
     #[cfg(feature = "snapshot")]
     pub(crate) fn of_generation(dir: &Path, document: &crate::snapshot::Document) -> Result<Self> {
         let entries = (document.repositories.iter())
@@ -859,10 +770,6 @@ impl Manifest {
         Self::of_entries(dir, entries)
     }
 
-    /// The workspace of one named workspace of a pulled generation (#342, ADR 0021): the
-    /// repositories the context records, in its order, each with the blocks the context recorded
-    /// (a mirror's own `meada.toml` still wins whole). The generation holds every mirror once, so
-    /// two contexts read the same ones and differ only in these blocks.
     #[cfg(feature = "snapshot")]
     pub(crate) fn of_context(
         dir: &Path,
@@ -883,7 +790,6 @@ impl Manifest {
         Self::of_entries(dir, entries)
     }
 
-    /// `entries`, each a document entry with the blocks to read it with.
     #[cfg(feature = "snapshot")]
     fn of_entries(
         dir: &Path,
@@ -971,8 +877,6 @@ impl Manifest {
         })
     }
 
-    /// The peers a servable repository's `meada.toml` names that the manifest does not list,
-    /// sorted: server mode looks for nothing by path hint or sibling clone.
     pub fn missing(&self) -> Vec<Missing> {
         let listed: HashSet<&str> = self.entries.iter().map(|l| l.repo.as_str()).collect();
         let mut missing: Vec<Missing> = (self.entries.iter())
@@ -991,12 +895,7 @@ impl Manifest {
         missing
     }
 
-    /// The workspace of a query about `first`: every listed repository that `reads` (a token's
-    /// grant, #290), `first` first, then manifest order. One it does not read is absent, as if
-    /// the manifest did not list it, and is not missing either. Refused while any entry kept
-    /// cannot be served, naming each problem.
     pub fn workspace(mut self, first: &str, reads: &dyn Fn(&str) -> bool) -> Result<Workspace> {
-        // Before `missing`, so neither a problem nor a missing peer names one left out.
         self.entries.retain(|l| reads(&l.repo));
         let mut missing = self.missing();
         missing.retain(|m| reads(&m.repo));
@@ -1027,8 +926,6 @@ impl Manifest {
     }
 }
 
-/// Where `path` is, even before it exists: its deepest existing ancestor canonicalized, the
-/// components that do not exist yet folded onto it (they hold no symbolic link).
 fn resolved(path: &Path) -> PathBuf {
     let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
     let mut rest = Vec::new();
@@ -1057,10 +954,6 @@ fn resolved(path: &Path) -> PathBuf {
     })
 }
 
-/// The repository a manifest entry lists as `repo` at `path`, its index under `index_dir`, or
-/// why it cannot be served: first the `problem` its identity alone decides (`entry_problems`),
-/// then the mirror's. Its configuration is its own `meada.toml`, whole, or the entry's blocks
-/// (`listed`) when it has none; the flag says it has one.
 fn mirror(
     index_dir: &Path,
     path: &Path,
@@ -1090,8 +983,6 @@ fn mirror(
         }
         .text());
     }
-    // The mirror is a clone of a repository its operator does not control: its two files are
-    // read as a pulled generation's are, bounded and through no symbolic link.
     let max = Some(config::GENERATION_CONFIG_MAX);
     let own = config::read_config_up_to(&root, max).map_err(|e| e.to_string())?;
     let has_own = own.is_some();
@@ -1105,7 +996,6 @@ fn mirror(
     Ok((repository, has_own))
 }
 
-/// Repository identities and sibling listings, each read from disk once.
 #[derive(Default)]
 struct Finder {
     identities: HashMap<PathBuf, String>,
@@ -1120,9 +1010,6 @@ impl Finder {
             .clone()
     }
 
-    /// The root of the peer `identity` named from the repository at `from`: at its `path`
-    /// hint, or among the clones next to `from`. A repository with no remote (`local/<dir>`)
-    /// is only found at its hint: any clone may share its directory name.
     fn peer(&mut self, from: &Path, identity: &str, hint: Option<&str>) -> Option<PathBuf> {
         if let Some(hint) = hint {
             let dir = from.join(hint);
@@ -1141,7 +1028,6 @@ impl Finder {
             .find(|sibling| self.identity(sibling) == identity)
     }
 
-    /// The git clones next to `root`, sorted.
     fn siblings(&mut self, root: &Path) -> Vec<PathBuf> {
         let Some(parent) = root.parent() else {
             return Vec::new();

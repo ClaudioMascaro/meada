@@ -1,4 +1,3 @@
-//! GCP Go clients, with Pub/Sub v2 and the explicit v1 compatibility forms.
 use super::{Argument, Code, Frame, Handle, Role, Stage, argument, field};
 
 pub(super) fn constructed<'a>(code: &Code<'a>, path: &'a str, index: usize) -> Option<Handle> {

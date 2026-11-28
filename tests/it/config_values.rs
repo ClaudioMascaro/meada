@@ -1,6 +1,3 @@
-//! Config values (#639, ADR 0025): every scalar of the YAML and JSON files the walk visits, and
-//! of the CI configuration under the hidden CI paths, found by `search` with the kind `value`.
-
 use std::fs;
 
 use meada::engine::{self, Engine};
@@ -9,8 +6,6 @@ use crate::common::{self, assert_golden, fixture_repo};
 
 const ORIGIN: Option<&str> = Some("https://example.com/acme/app.git");
 
-/// HCL JSON permits arrays around label maps and block bodies. The format's sensitive
-/// markers hide defaults and tfvars in those forms, while ordinary values stay searchable.
 #[test]
 fn terraform_json_arrays_keep_marked_values_private() {
     let repo = fixture_repo(
@@ -52,8 +47,6 @@ fn terraform_json_arrays_keep_marked_values_private() {
     }
 }
 
-/// ADR 0025's SecureString marker hides the resource's value in both Terraform syntaxes,
-/// even when the marker follows it. Ordinary String parameters remain searchable.
 #[test]
 fn secure_string_parameters_keep_their_values_out_of_storage_and_search() {
     let repo = fixture_repo("config_values_ssm", "terraform-ssm-values", ORIGIN);
@@ -94,7 +87,6 @@ fn secure_string_parameters_keep_their_values_out_of_storage_and_search() {
     }
 }
 
-/// The `search` answers of `queries` with the kind `value`, in order, a blank line between two.
 fn searched(engine: &Engine, queries: &[&str]) -> String {
     (queries.iter())
         .map(|q| engine.search(q, Some("value"), None).unwrap())
@@ -102,10 +94,6 @@ fn searched(engine: &Engine, queries: &[&str]) -> String {
         .join("\n")
 }
 
-/// The fixture's Helm values carry #638's labels, its multi-document Kubernetes file a Secret,
-/// `.github/workflows/ci.yml` a workflow; the editor's hidden `.vscode/` and the
-/// `.meadaignore`d `secrets/` stay out, the lockfile and the Helm template that does not parse
-/// are skipped. A query matches values and key paths, exact first, then prefix, then substring.
 #[test]
 fn search_with_the_kind_value_finds_config_values_by_value_or_key_path() {
     let repo = fixture_repo("config_values_search", "config-values", ORIGIN);
@@ -127,8 +115,6 @@ fn search_with_the_kind_value_finds_config_values_by_value_or_key_path() {
     assert_golden("config-values.search.txt", &searched(&engine, &queries));
 }
 
-/// `meada status` counts the config files read and skipped (the lockfile, the Helm template
-/// that does not parse) and the values redacted.
 #[test]
 fn status_counts_the_config_files_read_and_skipped_and_the_values_redacted() {
     let repo = fixture_repo("config_values_status", "config-values", ORIGIN);
@@ -136,9 +122,6 @@ fn status_counts_the_config_files_read_and_skipped_and_the_values_redacted() {
     assert_golden("config-values.status.txt", &engine::status(&repo).unwrap());
 }
 
-/// The issue's reproduction (#817): a JSON dump of 14,000 scalars that only the config value
-/// reader takes is data. It keeps no value, so a `value` search finds none of them, and `meada
-/// status` counts and names it apart; a small file beside it is read as before.
 #[test]
 fn a_data_file_keeps_no_value_and_status_counts_and_names_it() {
     let repo = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
@@ -182,8 +165,6 @@ fn a_data_file_keeps_no_value_and_status_counts_and_names_it() {
     assert!(status.contains(named), "{status}");
 }
 
-/// With no kind, values answer only when no symbol and no contract matches: `health` finds the
-/// function alone though `HealthCheckFailing` is a value, and `team-b` finds the values.
 #[test]
 fn the_default_search_falls_back_to_values_only_when_nothing_else_matches() {
     let repo = fixture_repo("config_values_default", "config-values", ORIGIN);
@@ -209,9 +190,6 @@ fn the_default_search_falls_back_to_values_only_when_nothing_else_matches() {
     assert_eq!(nothing, "no matches for `no-such-value`\n");
 }
 
-/// Scalars stay out of `meada export` except names that form image contracts (#662), and a
-/// Secret's values stay out of the index itself: its file
-/// holds neither the encoded `data` nor the plain `stringData`.
 #[test]
 fn values_stay_out_of_the_export_and_a_secret_out_of_the_index() {
     let repo = fixture_repo("config_values_export", "config-values", ORIGIN);
@@ -242,10 +220,6 @@ fn values_stay_out_of_the_export_and_a_secret_out_of_the_index() {
     }
 }
 
-/// Terraform and OpenTofu files (#640): `.tf`, `.tofu`, `.tf.json` and `.tfvars` files are
-/// read, an attribute's key path running over its block's type and labels; a `.tofu` file shadows
-/// the `.tf` file of its name; a file that does not parse is counted and skipped; a hidden
-/// `.terraform/` stays out.
 #[test]
 fn search_with_the_kind_value_finds_terraform_values_by_block_path() {
     let repo = fixture_repo("config_values_terraform", "terraform-values", ORIGIN);
@@ -276,8 +250,6 @@ fn search_with_the_kind_value_finds_terraform_values_by_block_path() {
     assert_golden("terraform-values.search.txt", &searched(&engine, &queries));
 }
 
-/// `meada status` counts the Terraform files like the others: the unreadable `broken.tf` is
-/// skipped, the `.tf` file a `.tofu` one shadows is not counted, the secrets are redacted.
 #[test]
 fn status_counts_the_terraform_files_read_and_skipped_and_the_values_redacted() {
     let repo = fixture_repo("config_values_terraform_status", "terraform-values", ORIGIN);
@@ -288,8 +260,6 @@ fn status_counts_the_terraform_files_read_and_skipped_and_the_values_redacted() 
     );
 }
 
-/// No secret of a sensitive variable reaches the index, whether its default or a value any
-/// `.tfvars` file gives it, while the plain values are there.
 #[test]
 fn a_sensitive_variable_and_the_tfvars_values_it_gets_stay_out_of_the_index() {
     let repo = fixture_repo("config_values_terraform_secret", "terraform-values", ORIGIN);
@@ -311,10 +281,6 @@ fn a_sensitive_variable_and_the_tfvars_values_it_gets_stay_out_of_the_index() {
     }
 }
 
-/// A `.tfvars` file is redacted for the sensitive variables of the Terraform files of its
-/// directory and above: marking a variable sensitive, or no longer, in a file that is not the
-/// `.tfvars` one redacts or shows its values at the next query, and so does removing the
-/// `.tofu` file that shadowed a `.tf` file.
 #[test]
 fn a_tfvars_file_follows_the_sensitive_variables_of_the_files_around_it() {
     let repo = fixture_repo("config_values_terraform_fresh", "terraform-values", ORIGIN);
@@ -335,7 +301,6 @@ fn a_tfvars_file_follows_the_sensitive_variables_of_the_files_around_it() {
     password("terraform.tfvars:2 db_password = \"root-tfvars-secret\"");
     password("envs/prd.tfvars:2 db_password = \"envs-tfvars-secret\"");
 
-    // Terraform converts the string "true" to the boolean.
     fs::write(
         &main,
         text.replace("sensitive = true", "sensitive = \"true\""),
@@ -366,10 +331,6 @@ fn a_tfvars_file_follows_the_sensitive_variables_of_the_files_around_it() {
     );
 }
 
-/// A Terraform file under a hidden CI path is read like any other (#640): its `sensitive`
-/// variable redacts the value a var file anywhere gives it, as ADR 0025 asks of "any Terraform
-/// file of the repository" (#709, judging #639's second deviation: a filter of the hidden CI files
-/// to YAML and JSON lost that redaction).
 #[test]
 fn a_sensitive_variable_under_a_hidden_ci_path_redacts_a_var_file_elsewhere() {
     let repo = fixture_repo("config_values_hidden_ci_sensitive", "config-values", ORIGIN);
@@ -397,11 +358,6 @@ fn a_sensitive_variable_under_a_hidden_ci_path_redacts_a_var_file_elsewhere() {
     );
 }
 
-/// Terraform merges an override file's blocks into those of the other files of its directory: a
-/// variable marked sensitive in one file keeps the default another file gives it out of the
-/// index, an override file or a primary one, in HCL and in JSON, and so does an override file
-/// that does not parse. Marking it so no longer, in the only file edited, shows the default at
-/// the next query, and so does removing the override file.
 #[test]
 fn a_default_another_file_of_its_directory_marks_sensitive_stays_out_of_the_index() {
     let repo = fixture_repo("config_values_override_sensitive", "config-values", ORIGIN);
@@ -449,7 +405,6 @@ fn a_default_another_file_of_its_directory_marks_sensitive_stays_out_of_the_inde
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, text).unwrap();
     }
-    // Static evaluation never puts one of them in a name either.
     for (dir, var) in [
         ("infra", "db"),
         ("infra", "token"),
@@ -524,12 +479,6 @@ fn a_default_another_file_of_its_directory_marks_sensitive_stays_out_of_the_inde
     );
 }
 
-/// Terraform ignores `.tofu` files and reads the `.tf` file one shadows, which Meada does not
-/// read: beside an override file it may mark any variable of its directory sensitive, so no
-/// default there is stored or resolves into a name, and a var file in that directory keeps every
-/// value redacted; elsewhere it changes nothing. An override file whose JSON root is an array of
-/// bodies marks a variable as an object does. Removing the shadowed file shows the default again
-/// at the next query.
 #[test]
 fn a_shadowed_terraform_file_and_a_json_root_array_keep_defaults_out_of_the_index() {
     let repo = fixture_repo("config_values_shadowed_sensitive", "config-values", ORIGIN);

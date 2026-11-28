@@ -1,5 +1,3 @@
-//! Images connect workload runners to the repositories whose configuration builds them.
-
 use crate::contract::Level;
 use crate::contract::{ContractKind, Found, Link, Role};
 use crate::iac::actions::run::{Part, Word, literal};
@@ -20,8 +18,6 @@ pub(crate) use config::named_file;
 
 pub struct Image;
 
-/// Effective image links for execution, without replacing the raw links used to validate
-/// decisions and list open items. Every consumer of workload scope shares this projection.
 pub(crate) fn execution_links(exports: &[Export], repositories: &[Repository]) -> Vec<Link> {
     let providers = exports
         .iter()
@@ -47,8 +43,6 @@ pub(crate) fn execution_links(exports: &[Export], repositories: &[Repository]) -
                 .flat_map(|c| Image.link(c, r, &providers, exports))
         })
         .collect();
-    // Missing-target decisions cannot change these visible links. Their waiting/stale
-    // reports are still computed with the real workspace by the ordinary Engine replay.
     crate::decisions::replay_repositories(links, repositories, &[], exports, |d| {
         d.target
             .split_once("::")
@@ -88,9 +82,6 @@ impl ContractKind for Image {
     }
     fn declare(&self, repo: &Repository, export: &mut Export) {
         let mut read = summaries(export);
-        // The CI steps of the repository by file and address: a builder is sited on the one
-        // that holds its form, found without a scan of the nodes for each. The builders come
-        // first, since a runner adds a node.
         let builds = read.iter().any(|(_, s)| !s.builders.is_empty());
         let steps: HashSet<(&str, &str)> = (export.iac.iter())
             .filter(|n| builds && n.ty == crate::iac::actions::STEP)
@@ -139,7 +130,6 @@ impl ContractKind for Image {
                 });
             }
         }
-        // The builder rows of the command table (ADR 0028): the CI step is the site.
         for script in &export.scripts {
             let step = script.site.strip_prefix(&repo.identity);
             let Some((path, step)) = step.and_then(|s| s.strip_prefix("::")?.split_once("::"))
@@ -147,7 +137,6 @@ impl ContractKind for Image {
                 continue;
             };
             let at = format!("{path}#{step}.run");
-            // An image the script pushes under two tags is one side.
             let images: std::collections::BTreeSet<String> =
                 script.commands.iter().flat_map(|c| pushed(c)).collect();
             for image in images {
@@ -309,28 +298,23 @@ impl ContractKind for Image {
                 link.by = Some(by);
                 link.p = p;
             }
-            // A repository builds an image in each CI step that names it: one link a site.
             let key = (
                 builder.identity.as_str(),
                 p.site.clone(),
                 p.contract.clone(),
             );
-            // With whether the builder's own name is evidence, not a literal.
             let found = (p.evidence.is_some(), link);
             let prior = candidates.entry(key).or_insert_with(|| found.clone());
             if (found.1.level, &found.1.reason) < (prior.1.level, &prior.1.reason) {
                 *prior = found;
             }
         }
-        // A builder repository's literal name covers its pattern that matches the same runner.
         let literal = (candidates.keys())
             .filter(|(_, _, c)| !c.contains('*'))
             .map(|&(repository, ..)| repository)
             .collect::<std::collections::BTreeSet<_>>();
         candidates
             .retain(|(repository, _, c), _| !c.contains('*') || !literal.contains(repository));
-        // Of the sites of one repository that build one image, those on its best evidence
-        // link: a Compose default beside a CI step that names the image adds no link.
         let rank = |(weak, link): &(bool, Link)| (link.level, *weak);
         let mut best = std::collections::HashMap::new();
         for ((repository, _, contract), found) in &candidates {
@@ -340,7 +324,6 @@ impl ContractKind for Image {
         candidates.retain(|(repository, _, contract), found| {
             best[&(*repository, contract.clone())] == rank(found)
         });
-        // Several CI steps of a repository that build one image are one candidate.
         let builders = (candidates.keys())
             .map(|(repository, _, contract)| (*repository, contract.as_str()))
             .collect::<std::collections::BTreeSet<_>>()
@@ -398,8 +381,6 @@ impl ContractKind for Image {
         exports: &[Export],
         _: &[Link],
     ) -> Vec<String> {
-        // Asked per group: a side whose group lacks a builder or a runner is no orphan. A
-        // literal image has its group's roles, asked once per group.
         let mut asked = std::collections::HashMap::<String, (bool, bool)>::new();
         let mut scoped = |contract: &str| {
             if !resolved(contract) {
@@ -464,8 +445,6 @@ impl ContractKind for Image {
             .iter()
             .flat_map(|e| e.executions.iter().cloned())
             .collect::<Vec<_>>();
-        // The CI steps of one repository that build an image run its code once, at the best
-        // level of their links.
         let mut run = std::collections::HashMap::new();
         for link in links.iter().filter(|l| l.contract.starts_with("image::")) {
             for e in exports {
@@ -541,7 +520,6 @@ impl ContractKind for Image {
                     ));
                 }
             }
-            // A builder at the node, a CI step: the image it builds and what runs it.
             let built = |p: &&Provider| p.site == symbol && p.contract.starts_with("image::");
             for p in e.providers.iter().filter(built) {
                 lines.push(format!("builds {}", p.contract));
@@ -595,9 +573,6 @@ impl ContractKind for Image {
     }
 }
 
-/// A chart environment's workload node per Chart environment declaration the values file at
-/// `path` gives (`config::chart_envs`), and its `executions` row: the package that owns the
-/// chart runs from it, `declared`. A chart no package owns runs nothing.
 fn chart_envs(repo: &Repository, export: &mut Export, path: &str, envs: Vec<config::ChartEnv>) {
     let Some(owner) = (!envs.is_empty())
         .then(|| crate::package::owner_of(&export.manifests, path))
@@ -620,7 +595,6 @@ fn chart_envs(repo: &Repository, export: &mut Export, path: &str, envs: Vec<conf
                 image: None,
                 name,
                 target: "Helm value".into(),
-                // A template a chart may render later is no literal.
                 value: crate::iac::environment::literal(&value).filter(|v| !v.contains("{{")),
                 contract: None,
             })
@@ -648,28 +622,21 @@ fn chart_envs(repo: &Repository, export: &mut Export, path: &str, envs: Vec<conf
     }
 }
 
-/// How a chart environment's execution row's reason starts (`chart_envs`).
 const CHART_RUNS: &str = "helm_env ";
 
-/// Whether the execution row `x` is a chart environment's (`chart_envs`): its path is the owning
-/// package's directory, which runs no package nested under it.
 pub(crate) fn chart_execution(x: &meada_core::export::Execution) -> bool {
     x.reason.starts_with(CHART_RUNS)
 }
 
-/// Whether `node` is a chart environment's workload node (`chart_envs`).
 pub(crate) fn chart_env(node: &crate::iac::Node) -> bool {
     node.ty == "HelmValues" && node.block == "env"
 }
 
-/// The repository of a builder's site: the site itself, or the repository of its CI step.
 fn repository(site: &str) -> &str {
     site.split_once("::")
         .map_or(site, |(repository, _)| repository)
 }
 
-/// The CI step that holds the builder form at `at` (`<file>#<key path>`), when the CI reader
-/// gives the file its nodes: the step's address is the key path up to one of its `.`.
 fn step(steps: &HashSet<(&str, &str)>, repository: &str, at: &str) -> Option<String> {
     let (path, key) = at.split_once('#')?;
     let mut cuts = key.match_indices('.').map(|(end, _)| &key[..end]);
@@ -677,8 +644,6 @@ fn step(steps: &HashSet<(&str, &str)>, repository: &str, at: &str) -> Option<Str
     Some(format!("{repository}::{path}::{address}"))
 }
 
-/// The options of `docker push` that take no value. The word after any other option is its
-/// value, never an image: a flag missing here costs the image after it, and gives no wrong one.
 const PUSH_FLAGS: [&str; 5] = [
     "-a",
     "--all-tags",
@@ -687,9 +652,6 @@ const PUSH_FLAGS: [&str; 5] = [
     "--disable-content-trust",
 ];
 
-/// The images a command of a `run` script publishes (ADR 0028, the command table): the one
-/// `docker push` names, and each `-t` or `--tag` of a `docker buildx build` with `--push`.
-/// No other word of the command is read for a name.
 fn pushed(command: &[Word]) -> Vec<String> {
     let words: Vec<Option<&str>> = command.iter().map(|w| literal(w)).collect();
     let mut tags = Vec::new();
@@ -709,7 +671,6 @@ fn pushed(command: &[Word]) -> Vec<String> {
             tags.truncate(usize::from(tags.len() == 1));
         }
         [Some("docker"), Some("buildx"), Some("build"), ..] => {
-            // A `--push` that is the value of a tag option pushes nothing.
             let mut push = false;
             let mut rest = command[3..].iter();
             while let Some(word) = rest.next() {
@@ -738,8 +699,6 @@ fn pushed(command: &[Word]) -> Vec<String> {
     images
 }
 
-/// The image the word names from its byte `from` on: an open part is the `*` of a pattern, and
-/// a name left open whole is `*`, an unresolved side.
 fn named(word: &[Part], from: usize) -> Option<String> {
     let mut name = String::new();
     for part in word {
@@ -750,15 +709,12 @@ fn named(word: &[Part], from: usize) -> Option<String> {
             Part::Open(_) => name.push('*'),
         }
     }
-    // A name that starts as an option is none: Docker refuses it.
     normalize_name(
         name.get(from..).filter(|name| !name.starts_with('-'))?,
         true,
     )
 }
 
-/// Whether `execution` runs a local path for the workload side `consumer` in its root: a module
-/// run from a local path in one root may run an image in another.
 fn runs_locally(execution: &meada_core::export::Execution, consumer: &Consumer) -> bool {
     execution.workload == consumer.site
         && (consumer.root.as_ref()).is_none_or(|root| *root == execution.root)
@@ -778,7 +734,6 @@ fn runs(export: &Export, node: &crate::iac::Node, contract: &str) -> bool {
         .any(|(_, image, _)| evaluated(image).is_some_and(|i| format!("image::{i}") == contract))
 }
 
-/// The one projection of stored format facts into image runners.
 fn images(export: &Export) -> Vec<(&crate::iac::Node, &str, Option<String>)> {
     let mut out = Vec::new();
     let mut nodes = std::collections::BTreeMap::new();
@@ -830,8 +785,6 @@ fn images(export: &Export) -> Vec<(&crate::iac::Node, &str, Option<String>)> {
     out
 }
 
-/// Whether the scope holds a builder and a runner of a resolved image name in the group of
-/// `contract`, the image's orphan scope (ADR 0026, "Orphan sides").
 fn roles(exports: &[Export], contract: &str) -> (bool, bool) {
     let side = |c: &str| resolved(c) && same_group(c, contract);
     (
@@ -887,7 +840,6 @@ fn matches(left: &str, right: &str) -> bool {
     }
 }
 
-/// Unresolved config interpolation keeps a pattern, without evaluating a process environment.
 fn evaluated(written: &str) -> Option<String> {
     if let Some(name) = normalize(written) {
         return Some(name);
@@ -925,9 +877,6 @@ fn evaluated(written: &str) -> Option<String> {
     normalize_name(&out, true)
 }
 
-/// The registry and namespace an image's orphan scope is asked in: the registry and the first
-/// segment of the repository path (`ghcr.io/acme/shop` and `ghcr.io/acme/tools/lint` are in
-/// `ghcr.io/acme`), or the registry alone for a path of one segment.
 fn group(contract: &str) -> &str {
     let name = contract.strip_prefix("image::").unwrap_or(contract);
     let Some((registry, path)) = name.split_once('/') else {
@@ -939,13 +888,7 @@ fn group(contract: &str) -> &str {
     }
 }
 
-/// Whether two images are in one group. A name is in its own group; a pattern (a name with an
-/// unresolved part, `*`) is in every group whose names its text before the `*` can start:
-/// `ghcr.io/*` is in `ghcr.io/acme` and in `ghcr.io` (names of one segment), `ghcr.io/acme-*` is
-/// not in `ghcr.io/acme`, nor `ghcr.io/acme/*` in `ghcr.io`.
 fn same_group(a: &str, b: &str) -> bool {
-    // What the names of an image's groups start with, and whether they end one segment later
-    // (the group of a registry alone).
     let start = |c: &str| {
         let name = c.strip_prefix("image::").unwrap_or(c);
         match name.split_once('*') {
@@ -961,8 +904,6 @@ fn same_group(a: &str, b: &str) -> bool {
     if let Some(rest) = long.strip_prefix(short.as_str()) {
         return !single || !rest.contains('/');
     }
-    // Starts that part ways share a group only where what they share already holds one: a
-    // registry and a namespace, or a registry while neither start goes past one segment.
     let shared = (short.bytes().zip(long.bytes()))
         .take_while(|(x, y)| x == y)
         .filter(|(x, _)| *x == b'/')
@@ -974,12 +915,10 @@ fn same_group(a: &str, b: &str) -> bool {
     }
 }
 
-/// Whether `contract` is an image the kind resolved, a name or a pattern it links by.
 fn resolved(contract: &str) -> bool {
     contract.starts_with("image::") && !crate::contract::unresolved(contract)
 }
 
-/// The registry and repository of an image, without its deployment tag or digest.
 fn normalize(written: &str) -> Option<String> {
     normalize_name(written, false)
 }
@@ -1012,14 +951,10 @@ fn normalize_name(written: &str, pattern: bool) -> Option<String> {
     {
         return None;
     }
-    // Normalization must not invent a pattern's literal evidence by adding Docker Hub's
-    // default registry and namespace to an unknown or unsupported source name.
     if pattern && name.contains('*') && !crate::iac::pattern::supported(&name) {
         return Some(name);
     }
     let (first, rest) = name.split_once('/').unwrap_or((&name, ""));
-    // An unresolved first component may be a registry. Docker Hub's default would
-    // turn that uncertainty into a different pattern and hide literal candidates.
     if first.contains('*') {
         return Some(name);
     }
@@ -1071,15 +1006,12 @@ mod tests {
                 "docker push --platform=linux/amd64 ${{ env.IMAGE }}@$DIGEST",
                 &["ghcr.io/acme/orders"],
             ),
-            // A part of the name left open is a pattern, the whole name an unresolved side.
             (
                 "docker push ghcr.io/$OWNER/orders:v1",
                 &["ghcr.io/*/orders"],
             ),
             ("docker push $OTHER", &["*"]),
             ("docker push ${{ inputs.image }}:${{ github.sha }}", &["*"]),
-            // The word after an option the row does not know is its value, and two names fit
-            // no `docker push`.
             ("docker push --unknown ghcr.io/acme/orders", &[]),
             ("docker push ghcr.io/acme/a ghcr.io/acme/b", &[]),
             ("docker push", &[]),
@@ -1087,7 +1019,6 @@ mod tests {
             ("docker push https://ghcr.io/acme/orders", &[]),
             ("docker image push ghcr.io/acme/orders", &[]),
             ("echo docker push ghcr.io/acme/orders", &[]),
-            // A build publishes only with `--push`, and only what its tag options name.
             ("docker build -t ghcr.io/acme/orders .", &[]),
             ("docker build --push -t ghcr.io/acme/orders .", &[]),
             ("docker buildx build -t ghcr.io/acme/orders .", &[]),
@@ -1107,8 +1038,6 @@ mod tests {
                 &["ghcr.io/acme/orders"],
             ),
             ("docker buildx build --push -t $OTHER .", &["*"]),
-            // A tag option takes the word after it, also `--push` (found by the verifier of
-            // #833): nothing is pushed, and an option is no image name.
             ("docker buildx build -t --push .", &[]),
             ("docker buildx build --tag --push .", &[]),
             ("docker buildx build --push -t --load .", &[]),
@@ -1140,7 +1069,6 @@ mod tests {
         assert!(same_group(shop, "image::ghcr.io/acme/tools/lint"));
         assert!(!same_group(shop, redis));
         assert!(!same_group(shop, "image::ghcr.io/other/shop"));
-        // A pattern is in the groups its text before the `*` can start.
         assert!(same_group("image::ghcr.io/*/orders", shop));
         assert!(same_group("image::ghcr.io/*", shop));
         assert!(same_group("image::ghcr.io/acme/orders-*", shop));
@@ -1151,15 +1079,12 @@ mod tests {
             "image::ghcr.io/acme-tools/lint"
         ));
         assert!(!same_group("image::ghcr.io/*/orders", redis));
-        // The group of one-segment names takes a pattern only while it stays in one segment.
         let orders = "image::localhost:5000/orders";
         assert!(same_group("image::localhost:5000/*", orders));
         assert!(same_group(orders, "image::localhost:5000/ord-*"));
         assert!(!same_group("image::localhost:5000/acme/*", orders));
         assert!(!same_group(orders, "image::localhost:5000/acme/*"));
         assert!(!same_group("image::localhost:5000/acme/shop", orders));
-        // Two patterns share a group when one start leads to the other, or when what they share
-        // holds a registry and a namespace, or a registry while neither goes past one segment.
         assert!(same_group(
             "image::ghcr.io/acme/orders-*",
             "image::ghcr.io/acme/billing-*"

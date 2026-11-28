@@ -6,8 +6,6 @@ use std::path::PathBuf;
 use common::{assert_golden, fixture_repo, without_processes};
 use meada::engine::{self, Engine};
 
-/// The two-repository fixture as siblings in one case directory: `http-web` consumes from
-/// `http-api` and names a peer that is not cloned.
 fn web_and_api(case: &str) -> (PathBuf, PathBuf) {
     (
         fixture_repo(case, "http-web", Some("git@example.com:acme/web.git")),
@@ -100,7 +98,6 @@ fn status_lists_the_workspace_index_states_and_missing_peers() {
         "http-web.status-unindexed.txt",
         &engine::status(&web).unwrap(),
     );
-    // The consumer's first query builds the peer's index inside the peer's own `.meada/`.
     Engine::open(&web).unwrap().refresh().unwrap();
     assert_golden("http-web.status.txt", &engine::status(&web).unwrap());
     assert_eq!(
@@ -142,8 +139,6 @@ fn a_peer_without_remote_is_not_found_among_siblings() {
     );
 }
 
-/// The error `Engine::open` gives for a repository whose `meada.toml` is `toml`, with the
-/// repository's path replaced by `<repo>`.
 fn config_error(case: &str, toml: &str) -> String {
     let repo = fixture_repo(case, "ts-basic", Some("https://example.com/acme/web.git"));
     fs::write(repo.join("meada.toml"), toml).unwrap();
@@ -209,7 +204,6 @@ fn invalid_config_errors_name_file_line_and_key() {
             "[[peer]]\nrepo = \"example.com/acme/api\"\nbranch = \"main\"\n",
             "<repo>/meada.toml:3: `peer.branch` is not a meada.toml key",
         ),
-        // A repository's own file replaces an entry's blocks, never its owner (ADR 0015).
         (
             "config_owner",
             "owner = \"team-web\"\n",

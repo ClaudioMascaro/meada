@@ -1,6 +1,3 @@
-//! Shape drift placed for `context`, `search` and `meada status` (spec #23): each consumer at its
-//! call, read from the files as they are. `meada_core::drift` turns the entries into lines.
-
 pub(crate) use meada_core::drift::{Entry, consumers, counts};
 
 use std::collections::HashSet;
@@ -10,7 +7,6 @@ use crate::index::Export;
 use crate::render::{Files, label};
 use crate::workspace::Repository;
 
-/// Every link of a consumer that read fields (a shape), or has drift.
 fn shown<'a>(exports: &[Export], links: &'a [Link]) -> impl Iterator<Item = &'a Link> {
     let shaped: HashSet<&str> = (exports.iter().flat_map(|e| &e.consumers))
         .filter(|c| c.shape.is_some())
@@ -20,12 +16,10 @@ fn shown<'a>(exports: &[Export], links: &'a [Link]) -> impl Iterator<Item = &'a 
     (links.iter()).filter(move |l| meada_core::drift::shown_link(l, &reads))
 }
 
-/// The call sites `entries` places: the consumers of the links it shows.
 pub(crate) fn sites<'a>(exports: &[Export], links: &'a [Link]) -> Vec<&'a str> {
     shown(exports, links).map(|l| l.consumer.as_str()).collect()
 }
 
-/// Every link of a consumer that read fields (a shape), or has drift, with where it calls.
 pub(crate) fn entries<'a>(
     repos: &[Repository],
     exports: &[Export],
@@ -34,7 +28,6 @@ pub(crate) fn entries<'a>(
     let mut files: Vec<Files> = repos.iter().map(|r| Files::new(&r.root)).collect();
     shown(exports, links)
         .filter_map(|link| {
-            // Scans the calls of every repository per link (Known ceilings).
             let (repo, export, call) = exports
                 .iter()
                 .enumerate()
@@ -59,9 +52,6 @@ pub(crate) fn entries<'a>(
         .collect()
 }
 
-/// One hit per missing path whose route path or field path matches `needle` (lowercase). The
-/// part `search` ranks a route against is its path alone, pinned by the HTTP test
-/// `a_route_ranks_against_its_path_alone`.
 pub(crate) fn matches(entries: &[Entry], needle: &str) -> Vec<Hit> {
     meada_core::drift::matches(entries, needle, |c| contract::parts(c).1.unwrap_or(""))
 }

@@ -1,14 +1,9 @@
-//! Operational reads. The console only coordinates the owning modules' checked readers;
-//! a request's complete service read is bounded, including lists and document downloads.
-
 use super::*;
 
 // ponytail: at most four operational readers run at once; a timed-out reader keeps its
 // permit until blocking I/O actually finishes, so later requests cannot leak more workers.
 pub(super) const READERS_MAX: usize = 4;
 
-/// Unlike the CLI helper, this runtime is dropped on the worker while its permit is held.
-/// A resolver or credential read left on its blocking pool cannot outlive the concurrency cap.
 fn read_runtime<T>(
     read: impl Future<Output = std::result::Result<T, String>>,
     reading: &Reading,
@@ -83,8 +78,6 @@ impl Console {
         })
     }
 
-    /// Permit acquisition and the whole worker share one deadline. Its permit moves into the
-    /// worker, never into the request future that a timeout drops.
     fn bounded<T: Send + 'static>(
         self: &Arc<Self>,
         initial: &'static str,
@@ -141,10 +134,6 @@ impl Console {
             .collect())
     }
 
-    /// A non-operator's teams (ADR 0015, #324): its `groups` that own an entry of the current
-    /// workspace version `grant` reads. Only with `[ui] operations`, `[workspace] source =
-    /// "store"` and groups to look for; a missing pointer or a pointer or document that cannot
-    /// be read or fails its checks gives none, so a read failure never grants a write.
     #[cfg(feature = "oidc")]
     pub(super) fn teams(
         self: &Arc<Self>,
@@ -293,7 +282,6 @@ fn store_problem(problem: String) -> String {
     format!("store: {problem}")
 }
 
-/// Entries may contain peer identities too; a grant bounds those exactly like top-level ones.
 pub(super) fn filter_entries(entries: &mut Vec<Value>, identity: &str, session: &Session) {
     entries.retain(|entry| entry[identity].as_str().is_some_and(|id| session.reads(id)));
     for entry in entries {
@@ -321,7 +309,6 @@ impl Console {
     ) -> std::result::Result<Option<Value>, String> {
         use crate::snapshot::{is_id, pull, store::Store};
         let single = route.strip_prefix("store/generations/");
-        // Refuse malformed arguments before opening either external service.
         if single.is_some_and(|id| !is_id(id)) {
             return Ok(None);
         }
@@ -435,7 +422,6 @@ impl Console {
 
 #[cfg(feature = "generation-pointer")]
 impl Console {
-    /// One read of the current managed workspace, used by admission and owner-level grants.
     #[cfg(any(feature = "oidc", feature = "github-app"))]
     async fn managed_identities(
         &self,
@@ -468,8 +454,6 @@ impl Console {
             .collect())
     }
 
-    /// The entries of the current workspace version, checked; `None` without a pointer. Read
-    /// per request, the document only when the pointer names another id than the last read.
     #[cfg(feature = "oidc")]
     async fn current_entries(
         &self,
@@ -505,9 +489,6 @@ impl Console {
         Ok(Some(entries))
     }
 
-    /// `excluded: true` on each of `entries`, of the version `id`, whose identity the newest
-    /// permissions set excluded when it checked that version (#333): absent otherwise, so without
-    /// the GitHub grant provider the body is as before.
     #[cfg(feature = "oidc")]
     fn flag_excluded(&self, id: &str, entries: &mut [Value]) {
         let found = self.providers.excluded();

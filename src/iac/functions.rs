@@ -1,10 +1,3 @@
-//! The pure functions static evaluation registers with `hcl-rs`'s evaluator (ADR 0025): string
-//! functions, collection functions and conversions, and `jsonencode`, each over the values it is
-//! given and nothing else (no file, clock, randomness or network). A call to any other function
-//! is undefined, so the expression holding it stays unresolved. Each follows Terraform's function
-//! of the same name; a case it does not cover (a `replace` pattern, a `format` verb other than
-//! `%s`, `%d`, `%v`, `%q` and `%%`) is an error, which leaves the call unresolved too.
-
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
 
@@ -14,11 +7,9 @@ use unicode_normalization::UnicodeNormalization;
 
 type Out = Result<Value, String>;
 
-/// The widest a `format` verb may pad (`%256s`); past it the call is unresolved.
 // ponytail: a name pads a number to two or three digits; 256 keeps `iac::cost` a tight bound.
 pub(super) const WIDTH_MAX: usize = 256;
 
-/// `ctx` with every function declared.
 pub(super) fn declare(ctx: &mut Context) {
     use ParamType::{Any, String as Str};
     let fixed = |params: Vec<ParamType>, f: fn(FuncArgs) -> Out| FuncDef::new(f, params);
@@ -72,7 +63,6 @@ pub(super) fn declare(ctx: &mut Context) {
     declare_exact(ctx);
 }
 
-/// `ctx` with `meada_exact` alone, the call `Exact` puts in: a var file calls no function.
 pub(super) fn declare_exact(ctx: &mut Context) {
     let def = FuncDef::builder()
         .params(vec![ParamType::String])
@@ -85,9 +75,6 @@ fn string(v: &Value) -> &str {
     v.as_str().unwrap_or_default()
 }
 
-/// `s` in Unicode NFC, the form Terraform and OpenTofu give every string they read or make, so
-/// that two spellings of one string are one value (#749). Every string literal is normalized
-/// before evaluation, and every call that makes a string normalizes it.
 pub(super) fn nfc(s: String) -> String {
     match s.is_ascii() || unicode_normalization::is_nfc(&s) {
         true => s,
@@ -95,8 +82,6 @@ pub(super) fn nfc(s: String) -> String {
     }
 }
 
-/// `v` with each string and object key in NFC: a value read whole rather than evaluated (a JSON
-/// var file's).
 pub(super) fn nfc_value(v: Value) -> Value {
     match v {
         Value::String(s) => Value::String(nfc(s)),
@@ -114,7 +99,6 @@ fn text(args: FuncArgs, f: fn(&str) -> String) -> Out {
     Ok(Value::String(nfc(f(string(&args[0])))))
 }
 
-/// A scalar as a template shows it; `None` for a null, a list or an object.
 pub(super) fn shown(v: &Value) -> Option<String> {
     match v {
         Value::String(s) => Some(s.clone()),
@@ -124,8 +108,6 @@ pub(super) fn shown(v: &Value) -> Option<String> {
     }
 }
 
-/// Terraform's `format`: `%s`, `%d`, `%v`, `%q` and `%%`, with an optional `-` or `0` flag and
-/// a width.
 fn formatted(spec: &str, args: &[Value]) -> Result<String, String> {
     let mut out = String::new();
     let mut args = args.iter();
@@ -184,7 +166,6 @@ fn format(args: FuncArgs) -> Out {
     Ok(Value::String(nfc(formatted(string(&args[0]), &args[1..])?)))
 }
 
-/// Terraform's `formatlist`: every list argument has the same length, a scalar repeats.
 fn formatlist(args: FuncArgs) -> Out {
     let rest = &args[1..];
     let lengths: Vec<usize> = rest
@@ -225,7 +206,6 @@ fn split(args: FuncArgs) -> Out {
     Ok(Value::Array(parts.collect()))
 }
 
-/// Go's `strings.Title`, as Terraform's `title`: a letter after a separator is upper case.
 fn title(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut after = true;
@@ -264,7 +244,6 @@ fn chomp(s: &str) -> String {
     s.trim_end_matches(['\n', '\r']).into()
 }
 
-/// A literal substring only: a `/.../` pattern is a regular expression, left unresolved.
 fn replace(args: FuncArgs) -> Out {
     let (s, from, to) = (string(&args[0]), string(&args[1]), string(&args[2]));
     if from.is_empty() || (from.len() > 1 && from.starts_with('/') && from.ends_with('/')) {
@@ -273,7 +252,6 @@ fn replace(args: FuncArgs) -> Out {
     Ok(Value::String(nfc(s.replace(from, to))))
 }
 
-/// Characters from `offset` (from the end when negative), `length` of them or, at -1, the rest.
 fn substr(args: FuncArgs) -> Out {
     let chars: Vec<char> = string(&args[0]).chars().collect();
     let int = |v: &Value| v.as_i64().ok_or("a non-integer");
@@ -360,15 +338,11 @@ fn length(args: FuncArgs) -> Out {
     Ok(Value::from(n as u64))
 }
 
-/// The distinct elements of a list in the order of cty's sets: strings bytewise, numbers by value,
-/// `false` before `true`, a null last, after `unified`. A set of collections is in hash order:
-/// unresolved.
 fn toset(args: FuncArgs) -> Out {
     let list = args[0].as_array().map_or(&[][..], Vec::as_slice);
     distinct(unified(list)?).map(Value::Array)
 }
 
-/// `items`, of one type, as a set orders them (`toset`).
 fn distinct(items: Vec<Value>) -> Result<Vec<Value>, String> {
     let (nulls, mut items): (Vec<_>, Vec<_>) = items.into_iter().partition(Value::is_null);
     if items.iter().any(|v| v.is_array() || v.is_object()) {
@@ -380,31 +354,24 @@ fn distinct(items: Vec<Value>) -> Result<Vec<Value>, String> {
     Ok(items)
 }
 
-/// The element type of a variable's declared `set(...)` or `list(...)`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum Elem {
     String,
     Number,
     Bool,
     Any,
-    /// A collection or an object: Meada makes no conversion to it.
     Other,
 }
 
-/// `v`, a list, tuple or set, as the set of `elem` that Terraform makes of it: the elements
-/// converted to `elem`, then sorted and deduplicated as cty does. `Err` where Meada cannot make
-/// the conversion with certainty, and for a value that is no list.
 pub(super) fn to_set(v: &Value, elem: Elem) -> Result<Value, String> {
     collection(v, elem, distinct)
 }
 
-/// `v` as the list of `elem` that Terraform makes of it: the elements converted, in their order.
 pub(super) fn to_list(v: &Value, elem: Elem) -> Result<Value, String> {
     collection(v, elem, Ok)
 }
 
 impl Elem {
-    /// The element type written `name` in a `set(...)` or `list(...)` constraint.
     pub(super) fn named(name: &str) -> Elem {
         match name.trim() {
             "string" => Elem::String,
@@ -415,7 +382,6 @@ impl Elem {
         }
     }
 
-    /// Whether this is a primitive type: `string`, `number` or `bool`.
     pub(super) fn primitive(self) -> bool {
         matches!(self, Elem::String | Elem::Number | Elem::Bool)
     }
@@ -442,7 +408,6 @@ fn collection(
     }
 }
 
-/// A scalar converted to the scalar type `elem`, as cty's `convert` does; a null stays null.
 pub(super) fn scalar_as(v: &Value, elem: Elem) -> Result<Value, String> {
     match (elem, v) {
         (_, Value::Null) => Ok(Value::Null),
@@ -469,7 +434,6 @@ fn tomap(args: FuncArgs) -> Out {
         return Ok(args[0].clone());
     };
     let values: Vec<Value> = map.values().cloned().collect();
-    // A map, unlike a list, takes a null beside values of one type, which stay as they are.
     let mut given = values.iter().filter(|v| !v.is_null()).map(type_of);
     let first = given.next();
     let values = match unified(&values) {
@@ -479,14 +443,11 @@ fn tomap(args: FuncArgs) -> Out {
     Ok(Value::Object(map.keys().cloned().zip(values).collect()))
 }
 
-/// Elements converted to their one type, as cty's `convert` does for a list or a set.
 fn unified(items: &[Value]) -> Result<Vec<Value>, String> {
     let ty = unify(&items.iter().map(type_of).collect::<Vec<_>>())?;
     Ok(items.iter().map(|v| converted(v, &ty)).collect())
 }
 
-/// A value's type as cty reads a literal: a list is a tuple, a null has any type (`Dynamic`).
-/// Unification also gives lists and maps.
 #[derive(Clone, PartialEq)]
 enum Type {
     Dynamic,
@@ -512,10 +473,6 @@ fn type_of(v: &Value) -> Type {
     }
 }
 
-/// The type cty's `unify` gives values of these types: objects of one set of attributes unify
-/// attribute by attribute, others to a map; tuples of one length element by element, others to a
-/// list; a string takes any scalar. A null beside a collection unifies to cty's dynamic type, which
-/// a list refuses and nested values seldom pass: unresolved.
 fn unify(types: &[Type]) -> Result<Type, String> {
     let count = |kind: fn(&Type) -> bool| types.iter().filter(|t| kind(t)).count();
     let nulls = count(|t| *t == Type::Dynamic);
@@ -578,7 +535,6 @@ fn unify(types: &[Type]) -> Result<Type, String> {
     }
 }
 
-/// `v` converted to `ty`, a type `unify` gave it: only a scalar becoming a string changes.
 fn converted(v: &Value, ty: &Type) -> Value {
     match (v, ty) {
         (Value::Array(items), Type::List(t)) => {
@@ -602,7 +558,6 @@ fn converted(v: &Value, ty: &Type) -> Value {
     }
 }
 
-/// Two scalars of one type as cty orders them in a set.
 fn order(a: &Value, b: &Value) -> Ordering {
     let int = |n: &Number| (n.as_i64().map(i128::from)).or_else(|| n.as_u64().map(i128::from));
     match (a, b) {
@@ -633,7 +588,6 @@ fn tonumber(args: FuncArgs) -> Out {
     }
 }
 
-/// The number a string is, if Terraform and Meada print it as it is written.
 fn number(s: &str) -> Result<Number, String> {
     (s.parse::<i64>().ok().map(Number::from))
         .or_else(|| s.parse::<u64>().ok().map(Number::from))
@@ -642,8 +596,6 @@ fn number(s: &str) -> Result<Number, String> {
         .ok_or_else(|| format!("{s:?} is no number"))
 }
 
-/// JSON as Terraform's `jsonencode` writes it: compact, keys in lexical order, `<`, `>` and `&`
-/// escaped as Go does.
 fn encoded(v: &Value) -> Result<String, String> {
     let json = serde_json::to_string(&super::lexical(v.clone())).map_err(|e| e.to_string())?;
     Ok(json

@@ -1,15 +1,3 @@
-//! A Yarn Berry (2 and later) `yarn.lock`: the entries it resolves, the edges between them and
-//! its workspace entries. `read` parses one, `diff` names what moved between two, `reached` walks
-//! from what moved up to the workspaces that depend on it, and `direct` lists what each
-//! workspace's own dependencies resolve to. Nothing here runs Yarn or reads a registry.
-//!
-//! An entry's key lists the descriptors (`name@range`) it resolves, comma-separated; its
-//! `resolution` is the locator. A dependency `name: range` is the descriptor `name@range`,
-//! matched against the keys after normalizing both sides: a `::<params>` suffix dropped, `npm:`
-//! put before a range with no protocol, and the root manifest's `resolutions` applied. One that
-//! still matches no key goes to every entry of that name, the safe side, and those entries are
-//! marked as reached by name.
-
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use serde::Serialize;
@@ -17,29 +5,20 @@ use serde_json::Value;
 
 use crate::document::events::{self, Syntax};
 
-/// The most a lockfile may hold. A monorepo's is a few MiB, past `lang::MAX_BYTES`, which bounds
-/// the other readers.
 // ponytail: 16 MiB; a larger lockfile is `too-large`, which a trace reads as every package.
 pub(crate) const MAX_LOCK_BYTES: usize = 16 << 20;
 
-/// Why a lockfile was not read.
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Unread {
-    /// No version before the change: a new lockfile, or a change given as whole files.
     NoBase,
-    /// The change deletes it.
     Deleted,
-    /// Over `MAX_LOCK_BYTES`.
     TooLarge,
-    /// Not a Berry lockfile: no `__metadata` (Yarn 1 and the rest).
     Format,
-    /// Not YAML, or not a map of entries.
     Unparsable,
 }
 
 impl Unread {
-    /// The kebab-case name the answer and the index spell it with.
     pub(crate) fn name(self) -> &'static str {
         match self {
             Unread::NoBase => "no-base",
@@ -51,52 +30,33 @@ impl Unread {
     }
 }
 
-/// One entry: what it resolved to and what it depends on.
 #[derive(Debug, PartialEq)]
 struct Entry {
     version: String,
     checksum: Option<String>,
-    /// Each dependency's name and normalized range, as written.
     dependencies: BTreeMap<String, String>,
-    /// The normalized descriptors of its key.
     keys: Vec<String>,
 }
 
-/// What one dependency edge reaches.
 #[derive(Debug, PartialEq)]
 enum Target {
-    /// The keys it matched.
     Keys(Vec<String>),
-    /// No key: every entry of its name.
     ByName,
 }
 
-/// A parsed lockfile.
 #[derive(Debug, Default)]
 pub(crate) struct Lock {
-    /// Entries by locator.
     entries: BTreeMap<String, Entry>,
-    /// Each normalized descriptor's locator.
     descriptors: BTreeMap<String, String>,
-    /// The workspace entries: directory (relative to the lockfile's folder, `.` for its own)
-    /// to locator.
     pub(crate) workspaces: BTreeMap<String, String>,
-    /// The directory of each workspace locator.
     dirs: HashMap<String, String>,
-    /// The locators of each name.
     named: HashMap<String, Vec<String>>,
-    /// The names some dependency reached by name only: every entry of such a name is marked.
     by_name: BTreeSet<String>,
-    /// Each dependency of each entry and what it reaches, by locator then dependency name.
     edges: BTreeMap<String, BTreeMap<String, Target>>,
-    /// The reverse of the edges that matched a key: each descriptor's dependents, as locator
-    /// and dependency name.
     dependents: HashMap<String, Vec<(String, String)>>,
-    /// The reverse of the by-name edges, by the name they reach.
     by_name_dependents: HashMap<String, Vec<(String, String)>>,
 }
 
-/// A descriptor that moved between two lockfiles, with its version on each side.
 #[derive(Serialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Moved {
     pub descriptor: String,
@@ -104,16 +64,12 @@ pub(crate) struct Moved {
     pub before: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
-    /// Whether an edge reached it by name only, so a dependent may not use it.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub by_name: bool,
-    /// Whether it moved only because a `patch:` descriptor wrapping it moved: what it resolves to
-    /// is the same entry, but what a dependent gets through the patch changed.
     #[serde(skip)]
     pub patched: bool,
 }
 
-/// What one workspace's dependency resolves to.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Resolved {
     pub dir: String,
@@ -122,8 +78,6 @@ pub(crate) struct Resolved {
     pub version: String,
 }
 
-/// The name part of a descriptor or locator: up to the `@` after the first character, so a
-/// scoped `@a/b@x` is `@a/b`.
 fn name_of(descriptor: &str) -> &str {
     descriptor
         .get(1..)
@@ -131,7 +85,6 @@ fn name_of(descriptor: &str) -> &str {
         .map_or(descriptor, |at| &descriptor[..at + 1])
 }
 
-/// Whether a range starts with a protocol (`npm:`, `workspace:`, `patch:`...).
 fn has_protocol(range: &str) -> bool {
     range.split_once(':').is_some_and(|(p, _)| {
         !p.is_empty()
@@ -140,7 +93,6 @@ fn has_protocol(range: &str) -> bool {
     })
 }
 
-/// `name@range` normalized: no `::<params>` suffix, and `npm:` before a range with no protocol.
 fn descriptor(name: &str, range: &str) -> String {
     let range = range.split_once("::").map_or(range, |(r, _)| r);
     match has_protocol(range) {
@@ -149,20 +101,16 @@ fn descriptor(name: &str, range: &str) -> String {
     }
 }
 
-/// A key's descriptor normalized as `descriptor` does.
 fn normalized(key: &str) -> String {
     let name = name_of(key);
     descriptor(name, key.get(name.len() + 1..).unwrap_or(""))
 }
 
-/// The protocol of a locator, after its name: `npm`, `workspace`, `patch`...
 fn origin(locator: &str) -> String {
     let range = locator.get(name_of(locator).len() + 1..).unwrap_or("");
     range.split_once(':').map_or("npm", |(p, _)| p).to_string()
 }
 
-/// The descriptor a `patch:` descriptor wraps, percent-decoded and normalized:
-/// `resolve@patch:resolve@npm%3A^1#~builtin<compat/resolve>` wraps `resolve@npm:^1`.
 fn patched(descriptor: &str) -> Option<String> {
     let range = descriptor.get(name_of(descriptor).len() + 1..)?;
     let inner = range.strip_prefix("patch:")?;
@@ -189,8 +137,6 @@ fn patched(descriptor: &str) -> Option<String> {
     Some(normalized(&String::from_utf8(out).ok()?))
 }
 
-/// The name a `resolutions` key applies to: its last package name, `parent/name` and
-/// `**/name` taken by `name`, a scoped `@a/b` kept whole, a trailing `@range` dropped.
 fn override_name(pattern: &str) -> &str {
     let segments: Vec<&str> = pattern.split('/').collect();
     let n = segments.len();
@@ -204,7 +150,6 @@ fn override_name(pattern: &str) -> &str {
     name_of(last)
 }
 
-/// A scalar as text: a string as written, a number or a boolean as YAML spells it.
 fn scalar(value: &Value) -> Option<String> {
     match value {
         Value::String(s) => Some(s.clone()),
@@ -214,12 +159,10 @@ fn scalar(value: &Value) -> Option<String> {
     }
 }
 
-/// A Berry lockfile. `overrides` is the root manifest's `resolutions`, pattern to range.
 pub(crate) fn read(bytes: &[u8], overrides: &BTreeMap<String, String>) -> Result<Lock, Unread> {
     if bytes.len() > MAX_LOCK_BYTES {
         return Err(Unread::TooLarge);
     }
-    // Before any parse: only a Berry lockfile has `__metadata` at the top.
     let berry = bytes
         .split(|&b| b == b'\n')
         .any(|line| line.starts_with(b"__metadata:"));
@@ -256,7 +199,6 @@ pub(crate) fn read(bytes: &[u8], overrides: &BTreeMap<String, String>) -> Result
             lock.descriptors.insert(k.clone(), locator.clone());
         }
         if origin(&locator) == "workspace" {
-            // `<name>@workspace:<dir>`.
             let dir = locator.get(name_of(&locator).len() + 11..).unwrap_or(".");
             lock.workspaces.insert(dir.to_string(), locator.clone());
             lock.dirs.insert(locator.clone(), dir.to_string());
@@ -274,8 +216,6 @@ pub(crate) fn read(bytes: &[u8], overrides: &BTreeMap<String, String>) -> Result
     for (locator, entry) in &lock.entries {
         let mut out = BTreeMap::new();
         for (name, range) in &entry.dependencies {
-            // An override may be scoped to a parent this edge is not under: both the overridden
-            // and the written range are tried, and every key they match is an edge.
             let tried = (overrides.get(name.as_str()).map(|r| descriptor(name, r)))
                 .into_iter()
                 .chain([descriptor(name, range)]);
@@ -305,7 +245,6 @@ pub(crate) fn read(bytes: &[u8], overrides: &BTreeMap<String, String>) -> Result
 }
 
 impl Lock {
-    /// The entry a descriptor resolves to, with its locator.
     fn resolve(&self, descriptor: &str) -> Option<(&str, &Entry)> {
         let (locator, entry) = self
             .entries
@@ -313,20 +252,15 @@ impl Lock {
         Some((locator, entry))
     }
 
-    /// Whether `descriptor` resolves to a workspace.
     pub(crate) fn is_workspace(&self, descriptor: &str) -> bool {
         (self.resolve(descriptor)).is_some_and(|(locator, _)| self.dirs.contains_key(locator))
     }
 
-    /// Whether `locator` is an entry some dependency reached by name only.
     fn by_name(&self, locator: &str) -> bool {
         self.by_name.contains(name_of(locator))
     }
 }
 
-/// The descriptors that moved from `base` to `head`, sorted: a locator, version, checksum or
-/// dependency list that differs, or a descriptor on one side only. A moved `patch:` descriptor
-/// moves the descriptor it wraps too, so a patch's new hash reaches what depends on the original.
 pub(crate) fn diff(base: &Lock, head: &Lock) -> Vec<Moved> {
     let every: BTreeSet<&String> = base
         .descriptors
@@ -338,7 +272,6 @@ pub(crate) fn diff(base: &Lock, head: &Lock) -> Vec<Moved> {
     };
     let mut moved = BTreeMap::new();
     let mut wrapped = Vec::new();
-    // Each locator's entries compared once, however many keys it has.
     let mut compared: HashMap<&str, bool> = HashMap::new();
     for d in every {
         let (b, h) = (base.resolve(d), head.resolve(d));
@@ -376,14 +309,6 @@ pub(crate) fn diff(base: &Lock, head: &Lock) -> Vec<Moved> {
     moved.into_values().collect()
 }
 
-/// The workspaces of `head` that depend on what moved, each with the names of its own
-/// dependencies that lead there. The walk starts at each moved descriptor's dependents (a key
-/// added to an unchanged entry reaches only what uses that key), goes up the dependency edges of
-/// `head` through every key of each entry it reaches, and stops at a workspace: one reached
-/// through another workspace is the code graph's to follow. A workspace whose own entry changed
-/// is reached through the dependencies it added, removed or changed since `base`.
-/// `peerDependencies` are no edges: the entry that provides a peer lists it. Each descriptor's
-/// dependents and each name's by-name dependents are taken once.
 pub(crate) fn reached(
     base: &Lock,
     head: &Lock,
@@ -407,7 +332,6 @@ pub(crate) fn reached(
             }
             None => {
                 descriptors.push(&m.descriptor);
-                // A by-name edge gets whichever entry of the name: one that changed reaches it.
                 if !own.is_some_and(|b| same(b, entry)) {
                     names.push(name_of(locator));
                 }
@@ -452,7 +376,6 @@ pub(crate) fn reached(
     out
 }
 
-/// The `resolutions` of a `package.json`'s bytes, pattern to range; none when it does not parse.
 pub(crate) fn overrides(manifest: &[u8]) -> BTreeMap<String, String> {
     let json = serde_json::from_slice::<serde_json::Value>(manifest).ok();
     let found = json
@@ -463,13 +386,10 @@ pub(crate) fn overrides(manifest: &[u8]) -> BTreeMap<String, String> {
         .collect()
 }
 
-/// Whether two entries of one locator read the same.
 fn same(a: &Entry, b: &Entry) -> bool {
     a.version == b.version && a.checksum == b.checksum && a.dependencies == b.dependencies
 }
 
-/// Whether what `descriptor` resolves to changed from `base` to `head`: another locator, or one
-/// whose entry reads otherwise. A key added to an entry that did not change is no change.
 pub(crate) fn changed(base: &Lock, head: &Lock, descriptor: &str) -> bool {
     let Some((locator, entry)) = head.resolve(descriptor) else {
         return true;
@@ -480,15 +400,11 @@ pub(crate) fn changed(base: &Lock, head: &Lock, descriptor: &str) -> bool {
     }
 }
 
-/// What each dependency of each workspace resolves to, sorted by directory and name. A
-/// dependency that matched no key gives a row only when its name has one entry.
 pub(crate) fn direct(lock: &Lock) -> Vec<Resolved> {
     let mut out = BTreeSet::new();
     for (dir, locator) in &lock.workspaces {
         for (name, target) in lock.edges.get(locator).into_iter().flatten() {
             let found: Vec<&str> = match target {
-                // Two locators (a parent-scoped override beside the written range): which one
-                // this member gets is not certain, so no row.
                 Target::Keys(keys) => {
                     let found: BTreeSet<&str> = (keys.iter())
                         .filter_map(|d| lock.descriptors.get(d))
@@ -523,7 +439,6 @@ mod tests {
 
     const HEAD: &str = "# generated\n\n__metadata:\n  version: 8\n  cacheKey: 10c0\n\n";
 
-    /// An entry: key, resolution, version and dependencies.
     type Row = (
         &'static str,
         &'static str,
@@ -531,7 +446,6 @@ mod tests {
         &'static [(&'static str, &'static str)],
     );
 
-    /// A lockfile of `__metadata` and `entries`, each `(key, resolution, version, deps)`.
     fn text(entries: &[Row]) -> String {
         let mut out = HEAD.to_string();
         for (key, resolution, version, deps) in entries {
@@ -628,7 +542,6 @@ mod tests {
             read(b"__metadata: [\n", &BTreeMap::new()).unwrap_err(),
             Unread::Unparsable
         );
-        // An entry that is no map, and one with no resolution.
         let scalar = format!("{HEAD}\"x@npm:1\": 3\n");
         assert_eq!(
             read(scalar.as_bytes(), &BTreeMap::new()).unwrap_err(),
@@ -792,7 +705,6 @@ mod tests {
             &[("lodash", "npm:^4.0.0")],
         ));
         assert_eq!(walk(&base, &head), names(&[("packages/c", &["lodash"])]));
-        // The entry itself did not change: what a hoisted import gets stays the same.
         let moved = diff(&base, &head);
         let outside: Vec<&Moved> = (moved.iter())
             .filter(|m| !head.is_workspace(&m.descriptor))
@@ -814,7 +726,6 @@ mod tests {
             ("left-pad@npm:^1", "left-pad@npm:1.3.2", "1.3.2", &[]),
             ("left-pad@npm:1.3.0", "left-pad@npm:1.3.0", "1.3.0", &[]),
         ];
-        // A parent-scoped override names `left-pad` too: both keys match the member's edge.
         let overrides = BTreeMap::from([("@scope/kit/left-pad".to_string(), "1.3.0".to_string())]);
         let lock = read(text(&rows).as_bytes(), &overrides).unwrap();
         assert!(
@@ -846,7 +757,6 @@ mod tests {
         };
         let overrides = BTreeMap::from([("left-pad".to_string(), "1.3.0".to_string())]);
         let base = read(text(&entries("1.3.0")).as_bytes(), &overrides).unwrap();
-        // The checksum is written from the version; a new one moves the entry.
         let head = read(text(&entries("1.3.0-r1")).as_bytes(), &overrides).unwrap();
         assert!(head.by_name.is_empty());
         assert_eq!(
@@ -923,7 +833,6 @@ mod tests {
                 "resolve@patch:resolve@npm%3A^1.20.0#~builtin<compat/resolve>"
             ]
         );
-        // Only the wrapped range is marked: it moved because the patch did.
         let patched: Vec<bool> = moved.iter().map(|m| m.patched).collect();
         assert_eq!(patched, [true, false]);
         assert_eq!(

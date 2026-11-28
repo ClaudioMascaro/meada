@@ -15,37 +15,11 @@ import (
 	"github.com/zclconf/go-cty/cty/convert"
 )
 
-// A module case is a directory under modules/ holding a root module (*.tf) and, optionally, the
-// local module `m/` that the root calls as `module "m" { source = "./m" ... }`. Its `want` file is
-// `<must>\t<keys>`: the keys of the `for_each` of the resource `a.q` (the one in `m/` when the
-// root has none), sorted and joined by commas, which `go run .` rewrites; `=` means Meada must
-// answer them exactly, `~` that it may leave them unresolved. Meada follows Terraform where
-// OpenTofu 1.13 and later differ (they convert a default once, to the final type; Terraform
-// converts it to the type of the block that declares it and again to the final one, #740). `!`
-// and a reason stand for keys Terraform refuses (a configuration it rejects too); `-` stands for
-// no key at all. The test in src/iac/tests/oracle.rs indexes the directory's files.
-//
-// The override rules are modelled by hand after Terraform's `decodeVariableBlock`
-// (internal/configs/named_values.go) and `Variable.merge` (internal/configs/module_merge.go), and
-// checked against Terraform v1.17.1's `console` for the rows of #740.
-//
-// Modelled, with Terraform's rules: a variable block's default is converted to the type that
-// block declares when it is decoded; an override file's variable block replaces the declared
-// `type` and `default`, and the default is converted again to the final type; a module argument
-// is evaluated in the caller and converted to the variable's declared type; locals, variables
-// (defaults and arguments only: no var files) and the functions of main.go. Anything else makes
-// `go run .` stop with an error naming the case, so a case outside the model cannot get a
-// `want`: an override file's resource, module or undeclared variable block, a local that does not
-// evaluate, a module argument the module does not declare, a variable without a value, a second
-// module call or a resource other than `a.q`.
 
-// refused is a configuration Terraform rejects: the case's keys are `!` and the reason.
 type refused struct{ why string }
 
 func (r refused) Error() string { return r.why }
 
-// variable is a declared variable: its type (any without a `type`) and default (cty.NilVal
-// without one), as Terraform keeps them.
 type variable struct {
 	ty  cty.Type
 	def cty.Value
@@ -63,7 +37,6 @@ func loadModule(dir string) (*module, error) {
 		b := filepath.Base(p)
 		return b == "override.tf" || strings.HasSuffix(b, "_override.tf")
 	}
-	// Override files merge into the others, which are all read first.
 	sort.SliceStable(paths, func(i, j int) bool { return !isOverride(paths[i]) && isOverride(paths[j]) })
 	m := &module{vars: map[string]*variable{}, locals: map[string]hclsyntax.Expression{}}
 	for _, p := range paths {
@@ -102,9 +75,6 @@ func loadModule(dir string) (*module, error) {
 	return m, nil
 }
 
-// declare reads a variable block as Terraform does: the default is converted to the type this
-// block declares, and an override's `type` and `default` replace the declared ones, the default
-// then converted again to the final type.
 func (m *module) declare(b *hclsyntax.Block, override bool) error {
 	name := b.Labels[0]
 	block := &variable{ty: cty.DynamicPseudoType, def: cty.NilVal}
@@ -155,8 +125,6 @@ func (m *module) declare(b *hclsyntax.Block, override bool) error {
 	return nil
 }
 
-// values are the module's variables: what `given` says, else the default, converted to the
-// declared type. A variable without a value, or an argument for none, ends the case.
 func (m *module) values(given map[string]cty.Value) (map[string]cty.Value, error) {
 	for name := range given {
 		if m.vars[name] == nil {
@@ -181,8 +149,6 @@ func (m *module) values(given map[string]cty.Value) (map[string]cty.Value, error
 	return out, nil
 }
 
-// context evaluates the locals, one pass per local so a chain of them settles; one that still
-// does not evaluate ends the case.
 func (m *module) context(vars map[string]cty.Value) (*hcl.EvalContext, error) {
 	locals := map[string]cty.Value{}
 	ctx := func() *hcl.EvalContext {
@@ -220,8 +186,6 @@ func (m *module) block(kind, label string) *hclsyntax.Block {
 	return nil
 }
 
-// forEachKeys are the instance keys of `a.q` in `m` (ok is false without that resource), or `!`
-// and the reason Terraform refuses its `for_each`.
 func forEachKeys(m *module, ctx *hcl.EvalContext) (keys string, ok bool) {
 	b := m.block("resource", "q")
 	if b == nil {
@@ -256,7 +220,6 @@ func forEachKeys(m *module, ctx *hcl.EvalContext) (keys string, ok bool) {
 	return strings.Join(list, ","), true
 }
 
-// moduleKeys are the keys of the case in `dir`, or `!` and a reason.
 func moduleKeys(dir string) (string, error) {
 	root, err := loadModule(dir)
 	var r refused
@@ -314,7 +277,6 @@ func moduleKeys(dir string) (string, error) {
 	return keys, nil
 }
 
-// moduleCases rewrites the `want` file of each case under dir/modules; it returns how many it changed.
 func moduleCases(dir string) (changed, total int, err error) {
 	wants, _ := filepath.Glob(filepath.Join(dir, "modules", "*", "want"))
 	for _, want := range wants {

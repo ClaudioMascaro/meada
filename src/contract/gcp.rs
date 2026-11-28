@@ -1,6 +1,3 @@
-//! GCP physical identities, shared by contract kinds, provisioning and config uses.
-//! A subscription names its own target, never a topic guessed from its id.
-
 pub(crate) mod sdk;
 
 fn bounded(text: &str) -> bool {
@@ -29,7 +26,6 @@ fn pubsub_id(text: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b"-_.~+%".contains(&b))
 }
 
-/// A topic id, or the disjoint `subscriptions/<id>` target of a subscription.
 pub(crate) fn pubsub(text: &str, subscription: bool) -> Option<String> {
     if !bounded(text) {
         return None;
@@ -57,7 +53,6 @@ pub(crate) fn pubsub(text: &str, subscription: bool) -> Option<String> {
     })
 }
 
-/// A Cloud Storage bucket; the object path after its slash is opaque.
 pub(crate) fn bucket(text: &str) -> Option<String> {
     if !bounded(text) {
         return None;
@@ -107,8 +102,6 @@ pub(crate) fn database_name(name: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
 }
 
-/// Partial physical names keep the existing pattern ceilings; resource paths never become
-/// patterns that can cross into a different GCP collection.
 pub(crate) fn pattern(ty: &str, text: &str) -> Option<String> {
     (bounded(text)
         && crate::iac::pattern::supported(text)
@@ -153,7 +146,6 @@ pub(crate) fn secret(text: &str) -> Option<String> {
     .then(|| name.into())
 }
 
-/// Structured identifiers alone, with complete kind validation before dropping a project.
 pub(crate) fn identified(text: &str) -> Option<String> {
     if text.starts_with("gs://") {
         return Some(format!("resource::gcs::{}", bucket(text)?));
@@ -169,7 +161,6 @@ pub(crate) fn identified(text: &str) -> Option<String> {
     }
 }
 
-/// Provider-specific aliases never change the established generic AWS key meanings.
 pub(crate) fn typed(key: &str, text: &str) -> Option<String> {
     let (prefix, name) = match key {
         "pubsub_topic" => ("channel::pubsub", pubsub(text, false)?),

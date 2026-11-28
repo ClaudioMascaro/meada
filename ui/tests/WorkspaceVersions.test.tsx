@@ -51,7 +51,6 @@ const base = (operate: boolean) => ({
 function answers(table: Record<string, () => Response>) {
   return vi.fn(async (route: string, init?: RequestInit) => {
     const key = `${init?.method ?? 'GET'} ${route}`;
-    // The longest key wins: `workspaces/<id>/versions` is not `workspaces/<id>`.
     const hit = Object.keys(table).filter(k => key.startsWith(k)).sort((a, b) => b.length - a.length)[0];
     if (!hit) throw new Error(`unexpected ${key}`);
     return table[hit]!();
@@ -120,14 +119,12 @@ test('an operator reads the history, a page at a time; a viewer has no history c
   const viewer = await open({
     ...base(false),
     [`GET /api/v1/workspaces/${ID}/versions`]: () => Response.json({ base: 3, versions: [row(NEW, true), row(OLD, false)], next: null }),
-    // This viewer reads the older version whole but not the current one: the diff is refused, the version is not.
     [`GET /api/v1/workspaces/${ID}/versions/${OLD}?against=current`]: () => Response.json({ error: { code: 'not_found', message: 'unknown version' } }, { status: 404 }),
     [`GET /api/v1/workspaces/${ID}/versions/${OLD}`]: () => Response.json({ ...document_, diff: undefined }),
   }, false);
   expect(queryByRole(host, 'button', { name: t.showHistory })).toBeNull();
   expect(queryByRole(host, 'region', { name: t.history })).toBeNull();
   expect(viewer.mock.calls.map(([r]) => String(r)).filter(r => r.includes('/history'))).toEqual([]);
-  // A viewer's list carries no author, and it cannot apply.
   expect(versions().getByRole('list', { name: t.versionsTitle }).textContent).not.toContain(t.author);
   await press(versions().getByRole('button', { name: `${t.showVersion} ${OLD}` }));
   await waitFor(() => getByRole(host, 'region', { name: `${t.versionOf} ${OLD}` }));

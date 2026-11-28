@@ -4,7 +4,6 @@ import operational from './fixtures/operational.json';
 import { fleetModel, storeModel, repositoriesModel, credentialsModel, checkModel, admissionModel } from '../src/operations';
 import { operationsCopy } from '../src/operations-i18n';
 
-// The API, rather than the browser, decides which validated heartbeats diagnose a stuck fleet.
 test('fleet separates malformed heartbeats and names the stuck node and fleet recoveries', () => {
   const model = fleetModel(fleet, operationsCopy.en);
   expect(model.nodes).toHaveLength(1);

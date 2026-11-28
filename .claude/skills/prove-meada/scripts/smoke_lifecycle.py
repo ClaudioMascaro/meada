@@ -96,7 +96,6 @@ def orphan_roles(rig, scope):
         'channel::sqs::smoke-idle': 'no use',
     }
     if scope == 'isolated':
-        # Assemble the seven source roles as one real index under the app's identity.
         (app / 'meada.toml').write_text('')
         for name in ('alertmanager.yaml', 'queues.tf', 'compose.yaml'):
             shutil.copyfile(lib / name, app / name)
@@ -104,7 +103,6 @@ def orphan_roles(rig, scope):
             shutil.copyfile(shared / '.github/workflows' / name, app / '.github/workflows' / name)
         write(app / '.github/workflows/isolated-build.yml',
               'name: Local control\non: workflow_dispatch\njobs:\n  call:\n    uses: ./.github/workflows/build.yml\n')
-        # Siblings would still be discovered without explicit peers.
         shutil.rmtree(lib)
         shutil.rmtree(shared)
     key[f'ci::{APP if scope == "isolated" else SHARED}/.github/workflows/orphan.yml'] = 'no consumer'

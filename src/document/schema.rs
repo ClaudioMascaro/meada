@@ -1,6 +1,3 @@
-//! JSON Schema to shape (spec #21): the field paths an OpenAPI schema lets a payload carry,
-//! with local `$ref`s resolved and the parts Meada cannot list left open.
-
 use std::collections::BTreeSet;
 use std::ops::Bound;
 
@@ -9,27 +6,17 @@ use serde_json::Value;
 use crate::qualify;
 use crate::shape::{Shape, Source};
 
-/// How many schemas reading one shape may visit. Local references can unfold a small document
-/// into a huge tree; past the budget, every part not yet read is open.
 const BUDGET: usize = 10_000;
 
-/// How deep reading one shape may go: every property, element, member and reference is one
-/// level, so a field path has at most half as many segments. Deeper parts are open, and the
-/// reader's recursion stays far from the end of the stack, even on a 2 MiB thread.
 // ponytail: real schemas nest a few dozen levels at most; past 128 the shape is open.
 const MAX_DEPTH: usize = 128;
 
-/// What reading every shape of one document may cost: the bytes of the field paths it lists,
-/// plus `COST` per schema visited. It bounds the memory and the index text one document's
-/// shapes take, whatever its routes and references; past it, every part not yet read is open.
 // ponytail: one budget per document; 64 MiB holds the shapes of the largest public API
 // descriptions, a few MiB each, with room to spare.
 pub(super) const WORK: usize = 64 << 20;
 
-/// What one schema visit costs from `WORK`, besides the field paths it adds.
 const COST: usize = 32;
 
-/// What is left of `WORK` for one document; every shape read from the document takes from it.
 pub struct Work(usize);
 
 impl Default for Work {
@@ -39,7 +26,6 @@ impl Default for Work {
 }
 
 impl Work {
-    /// Takes `cost` when that much is left; once it cannot, nothing is left.
     fn take(&mut self, cost: usize) -> bool {
         match self.0.checked_sub(cost) {
             Some(left) => {
@@ -54,8 +40,6 @@ impl Work {
     }
 }
 
-/// The keywords that say something about a payload's structure. A schema with none of them
-/// may be anything.
 const STRUCTURE: &[&str] = &[
     "type",
     "properties",
@@ -67,8 +51,6 @@ const STRUCTURE: &[&str] = &[
     "$ref",
 ];
 
-/// Whether `schema` types its part as a scalar alone: a `type` of `string`, `number`,
-/// `integer` or `boolean` (with `null` or not), and no keyword that gives it structure.
 fn scalar(schema: &serde_json::Map<String, Value>) -> bool {
     const SCALARS: &[&str] = &["string", "number", "integer", "boolean"];
     let types: Vec<&str> = match schema.get("type") {
@@ -83,15 +65,6 @@ fn scalar(schema: &serde_json::Map<String, Value>) -> bool {
             .any(|&k| k != "type" && schema.contains_key(k))
 }
 
-/// The shape `schema`, a schema of the document `doc`, gives, with `source` as its source, and
-/// every external `$ref` met, whose part is open. Reading takes from `work`, what is left of
-/// the document's budget.
-///
-/// `properties` give fields and `items` the `[]` elements; `allOf`, `oneOf` and `anyOf` add
-/// their members' fields. An object is open when its `additionalProperties` is `true` or a
-/// schema, or when it lists no fields and does not forbid others. Local `$ref`s resolve; a
-/// cycle, a missing target and an external reference leave their part open, and so does what
-/// lies past `MAX_DEPTH`, `BUDGET` or `work`.
 pub fn read(
     doc: &Value,
     schema: &Value,
@@ -110,7 +83,6 @@ pub fn read(
     };
     reader.schema(schema, "", false, 0);
     let (fields, open) = (&reader.fields, &reader.open);
-    // A part some member reads as a scalar and another gives fields, or leaves open, is none.
     let below = |set: &BTreeSet<String>, path: &str| {
         [".", "["].iter().any(|step| {
             let start = format!("{path}{step}");
@@ -134,20 +106,16 @@ pub fn read(
 
 struct Reader<'a, 'w> {
     doc: &'a Value,
-    /// The local references being read, outermost first.
     stack: Vec<&'a str>,
     budget: usize,
     work: &'w mut Work,
     fields: BTreeSet<String>,
     open: BTreeSet<String>,
-    /// The parts some schema types as a string, a number, an integer or a boolean.
     scalars: BTreeSet<String>,
     external: BTreeSet<String>,
 }
 
 impl<'a> Reader<'a, '_> {
-    /// Reads `schema` at `path`, `depth` levels below the root. An `allOf` member (`member`)
-    /// only narrows the others, so a member that says nothing of its structure adds nothing.
     fn schema(&mut self, schema: &'a Value, path: &str, member: bool, depth: usize) {
         if self.budget == 0 || depth >= MAX_DEPTH || !self.work.take(COST) {
             return self.open(path);
@@ -156,7 +124,6 @@ impl<'a> Reader<'a, '_> {
         let depth = depth + 1;
         let schema = match schema {
             Value::Object(schema) => schema,
-            // `true` allows anything; `false` (nothing) and malformed schemas add nothing.
             Value::Bool(true) if !member => return self.open(path),
             _ => return,
         };
@@ -217,8 +184,6 @@ impl<'a> Reader<'a, '_> {
         }
     }
 
-    /// Reads the schema `reference` points to at `path`: a local one in place, unless it is
-    /// already being read (a cycle); anything else leaves `path` open.
     fn reference(&mut self, reference: &'a Value, path: &str, depth: usize) {
         let Some(reference) = reference.as_str() else {
             return self.open(path);
@@ -237,7 +202,6 @@ impl<'a> Reader<'a, '_> {
         }
     }
 
-    /// Lists the field path `field`, when the document's work budget still pays for its text.
     fn field(&mut self, field: &str) -> bool {
         let paid = self.work.take(field.len());
         if paid {
@@ -258,7 +222,6 @@ mod tests {
     use super::{Work, read as read_with};
     use crate::shape::{Shape, Source};
 
-    /// `read` with a document budget of its own.
     fn read(
         doc: &Value,
         schema: &Value,
@@ -295,7 +258,6 @@ mod tests {
             "count": {"type": ["integer", "null"]},
             "paid": {"type": "boolean"},
             "tags": {"type": "array", "items": {"type": "number"}},
-            // A member that is an object with fields makes the part no scalar.
             "either": {"oneOf": [
                 {"type": "string"},
                 {"type": "object", "properties": {"code": {"type": "string"}}}
@@ -349,7 +311,6 @@ mod tests {
                 &[],
                 &[],
             ),
-            // `allOf` merges; a member that only constrains adds nothing.
             (
                 json!({"allOf": [
                     {"$ref": base},
@@ -399,7 +360,6 @@ mod tests {
                 &[],
                 &[],
             ),
-            // Types, formats, `required` and `nullable` are not recorded.
             (
                 json!({"type": "object", "required": ["id"], "properties": {
                     "id": {"type": "string", "format": "uuid", "nullable": true}}}),
@@ -407,7 +367,6 @@ mod tests {
                 &[],
                 &[],
             ),
-            // A cycle stops at the repeated schema, open there.
             (
                 json!({"$ref": "#/components/schemas/Node"}),
                 &["children", "children[]", "name"],
@@ -432,7 +391,6 @@ mod tests {
                 &[""],
                 &[],
             ),
-            // A schema that says nothing of its structure may be anything.
             (json!({"description": "anything"}), &[], &[""], &[]),
             (json!({"type": ["object", "null"]}), &[], &[""], &[]),
             (
@@ -458,7 +416,6 @@ mod tests {
         }
     }
 
-    /// `n` schemas, each referring to the next through `step`, the last a string.
     fn chain(n: usize, step: impl Fn(Value) -> Value) -> Value {
         let mut schemas = serde_json::Map::new();
         for i in 0..n {
@@ -473,13 +430,10 @@ mod tests {
     fn a_schema_nested_past_the_depth_limit_is_open_there() {
         let source = || Source::Document("openapi.yaml".into());
         let start = json!({"$ref": "#/components/schemas/S0"});
-        // 10,000 references in a row: no field, and the end is out of reach.
         let doc = chain(10_000, |next| next);
         let (shape, _) = read(&doc, &start, source());
         assert!(shape.fields.is_empty());
         assert_eq!(shape.open.iter().collect::<Vec<_>>(), [""]);
-        // 10,000 nested fields: each level is a field and a reference, so the field paths stop
-        // at half the depth limit, open below.
         let doc = chain(10_000, |next| json!({"properties": {"a": next}}));
         let (shape, _) = read(&doc, &start, source());
         let deepest = vec!["a"; 64].join(".");
@@ -490,8 +444,6 @@ mod tests {
 
     #[test]
     fn a_document_reads_its_shapes_within_one_work_budget() {
-        // A schema of 5,000 fields with 1 KB names, read for 100 routes: half a gigabyte of
-        // field paths if each route read it in full.
         let fields: serde_json::Map<String, Value> = (0..5_000)
             .map(|n| (format!("{n:01024}"), json!({"type": "string"})))
             .collect();
@@ -511,7 +463,6 @@ mod tests {
 
     #[test]
     fn a_schema_that_unfolds_without_end_stops_open() {
-        // Each level refers to the next twice: 2^40 nodes if read in full.
         let mut schemas = serde_json::Map::new();
         for n in 0..40 {
             let next = json!({"$ref": format!("#/components/schemas/S{}", n + 1)});

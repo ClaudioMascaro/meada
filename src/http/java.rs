@@ -1,15 +1,3 @@
-//! Spring MVC and JAX-RS (`jax_rs`, #87) providers (spec #26): a method of a `@RestController` or `@Controller` class
-//! carrying a mapping annotation serves the class prefix (`@RequestMapping`) joined to each of
-//! its paths. The pack reads an annotation as a call decorating its target (`Call::decorates`,
-//! the target a class or a method), so the annotations, `RequestMethod.X` and the constants of
-//! the paths are read here, never in the pack: an annotation or an enum counts only when
-//! `Code::outside` says an import from Spring binds its name (a class or an enum of the
-//! repository with the same name hides it), and a path folds `static final` constants and `+`
-//! through `Code::value`. `@RequestMapping` without `method` serves every method (`ANY`).
-//! `server.servlet.context-path` is not applied.
-//! Kotlin controllers (#97) are read the same way: the Kotlin pack gives the same facts.
-//! The consumers are `clients.rs`'s and `declarative.rs`'s.
-
 mod clients;
 mod declarative;
 
@@ -27,7 +15,6 @@ const CONTROLLERS: &[&str] = &[
     "org.springframework.stereotype.Controller",
 ];
 const MAPPING: &str = "org.springframework.web.bind.annotation.RequestMapping";
-/// The method annotations that give one method, by the annotation's name in `WEB`.
 const SHORTCUTS: &[(&str, &str)] = &[
     ("GetMapping", "GET"),
     ("PostMapping", "POST"),
@@ -35,26 +22,21 @@ const SHORTCUTS: &[(&str, &str)] = &[
     ("PatchMapping", "PATCH"),
     ("DeleteMapping", "DELETE"),
 ];
-/// The members of Spring's `RequestMethod`, which its `HttpMethod` has too.
 const REQUEST_METHODS: &[&str] = &[
     "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE",
 ];
 const REQUEST_METHOD: &str = "org.springframework.web.bind.annotation.RequestMethod.";
-/// What a mapping annotation names its paths by: `value` or its alias `path`.
 const MAPPING_PATHS: &[&str] = &["value", "path"];
 
-/// The consumers of the clients (`clients.rs`) and of the declarative clients (`declarative.rs`).
 pub(super) fn consumers<'a>(code: &Code<'a>, indexed: &Indexed) -> Vec<Found> {
     let mut found = clients::consumers(code, indexed);
     found.extend(declarative::consumers(code, indexed));
     found
 }
 
-/// Spring MVC providers: see the module.
 pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     let mut found = Vec::new();
     for (path, facts) in jvm_files(code) {
-        // What Spring annotation a call is, by its name outside the repository.
         let spring =
             |call: &'a Call| -> Option<String> { known_annotation(code, path, call, annotation) };
         let annotations: Vec<(usize, &'a Call, String)> = (facts.calls.iter().enumerate())
@@ -62,7 +44,6 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             .filter_map(|(n, c)| Some((n, c, spring(c)?)))
             .collect();
         for (n, call, name) in &annotations {
-            // A method's annotation; a class carries the prefix and the controller marker.
             let Some(target) = call.decorates.as_deref().filter(|t| is_method(facts, t)) else {
                 continue;
             };
@@ -71,14 +52,12 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
                     .iter()
                     .filter(move |(_, c, _)| c.decorates.as_deref() == Some(class))
             };
-            // A method of a controller class: its annotation's scope is the class.
             let shortcut = shortcut(name);
             if shortcut.is_none() && name != MAPPING
                 || !on(&call.scope).any(|(.., n)| CONTROLLERS.contains(&n.as_str()))
             {
                 continue;
             }
-            // The index keeps no argument: they come from the full facts of the file.
             let Some(given) = code.call(path, *n) else {
                 continue;
             };
@@ -92,7 +71,6 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
             let prefixes = match on(&call.scope).find(|(.., n)| n == MAPPING) {
                 None => vec![String::new()],
                 Some((c, ..)) => match code.call(path, *c) {
-                    // A class-level `method` restricts every method of the class: not read.
                     Some(class) if class.keyword("method").is_none() => {
                         match paths(code, path, class, MAPPING_PATHS) {
                             Some(prefixes) => prefixes,
@@ -126,20 +104,14 @@ pub(super) fn providers<'a>(code: &Code<'a>) -> Vec<Found> {
     found
 }
 
-/// The packages of JAX-RS, before and after the move to Jakarta EE.
 const JAX_RS: &[&str] = &["javax.ws.rs.", "jakarta.ws.rs."];
 
-/// Whether `spelled` is a JAX-RS annotation this module reads: `Path` or a method annotation,
-/// which is the HTTP method itself (`METHODS`).
 fn jax_rs_annotation(spelled: &str) -> bool {
     (JAX_RS.iter())
         .filter_map(|p| spelled.strip_prefix(p))
         .any(|n| n == "Path" || METHODS.contains(&n))
 }
 
-/// JAX-RS providers: a method of a class with `@Path` carrying a method annotation serves the
-/// class path joined to its own `@Path`. A method with only `@Path` is a sub-resource locator,
-/// and `@ApplicationPath` is not applied, and an interface is a client, not a resource. Names count as Spring's do, through `known`.
 fn jax_rs<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
     for (path, facts) in java_files(code) {
         let annotations: Vec<(usize, &'a Call, String)> = (facts.calls.iter().enumerate())
@@ -165,12 +137,10 @@ fn jax_rs<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
             if !is_method(facts, target) {
                 continue;
             }
-            // The index keeps no argument: they come from the full facts of the file.
             let read = |entry: Option<&(usize, &'a Call, String)>| {
                 let given = code.call(path, entry?.0)?;
                 paths(code, path, given, MAPPING_PATHS)
             };
-            // An interface with `@Path` is a client (MicroProfile, Quarkus), not a server.
             if facts.interfaces.contains(&call.scope) {
                 continue;
             }
@@ -199,17 +169,14 @@ fn jax_rs<'a>(code: &Code<'a>, found: &mut Vec<Found>) {
     }
 }
 
-/// Whether `spelled` is a Spring annotation this module reads.
 fn annotation(spelled: &str) -> bool {
     CONTROLLERS.contains(&spelled) || mapping(spelled)
 }
 
-/// Whether `spelled` is one of Spring's mapping annotations: `@RequestMapping` or a shortcut.
 fn mapping(spelled: &str) -> bool {
     spelled == MAPPING || shortcut(spelled).is_some()
 }
 
-/// The one method of the mapping shortcut `spelled` (`@GetMapping`), if it is one.
 fn shortcut(spelled: &str) -> Option<&'static str> {
     let name = spelled.strip_prefix(WEB)?;
     (SHORTCUTS.iter())
@@ -217,15 +184,11 @@ fn shortcut(spelled: &str) -> Option<&'static str> {
         .map(|(_, method)| *method)
 }
 
-/// The member of a Spring method enum that `spelled` names, the enum spelled `of` with its dot:
-/// `RequestMethod` (`REQUEST_METHOD`) or `HttpMethod`, which have the same members.
 fn member_of<'s>(spelled: &'s str, of: &str) -> Option<&'s str> {
     let member = spelled.strip_prefix(of)?;
     REQUEST_METHODS.contains(&member).then_some(member)
 }
 
-/// Whether `client` (a name, or a call made in place) is of the client type `ty`: written as
-/// one, or made by a call it traces back to that `makes` accepts (`makes(code, path, index)`).
 fn made<'a>(
     code: &Code<'a>,
     (path, scope): (&'a str, &'a str),
@@ -256,7 +219,6 @@ fn reach<'a>(
             if (origins.iter().filter_map(|o| o.call)).any(|(at, i)| makes(code, at, i)) {
                 return true;
             }
-            // A local the source writes no type of holds what the pack recorded for it (Kotlin).
             match code.local(path, scope, name) {
                 Some(Bound { within, value, .. }) if depth < LOCAL_DEPTH => {
                     reach(code, (path, within), value, ty, makes, depth + 1)
@@ -271,11 +233,6 @@ fn reach<'a>(
     }
 }
 
-/// What the local `client` (a name the source writes no type for) holds, folded where it is made:
-/// the chain `WebClient.create(..)` or `Retrofit.Builder()...build()` it is bound to, whose base
-/// a reader joins. `None` for anything but a name bound to exactly one call (`Facts::bound`:
-/// a Java local the file never reassigns, a Kotlin `val`) and for a call a wrapper's callers fold
-/// to several values.
 fn folded_local<'a>(
     code: &Code<'a>,
     (path, scope): (&'a str, &'a str),
@@ -303,10 +260,6 @@ fn folded_local<'a>(
     }
 }
 
-/// The paths of a mapping annotation: one of the elements `keys` names (Spring's `value` or
-/// `path`), or the unnamed arguments (one string or array, or Kotlin's several, which fill the
-/// `value` array), constants folded; the root when it gives none. `None` when it gives two
-/// kinds, or a value that is no list of strings; a path that cannot be read yields none.
 fn paths<'a>(code: &Code<'a>, file: &'a str, call: &'a Call, keys: &[&str]) -> Option<Vec<String>> {
     let given: Vec<&Value> = (call.args.iter())
         .chain(keys.iter().filter_map(|k| call.keyword(k)))
@@ -330,9 +283,6 @@ fn paths<'a>(code: &Code<'a>, file: &'a str, call: &'a Call, keys: &[&str]) -> O
     }
 }
 
-/// The methods `@RequestMapping(method = ..)` names: every method without one, and those of
-/// `RequestMethod.X` that Spring's enum binds (a member read through an import from Spring, so
-/// a type of the repository by that name is none).
 fn request_methods<'a>(code: &Code<'a>, file: &'a str, call: &'a Call) -> Option<Vec<String>> {
     let member = |value: &'a Value| -> Option<String> {
         let Value::Ref(name) = value else {
@@ -373,12 +323,10 @@ mod tests {
         import org.springframework.web.bind.annotation.RequestMethod;\n\
         import org.springframework.web.bind.annotation.RestController;\n";
 
-    /// The contracts of the providers one controller file gives.
     fn served(imports: &str, body: &str) -> Vec<String> {
         served_with(imports, body, &[])
     }
 
-    /// The same, with other files of the repository (`(path, source)`).
     fn served_with(imports: &str, body: &str, others: &[(&str, &str)]) -> Vec<String> {
         let src = format!("package a;\n{imports}\n{body}\n");
         let mut parsed = vec![("a/C.java", Java.parse("a/C.java", src.as_bytes()).unwrap())];
@@ -428,7 +376,6 @@ mod tests {
         };
         let spring = IMPORTS;
         assert_eq!(with(spring, "", "RequestMethod.GET"), ["http::GET::/x"]);
-        // Nowhere to be read, not a member, or hidden by a type of the file.
         assert!(with(spring, "", "Unknown.GET").is_empty());
         assert!(with(spring, "", "RequestMethod.SPELL").is_empty());
         assert!(with(spring, "enum RequestMethod { GET }", "RequestMethod.GET").is_empty());
@@ -453,14 +400,10 @@ mod tests {
             .is_empty()
         );
         assert!(served(IMPORTS, "class C { @GetMapping(\"/x\") void f() {} }").is_empty());
-        // A nested class's own annotations are not its methods'.
         let nested = "@RestController class C { @RequestMapping(\"/in\") @RestController static class D { @GetMapping(\"/x\") void f() {} } }";
         assert_eq!(served(IMPORTS, nested), ["http::GET::/in/x"]);
     }
 
-    /// An annotation written in full is the framework's unless the repository wins (#360): an
-    /// import that binds its head, a class of the repository that is its head, or one spelled
-    /// exactly like it gives no provider from the framework's reading.
     #[test]
     fn an_annotation_written_in_full_gives_way_to_the_repository() {
         const SPRING: &str = "org.springframework.web.bind.annotation";
@@ -468,12 +411,9 @@ mod tests {
             "@{SPRING}.RestController class C {{ @{SPRING}.GetMapping(\"/x\") void f() {{}} }}"
         );
         assert_eq!(served("", &body), ["http::GET::/x"]);
-        // An import binds the head `org`.
         assert!(served("import com.acme.org;", &body).is_empty());
-        // A class of the repository is the head.
         let head = [("a/org.java", "package a; class org {}")];
         assert!(served_with("", &body, &head).is_empty());
-        // The repository declares the framework's very names: its classes are not Spring's.
         let own = |name: &str| {
             format!(
                 "package {SPRING}; public @interface {name} {{ String[] value() default {{}}; }}"
@@ -486,8 +426,6 @@ mod tests {
         assert!(served_with("", &body, &rest).is_empty());
     }
 
-    /// A controller whose base comes from outside the repository serves its methods: a method
-    /// annotation is read through the imports, no field of that base hiding them (#354).
     #[test]
     fn a_controller_with_an_outside_base_serves_its_methods() {
         let imports = format!("{IMPORTS}import com.corp.shared.BaseController;\n");
@@ -500,7 +438,6 @@ mod tests {
 
     #[test]
     fn what_cannot_be_read_with_certainty_serves_nothing() {
-        // `value` and `path` together, a class-level `method`, a pattern with a `/` inside braces.
         let both = "@GetMapping(value = \"/a\", path = \"/b\") void f() {}";
         assert!(controller("", both).is_empty());
         let restricted = "@GetMapping(\"/a\") void f() {}";
@@ -536,7 +473,6 @@ mod tests {
     #[test]
     fn a_wildcard_import_from_spring_binds_its_annotations_and_enum() {
         assert_eq!(served(WILD, ROUTE), ["http::GET::/p/x", "http::POST::/p/y"]);
-        // Another on-demand import, `java.lang` and the package's own do not bind them.
         let more = format!("import java.util.*;\nimport org.acme.*;\n{WILD}");
         assert_eq!(
             served(&more, ROUTE),
@@ -546,13 +482,9 @@ mod tests {
 
     #[test]
     fn a_wildcard_import_binds_nothing_another_binding_or_candidate_may_take() {
-        // Only the `GetMapping` is hidden: `RequestMethod.POST` still binds.
         const POST: [&str; 1] = ["http::POST::/p/y"];
-        // A class of the package, a single-type import, a class a repository wildcard brings,
-        // and a static on-demand import of an outside class: any of them may be the name.
         let same = [("a/GetMapping.java", "package a; class GetMapping {}")];
         assert_eq!(served_with(WILD, ROUTE, &same), POST);
-        // An annotation type of the package hides it too.
         let annotation = [(
             "a/GetMapping.java",
             "package a; @interface GetMapping { String[] value(); }",
@@ -563,7 +495,6 @@ mod tests {
         let other = [("b/GetMapping.java", "package b; public class GetMapping {}")];
         let repository = format!("{WILD}import b.*;\n");
         assert_eq!(served_with(&repository, ROUTE, &other), POST);
-        // A repository wildcard that does not define the name leaves it to Spring's.
         let unrelated = [("b/Other.java", "package b; public class Other {}")];
         assert_eq!(served_with(&repository, ROUTE, &unrelated).len(), 2);
         let ambiguous = format!("{WILD}import static org.acme.Util.*;\nimport b.*;\n");
@@ -605,9 +536,6 @@ mod tests {
         import org.springframework.web.bind.annotation.RequestMethod\n\
         import org.springframework.web.bind.annotation.RestController\n";
 
-    /// The contracts of the Spring providers of Kotlin controllers: `body` after `imports` in
-    /// `a/C.kt`, with other files of the repository (`(path, source)`), which Java's resolver
-    /// reads with the Java ones.
     fn served_kotlin(imports: &str, body: &str, others: &[(&str, &str)]) -> Vec<String> {
         use crate::lang::kotlin::Kotlin;
         let src = format!("package a\n{imports}\n{body}\n");
@@ -687,7 +615,6 @@ mod tests {
             served_kotlin(imports, body, &[]),
             ["http::GET::/x", "http::PUT::/y"]
         );
-        // A type of the package hides the star import's name.
         let own = [("a/GetMapping.kt", "package a\nannotation class GetMapping")];
         assert_eq!(served_kotlin(imports, body, &own), ["http::PUT::/y"]);
     }
@@ -715,7 +642,6 @@ mod tests {
         .collect();
         expected.sort();
         assert_eq!(found, expected);
-        // Two kinds of argument, or an `arrayOf` of the repository, serve nothing.
         let mixed = "@RestController class C { @GetMapping(\"/a\", path = [\"/b\"]) fun f() {} }";
         assert!(served_kotlin(KOTLIN_IMPORTS, mixed, &[]).is_empty());
         let own = [(
@@ -790,11 +716,9 @@ mod tests {
     #[test]
     fn jax_rs_names_count_only_through_an_import_and_a_resource_class() {
         let body = "@Path(\"/x\") class C { @GET void f() {} }";
-        // A package that is no JAX-RS, a shadowing type, no class @Path, no import at all.
         let other = JAXRS.replace("javax.ws.rs.GET", "org.acme.GET");
         assert!(resource(&other, body).is_empty());
         let shadow = [("a/GET.java", "package a; class GET {}")];
-        // A single-type import wins over the package's own class; an on-demand one does not.
         assert_eq!(served_with(JAXRS, body, &shadow), ["http::GET::/x"]);
         let wild = "import javax.ws.rs.*;\n";
         assert!(served_with(wild, body, &shadow).is_empty());
@@ -805,7 +729,6 @@ mod tests {
         assert!(resource(&single, body).is_empty());
         assert!(resource(JAXRS, "class C { @GET void f() {} }").is_empty());
         assert!(resource("", body).is_empty());
-        // A method with only @Path is a sub-resource locator, not a route.
         assert!(resource(JAXRS, "@Path(\"/x\") class C { @Path(\"/y\") void f() {} }").is_empty());
     }
 

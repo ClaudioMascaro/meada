@@ -1,7 +1,3 @@
-//! Exact locations named by declarations, resolved solely against the config index (#641).
-//! Selectors compare complete scalar values, never redacted or cut values. Parsing and
-//! matching are iterative; a query cannot expand beyond the keys already held by its file.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use rusqlite::Connection;
@@ -10,7 +6,6 @@ use crate::Result;
 use crate::document::events::Step;
 use crate::index::Export;
 
-/// One location, with the declaration spelling retained for selector-based queries.
 #[derive(Clone, Debug)]
 pub(crate) struct Site {
     pub id: String,
@@ -26,7 +21,6 @@ impl Site {
     }
 }
 
-/// The declared keys named by canonical identity, local locator or declaration selector.
 pub(crate) fn found<'a>(exports: &'a [Export], text: &str) -> Vec<(usize, &'a Site)> {
     let mut seen = BTreeSet::new();
     exports
@@ -50,7 +44,6 @@ enum Part {
     Select(Vec<Step>, String),
 }
 
-/// Position of `wanted` outside strings and nested brackets.
 fn boundary(text: &str, wanted: u8) -> Option<usize> {
     let (mut quoted, mut escaped, mut depth) = (false, false, 0usize);
     for (n, byte) in text.bytes().enumerate() {
@@ -150,8 +143,6 @@ struct Scalar {
     line: usize,
 }
 
-/// Resolve one `<file>#<key path>` against indexed scalars and their parent keys. No source
-/// path is followed; ignored, unreadable, missing and out-of-repository files have no rows.
 pub(crate) fn locate(db: &Connection, identity: &str, via: &str) -> Result<Vec<Site>> {
     let Some((path, key)) = via.split_once('#') else {
         return Ok(Vec::new());

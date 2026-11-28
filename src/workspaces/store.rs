@@ -1,12 +1,3 @@
-//! The records of named workspaces in Postgres (ADR 0021 contract 4, #342): four tables beside
-//! the permissions set, and the one transaction that creates a workspace. Creation is the atomic
-//! boundary of ADR 0021: in one transaction it reads the newest permissions set (not the
-//! admission cache), decides eligibility for every selected repository from it, and only then
-//! inserts the workspace, its first operator, its first version and its history. Nothing is
-//! stored when a repository is refused, so a revoked grant or a forged payload authorizes
-//! nothing. The version document itself is the shared store's, immutable and content-addressed
-//! (`document`); this file holds no author, time or message of it.
-
 use std::collections::BTreeSet;
 use std::time::Duration;
 
@@ -18,12 +9,8 @@ use super::{Authority, Reason};
 use crate::msg::Msg;
 use crate::postgres::{self, Opened};
 
-/// The key of the advisory lock that serializes workspace creation, so that `max_workspaces`
-/// holds under concurrent creates.
 const CREATE_LOCK: i64 = 0x6d65_6164_6177_6b73;
 
-/// What decides eligibility: the section's settings and `[oidc.github]`'s accepted roles and the
-/// age past which a set grants nothing.
 pub(crate) struct Policy<'a> {
     pub postgres: &'a postgres::Config,
     pub max_age: Duration,
@@ -31,15 +18,12 @@ pub(crate) struct Policy<'a> {
     pub max_workspaces: usize,
 }
 
-/// Who creates: the authenticated subject, its GitHub login and whether it is the platform
-/// administrator. Nothing here comes from the request body.
 pub(crate) struct Creator<'a> {
     pub subject: &'a str,
     pub login: Option<&'a str>,
     pub administrator: bool,
 }
 
-/// A workspace to create.
 pub(crate) struct New<'a> {
     pub name: &'a str,
     pub description: &'a str,
@@ -48,35 +32,20 @@ pub(crate) struct New<'a> {
     pub message: &'a str,
 }
 
-/// Why a creation did not happen.
 #[derive(Debug)]
 pub(crate) enum CreateError {
-    /// A condition of the platform or the caller, the same for every identity. Nothing can be
-    /// selected (fail closed).
     Pending(Reason),
-    /// Some selected identity is not eligible: the ones the grant reads, named, and the count of
-    /// the others.
     Refused(Creation),
-    /// `max_workspaces` workspaces exist.
     Limit,
-    /// The same triple was created and then deleted.
     Deleted,
     Failed(String),
 }
 
-/// Why the permissions set cannot decide eligibility.
 pub(super) enum Gate {
-    /// A condition of the platform or the caller, the same for every identity. Nothing can be
-    /// selected (fail closed).
     Pending(Reason),
     Db(tokio_postgres::Error),
 }
 
-/// The identities of `selected` that `actor` may select, decided in `tx` from the newest
-/// permissions set on Postgres's clock (not the admission cache): the catalog holds the
-/// identity, and a login holds an accepted role on it; for the platform administrator, the
-/// catalog alone. Pending when no set exists, the set is older than `max_age` or a subject
-/// other than the administrator has no login.
 pub(super) async fn eligible(
     tx: &tokio_postgres::Transaction<'_>,
     q: &str,
@@ -99,7 +68,6 @@ pub(super) async fn eligible(
     if !actor.administrator && login.is_none() {
         return Err(Gate::Pending(Reason::MissingLogin));
     }
-    // The catalog holds the identity; a login is eligible when it holds an accepted role on it.
     let catalog = format!(
         "SELECT p.identity FROM {q}.permission_repositories p \
          WHERE p.set_id = $1 AND p.coverage = 'listed' AND p.source IN ('catalog', 'both') \
@@ -115,17 +83,13 @@ pub(super) async fn eligible(
     Ok(rows.iter().map(|r| r.get(0)).collect())
 }
 
-/// A created workspace, or the one the same creator and entries already made.
 pub(crate) struct Created {
     pub id: String,
     pub created: bool,
 }
 
-/// `to_char` for a time column at UTC, to the second.
 pub(super) const TIME: &str = "'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'";
 
-/// Creates the workspace `new` for `creator` (ADR 0021): the checks and the inserts in one
-/// transaction under the creation lock. `grant` is what the caller reads, to word a refusal.
 pub(crate) async fn create(
     policy: &Policy<'_>,
     creator: &Creator<'_>,
@@ -210,7 +174,6 @@ pub(crate) async fn create(
     Ok(Created { id, created: true })
 }
 
-/// One workspace as the console lists and shows it.
 pub(crate) struct Record {
     pub id: String,
     pub name: String,
@@ -218,14 +181,10 @@ pub(crate) struct Record {
     pub created: String,
     pub seq: i64,
     pub current: String,
-    /// The identities of the current version, in manifest order.
     pub entries: Vec<String>,
-    /// Each operator: its subject and its GitHub login.
     pub operators: Vec<(String, Option<String>)>,
 }
 
-/// Every workspace not deleted, ordered by id, with its operators; at most `max` rows. `only`
-/// narrows to one id.
 pub(crate) async fn records(
     postgres: &postgres::Config,
     only: Option<&str>,
@@ -251,8 +210,6 @@ pub(crate) async fn records(
         let operators = (operators.as_array().into_iter().flatten())
             .filter_map(|o| Some((o[0].as_str()?.to_string(), o[1].as_str().map(String::from))))
             .collect();
-        // Every row is hostile: one that is not what the migration wrote is an error naming the
-        // table, never a panic or a value the pages would show.
         let bad = || Msg::PermissionsBadRow(&format!("{q}.workspaces")).text();
         let (id, current): (String, String) = (
             row.try_get(0).map_err(|_| bad())?,
@@ -275,11 +232,6 @@ pub(crate) async fn records(
     Ok(records)
 }
 
-/// What creating workspace `id` would meet after eligibility, read without the creation lock (the
-/// proposal server's, ADR 0022): `Deleted` when the same creator, name and entries were created
-/// and deleted, `Limit` when `max` workspaces exist and `id` is none of them, else `None` (a new
-/// workspace, or the creator's own existing one, which the console answers as already created).
-/// The transaction of `create` decides again.
 #[cfg(feature = "proposals")]
 pub(crate) async fn creation_conflict(
     postgres: &postgres::Config,
@@ -298,8 +250,6 @@ pub(crate) async fn creation_conflict(
     Ok((held.get::<_, i64>(0) >= max as i64).then_some(CreateError::Limit))
 }
 
-/// What `meada workspace pull` reads: every workspace not deleted, its id, current version and
-/// the logins of its operators, in one `REPEATABLE READ` transaction, ordered by id.
 pub(crate) async fn current_contexts(
     postgres: &postgres::Config,
 ) -> Result<Vec<(String, String, Vec<String>)>, String> {
@@ -338,8 +288,6 @@ pub(crate) async fn current_contexts(
     Ok(read)
 }
 
-/// A named version document in the shared store (`workspaces/<version id>.json`): its id and its
-/// entries only, so one workspace never reads another's author, time or message through it.
 pub(crate) fn document_text(version: &str, entries: &[Json]) -> Vec<u8> {
     let mut text = serde_json::to_vec_pretty(&json!({"id": version, "repositories": entries}))
         .unwrap_or_default();
@@ -347,8 +295,6 @@ pub(crate) fn document_text(version: &str, entries: &[Json]) -> Vec<u8> {
     text
 }
 
-/// The entries of the named version document `bytes`, hostile input: the id must be `version`,
-/// the entries a valid named text of at most `ENTRIES_MAX` entries whose id is `version`.
 pub(crate) fn document_entries(
     key: &str,
     version: &str,
@@ -369,8 +315,6 @@ pub(crate) fn document_entries(
     }
 }
 
-/// Stores the version document `entries` is in the shared store, unless it holds it already:
-/// content-addressed and immutable, so a second writer of the same entries changes nothing.
 pub(crate) fn put_document(
     snapshot: &crate::snapshot::Config,
     version: &str,
@@ -386,7 +330,6 @@ pub(crate) fn put_document(
     Ok(())
 }
 
-/// The entries of the named version document `version` from the shared store, checked.
 pub(crate) fn get_document(
     snapshot: &crate::snapshot::Config,
     version: &str,

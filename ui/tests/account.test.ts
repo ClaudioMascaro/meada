@@ -19,7 +19,6 @@ test.each(['en', 'pt-BR'] as const)('a refused sign-in is one generic message, b
   expect(new Set([invalid, busy, audit, signInProblem(new Error('network'), t)]).size).toBe(4);
   expect(busy).toBe(t.signInBusy);
   expect(audit).toBe(t.signInAudit);
-  // The server's own text is never shown for a sign-in.
   expect(`${invalid}${busy}${audit}`).not.toContain('server');
 });
 

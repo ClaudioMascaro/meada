@@ -1,16 +1,3 @@
-//! FastAPI and Flask providers (spec #24): a decorator registers the function it decorates on an
-//! app or a router, under the router's own prefix and every prefix it is mounted under
-//! (`include_router`, `mount`, `register_blueprint`, through the root's `prefixes`), the app or
-//! router followed through `Code::origins` (`Follow::Values`: constants, imports, arguments and
-//! return values) and counted only when its framework's constructor creates it, its callee read
-//! as a name (`Code::outside` without the path flag). Django providers: the `path()` and
-//! `re_path()` entries of every root URLconf's `urlpatterns`, each `include()` followed at any
-//! depth (`URLCONF_BUDGET`, `INCLUDE_DEPTH`); a function view serves what its decorators allow
-//! or every method, a class-based view the handler methods it defines. Both ask `Code::origins`
-//! with `Follow::Values` (a `urlpatterns` list, an `include()` entry, a view) and read the name
-//! of a decorator, a view or a callee with `Code::outside` without the path flag. Seams of the
-//! root reused: `prefixes`, `path_literal`, `methods`, `normalize_path`, `provider`.
-
 mod clients;
 
 pub(super) use clients::consumers;
@@ -23,51 +10,33 @@ use crate::contract::{Found, Site};
 use crate::lang::{Call, Value, literal};
 use crate::resolve::{Code, Follow, Of, Origin, Target};
 
-/// FastAPI, Flask and Django providers: see the module.
 pub(super) fn providers(code: &Code) -> Vec<Found> {
     let mut found = decorated(code);
     found.extend(django(code));
     found
 }
 
-/// A method mounting an app or a router (the child) on the one it is called on.
 struct Mount {
     method: &'static str,
-    /// The child's position, and its keyword.
     child: (usize, &'static str),
-    /// The prefix given: its position when it may be positional, and its keyword.
     prefix: (Option<usize>, &'static str),
-    /// Whether the child may be an app (FastAPI's `include_router(app.router)` and `mount`), so
-    /// a child that cannot be read may be any app.
     takes_apps: bool,
 }
 
-/// The argument of `call` at `position`, or else its keyword argument `keyword`.
 fn argument<'c>(call: &'c Call, (position, keyword): (Option<usize>, &str)) -> Option<&'c Value> {
     (position.and_then(|n| call.args.get(n))).or_else(|| call.keyword(keyword))
 }
 
-/// A Python web framework whose routes are decorators on an app or a router.
 struct Framework {
-    /// What creates its apps, as named outside the repository: an app nothing mounts is served
-    /// at its root.
     apps: &'static [&'static str],
-    /// What creates its routers: a router is served only where a mount Meada reads puts it.
     routers: &'static [&'static str],
-    /// The constructor's keyword giving a router's own prefix.
     prefix: &'static str,
     mounts: &'static [Mount],
-    /// Whether a prefix given when mounting replaces the router's own (Flask) or goes before
-    /// it (FastAPI).
     replaces: bool,
-    /// The decorator taking a path and `methods=[...]` (`GET` without them).
     route: &'static str,
-    /// Whether `@app.get(path)` and the other method decorators register a route.
     shortcuts: bool,
 }
 
-// Mount matching compares framework identities across lookups. A static owns one
-// table; a const may be promoted to different allocations by optimized code.
 static FRAMEWORKS: &[Framework] = &[
     Framework {
         apps: &["fastapi.FastAPI"],
@@ -107,17 +76,9 @@ static FRAMEWORKS: &[Framework] = &[
     },
 ];
 
-/// FastAPI and Flask providers: a decorator registering the function it decorates on an app
-/// or a router, under the router's own prefix and every prefix it is mounted under, at any
-/// depth. The app or router is followed through constants, imports, arguments and return
-/// values; a decorator counts only on one its framework's constructor creates. A router is
-/// served only under the mounts Meada reads; an app nothing mounts is served at its root,
-/// unless a mount whose child cannot be read, called on another app or router of its
-/// framework, may mount it.
 // ponytail: such a mount hides every other app of its framework that nothing else mounts, even
 // one it cannot hold.
 fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
-    // The framework that creates an app or router, and whether it is an app.
     let framework = |(path, n): CallAt<'a>| -> Option<(&Framework, bool)> {
         let call = &code.files()[path].calls[n];
         let name = code
@@ -143,7 +104,6 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
         );
         origins.iter().filter_map(creator).collect()
     };
-    // The prefix a router's constructor gives it: none when absent.
     let own = |router @ (path, n): CallAt<'a>| -> Option<String> {
         let call = code.call(path, n)?;
         match call.keyword(framework(router)?.0.prefix) {
@@ -152,7 +112,6 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
         }
     };
     let mut mounts = Mounts::new();
-    // The apps and routers holding a mount that takes apps and whose child cannot be read.
     let mut unread: Vec<(CallAt, &Framework)> = Vec::new();
     let mut routes = Vec::new();
     for (&path, facts) in code.files() {
@@ -211,8 +170,6 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
             }
         }
     }
-    // Where a router nothing mounts is served: an app at its root, unless a mount that cannot
-    // be read may hold it.
     let root = |router: CallAt<'a>| -> Option<String> {
         let (kind, app) = framework(router)?;
         let elsewhere = (unread.iter()).any(|&(at, f)| at != router && std::ptr::eq(f, kind));
@@ -255,33 +212,22 @@ fn decorated<'a>(code: &Code<'a>) -> Vec<Found> {
     found
 }
 
-/// The methods a Django class-based view serves by defining them.
 const VIEW_METHODS: &[&str] = &[
     "get", "post", "put", "patch", "delete", "head", "options", "trace",
 ];
 
-/// What a Django URLconf entry or a view decorator is, by its name outside the repository.
 const DJANGO_PATH: &str = "django.urls.path";
 const DJANGO_RE_PATH: &str = "django.urls.re_path";
 const DJANGO_INCLUDE: &str = "django.urls.include";
 
-/// How many URLconf entries `django` reads, over every root and every `include()` it follows.
-/// A module included under several prefixes is read once for each, so a crafted ladder of
-/// modules each including the next twice has as many paths as two to its height; past the
-/// budget the remaining entries yield no provider.
 // ponytail: real projects have a few thousand routes at most; 2^15 entries is far past them.
 const URLCONF_BUDGET: usize = 1 << 15;
-/// How many `include()` calls deep `django` follows a URLconf: the routes of a module included
-/// deeper yield no provider.
 // ponytail: real projects nest a few levels of `include()`; the limit keeps a crafted chain of
 // thousands of modules from overflowing the stack, which the budget alone would not.
 const INCLUDE_DEPTH: usize = 64;
 
 const DJANGO_HTTP: &str = "django.views.decorators.http.";
 
-/// A `re_path()` pattern as a route: literal text and simple named groups (`(?P<name>...)`),
-/// each group a parameter; `None` for any other pattern. A leading `^` and a trailing `$`
-/// anchor it.
 fn regex_route(pattern: &str) -> Option<String> {
     let pattern = pattern.strip_prefix('^').unwrap_or(pattern);
     let pattern = pattern.strip_suffix('$').unwrap_or(pattern);
@@ -290,7 +236,6 @@ fn regex_route(pattern: &str) -> Option<String> {
     while let Some(c) = rest.chars().next() {
         rest = &rest[c.len_utf8()..];
         match c {
-            // An escaped punctuation character is itself; `\d` and the like are classes.
             '\\' => {
                 let escaped = rest.chars().next().filter(|e| !e.is_ascii_alphanumeric())?;
                 rest = &rest[escaped.len_utf8()..];
@@ -302,7 +247,6 @@ fn regex_route(pattern: &str) -> Option<String> {
                 if name.is_empty() || !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
                     return None;
                 }
-                // A group holding no other group: it ends at the first `)` not escaped.
                 let mut chars = body.char_indices();
                 let end = loop {
                     match chars.next()? {
@@ -322,9 +266,6 @@ fn regex_route(pattern: &str) -> Option<String> {
     Some(out)
 }
 
-/// The methods the Django function view `view` serves, from its decorators: those of
-/// `require_http_methods([...])`, `require_GET`, `require_POST` and `require_safe` (`GET`
-/// and `HEAD`), all of them when several restrict it; `None` when nothing restricts it.
 fn view_methods<'a>(code: &Code<'a>, view: Target<'a>) -> Option<Vec<String>> {
     let facts = code.files()[view.path];
     let scope = crate::parent(view.name);
@@ -369,22 +310,13 @@ fn view_methods<'a>(code: &Code<'a>, view: Target<'a>) -> Option<Vec<String>> {
     allowed
 }
 
-/// What an `include()` argument names.
 enum Include<'a> {
-    /// A URLconf module of the repository.
     Module(&'a str),
-    /// The entries of a list, as written.
     Entries(&'a Value),
-    /// A dotted name no module of the repository answers to: a module outside it, or one
-    /// Meada cannot resolve, so any URLconf whose path ends with it may be that module.
     Named(String),
-    /// Anything Meada cannot read: it may name any URLconf.
     Unknown,
 }
 
-/// What the `include()` argument `arg`, written in `scope` of `path`, names: a module by dotted
-/// name or as a module, a list of entries, or either of them first in a tuple with the
-/// application namespace (`include(("shop.urls", "shop"))`).
 fn include<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, arg: &'a Value) -> Include<'a> {
     let dotted = |value: Value| -> Include<'a> {
         let Value::Str(parts) = value else {
@@ -438,8 +370,6 @@ fn include<'a>(code: &Code<'a>, path: &'a str, scope: &'a str, arg: &'a Value) -
     }
 }
 
-/// The URLconf entries an `include()` call at `index` of `path` holds: the `urlpatterns` of
-/// the module it names, or the entries of the list it is given.
 fn included<'a>(code: &Code<'a>, path: &'a str, index: usize) -> Vec<Origin<'a>> {
     let Some(call) = code.call(path, index) else {
         return Vec::new();
@@ -468,8 +398,6 @@ fn included<'a>(code: &Code<'a>, path: &'a str, index: usize) -> Vec<Origin<'a>>
     }
 }
 
-/// Whether `module`, a file of the repository, may be what the dotted name `name` imports from
-/// some source root: its dotted path is `name` or ends with it.
 fn may_be(module: &str, name: &str) -> bool {
     let module = module.strip_suffix(".py").unwrap_or(module);
     let module = module.strip_suffix("/__init__").unwrap_or(module);
@@ -477,8 +405,6 @@ fn may_be(module: &str, name: &str) -> bool {
     module == name || module.ends_with(&format!(".{name}"))
 }
 
-/// Whether the origin's call is the function `name` outside the repository, its callee read as a
-/// name (a Rust file's `urls::path(..)` is no `path`, as `Origin::outside` reads the call's path).
 fn is_call<'a>(code: &Code<'a>, origin: &Origin<'a>, name: &str) -> bool {
     let Some((path, n)) = origin.call else {
         return false;
@@ -487,19 +413,11 @@ fn is_call<'a>(code: &Code<'a>, origin: &Origin<'a>, name: &str) -> bool {
         .is_some_and(|call| is_named(code, path, call, name))
 }
 
-/// Whether the callee of `call`, written in `path`, is the function `name` outside the
-/// repository.
 fn is_named<'a>(code: &Code<'a>, path: &'a str, call: &'a Call, name: &str) -> bool {
     let outside = code.outside(path, &call.scope, &call.callee, false);
     outside.is_some_and(|o| o.spelled == name)
 }
 
-/// Django providers: the `path()` and `re_path()` entries of every root URLconf's
-/// `urlpatterns`, each `include()` followed at any depth with the route before it. A root is a
-/// module no `include()` may name: none names it, none holds a dotted name its path ends with,
-/// and none holds an argument Meada cannot read. A function view serves the methods its
-/// decorators allow, or every method (`ANY`); a class-based view (`View.as_view()`) the handler
-/// methods it defines.
 // ponytail: one `include()` Meada cannot read leaves no root at all; a single `urlpatterns =
 // [...] + other` (no list literal as a whole) yields no entry.
 fn django<'a>(code: &Code<'a>) -> Vec<Found> {
@@ -512,7 +430,6 @@ fn django<'a>(code: &Code<'a>) -> Vec<Found> {
     }
     for (&path, facts) in code.files() {
         for (n, call) in facts.calls.iter().enumerate() {
-            // The name check first: `is_named` resolves the callee.
             let named = call.callee.rsplit('.').next() == Some("include");
             if !named || !is_named(code, path, call, DJANGO_INCLUDE) {
                 continue;
@@ -543,10 +460,6 @@ fn django<'a>(code: &Code<'a>) -> Vec<Found> {
     found
 }
 
-/// The providers of URLconf `entries` (the `Values` origins of a `urlpatterns` list or an
-/// `include()`d one) under `prefix`; `stack` holds the `include()` calls
-/// being followed, so one met again (a cycle) adds nothing. Each entry read is charged to
-/// `budget`; once it is spent, nothing more is read.
 // ponytail: `django.conf.urls.url`, a view wrapped in a call (`require_POST(view)`), a handler
 // method a class-based view inherits and `as_view()` on a class outside the repository yield
 // nothing; a `re_path()` pattern is read as written, so a non-raw string with doubled
@@ -657,8 +570,6 @@ mod tests {
 
     #[test]
     fn a_rust_path_call_named_like_django_path_is_no_route() {
-        // `urls::path` is a module's function, found by its path; read as a name, `urls` is a
-        // local function and `django::urls` is not what `urls::path(..)` names.
         let src = "use django::urls;\nfn urls() {}\nfn view() {}\n\
                    static urlpatterns: [R; 1] = [urls::path(\"a/\", view)];\n";
         let facts = Rust.parse("src/lib.rs", src.as_bytes()).unwrap();

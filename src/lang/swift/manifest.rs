@@ -1,19 +1,10 @@
-//! `Package.swift`, read with the Swift grammar and no Swift toolchain: the targets a SwiftPM
-//! package declares, each a module of the files under its directory (`targets`), and the
-//! grammar readers the package kind's own reader (`package::swiftpm::manifest`) builds on: a
-//! call with its labelled arguments (`call`), a string with its computed parts (`pattern`) and a
-//! literal one (`literal`).
-
 use tree_sitter::{Node, Parser};
 
 use super::super::{named, text};
 
-/// Where a package's manifest sits, as a config file's glob, and its file name.
 pub(crate) const MANIFESTS: &str = "**/Package.swift";
 pub(crate) const MANIFEST: &str = MANIFESTS.split_at(3).1;
 
-/// A target of a package: its module name, the directory of its package and the directory of
-/// its files, both relative to the repository (`pkg`, `pkg/Sources/Store`).
 #[derive(Debug, PartialEq)]
 pub struct Target {
     pub name: String,
@@ -21,12 +12,6 @@ pub struct Target {
     pub dir: String,
 }
 
-/// The targets the manifest at `path` declares: every `.target`, `.executableTarget`,
-/// `.testTarget`, `.macro` and `.plugin` call written in it, wherever it sits (a variable may
-/// hold the list) but in a `dependencies:` argument (`.target(name:)` there names a
-/// dependency), with a literal `name:`. Its `path:` names its directory when it is a literal
-/// inside the package, else the default one (`Sources/<name>`, `Tests/<name>` for a test target,
-/// `Plugins/<name>` for a plugin).
 // ponytail: `sources:` and `exclude:` are not read; every file under the directory is the
 // target's.
 pub fn targets(path: &str, src: &[u8]) -> Vec<Target> {
@@ -42,7 +27,6 @@ pub fn targets(path: &str, src: &[u8]) -> Vec<Target> {
     };
     let package = path.rsplit_once('/').map_or("", |(dir, _)| dir);
     let mut found = Vec::new();
-    // Each node with whether a `dependencies:` argument holds it.
     let mut pending = vec![(tree.root_node(), false)];
     while let Some((node, dependency)) = pending.pop() {
         let label = (node.kind() == "value_argument")
@@ -75,7 +59,6 @@ pub fn targets(path: &str, src: &[u8]) -> Vec<Target> {
         let dir = match dir {
             None => format!("{defaults}/{name}"),
             Some(Some(dir)) if inside(&dir) => dir,
-            // A computed or escaping path: the target's files are not known.
             Some(_) => continue,
         };
         let segments = package.split('/').chain(dir.split('/'));
@@ -90,11 +73,8 @@ pub fn targets(path: &str, src: &[u8]) -> Vec<Target> {
     found
 }
 
-/// One argument: its label, when it has one, and its value.
 pub(crate) type Argument<'t> = (Option<&'t str>, Node<'t>);
 
-/// A call's function name (`Package`, or the member of `.library(...)` and `Product.library(...)`)
-/// and its arguments, each with its label.
 pub(crate) fn call<'t>(node: Node<'t>, src: &'t [u8]) -> Option<(&'t str, Vec<Argument<'t>>)> {
     let function = named(node).next()?;
     let name = match function.kind() {
@@ -119,8 +99,6 @@ pub(crate) fn call<'t>(node: Node<'t>, src: &'t [u8]) -> Option<(&'t str, Vec<Ar
     Some((text(name, src), arguments))
 }
 
-/// A string written with its computed parts as `*`, and whether it has any. Anything that is no
-/// string literal is one computed part.
 pub(crate) fn pattern(node: Node, src: &[u8]) -> (String, bool) {
     if node.kind() != "line_string_literal" {
         return ("*".to_string(), true);
@@ -139,13 +117,9 @@ pub(crate) fn pattern(node: Node, src: &[u8]) -> (String, bool) {
     (out, computed)
 }
 
-/// The directory a target call's kind (`.target`, `.testTarget`) holds its files in by
-/// default, when `function` is one.
 fn defaults(function: Node, src: &[u8]) -> Option<&'static str> {
     let member = match function.kind() {
-        // `.target(...)`, the implicit member form.
         "prefix_expression" => function.child_by_field_name("target")?,
-        // `Target.target(...)`.
         "navigation_expression" => function
             .child_by_field_name("suffix")?
             .child_by_field_name("suffix")?,
@@ -159,7 +133,6 @@ fn defaults(function: Node, src: &[u8]) -> Option<&'static str> {
     }
 }
 
-/// A string literal with no interpolation.
 pub(crate) fn literal(node: Node, src: &[u8]) -> Option<String> {
     if node.kind() != "line_string_literal" {
         return None;
@@ -174,7 +147,6 @@ pub(crate) fn literal(node: Node, src: &[u8]) -> Option<String> {
     Some(out)
 }
 
-/// Whether a relative directory stays inside the package: no root, no `..`.
 fn inside(dir: &str) -> bool {
     !dir.starts_with('/') && !dir.split('/').any(|s| s == "..")
 }

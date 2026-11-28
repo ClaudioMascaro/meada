@@ -1,5 +1,3 @@
-//! GCP client policy. The shared SDK walk proves construction; these forms select the
-//! receiver stage, operation, direction and identity-bearing argument.
 use crate::contract::sdk::origins::{Evidence, Policy};
 use crate::contract::{Found, Role, Site};
 use crate::lang::{Value, property};
@@ -212,8 +210,6 @@ fn subscription(operation: Option<&str>) -> bool {
     )
 }
 
-/// A plain workload id has the subtype of its SDK operation. A structured wrong
-/// collection stays unresolved instead of falling back to a plausible topic id.
 pub(crate) fn environment_name(value: &str, operation: Option<&str>) -> Option<String> {
     super::pubsub(value, subscription(operation))
 }
@@ -228,7 +224,6 @@ pub(crate) fn environment_target(name: &str, operation: Option<&str>) -> bool {
     physical.and_then(|s| super::pubsub(s, sub)).as_deref() == Some(name)
 }
 
-/// The stage is retained until the final operation: making a handle supplies no direction.
 pub(crate) fn extract(code: &Code, channels: bool) -> Vec<Found> {
     let extensions = code.pack().extensions();
     let language = if extensions.contains(&"ts") {
@@ -342,7 +337,6 @@ fn typed_name(name: &str) -> bool {
     )
 }
 
-/// Only imported typed-name helpers may project an identity component.
 fn value_argument<'a>(code: &Code<'a>, path: &'a str, value: &Value) -> Argument {
     if let Value::New(ty, args) = value
         && matches!(

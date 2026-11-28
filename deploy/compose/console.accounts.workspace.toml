@@ -1,4 +1,3 @@
-# The console of the local accounts proof of concept; console.workspace.toml is the other profiles'.
 index_dir = "/var/lib/meada/console/indexes"
 
 [workspace]
@@ -29,9 +28,6 @@ keep = 3
 [refresh_lock]
 ttl_seconds = 300
 
-# Local accounts (ADR 0024, compose.accounts.yaml): the sign-in is the console's own, so there is
-# no [oidc] here. The default account reads MEADA_ADMIN_PASSWORD (empty: a generated password,
-# printed once on the console's stderr).
 [postgres]
 url_env = "MEADA_POSTGRES_URL"
 ca_file = "/etc/meada/ca/ca.pem"

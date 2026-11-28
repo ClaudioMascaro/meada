@@ -134,7 +134,6 @@ test('a 403 password_change_required binds the tab to the forced change, kept ac
   expect(auth.stage()).toBe('forced');
   expect(auth.token).toBe('t');
   expect(new LocalAuth(config).stage()).toBe('forced');
-  // Another 403 changes nothing.
   const other = new LocalAuth(config);
   await expect(new Api(other).session()).rejects.toMatchObject({ status: 403, code: 'forbidden' });
 }  );

@@ -1,9 +1,3 @@
-//! The audit (#328, ADR 0016): with `[postgres]`, every console write leaves one record, written
-//! before the write and refusing it when it cannot be written, and the global operator reads
-//! them through `GET audit`. The team fixture of `team` (real Valkey and store, the `oidc`
-//! module's loopback issuer), a local Postgres in a schema of each test's own behind a loopback
-//! relay the test may close.
-
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -22,7 +16,6 @@ use crate::server::Server;
 use crate::snapshot::next_commit;
 use crate::ui::{Reply, send_body};
 
-/// `team` with `[postgres]` in the console's manifest, and the console restarted over it.
 fn audited_team(case: &'static str) -> Option<(Team, Audited, Server)> {
     let team = team(case, true)?;
     let audit = audited(&team.fleet.dir, case)?;
@@ -43,7 +36,6 @@ fn post(console: &Server, route: &str, token: &str, body: Value) -> Reply {
     )
 }
 
-/// A write whose body announces a megabyte and never comes: the status, read within 10 s.
 fn unfinished(console: &Server, route: &str, token: &str) -> u16 {
     let address = console.url.trim_start_matches("http://");
     let mut stream = TcpStream::connect(address).unwrap();
@@ -64,7 +56,6 @@ fn unfinished(console: &Server, route: &str, token: &str) -> u16 {
     answer.split(' ').nth(1).unwrap().parse().unwrap()
 }
 
-/// `record` without its `id` and `time`, for comparison.
 fn fields(record: &Value) -> Value {
     let mut record = record.clone();
     let object = record.as_object_mut().unwrap();
@@ -73,7 +64,6 @@ fn fields(record: &Value) -> Value {
     record
 }
 
-/// No part of a token of `tokens` and no Postgres URL in `text`.
 fn assert_leaks_nothing(audit: &Audited, text: &str, tokens: &[&str]) {
     for token in tokens {
         for part in token.split('.') {
@@ -83,12 +73,6 @@ fn assert_leaks_nothing(audit: &Audited, text: &str, tokens: &[&str]) {
     audit.assert_no_url(text);
 }
 
-/// The global operator's `pointer` `set`, `retain` and `drop`, `fence/recover`,
-/// `workspace/versions` and `workspace/apply` each leave one record (`via = "console"`, its
-/// action, its arguments, `accepted`), and `audit` returns them newest first with Postgres's
-/// time, paged by `next`; a write while `meada snapshot lock` holds the lock goes from pending to
-/// `refused`. Only the global operator reads the audit, and a query other than `before` and
-/// `limit` is a 400. The stderr lines are the ones S2 prints.
 #[test]
 fn every_operator_write_leaves_one_record_read_newest_first() {
     let Some((team, audit, console)) = audited_team("ui_audit_writes") else {
@@ -123,7 +107,6 @@ fn every_operator_write_leaves_one_record_read_newest_first() {
         (retained.as_str(), dropped.as_str(), recovered.as_str()),
         (g1.as_str(), g2.as_str(), "50")
     );
-    // A held lock: refused, after its pending record.
     let child = lock(dir, MANIFEST, "touch ops/started; exec sleep 60");
     wait_for(&dir.join("ops/started"));
     let held = post(
@@ -140,7 +123,6 @@ fn every_operator_write_leaves_one_record_read_newest_first() {
     nix::sys::signal::kill(pid, nix::sys::signal::Signal::SIGTERM).unwrap();
     child.wait();
 
-    // `config` tells the front end the page has its route.
     assert_eq!(ask(&console, "/api/v1/config", &root).json()["audit"], true);
     let page = ask(&console, "/api/v1/audit", &root);
     assert_eq!(page.status, 200, "{}", page.body);
@@ -172,7 +154,6 @@ fn every_operator_write_leaves_one_record_read_newest_first() {
         record("pointer.retain", json!({"generation": g1}), "accepted", &g1),
     ];
     assert_eq!(records.iter().map(fields).collect::<Vec<_>>(), expected);
-    // Newest first, each `time` Postgres's own.
     let times = audit.admin.texts(&format!(
         "SELECT to_char(\"time\" AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') FROM \
          \"{}\".audit ORDER BY id DESC",
@@ -186,7 +167,6 @@ fn every_operator_write_leaves_one_record_read_newest_first() {
     let ids: Vec<i64> = records.iter().map(|r| r["id"].as_i64().unwrap()).collect();
     assert!(ids.windows(2).all(|w| w[0] > w[1]), "{ids:?}");
 
-    // Paging with `next` lists every record once.
     let mut paged = Vec::new();
     let mut path = "/api/v1/audit?limit=3".to_string();
     loop {
@@ -227,8 +207,6 @@ fn every_operator_write_leaves_one_record_read_newest_first() {
         );
     }
 
-    // A row that fails its checks (a role, then a login outside its pattern) is left out, one
-    // stderr line naming the table and no value.
     audit.admin.run(&format!(
         "INSERT INTO \"{0}\".audit (via, subject, role, action, arguments, outcome, message) \
          VALUES ('console', 'mallory-328', 'admin', 'pointer.set', '{{}}', 'accepted', 'x');
@@ -271,16 +249,10 @@ fn every_operator_write_leaves_one_record_read_newest_first() {
     assert_leaks_nothing(&audit, &all, &[&root, &ana, &bob]);
 }
 
-/// The lines of `console` that start with `ui: `, once it is killed.
 fn audit_lines(console: Server) -> Vec<String> {
     audit(console)
 }
 
-/// A team operator's accepted save and apply record `team_operator` and the owners of the touched
-/// entries; its refused save records `refused`, its teams and the message with the named
-/// identities and the hidden count. A viewer's write and a team operator's `pointer` or
-/// `fence/recover` leave one `refused` record with the route's action and no argument, answered
-/// before their bodies arrive.
 #[test]
 fn team_writes_and_refusals_before_the_body_are_recorded() {
     let Some((team, audit, console)) = audited_team("ui_audit_team") else {
@@ -305,7 +277,6 @@ fn team_writes_and_refusals_before_the_body_are_recorded() {
     let reply = post(&console, "workspace/apply", &ana, json!({"version": saved}));
     assert_eq!(reply.status, 200, "{}", reply.body);
     let applied = reply.json()["result"].as_str().unwrap().to_string();
-    // The joint entry is team-search's: refused, naming it.
     let other = text.replace("../e.test/team/joint", "../moved");
     let reply = post(
         &console,
@@ -402,7 +373,6 @@ fn team_writes_and_refusals_before_the_body_are_recorded() {
             ),
         ]
     );
-    // The save's arguments name the version as submitted, before the composition.
     assert_eq!(records[0]["arguments"]["message"], "m");
     assert!(meada_core::ids::is_id(
         records[0]["arguments"]["version"].as_str().unwrap()
@@ -434,10 +404,6 @@ fn team_writes_and_refusals_before_the_body_are_recorded() {
     assert_leaks_nothing(&audit, &all, &[&ana, &bob]);
 }
 
-/// With Postgres stopped (the relay closed), every write answers 503 `audit_unavailable` and
-/// Valkey and the store are unchanged; reads and `session` still answer, and so does a console
-/// started then; a viewer's write is still the role refusal with its stderr line, and no record.
-/// On a schema version this binary does not know, the console refuses to start, naming both.
 #[test]
 fn without_postgres_no_write_runs_and_reads_still_answer() {
     let Some((team, audit, console)) = audited_team("ui_audit_down") else {
@@ -490,7 +456,6 @@ fn without_postgres_no_write_runs_and_reads_still_answer() {
         (page.status, page.json()["error"]["code"].clone()),
         (503, json!("audit_unavailable"))
     );
-    // A console started now starts, and serves its reads.
     let again = start(&team.fleet);
     assert_eq!(ask(&again, "/api/v1/fleet", &root).status, 200);
     assert!(audit.records().is_empty());
@@ -522,7 +487,6 @@ fn without_postgres_no_write_runs_and_reads_still_answer() {
     );
     assert_leaks_nothing(&audit, &lines.join("\n"), &[&root, &bob]);
 
-    // A schema this binary does not know refuses the start, naming both versions.
     fs::write(dir.join("ops/pg-url"), &audit.url).unwrap();
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_meada"))
         .current_dir(dir)

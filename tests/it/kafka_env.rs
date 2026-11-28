@@ -1,12 +1,8 @@
-//! A Kafka topic read from the environment carries its variable, so a workload that sets it
-//! names the side (front 6, Task 3).
-
 use meada::engine::Engine;
 use serde_json::Value;
 
 use crate::common::fixture_repo;
 
-/// The export of the `kafka-env` fixture, copied for `case`, after `change` edits the copy.
 fn export(case: &str, change: impl FnOnce(&std::path::Path)) -> Value {
     let repo = fixture_repo(
         case,
@@ -17,7 +13,6 @@ fn export(case: &str, change: impl FnOnce(&std::path::Path)) -> Value {
     serde_json::from_str(&Engine::open(&repo).unwrap().export().unwrap()).unwrap()
 }
 
-/// The side of `role` (`providers` or `consumers`) whose site is in `file`.
 fn side<'e>(export: &'e Value, role: &str, file: &str) -> &'e Value {
     let at = format!("::{file}::");
     (export[role].as_array().unwrap().iter())
@@ -25,7 +20,6 @@ fn side<'e>(export: &'e Value, role: &str, file: &str) -> &'e Value {
         .unwrap_or_else(|| panic!("no {role} in {file}: {export}"))
 }
 
-/// The link between a provider in `from` and a consumer in `to`.
 fn link<'e>(export: &'e Value, from: &str, to: &str) -> &'e Value {
     let (from, to) = (format!("::{from}::"), format!("::{to}::"));
     (export["links"].as_array().unwrap().iter())

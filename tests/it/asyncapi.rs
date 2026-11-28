@@ -1,9 +1,3 @@
-//! AsyncAPI documents (spec #21): the channels and operations of a repository with a `[serve]`
-//! table become channel sides, merged with the code sides of the same channel and direction,
-//! linked to the producers and consumers of other repositories and shown by `trace`, `context`
-//! and `meada status`. Over `asyncapi-events` (the documents) and `asyncapi-services` (the
-//! code on the other side of them).
-
 use crate::common;
 
 use std::path::PathBuf;
@@ -12,8 +6,6 @@ use common::{assert_golden, fixture_repo, without_processes};
 use meada::engine::{self, Direction, Engine, Start};
 use serde_json::Value;
 
-/// The fixture as siblings in one case directory; returns `services`, whose workspace holds
-/// `events` too.
 fn workspace(case: &str) -> PathBuf {
     let events = "https://example.com/asyncapi/events.git";
     fixture_repo(case, "asyncapi-events", Some(events));
@@ -46,7 +38,6 @@ fn a_documented_side_merges_with_the_code_side_of_its_channel_and_direction() {
         let same = sides.iter().filter(|s| s["contract"] == contract);
         same.cloned().collect()
     };
-    // Sent from code and documented: one side, the code's, with the document's shape.
     let updated = of("providers", "channel::kafka::orders.updated");
     assert_eq!(updated.len(), 1);
     assert!(
@@ -56,7 +47,6 @@ fn a_documented_side_merges_with_the_code_side_of_its_channel_and_direction() {
             .contains("src/emit.ts::")
     );
     assert_eq!(updated[0]["shape"]["source"]["document"], "asyncapi.yaml");
-    // Received by code and documented: likewise.
     let cancelled = of("consumers", "channel::amqp::shipments.cancelled");
     assert_eq!(cancelled.len(), 1);
     assert!(

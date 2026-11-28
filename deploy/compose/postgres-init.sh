@@ -1,9 +1,5 @@
 #!/bin/sh
 set -eu
-# Runs once, when the data volume is first initialised. The three roles ADR 0016 recommends:
-# meada_migrate owns the schema and runs `meada postgres migrate`; meada_write is the console,
-# the job's role check and the CLI twins; meada_read is the nodes. The default privileges give
-# the other two roles the tables the migrate role creates later.
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
   -v migrate_password="$POSTGRES_MIGRATE_PASSWORD" \
   -v write_password="$POSTGRES_WRITE_PASSWORD" \

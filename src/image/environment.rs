@@ -1,5 +1,3 @@
-//! Resolve directed contract reads only through the container that runs their code.
-
 use crate::contract::Level;
 use crate::contract::{EnvironmentScope, EnvironmentValue, ReceiverIdentity};
 use crate::iac::environment::Entry;
@@ -9,8 +7,6 @@ use crate::workspace::Repository;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-// Legacy channel sides exposed no environment provenance before workload resolution.
-// Keep their new variable data distinct from established SDK `env:` metadata.
 const PENDING: &str = "pending-workload-env:";
 
 pub(crate) fn pending(variable: &str) -> String {
@@ -22,13 +18,9 @@ struct Scope<'a> {
     root: &'a str,
     entry: &'a Entry,
     certain: bool,
-    /// A chart environment's scope (`image::chart_env`): only a kind that reads chart
-    /// environments sees it, for sites the scope's package owns.
     helm: Option<Helm<'a>>,
 }
 
-/// What a chart environment's scope knows of its chart: its directory, its values file, its
-/// key and the chart's environment files, so a variable's agreement across the chart can be told.
 #[derive(Clone)]
 struct Helm<'a> {
     chart: &'a str,
@@ -40,14 +32,11 @@ struct Helm<'a> {
 type Paths<'a> = BTreeMap<&'a str, Vec<Scope<'a>>>;
 type Variables<'a> = BTreeMap<&'a str, Paths<'a>>;
 
-/// Workload-scoped values, shared with kinds that resolve an HTTP base or a resource name.
 pub(crate) struct Environments<'a> {
     scopes: BTreeMap<String, Variables<'a>>,
-    /// Each repository's manifests, for the package a chart environment's site belongs to.
     manifests: BTreeMap<&'a str, &'a [crate::package::Manifest]>,
 }
 
-/// A base URL carries its workload scope without putting identities in human reason text.
 pub(crate) struct ScopedValue<'a> {
     pub value: Option<&'a str>,
     pub reason: String,
@@ -116,7 +105,6 @@ impl<'a> Environments<'a> {
                 });
                 let workload: Arc<str> = node.identity(&export.repository).into();
                 let direct = executions.get(&(workload.as_ref(), node.root.as_str()));
-                // Resolve one container image once, independently of how many variables it sets.
                 let mut images = BTreeMap::new();
                 for entry in &node.environment {
                     let repositories = images.entry(entry.image.as_deref()).or_insert_with(|| {
@@ -166,7 +154,6 @@ impl<'a> Environments<'a> {
         out
     }
 
-    /// HTTP keeps unread entries too, so a Secret cannot fall back to a guessed base URL.
     pub(crate) fn scoped_values(
         &self,
         repository: &str,
@@ -174,8 +161,6 @@ impl<'a> Environments<'a> {
         variable: &str,
     ) -> Vec<ScopedValue<'_>> {
         let mut entries = self.entries(repository, site, variable, false);
-        // An unresolved envFrom can hold any matching name, except an explicit override in
-        // that same container. Reuse the indexed paths rather than scan source or processes.
         if let Some(variables) = self.scopes.get(repository) {
             let unread = variables
                 .keys()
@@ -209,11 +194,6 @@ impl<'a> Environments<'a> {
             .collect()
     }
 
-    /// Values and their explanations for one variable at one code site, each with the cap a
-    /// chart environment's value carries (Goal 2): `declared` when every environment of every
-    /// chart in scope that sets the variable gives the one literal, else `inferred`; `None` for
-    /// any other workload's. `helm` is whether the reader's kind reads chart environments. No
-    /// process is read.
     fn values(
         &self,
         repository: &str,
@@ -231,7 +211,6 @@ impl<'a> Environments<'a> {
             charts.map(|h| (h.chart, &*h.environments)).collect();
         let mut values = scopes.iter().filter(|s| s.helm.is_some());
         let first = values.next().and_then(|s| s.entry.value.as_deref());
-        // A chart that never sets the variable has no scope here, so it says nothing.
         let agreed = first.is_some()
             && values.all(|s| s.entry.value.as_deref() == first)
             && (every.iter()).all(|(chart, environments)| {
@@ -250,7 +229,6 @@ impl<'a> Environments<'a> {
             .collect()
     }
 
-    /// Typed known resource references share exactly the same code/container/root scope.
     fn targets(
         &self,
         repository: &str,
@@ -288,9 +266,6 @@ impl<'a> Environments<'a> {
             .collect()
     }
 
-    /// The scopes that hold `variable` for `site`: a workload's whose code path holds the
-    /// site's file, and, when `helm` (the reader's kind reads chart environments), a chart
-    /// environment's whose package is the one that owns the file, so a nested package is out.
     fn entries(&self, repository: &str, site: &str, variable: &str, helm: bool) -> Vec<&Scope<'a>> {
         let Some(path) = site
             .strip_prefix(repository)
@@ -311,7 +286,6 @@ impl<'a> Environments<'a> {
             .flatten()
             .and_then(|manifests| crate::package::owner_of(manifests, path))
             .map(|m| m.path.rsplit_once('/').map_or(".", |(dir, _)| dir));
-        // Only the file and its ancestors can contain this site; unrelated build paths are skipped.
         let ancestors =
             std::iter::successors(Some(path), |p| p.rsplit_once('/').map(|(parent, _)| parent));
         std::iter::once(".")
@@ -341,7 +315,6 @@ pub(super) fn resolve(exports: &mut [Export], repositories: &[Repository]) {
         clear_pending(exports);
         return;
     }
-    // Compute replacements before mutating the exports that own each scope's stored entries.
     let replacements = exports
         .iter()
         .map(|export| {
@@ -358,7 +331,6 @@ pub(super) fn resolve(exports: &mut [Export], repositories: &[Repository]) {
                     return None;
                 }
                 let kind = crate::contract::kind_of(contract)?;
-                // Only channel resolution reads chart environments (front 6, Goal 2).
                 let helm = kind.prefix() == "channel";
                 if let Some(identity) = identity
                     && let Some(values) =
@@ -376,7 +348,6 @@ pub(super) fn resolve(exports: &mut [Export], repositories: &[Repository]) {
                     if let Some(name) = kind.environment_name(contract, value, operation) {
                         let (reasons, side) = values.entry(name).or_default();
                         reasons.insert(reason);
-                        // A side is `declared` when one of its sources is.
                         *side = [*side, cap].into_iter().flatten().min();
                     }
                 }

@@ -9,11 +9,6 @@ import { copy } from './i18n';
 import type { Language } from './i18n';
 import './operations.css';
 
-/**
- * The repository picker (#341): the repositories the session may select before a manifest exists,
- * a page at a time, with the state the catalog is in. Nothing is stored: the selection lives on
- * the page and a verification asks the server again, which decides.
- */
 export function CatalogPage({ api, locale }: { api: Api; locale: Language }) {
   const t = catalogCopy[locale];
   const common = copy[locale];

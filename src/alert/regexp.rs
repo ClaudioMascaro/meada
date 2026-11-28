@@ -1,4 +1,3 @@
-//! Alertmanager/Go RE2 compatibility on the bounded Rust regex engine.
 use super::{
     ALERT_REGEX_CLASSES_MAX, ALERT_REGEX_FOLD_MAX, ALERT_REGEX_MAX, ALERT_REGEX_POOL_MAX,
     ALERT_REGEX_SIZE_MAX,
@@ -13,9 +12,6 @@ use std::sync::{Arc, LazyLock};
 // ponytail: Go/RE2 rejects counted repetitions, including nested products, above 1000.
 const RE2_REPEAT_MAX: u32 = 1000;
 
-// The `regexp/syntax` error codes (`ErrorCode`, whose value is this text) that Go's `regexp`
-// answers a syntax error with and `refusal` can establish; any other failure is not known to be
-// a refusal.
 const MISSING_PAREN: &str = "missing closing )";
 const UNEXPECTED_PAREN: &str = "unexpected )";
 const MISSING_BRACKET: &str = "missing closing ]";
@@ -27,27 +23,12 @@ const ESCAPE: &str = "invalid escape sequence";
 const PERL_OP: &str = "invalid or unsupported Perl syntax";
 const NAMED_CAPTURE: &str = "invalid named capture";
 
-/// `None`, noting in `refusal` that Go's `regexp` refuses the expression with error code `code`.
 fn refuse<T>(refusal: &mut Option<&'static str>, code: &'static str) -> Option<T> {
     *refusal = Some(code);
     None
 }
 
-/// The `regexp/syntax` error code with which Go's `regexp` certainly refuses `pattern`, which
-/// makes Alertmanager refuse the whole configuration holding it. Alertmanager hands Go the text
-/// `^(?:pattern)$`, and so does this, so that a `)` of the pattern that closes the wrapper does
-/// not stand alone.
-///
-/// `None` when Go compiles it or when this cannot tell: a pattern past `ALERT_REGEX_MAX` (valid
-/// or not), a Unicode property outside the list (the tables follow Go's version), an ambiguous
-/// count (`a{01}`), a nesting past the 250 of `regex-syntax` where Go allows 1000, a failure of
-/// `regex-syntax` that Go does not share (`(?ii)`, `a{,5}`, `[\d-z]` are valid for Go), and
-/// whatever `compile` leaves unmatched for its budgets. A failure is a refusal only if Go's
-/// parser refuses what it names, for each class of the error codes above. The ignored test
-/// `refusal_agrees_with_go` checks it against Go.
 pub(super) fn refusal(pattern: &str) -> Option<&'static str> {
-    // `regex_source` reads a `[:` more leniently than Go (`[[:]` is no POSIX class for Go) and
-    // drops a `\Q\E` that Go counts between two operators, leaving the rest misread.
     if pattern.len() > ALERT_REGEX_MAX || pattern.contains("[:") || pattern.contains("\\Q") {
         return None;
     }
@@ -64,10 +45,6 @@ pub(super) fn refusal(pattern: &str) -> Option<&'static str> {
         GroupUnclosed => MISSING_PAREN,
         GroupUnopened => UNEXPECTED_PAREN,
         ClassUnclosed => MISSING_BRACKET,
-        // Go reads `(?` as a group of flags, which repeats nothing and lets a repetition after
-        // it repeat what came before, and `{` as text unless it forms a count: only `*`, `+`
-        // and `?` right after the start of a group or an alternative, past any groups of flags,
-        // lack an operand for certain.
         RepetitionMissing => {
             let at = error.span().start.offset;
             let mut before = source.get(..at)?;
@@ -95,12 +72,8 @@ pub(super) fn refusal(pattern: &str) -> Option<&'static str> {
     })
 }
 
-/// The flags of a group of flags.
 const FLAGS: [char; 5] = ['i', 'm', 's', 'U', '-'];
 
-/// Whether `text` ends where a group or an alternative starts: a `|`, or a `(`, `(?flags:`,
-/// `(?P<name>` or `(?<name>`, none escaped. Where a literal could end instead (`>`, `:`), the
-/// whole opener is required.
 fn opens(text: &str) -> bool {
     let unescaped = |head: &str| (head.len() - head.trim_end_matches('\\').len()).is_multiple_of(2);
     let head = if let Some(head) = text.strip_suffix(['|', '(']) {
@@ -125,42 +98,29 @@ fn opens(text: &str) -> bool {
     unescaped(head)
 }
 
-/// An expression compiled within its part of the ceilings, and its automaton positions (each
-/// character, dot or class and each state that reads none, once per copy its counted repetitions
-/// make) by the byte offsets of a value each may start at: matching takes at most a step per
-/// position and offset, whichever engine runs, as the lazy DFA gives way to the PikeVM when its
-/// states do not fit.
 pub(super) struct Compiled {
     pub(super) regex: regex::Regex,
-    /// The positions an unbounded repetition, around or before them, lets start at any offset.
     looped: usize,
-    /// The offsets each other position may start at, summed: one more than the characters what
-    /// precedes it may vary by.
     spread: usize,
 }
 impl Compiled {
-    /// An upper bound on the steps matching a value of `len` bytes takes.
     pub(super) fn cost(&self, len: usize) -> usize {
         (len.saturating_add(1))
             .saturating_mul(self.looped)
             .saturating_add(self.spread)
     }
-    /// A position entered at `starts` offsets (`None`: at any).
     fn step(&mut self, starts: Option<usize>) {
         match starts {
             Some(starts) => self.spread = self.spread.saturating_add(starts),
             None => self.looped = self.looped.saturating_add(1),
         }
     }
-    /// Counts the positions of `ast`, entered at `starts` offsets (`None`: at any), and returns
-    /// the fewest and the most characters it matches (`None`: no most).
     fn add(&mut self, ast: &Ast, starts: Option<usize>) -> (usize, Option<usize>) {
         let widen = |starts: Option<usize>, (fewest, most): (usize, Option<usize>)| {
             Some(starts?.saturating_add(most?.saturating_sub(fewest)))
         };
         match ast {
             Ast::Flags(_) => (0, Some(0)),
-            // A state that reads no character is still walked at each offset it may start at.
             Ast::Empty(_) | Ast::Assertion(_) => {
                 self.step(starts);
                 (0, Some(0))
@@ -175,7 +135,6 @@ impl Compiled {
             }
             Ast::Group(group) => {
                 let length = self.add(&group.ast, starts);
-                // A capture saves its start and its end, each a state.
                 if !matches!(group.kind, GroupKind::NonCapturing(_)) {
                     self.step(starts);
                     self.step(widen(starts, length));
@@ -209,14 +168,11 @@ impl Compiled {
                     RepetitionKind::Range(RepetitionRange::Bounded(n, m)) => (*n, Some(*m)),
                 };
                 let (min, max) = (min as usize, max.map(|m| m as usize));
-                // The automaton holds `max` copies, or `min` (at least one) with the last looping;
-                // a copy starts where the ones before it may end.
                 let copies = max.unwrap_or(min.max(1));
                 let (mut length, mut entry) = ((0, Some(0)), starts);
                 for copy in 1..=copies {
                     let looping = max.is_none() && copy == copies;
                     let at = entry.filter(|_| !looping);
-                    // An optional or looping copy is entered through a choice.
                     if looping || copy > min {
                         self.step(at);
                     }
@@ -230,26 +186,17 @@ impl Compiled {
     }
 }
 
-/// The expressions one linking pass compiled, each once for its share, and how many routing
-/// scopes share the pass's ceilings in equal parts.
 pub(super) struct Pass<'a> {
     scopes: usize,
     compiled: HashMap<(&'a str, usize), Option<Arc<Compiled>>>,
 }
 impl<'a> Pass<'a> {
-    /// A pass over `scopes` routing scopes, each compiling its expressions within an equal part
-    /// of the ceilings, so what one scope compiles never depends on the scopes before it.
     pub(super) fn new(scopes: usize) -> Self {
         Self {
             scopes: scopes.max(1),
             compiled: HashMap::new(),
         }
     }
-    /// `pattern` as Alertmanager reads it, anchored to the whole value, within its part of
-    /// `ALERT_REGEX_POOL_MAX` (at most `ALERT_REGEX_SIZE_MAX` for its scope),
-    /// `ALERT_REGEX_FOLD_MAX` and `ALERT_REGEX_CLASSES_MAX`: an equal share of its scope's part,
-    /// one of `shares` distinct expressions. `None` past them, past `ALERT_REGEX_MAX` or for no
-    /// RE2 expression.
     pub(super) fn compile(&mut self, pattern: &'a str, shares: usize) -> Option<Arc<Compiled>> {
         let scopes = self.scopes;
         let compiled = self.compiled.entry((pattern, shares));
@@ -259,7 +206,6 @@ impl<'a> Pass<'a> {
     }
 }
 
-/// `Pass::compile` in a pass of `scopes`.
 fn compile(pattern: &str, scopes: usize, shares: usize) -> Option<Compiled> {
     if pattern.len() > ALERT_REGEX_MAX {
         return None;
@@ -282,7 +228,6 @@ fn compile(pattern: &str, scopes: usize, shares: usize) -> Option<Compiled> {
         .dfa_size_limit(budget)
         .build()
         .ok()?;
-    // Counted once the automaton fits its part, which bounds the copies to count.
     let mut compiled = Compiled {
         regex,
         looped: 0,
@@ -292,7 +237,6 @@ fn compile(pattern: &str, scopes: usize, shares: usize) -> Option<Compiled> {
     Some(compiled)
 }
 
-/// Whether an `i` flag appears anywhere in `ast`, and how many Unicode classes it holds.
 fn shape(ast: &Ast) -> (bool, usize) {
     #[derive(Default)]
     struct Shape {
@@ -329,17 +273,7 @@ fn shape(ast: &Ast) -> (bool, usize) {
     ast::visit(ast, Shape::default()).unwrap_or_default()
 }
 
-/// An upper bound on the code points `regex-syntax` 0.8 visits to fold the case of `ast`, parsed
-/// from `pattern`, as if all of it were case-insensitive; `None` past `limit` or for a class it
-/// cannot read. Each Unicode or ASCII class is folded on its own, and each bracket holding a
-/// character or a range folds all it holds, its classes as folding left them: a fold visits
-/// every code point of each range, before negation, that holds one of `CASED` (all 1.1 million
-/// of `\p{Any}`, none of `\p{Han}`). A bracket of classes alone is folded already. A class in a
-/// bracket is folded here too once its count fits, so the bracket holds the ranges
-/// `regex-syntax` visits.
 fn folds(pattern: &str, ast: &Ast, limit: usize) -> Option<usize> {
-    /// An open bracket: its characters and ranges, and its classes as folding and negation left
-    /// them.
     struct Bracket {
         ranges: Vec<ClassUnicodeRange>,
         classes: ClassUnicode,
@@ -366,7 +300,6 @@ fn folds(pattern: &str, ast: &Ast, limit: usize) -> Option<usize> {
                 Ok(())
             }
         }
-        /// A class folded alone, written `text`, then added folded to the bracket around it.
         fn alone(&mut self, text: Option<&str>, negated: bool) -> Result<(), ()> {
             let mut class = text.and_then(class).ok_or(())?;
             if negated {
@@ -379,15 +312,12 @@ fn folds(pattern: &str, ast: &Ast, limit: usize) -> Option<usize> {
             let bracket = self.brackets.pop().ok_or(())?;
             let mut class = ClassUnicode::new(bracket.ranges.iter().copied());
             class.union(&bracket.classes);
-            // A bracket of classes alone holds them folded already.
             let unfolded = !bracket.ranges.is_empty();
             if unfolded {
                 self.fold(&class)?;
             }
             self.join(class, unfolded, negated)
         }
-        /// Adds `class` to the bracket around it, if any, as `regex-syntax` does: folded, once
-        /// counted, then negated.
         fn join(&mut self, mut class: ClassUnicode, fold: bool, negated: bool) -> Result<(), ()> {
             if self.brackets.is_empty() {
                 return Ok(());
@@ -446,14 +376,12 @@ fn folds(pattern: &str, ast: &Ast, limit: usize) -> Option<usize> {
                 }
                 ClassSetItem::Bracketed(class) => return self.close(class.negated),
                 ClassSetItem::Empty(_) | ClassSetItem::Union(_) => return Ok(()),
-                // `regex_source` writes Perl classes as brackets.
                 ClassSetItem::Perl(_) => return Err(()),
             };
             self.brackets.last_mut().ok_or(())?.ranges.push(range);
             Ok(())
         }
         fn visit_class_set_binary_op_pre(&mut self, _: &ast::ClassSetBinaryOp) -> Result<(), ()> {
-            // `regex_source` escapes or refuses the class operators.
             Err(())
         }
     }
@@ -466,14 +394,11 @@ fn folds(pattern: &str, ast: &Ast, limit: usize) -> Option<usize> {
     ast::visit(ast, folds).ok()
 }
 
-/// The code points that change when case mapped, a superset of those simple case folding maps
-/// (the keys of `regex-syntax`'s table, whose ranges folding visits).
 static CASED: LazyLock<ClassUnicode> = LazyLock::new(|| {
     class(r"\p{CWCM}")
         .unwrap_or_else(|| ClassUnicode::new([ClassUnicodeRange::new('\0', char::MAX)]))
 });
 
-/// The code points of the ranges of `class` that hold one of `CASED`.
 fn cased(class: &ClassUnicode) -> usize {
     let holds = |r: &ClassUnicodeRange| {
         let cased = CASED.ranges().binary_search_by(|c| {
@@ -493,7 +418,6 @@ fn cased(class: &ClassUnicode) -> usize {
         .sum()
 }
 
-/// The class `text` writes, read alone and case-sensitively.
 fn class(text: &str) -> Option<ClassUnicode> {
     Some(match regex_syntax::parse(text).ok()?.into_kind() {
         HirKind::Class(Class::Unicode(class)) => class,
@@ -506,11 +430,6 @@ fn class(text: &str) -> Option<ClassUnicode> {
     })
 }
 
-/// Alertmanager uses Go's RE2 syntax: Perl classes and word boundaries are ASCII,
-/// while ordinary characters and Unicode classes still operate on Unicode text.
-///
-/// `None` for what it cannot read; when Go's `regexp` certainly refuses it too, `refusal` also
-/// names the `regexp/syntax` error code (see `refusal`).
 fn regex_source(pattern: &str, refusal: &mut Option<&'static str>) -> Option<String> {
     let mut out = String::new();
     let mut chars = pattern.chars().peekable();
@@ -519,8 +438,6 @@ fn regex_source(pattern: &str, refusal: &mut Option<&'static str>) -> Option<Str
     while let Some(ch) = chars.next() {
         if ch != '\\' {
             if !class && ch == '{' {
-                // Go treats malformed counted syntax as literal text, while Rust accepts
-                // leading zeroes and spaces as a repetition. Refuse those ambiguous forms.
                 let count = chars
                     .clone()
                     .take_while(|c| c.is_ascii_digit() || c.is_whitespace() || *c == ',')
@@ -558,11 +475,8 @@ fn regex_source(pattern: &str, refusal: &mut Option<&'static str>) -> Option<Str
                 }
                 if chars.peek() == Some(&'<') {
                     out.push(chars.next()?);
-                    // Validate the original spelling before translating any escapes.
                     let start = out.len();
                     loop {
-                        // Go names a group up to the first `>`: a name that is empty or holds
-                        // another character than a letter, digit or `_` is refused.
                         let ch = chars.next()?;
                         if ch == '>' {
                             if out.len() == start {
@@ -590,7 +504,6 @@ fn regex_source(pattern: &str, refusal: &mut Option<&'static str>) -> Option<Str
                 continue;
             }
             if class && ch == '[' {
-                // RE2 has POSIX classes; another opening bracket inside a class is literal.
                 if chars.peek() != Some(&':') {
                     out.push('\\');
                     out.push(ch);
@@ -611,7 +524,6 @@ fn regex_source(pattern: &str, refusal: &mut Option<&'static str>) -> Option<Str
                 }
                 continue;
             }
-            // Rust's class intersection and symmetric difference are literals in RE2.
             if class && matches!(ch, '&' | '~') {
                 out.push('\\');
             }
@@ -646,7 +558,6 @@ fn regex_source(pattern: &str, refusal: &mut Option<&'static str>) -> Option<Str
                     chars.next();
                     let mut name = String::new();
                     loop {
-                        // Go reads `\p{` to the closing brace and names no class without it.
                         let Some(ch) = chars.next() else {
                             return refuse(refusal, CHAR_RANGE);
                         };
@@ -673,7 +584,6 @@ fn regex_source(pattern: &str, refusal: &mut Option<&'static str>) -> Option<Str
                 out.push_str(&format!("\\{escaped}{{{name}}}"));
             }
             '0'..='7' => {
-                // A lone `\1` to `\7` is a backreference, which Go does not read.
                 if escaped != '0' && !chars.peek().is_some_and(|c| ('0'..='7').contains(c)) {
                     return refuse(refusal, ESCAPE);
                 }
@@ -703,7 +613,6 @@ fn regex_source(pattern: &str, refusal: &mut Option<&'static str>) -> Option<Str
                 out.push_str(&regex::escape(&literal));
             }
             'b' | 'B' if !class => out.push_str(&format!("(?-u:\\{escaped})")),
-            // These Rust escapes are not RE2 escapes, which Go refuses.
             'u' | 'U' => return refuse(refusal, ESCAPE),
             _ => {
                 out.push('\\');
@@ -714,8 +623,6 @@ fn regex_source(pattern: &str, refusal: &mut Option<&'static str>) -> Option<Str
     Some(out)
 }
 
-/// Go bounds each nested counted-repeat product and refuses a repetition operator stacked on
-/// another (`a**`, `a{2}*`): the code it refuses with.
 fn re2_ast(ast: &Ast) -> Result<(), &'static str> {
     let mut pending = vec![(ast, 1u32)];
     while let Some((ast, parent)) = pending.pop() {
@@ -794,8 +701,6 @@ fn unicode_property(name: &str) -> bool {
     ) || SCRIPTS.contains(&name)
 }
 
-// Canonical script names accepted by Go unicode.Scripts, not Rust's additional aliases or
-// binary properties. Source: https://github.com/golang/go/blob/master/src/unicode/tables.go
 const SCRIPTS: &[&str] = &[
     "Adlam",
     "Ahom",
@@ -977,8 +882,6 @@ const SCRIPTS: &[&str] = &[
 mod tests {
     use super::*;
 
-    /// `folds` counts a range only when it holds one of `CASED`, which holds every code point
-    /// simple case folding maps: folding all the others leaves them as they are.
     #[test]
     fn case_folding_maps_only_cased_code_points() {
         let mut uncased = CASED.clone();
@@ -991,9 +894,6 @@ mod tests {
         assert_eq!(counts, [Some(1), Some(0), Some(1), Some(50)]);
     }
 
-    /// `(?i)[\w-]` is read as `[[A-Za-z0-9_]-]`: the inner bracket visits its 52 letters, and the
-    /// outer one visits them again with the Kelvin sign and long s their folding added, 54, not
-    /// every cased code point.
     #[test]
     fn a_bracket_of_characters_and_classes_visits_what_its_classes_fold_to() {
         let pattern = regex_source(r"(?i)[\w-]", &mut None).unwrap();
@@ -1001,12 +901,6 @@ mod tests {
         assert_eq!(folds(&pattern, &ast, usize::MAX), Some(52 + 54));
     }
 
-    /// Matching takes a step per position and offset it may start at: inside or after an
-    /// unbounded repetition, every offset of the value and one more; elsewhere, one more than the
-    /// characters what precedes it may vary by. A literal alternation costs its characters,
-    /// whatever the value. A state that reads no character is a position too: an assertion, an
-    /// empty expression, each end of a capture, the choice of an alternation and the loop or
-    /// option of a repetition, so each `()` of `.*w(?:()[wy]){2}` is three.
     #[test]
     fn matching_costs_a_step_per_position_and_offset_it_may_start_at() {
         let cost = |pattern: &str, len: usize| compile(pattern, 1, 1).map(|c| c.cost(len));
@@ -1026,9 +920,6 @@ mod tests {
         );
     }
 
-    /// Each class of expression `refusal` names, all refused by Go's `regexp/syntax` with the
-    /// error code beside it, as `regexp.Compile("^(?:" + pattern + ")$")` (Go 1.24; the wrapper
-    /// Alertmanager puts around a `match_re` and a matcher value).
     #[test]
     fn go_refuses_these_classes_of_syntax_error_with_the_code_named() {
         for (code, patterns) in [
@@ -1044,7 +935,6 @@ mod tests {
                     "(?:*)",
                     "(+)",
                     "(?i:?)",
-                    // Right after a group name, or after groups of flags.
                     "(?P<n>*a)",
                     "(?<n>+a)",
                     "(?P<n>?a)",
@@ -1083,25 +973,16 @@ mod tests {
         }
     }
 
-    /// What `refusal` leaves alone because Go compiles it, or because this cannot tell. None of
-    /// it refuses a configuration: a pattern past `ALERT_REGEX_MAX` (valid, or not), one past the
-    /// automaton budgets, syntax this module does not read, and what `regex-syntax` refuses and
-    /// Go reads, so that a `compile` that answers `None` is no proof of a refusal. Go's own
-    /// answer is in each comment.
     #[test]
     fn what_go_accepts_or_this_cannot_tell_is_no_refusal() {
         let deep = format!("{}a{}", "(".repeat(300), ")".repeat(300));
         let many = r"\pL".repeat(ALERT_REGEX_CLASSES_MAX + 1);
         for (why, pattern) in [
-            // Past the budgets of Meada, valid for Go; invalid for Go, but never judged past
-            // `ALERT_REGEX_MAX`.
             ("regex bytes", "a".repeat(ALERT_REGEX_MAX + 1)),
             ("regex bytes", format!("({}", "a".repeat(ALERT_REGEX_MAX))),
             ("classes", many),
             ("automaton", "x{1000}".repeat(1000)),
-            // Valid for Go, which allows 1000 nested groups where `regex-syntax` allows 250.
             ("nesting", deep),
-            // Valid for Go, and read differently by `regex-syntax`.
             ("count text", "a{,5}".into()),
             ("count text", "a{01}".into()),
             ("count text", "a{ 1}".into()),
@@ -1117,39 +998,24 @@ mod tests {
             ("an operand named like a group end", ">*".into()),
             ("an escaped angle", r"a|\>*".into()),
             ("an empty named group", "(?P<n>)*".into()),
-            // A literal that looks like the start of a group, before a group of flags.
             ("flags after a literal", ">(?i)*".into()),
             ("flags after a colon", "a:(?i)*".into()),
             ("flags after an escaped paren", r"\((?i)+".into()),
             ("flags after an escaped bar", r"\|(?i)*".into()),
             ("brace text", "{x".into()),
-            // The wrapper's `)` closes a group this one opens, and its own `)` is left over.
             ("closing the wrapper", "a)(b".into()),
             ("POSIX class", "[[:alpha:]]".into()),
             ("POSIX look-alike", "[[:]".into()),
-            // Refused by Go, but not told apart here: a Unicode property name follows Go's
-            // version, and `[:` and `\Q` are read more leniently than Go does.
             ("property name", r"\p{Alphabetic}".into()),
             ("quoted tail", r"\Qteam".into()),
             ("POSIX tail", "([[:alpha:]]".into()),
         ] {
             assert_eq!(refusal(&pattern), None, "{why}");
         }
-        // `compile` answers `None` for these as well.
         assert!(compile("a{,5}", 1, 1).is_none());
         assert!(compile(&"a".repeat(ALERT_REGEX_MAX + 1), 1, 1).is_none());
     }
 
-    /// `refusal` against Go's own `regexp.Compile`, on a generated corpus (#718). A pattern it
-    /// judges refused that Go compiles, with either wrapper Alertmanager uses, fails the test:
-    /// it would drop the links of a configuration Alertmanager loads. A pattern Go refuses and
-    /// `refusal` leaves unjudged is only reported, per Go error code with the shortest example:
-    /// a code marked `named` is a class the ceilings entry names, so a miss there is a position
-    /// that class does not cover yet.
-    ///
-    /// Run it after a change to `refusal` or `regex_source`; it needs `go` on PATH and no
-    /// network. `MEADA_REGEXP_ORACLE_N` sets the corpus size (200,000) and
-    /// `MEADA_REGEXP_ORACLE_SEED` its seed (1). `scripts/regexp-oracle.go` is the oracle.
     #[test]
     #[ignore = "needs Go: cargo test --lib alert::regexp::tests::refusal_agrees_with_go -- --ignored --nocapture"]
     fn refusal_agrees_with_go() {
@@ -1202,7 +1068,6 @@ mod tests {
                 (Some(code), false) => false_refusals.push((pattern, code)),
                 (Some(_), true) => judged += 1,
                 (None, true) => {
-                    // "error parsing regexp: <code>: `<expression>`"
                     let message = errors[0].strip_prefix("error parsing regexp: ");
                     let code = message
                         .and_then(|m| m.split(": `").next())
@@ -1241,8 +1106,6 @@ mod tests {
         );
     }
 
-    /// `count` patterns of one to nine of the tokens Go's parser tells apart (groups, flags,
-    /// names, classes, escapes, operators, counts), from `seed`: the same corpus every run.
     fn corpus(count: usize, seed: u64) -> Vec<String> {
         const TOKENS: &[&str] = &[
             "a",
